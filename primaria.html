@@ -1532,21 +1532,51 @@
         }
 
 
+
         // ============================================
-        // NUBE (Google Sheets via Apps Script)
+        // NUBE (Google Sheets) — guardado POR ÁREA
         // ============================================
         const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec";
         const CLOUD_NIVEL = "primaria";
 
+        function cloudClave(area) {
+            const sec = estado.seccion || 'UNICA';
+            return [CLOUD_NIVEL, estado.bimestre, estado.grado, sec, area].join('|');
+        }
+
         async function subirNube() {
             try {
-                const doc = document.getElementById('nombreDocente');
-                if (doc) estado.nombreDocente = doc.value;
-                mostrarToast('Subiendo a la nube...', 'success');
+                const area = estado.areaActual;
+                if (!area) {
+                    mostrarToast('Primero selecciona un área para subir', 'error');
+                    return;
+                }
+                // Datos solo de ESTA área en el bimestre/grado/sección actual
+                const ctxKey = `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
+                const areaData = (estado.datos[ctxKey] && estado.datos[ctxKey][area])
+                    ? estado.datos[ctxKey][area]
+                    : {};
+
+                let docenteArea = (document.getElementById('nombreDocente') || {}).value || estado.nombreDocente || '';
+
+                const payload = {
+                    action: 'saveArea',
+                    nivel: CLOUD_NIVEL,
+                    bimestre: estado.bimestre,
+                    grado: estado.grado,
+                    seccion: estado.seccion || 'UNICA',
+                    area: area,
+                    clave: cloudClave(area),
+                    totalEstudiantes: estado.totalEstudiantes,
+                    docente: docenteArea,
+                    competencias: areaData
+                };
+
+                mostrarToast('Subiendo área "' + area + '"...', 'success');
                 const res = await fetch(CLOUD_API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ nivel: CLOUD_NIVEL, estado: estado })
+                    body: JSON.stringify(payload)
                 });
                 const text = await res.text();
                 let data;
@@ -1555,9 +1585,12 @@
                 }
                 if (!data.ok) throw new Error(data.error || 'Error al guardar');
                 if (storageDisponible) {
-                    try { localStorage.setItem('matriz_IE22375', JSON.stringify(estado)); } catch(e) {}
+                    try {
+                        const sk = CLOUD_NIVEL === 'primaria' ? 'matriz_IE22375' : 'matriz_SEC_IE22375';
+                        localStorage.setItem(sk, JSON.stringify(estado));
+                    } catch(e) {}
                 }
-                mostrarToast('Guardado en la nube ✓', 'success');
+                mostrarToast('Área guardada en la nube (no borra otras) ✓', 'success');
             } catch (err) {
                 console.error(err);
                 mostrarToast('Error al subir: ' + (err.message || err), 'error');
@@ -1565,10 +1598,12 @@
         }
 
         async function bajarNube() {
-            if (!confirm('¿Descargar datos de la nube?\n\nSe reemplazarán los datos locales de este nivel con los de Google Sheets.')) return;
+            if (!confirm('¿Traer de la nube las áreas de este nivel?
+
+Se COMBINAN con lo local: cada área de la nube actualiza solo esa área; no borra áreas que solo tengas tú en este dispositivo.')) return;
             try {
-                mostrarToast('Descargando de la nube...', 'success');
-                const url = CLOUD_API_URL + '?action=load&nivel=' + encodeURIComponent(CLOUD_NIVEL);
+                mostrarToast('Descargando áreas de la nube...', 'success');
+                const url = CLOUD_API_URL + '?action=loadNivel&nivel=' + encodeURIComponent(CLOUD_NIVEL);
                 const res = await fetch(url);
                 const text = await res.text();
                 let data;
@@ -1576,36 +1611,54 @@
                     throw new Error('Respuesta inválida del servidor');
                 }
                 if (!data.ok) throw new Error(data.error || 'Error al cargar');
-                if (!data.estado) {
-                    mostrarToast('Aún no hay datos en la nube para este nivel', 'error');
+                const items = data.items || [];
+                if (!items.length) {
+                    mostrarToast('Aún no hay áreas guardadas en la nube para este nivel', 'error');
                     return;
                 }
-                estado = { ...estado, ...data.estado, datos: data.estado.datos || {} };
-                if (data.estado.docentes) estado.docentes = data.estado.docentes;
+                if (!estado.datos) estado.datos = {};
+                let n = 0;
+                items.forEach(it => {
+                    const ctxKey = `${it.bimestre}|${it.grado}|${it.seccion || 'UNICA'}`;
+                    if (!estado.datos[ctxKey]) estado.datos[ctxKey] = {};
+                    if (it.competencias && typeof it.competencias === 'object') {
+                        estado.datos[ctxKey][it.area] = it.competencias;
+                        n++;
+                    }
+
+                    if (it.docente && !estado.nombreDocente) {
+                        estado.nombreDocente = it.docente;
+                        const docEl = document.getElementById('nombreDocente');
+                        if (docEl) docEl.value = it.docente;
+                    }
+
+                    if (it.totalEstudiantes && Number(it.totalEstudiantes) > 0) {
+                        // no forzar si el usuario ya tiene otro número en pantalla del mismo contexto activo
+                    }
+                });
                 if (storageDisponible) {
-                    try { localStorage.setItem('matriz_IE22375', JSON.stringify(estado)); } catch(e) {}
+                    try {
+                        const sk = CLOUD_NIVEL === 'primaria' ? 'matriz_IE22375' : 'matriz_SEC_IE22375';
+                        localStorage.setItem(sk, JSON.stringify(estado));
+                    } catch(e) {}
                 }
-                // Refrescar UI
-                const doc = document.getElementById('nombreDocente');
-                if (doc) doc.value = estado.nombreDocente || '';
-                const tot = document.getElementById('totalEstudiantes');
-                if (tot) tot.value = estado.totalEstudiantes || 26;
+                // Refrescar vista actual sin borrar selección de bimestre/grado
                 if (typeof actualizarBotonesSeleccion === 'function') actualizarBotonesSeleccion();
                 if (typeof renderizarSelectoresGrado === 'function') renderizarSelectoresGrado();
-                estado.areaActual = null;
-                document.getElementById('panelCompetencias').classList.add('hidden');
-                document.getElementById('vistaTabla').classList.add('hidden');
-                document.getElementById('mensajeInicial').classList.remove('hidden');
-                document.getElementById('areasContainer').parentElement.classList.remove('hidden');
-                document.getElementById('resumenRapido').classList.remove('hidden');
                 renderizarAreas();
                 renderizarResumen();
-                mostrarToast('Datos cargados de la nube ✓', 'success');
+                if (estado.areaActual) {
+                    if (typeof renderizarAreaHeader === 'function') renderizarAreaHeader();
+                    if (typeof renderizarCompetencias === 'function') renderizarCompetencias();
+                    if (typeof crearGraficosExposicion === 'function') crearGraficosExposicion();
+                }
+                mostrarToast('Combinadas ' + n + ' área(s) desde la nube ✓', 'success');
             } catch (err) {
                 console.error(err);
                 mostrarToast('Error al bajar: ' + (err.message || err), 'error');
             }
         }
+
 
         // ============================================
         // TOAST
