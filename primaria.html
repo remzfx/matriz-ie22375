@@ -1598,9 +1598,7 @@
         }
 
         async function bajarNube() {
-            if (!confirm('¿Traer de la nube las áreas de este nivel?
-
-Se COMBINAN con lo local: cada área de la nube actualiza solo esa área; no borra áreas que solo tengas tú en este dispositivo.')) return;
+            if (!confirm('¿Traer de la nube las áreas de este nivel?\n\nSe combinan con lo local: cada área de la nube actualiza solo esa área.')) return;
             try {
                 mostrarToast('Descargando áreas de la nube...', 'success');
                 const url = CLOUD_API_URL + '?action=loadNivel&nivel=' + encodeURIComponent(CLOUD_NIVEL);
