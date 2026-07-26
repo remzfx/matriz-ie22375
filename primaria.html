@@ -167,6 +167,12 @@
                         <i class="fas fa-file-import"></i> Importar
                         <input type="file" accept=".json" onchange="importarDatos(event)" class="hidden">
                     </label>
+                    <button onclick="subirNube()" class="bg-emerald-500/90 hover:bg-emerald-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition" title="Guardar en Google Sheets">
+                        <i class="fas fa-cloud-upload-alt"></i> Subir nube
+                    </button>
+                    <button onclick="bajarNube()" class="bg-sky-500/90 hover:bg-sky-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition" title="Cargar desde Google Sheets">
+                        <i class="fas fa-cloud-download-alt"></i> Bajar nube
+                    </button>
                     <button onclick="limpiarTodo()" class="bg-red-500/80 hover:bg-red-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition">
                         <i class="fas fa-trash-alt"></i>
                     </button>
@@ -1522,6 +1528,82 @@
                 renderizarAreas();
                 renderizarResumen();
                 mostrarToast('Datos eliminados', 'success');
+            }
+        }
+
+
+        // ============================================
+        // NUBE (Google Sheets via Apps Script)
+        // ============================================
+        const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec";
+        const CLOUD_NIVEL = "primaria";
+
+        async function subirNube() {
+            try {
+                const doc = document.getElementById('nombreDocente');
+                if (doc) estado.nombreDocente = doc.value;
+                mostrarToast('Subiendo a la nube...', 'success');
+                const res = await fetch(CLOUD_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ nivel: CLOUD_NIVEL, estado: estado })
+                });
+                const text = await res.text();
+                let data;
+                try { data = JSON.parse(text); } catch(e) {
+                    throw new Error('Respuesta inválida del servidor');
+                }
+                if (!data.ok) throw new Error(data.error || 'Error al guardar');
+                if (storageDisponible) {
+                    try { localStorage.setItem('matriz_IE22375', JSON.stringify(estado)); } catch(e) {}
+                }
+                mostrarToast('Guardado en la nube ✓', 'success');
+            } catch (err) {
+                console.error(err);
+                mostrarToast('Error al subir: ' + (err.message || err), 'error');
+            }
+        }
+
+        async function bajarNube() {
+            if (!confirm('¿Descargar datos de la nube?\n\nSe reemplazarán los datos locales de este nivel con los de Google Sheets.')) return;
+            try {
+                mostrarToast('Descargando de la nube...', 'success');
+                const url = CLOUD_API_URL + '?action=load&nivel=' + encodeURIComponent(CLOUD_NIVEL);
+                const res = await fetch(url);
+                const text = await res.text();
+                let data;
+                try { data = JSON.parse(text); } catch(e) {
+                    throw new Error('Respuesta inválida del servidor');
+                }
+                if (!data.ok) throw new Error(data.error || 'Error al cargar');
+                if (!data.estado) {
+                    mostrarToast('Aún no hay datos en la nube para este nivel', 'error');
+                    return;
+                }
+                estado = { ...estado, ...data.estado, datos: data.estado.datos || {} };
+                if (data.estado.docentes) estado.docentes = data.estado.docentes;
+                if (storageDisponible) {
+                    try { localStorage.setItem('matriz_IE22375', JSON.stringify(estado)); } catch(e) {}
+                }
+                // Refrescar UI
+                const doc = document.getElementById('nombreDocente');
+                if (doc) doc.value = estado.nombreDocente || '';
+                const tot = document.getElementById('totalEstudiantes');
+                if (tot) tot.value = estado.totalEstudiantes || 26;
+                if (typeof actualizarBotonesSeleccion === 'function') actualizarBotonesSeleccion();
+                if (typeof renderizarSelectoresGrado === 'function') renderizarSelectoresGrado();
+                estado.areaActual = null;
+                document.getElementById('panelCompetencias').classList.add('hidden');
+                document.getElementById('vistaTabla').classList.add('hidden');
+                document.getElementById('mensajeInicial').classList.remove('hidden');
+                document.getElementById('areasContainer').parentElement.classList.remove('hidden');
+                document.getElementById('resumenRapido').classList.remove('hidden');
+                renderizarAreas();
+                renderizarResumen();
+                mostrarToast('Datos cargados de la nube ✓', 'success');
+            } catch (err) {
+                console.error(err);
+                mostrarToast('Error al bajar: ' + (err.message || err), 'error');
             }
         }
 
