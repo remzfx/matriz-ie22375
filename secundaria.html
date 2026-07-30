@@ -681,9 +681,15 @@
         function renderGradoSeccion() {
             const cont = document.getElementById('btnGradoSeccion');
             if (!cont) return;
-            const grados = ['1°', '2°', '3°', '4°', '5°'];
-            const secciones = ['A', 'B', 'ÚNICA'];
-            cont.innerHTML = grados.map(g => {
+            // 1°–4°: solo A y B · 5° este año: solo ÚNICA
+            const grados = [
+                { g: '1°', secciones: ['A', 'B'] },
+                { g: '2°', secciones: ['A', 'B'] },
+                { g: '3°', secciones: ['A', 'B'] },
+                { g: '4°', secciones: ['A', 'B'] },
+                { g: '5°', secciones: ['ÚNICA'] }
+            ];
+            cont.innerHTML = grados.map(({ g, secciones }) => {
                 const isThis = estado.grado === g;
                 return `
                 <div class="grado-card ${isThis ? 'active-grado' : ''}" data-grado="${g}">
@@ -692,7 +698,7 @@
                         ${secciones.map(s => `
                             <button type="button" title="${s}"
                                 class="sec-btn ${isThis && estado.seccion === s ? 'active' : ''}"
-                                onclick="setGradoSeccion('${g}','${s}')">${s === 'ÚNICA' ? 'Ú' : s}</button>
+                                onclick="setGradoSeccion('${g}','${s}')">${s === 'ÚNICA' ? 'Única' : s}</button>
                         `).join('')}
                     </div>
                 </div>`;
@@ -701,6 +707,12 @@
 
         function setGradoSeccion(grado, seccion) {
             estado.grado = grado;
+            // Normalizar sección según grado (5° solo ÚNICA; 1°–4° solo A/B)
+            if (grado === '5°') {
+                seccion = 'ÚNICA';
+            } else if (seccion === 'ÚNICA') {
+                seccion = 'A';
+            }
             estado.seccion = seccion;
             estado.areaActual = null;
             
