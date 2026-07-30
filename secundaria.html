@@ -73,16 +73,17 @@
             background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
         }
         
-        /* Tarjetas Bimestre / Grado — ocupan todo el ancho, se ven grandes y claras */
+        /* Tarjetas Bimestre / Grado — legibles en móvil */
         .grado-card, .bim-card {
             background: white;
             border: 2px solid #e2e8f0;
             border-radius: 14px;
-            padding: 8px 6px 10px;
+            padding: 10px 8px 12px;
             text-align: center;
             transition: all 0.2s ease;
             width: 100%;
             min-width: 0;
+            box-sizing: border-box;
         }
         .grado-card.active-grado, .bim-card.active-bim {
             border-color: #0ea5e9;
@@ -90,23 +91,29 @@
             background: #f0f9ff;
         }
         .grado-card .grado-label, .bim-card .bim-label {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 800;
             color: #64748b;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             letter-spacing: 0.03em;
         }
         .grado-card.active-grado .grado-label,
         .bim-card.active-bim .bim-label {
             color: #0369a1;
         }
+        .sec-row {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+        }
         .sec-btn {
-            flex: 1;
-            min-width: 0;
-            height: 34px;
-            padding: 0 2px;
-            border-radius: 8px;
-            font-size: 13px;
+            flex: 1 1 0;
+            min-width: 36px;
+            min-height: 42px;
+            height: 42px;
+            padding: 0 4px;
+            border-radius: 10px;
+            font-size: 15px;
             font-weight: 800;
             border: 2px solid #e2e8f0;
             background: #f8fafc;
@@ -114,6 +121,9 @@
             transition: all 0.15s ease;
             cursor: pointer;
             line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         .sec-btn:hover {
             border-color: #38bdf8;
@@ -128,9 +138,10 @@
         }
         .bim-btn-inner {
             width: 100%;
-            height: 34px;
-            border-radius: 8px;
-            font-size: 16px;
+            min-height: 42px;
+            height: 42px;
+            border-radius: 10px;
+            font-size: 17px;
             font-weight: 800;
             border: 2px solid #e2e8f0;
             background: #f8fafc;
@@ -138,6 +149,9 @@
             cursor: pointer;
             transition: all 0.15s ease;
             line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         .bim-btn-inner:hover {
             border-color: #38bdf8;
@@ -149,6 +163,22 @@
             border-color: #0f172a;
             color: white;
             box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25);
+        }
+        /* En pantallas muy angostas, grados en 2 columnas para no aplastar A/B/Ú */
+        @media (max-width: 640px) {
+            .grado-card {
+                padding: 12px 10px 14px;
+            }
+            .sec-btn {
+                min-height: 44px;
+                height: 44px;
+                font-size: 16px;
+                border-radius: 12px;
+            }
+            .bim-btn-inner {
+                min-height: 44px;
+                height: 44px;
+            }
         }
         
         .competencia-card {
@@ -292,7 +322,7 @@
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                         <i class="fas fa-layer-group mr-1.5 text-sky-600"></i>Grado y Sección
                     </label>
-                    <div id="btnGradoSeccion" class="grid grid-cols-5 gap-1.5 w-full">
+                    <div id="btnGradoSeccion" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 w-full">
                         <!-- JS -->
                     </div>
                 </div>
@@ -658,7 +688,7 @@
                 return `
                 <div class="grado-card ${isThis ? 'active-grado' : ''}" data-grado="${g}">
                     <div class="grado-label">${g}</div>
-                    <div class="flex gap-1.5 w-full">
+                    <div class="sec-row">
                         ${secciones.map(s => `
                             <button type="button" title="${s}"
                                 class="sec-btn ${isThis && estado.seccion === s ? 'active' : ''}"
