@@ -1,0 +1,32 @@
+{
+  "name": "Matriz IE 22375 Santa Rosa de los Molinos",
+  "short_name": "Matriz IE 22375",
+  "description": "Matriz de consolidado de evaluación — Primaria y Secundaria",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0c4a6e",
+  "theme_color": "#0369a1",
+  "lang": "es-PE",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

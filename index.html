@@ -3,6 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <meta name="theme-color" content="#0369a1" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Matriz IE 22375" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+
   <title>Matriz de Consolidado | IE 22375 Santa Rosa de los Molinos</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -108,6 +118,17 @@
     <p>IE 22375 Santa Rosa de los Molinos · Sistema de Matriz de Consolidado</p>
     <p class="mt-1">Diseño e integración: <strong class="text-slate-700">Mag. Efrain Ceopa Paredes</strong></p>
   </footer>
+
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./sw.js').catch(function (e) {
+        console.warn('SW no registrado', e);
+      });
+    });
+  }
+</script>
 
 </body>
 </html>
