@@ -203,6 +203,17 @@
         }
         #modoPresentacion .pres-close:hover { background: rgba(239,68,68,0.85); }
 
+        #modoPresentacion .pres-nav-grados button {
+            font-size: 11px;
+            padding: 6px 10px;
+            min-width: 44px;
+        }
+        #modoPresentacion .pres-nav {
+            max-height: 28vh;
+            overflow-y: auto;
+        }
+
+
         #modoPresentacion .pres-slides {
             display: flex;
             gap: 6px;
@@ -704,8 +715,10 @@
             <div id="presMiniGrid" class="pres-mini-grid"></div>
         </div>
         <div class="pres-nav">
-            <p class="text-center text-[10px] text-slate-400 uppercase font-bold mb-2 tracking-wider">Cambiar área</p>
+            <p class="text-center text-[10px] text-slate-400 uppercase font-bold mb-1.5 tracking-wider">Cambiar área</p>
             <div id="presNavAreas" class="pres-nav-btns"></div>
+            <p class="text-center text-[10px] text-slate-400 uppercase font-bold mb-1.5 mt-3 tracking-wider">Grado / sección</p>
+            <div id="presNavGrados" class="pres-nav-btns pres-nav-grados"></div>
         </div>
     </div>
 
@@ -1153,21 +1166,62 @@
 
         function renderPresNavAreas() {
             const cont = document.getElementById('presNavAreas');
+            if (cont) {
+                cont.innerHTML = '';
+                Object.keys(ESTRUCTURA_AREAS).forEach(nombreArea => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = typeof abrevArea === 'function' ? abrevArea(nombreArea) : nombreArea;
+                    btn.title = nombreArea;
+                    if (estado.areaActual === nombreArea) btn.classList.add('active');
+                    btn.onclick = () => {
+                        estado.areaActual = nombreArea;
+                        if (typeof renderizarAreas === 'function') renderizarAreas();
+                        if (typeof renderizarAreaHeader === 'function') renderizarAreaHeader();
+                        if (typeof renderizarCompetencias === 'function') renderizarCompetencias();
+                        if (typeof renderizarResumen === 'function') renderizarResumen();
+                        if (typeof renderNavegadorAreas === 'function') renderNavegadorAreas();
+                        if (typeof syncInputTotalEstudiantes === 'function') syncInputTotalEstudiantes();
+                        actualizarCabeceraPresentacion();
+                        renderPresNavAreas();
+                        if (presSlide === 2) crearGraficosPresCompetencias();
+                        else crearGraficosPresentacion();
+                    };
+                    cont.appendChild(btn);
+                });
+            }
+            renderPresNavGrados();
+        }
+
+        function renderPresNavGrados() {
+            const cont = document.getElementById('presNavGrados');
             if (!cont) return;
             cont.innerHTML = '';
-            Object.keys(ESTRUCTURA_AREAS).forEach(nombreArea => {
+            // Primaria: grados sin sección múltiple
+            const grados = [
+                ['PRIMERO', '1°'],
+                ['SEGUNDO', '2°'],
+                ['TERCERO', '3°'],
+                ['CUARTO', '4°'],
+                ['QUINTO', '5°'],
+                ['SEXTO', '6°']
+            ];
+            grados.forEach(([val, label]) => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.textContent = typeof abrevArea === 'function' ? abrevArea(nombreArea) : nombreArea;
-                btn.title = nombreArea;
-                if (estado.areaActual === nombreArea) btn.classList.add('active');
+                btn.textContent = label;
+                btn.title = label;
+                if (estado.grado === val) btn.classList.add('active');
                 btn.onclick = () => {
-                    estado.areaActual = nombreArea;
+                    estado.grado = val;
+                    if (typeof actualizarBotonesSeleccion === 'function') actualizarBotonesSeleccion();
                     if (typeof renderizarAreas === 'function') renderizarAreas();
                     if (typeof renderizarAreaHeader === 'function') renderizarAreaHeader();
                     if (typeof renderizarCompetencias === 'function') renderizarCompetencias();
                     if (typeof renderizarResumen === 'function') renderizarResumen();
                     if (typeof renderNavegadorAreas === 'function') renderNavegadorAreas();
+                    if (typeof syncInputTotalEstudiantes === 'function') syncInputTotalEstudiantes();
+                    if (typeof guardarDatos === 'function') guardarDatos();
                     actualizarCabeceraPresentacion();
                     renderPresNavAreas();
                     if (presSlide === 2) crearGraficosPresCompetencias();
