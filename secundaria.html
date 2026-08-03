@@ -651,7 +651,7 @@
         <!-- FOOTER -->
         <div class="text-center text-xs text-slate-400 py-4 no-print">
             <p>IE 22375 Santa Rosa de los Molinos • Sistema de Matriz de Consolidado — SECUNDARIA v1.1 • Datos guardados localmente</p>
-            <p class="mt-1 text-slate-500">Desarrollo | Diseño e integración: <strong>Mag. Efrain Ceopa Paredes</strong></p>
+            <p class="mt-1 text-slate-500">Desarrollo | Diseño | Integración: <strong>Mag. Efrain Ceopa Paredes</strong></p>
         </div>
     </main>
 
@@ -663,13 +663,17 @@
                 <div id="presTitulo" class="text-lg md:text-xl font-bold leading-tight">Área</div>
                 <div id="presSubtitulo" class="text-xs text-sky-100/90"></div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap justify-end">
+                <div class="pres-slides" role="tablist">
+                    <button type="button" id="presBtnSlide1" class="pres-slide-btn active" onclick="setPresSlide(1)">1 · Resumen</button>
+                    <button type="button" id="presBtnSlide2" class="pres-slide-btn" onclick="setPresSlide(2)">2 · Por competencia</button>
+                </div>
                 <button type="button" class="pres-close" onclick="cerrarPresentacion()" title="Salir (Esc)">
                     <i class="fas fa-times"></i> Salir
                 </button>
             </div>
         </div>
-        <div class="pres-body">
+        <div id="presSlide1" class="pres-body">
             <div class="pres-card">
                 <h4><i class="fas fa-chart-bar text-indigo-500"></i> Comparativo por competencia</h4>
                 <div class="pres-chart-wrap"><canvas id="chartPresBarras"></canvas></div>
@@ -678,6 +682,9 @@
                 <h4><i class="fas fa-chart-pie text-sky-500"></i> Resumen del área</h4>
                 <div class="pres-chart-wrap"><canvas id="chartPresDona"></canvas></div>
             </div>
+        </div>
+        <div id="presSlide2" class="pres-body-comp" style="display:none;">
+            <div id="presMiniGrid" class="pres-mini-grid"></div>
         </div>
         <div class="pres-nav">
             <p class="text-center text-[10px] text-slate-400 uppercase font-bold mb-2 tracking-wider">Cambiar área</p>
@@ -1145,7 +1152,26 @@
         }
 
 
-        let chartsPres = { barras: null, dona: null };
+
+        let chartsPres = { barras: null, dona: null, minis: {} };
+        let presSlide = 1;
+
+        function setPresSlide(n) {
+            presSlide = n === 2 ? 2 : 1;
+            const s1 = document.getElementById('presSlide1');
+            const s2 = document.getElementById('presSlide2');
+            const b1 = document.getElementById('presBtnSlide1');
+            const b2 = document.getElementById('presBtnSlide2');
+            if (s1) s1.style.display = presSlide === 1 ? '' : 'none';
+            if (s2) s2.style.display = presSlide === 2 ? '' : 'none';
+            if (b1) b1.classList.toggle('active', presSlide === 1);
+            if (b2) b2.classList.toggle('active', presSlide === 2);
+            if (presSlide === 1) {
+                setTimeout(() => crearGraficosPresentacion(), 40);
+            } else {
+                setTimeout(() => crearGraficosPresCompetencias(), 40);
+            }
+        }
 
         function abrirPresentacion() {
             if (!estado.areaActual) {
@@ -1159,8 +1185,7 @@
             document.body.style.overflow = 'hidden';
             actualizarCabeceraPresentacion();
             renderPresNavAreas();
-            setTimeout(() => crearGraficosPresentacion(), 80);
-            // Intentar fullscreen del navegador
+            setPresSlide(1);
             try {
                 const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
                 if (req) req.call(el);
@@ -1210,7 +1235,8 @@
                     if (typeof renderNavegadorAreas === 'function') renderNavegadorAreas();
                     actualizarCabeceraPresentacion();
                     renderPresNavAreas();
-                    crearGraficosPresentacion();
+                    if (presSlide === 2) crearGraficosPresCompetencias();
+                    else crearGraficosPresentacion();
                 };
                 cont.appendChild(btn);
             });
@@ -1219,11 +1245,16 @@
         function destruirGraficosPres() {
             if (chartsPres.barras) { try { chartsPres.barras.destroy(); } catch(e) {} chartsPres.barras = null; }
             if (chartsPres.dona) { try { chartsPres.dona.destroy(); } catch(e) {} chartsPres.dona = null; }
+            Object.keys(chartsPres.minis || {}).forEach(k => {
+                try { chartsPres.minis[k].destroy(); } catch(e) {}
+            });
+            chartsPres.minis = {};
         }
 
         function crearGraficosPresentacion() {
             if (typeof Chart === 'undefined' || !estado.areaActual) return;
-            destruirGraficosPres();
+            if (chartsPres.barras) { try { chartsPres.barras.destroy(); } catch(e) {} chartsPres.barras = null; }
+            if (chartsPres.dona) { try { chartsPres.dona.destroy(); } catch(e) {} chartsPres.dona = null; }
             const area = ESTRUCTURA_AREAS[estado.areaActual];
             if (!area) return;
             const comps = area.competencias || [];
@@ -1259,13 +1290,13 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
-                            datalabels: { anchor: 'end', align: 'top', font: { weight: 'bold', size: 10 }, color: '#334155',
+                            legend: { position: 'bottom', labels: { boxWidth: 16, font: { size: 14, weight: 'bold' } } },
+                            datalabels: { anchor: 'end', align: 'top', font: { weight: 'bold', size: 16 }, color: '#0f172a',
                                 formatter: (v) => v > 0 ? v : '' }
                         },
                         scales: {
-                            x: { ticks: { font: { size: 10 }, maxRotation: 40 } },
-                            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                            x: { ticks: { font: { size: 13, weight: '600' }, maxRotation: 40 } },
+                            y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 14, weight: '600' } } }
                         }
                     }
                 });
@@ -1299,12 +1330,92 @@
             }
         }
 
+        function crearGraficosPresCompetencias() {
+            if (typeof Chart === 'undefined' || !estado.areaActual) return;
+            Object.keys(chartsPres.minis || {}).forEach(k => {
+                try { chartsPres.minis[k].destroy(); } catch(e) {}
+            });
+            chartsPres.minis = {};
+            const grid = document.getElementById('presMiniGrid');
+            if (!grid) return;
+            const area = ESTRUCTURA_AREAS[estado.areaActual];
+            if (!area) return;
+            const totalEst = getTotalEstudiantes();
+            const pct = (n) => totalEst > 0 ? Math.round((n / totalEst) * 100) : (n > 0 ? '—' : 0);
+            grid.innerHTML = '';
+            (area.competencias || []).forEach((comp, idx) => {
+                const d = getDato(estado.areaActual, comp);
+                const tot = (d.inicio||0)+(d.proceso||0)+(d.previsto||0)+(d.destacado||0);
+                const tiene = tot > 0;
+                const card = document.createElement('div');
+                card.className = 'pres-mini-card';
+                const cid = 'pres-mini-' + idx;
+                card.innerHTML = `
+                    <h5><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:#e2e8f0;font-size:11px;margin-right:6px;">${idx+1}</span>${comp}</h5>
+                    <div style="position:relative;height:190px;"><canvas id="${cid}"></canvas></div>
+                    <div class="pres-mini-stats">
+                        <div style="background:#fef2f2;border-color:#fecaca;color:#b91c1c">
+                            <div class="n">${d.inicio||0}</div>
+                            <div class="p">${totalEst > 0 ? pct(d.inicio||0) + '%' : '—'}</div>
+                            <div class="l">C</div>
+                        </div>
+                        <div style="background:#fffbeb;border-color:#fde68a;color:#a16207">
+                            <div class="n">${d.proceso||0}</div>
+                            <div class="p">${totalEst > 0 ? pct(d.proceso||0) + '%' : '—'}</div>
+                            <div class="l">B</div>
+                        </div>
+                        <div style="background:#f7fee7;border-color:#bef264;color:#3f6212">
+                            <div class="n">${d.previsto||0}</div>
+                            <div class="p">${totalEst > 0 ? pct(d.previsto||0) + '%' : '—'}</div>
+                            <div class="l">A</div>
+                        </div>
+                        <div style="background:#ecfdf5;border-color:#6ee7b7;color:#047857">
+                            <div class="n">${d.destacado||0}</div>
+                            <div class="p">${totalEst > 0 ? pct(d.destacado||0) + '%' : '—'}</div>
+                            <div class="l">AD</div>
+                        </div>
+                    </div>`;
+                grid.appendChild(card);
+                setTimeout(() => {
+                    const canvas = document.getElementById(cid);
+                    if (!canvas) return;
+                    chartsPres.minis[cid] = new Chart(canvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['C','B','A','AD'],
+                            datasets: [{
+                                data: tiene ? [d.inicio||0, d.proceso||0, d.previsto||0, d.destacado||0] : [1],
+                                backgroundColor: tiene ? ['#ef4444','#eab308','#84cc16','#16a34a'] : ['#e2e8f0'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                datalabels: {
+                                    color: '#fff',
+                                    font: { weight: 'bold', size: 18 },
+                                    formatter: (v) => (tiene && v > 0) ? v : ''
+                                }
+                            },
+                            cutout: '55%'
+                        }
+                    });
+                }, 30 + idx * 20);
+            });
+        }
+
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const el = document.getElementById('modoPresentacion');
-                if (el && el.classList.contains('activo')) cerrarPresentacion();
-            }
+            const el = document.getElementById('modoPresentacion');
+            if (!el || !el.classList.contains('activo')) return;
+            if (e.key === 'Escape') cerrarPresentacion();
+            if (e.key === 'ArrowRight' || e.key === '2') setPresSlide(2);
+            if (e.key === 'ArrowLeft' || e.key === '1') setPresSlide(1);
         });
+
+
 
 
         // ============================================
