@@ -515,6 +515,7 @@
             seccion: "UNICA",
             totalEstudiantes: 26, // legado; se usa totalesPorAula
             totalesPorAula: {}, // clave: bimestre|grado|seccion → N° estudiantes
+            totalesPorAulaTs: {}, // última modificación LOCAL por aula
             nombreDocente: "",
             areaActual: null,
             datos: {}
@@ -525,6 +526,8 @@
 
 
         // N° estudiantes POR aula (bimestre + grado + sección)
+        // totalesPorAula[k] = número
+        // totalesPorAulaTs[k] = timestamp ms de la última modificación LOCAL del usuario
         function claveAula() {
             return `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
         }
@@ -532,24 +535,68 @@
             if (!estado.totalesPorAula) estado.totalesPorAula = {};
             const k = claveAula();
             if (estado.totalesPorAula[k] != null && estado.totalesPorAula[k] !== '') {
-                return Number(estado.totalesPorAula[k]) || 26;
+                const v = estado.totalesPorAula[k];
+                if (typeof v === 'object' && v !== null) return Number(v.valor != null ? v.valor : v.n) || 26;
+                return Number(v) || 26;
             }
-            // compatibilidad con datos antiguos (un solo total global)
+            // default de pantalla: NO cuenta como "modificado local"
             return Number(estado.totalEstudiantes) || 26;
         }
-        function setTotalEstudiantes(val) {
+        function setTotalEstudiantes(val, ts) {
             if (!estado.totalesPorAula) estado.totalesPorAula = {};
+            if (!estado.totalesPorAulaTs) estado.totalesPorAulaTs = {};
             val = parseInt(val) || 26;
             if (val < 1) val = 1;
             if (val > 60) val = 60;
-            estado.totalesPorAula[claveAula()] = val;
-            estado.totalEstudiantes = val; // mantener sincronizado el legado
+            const k = claveAula();
+            estado.totalesPorAula[k] = val;
+            estado.totalesPorAulaTs[k] = (ts != null ? Number(ts) : Date.now());
+            estado.totalEstudiantes = val; // legado
             return val;
         }
         function syncInputTotalEstudiantes() {
             const el = document.getElementById('totalEstudiantes');
             if (el) el.value = getTotalEstudiantes();
         }
+        function parseCloudTime(v) {
+            if (v == null || v === '') return 0;
+            if (typeof v === 'number' && !isNaN(v)) return v < 1e12 ? v * 1000 : v;
+            const d = new Date(v);
+            const ms = d.getTime();
+            return isNaN(ms) ? 0 : ms;
+        }
+        /** Aplica totales de la nube: solo si la nube es más reciente que el cambio local */
+        function aplicarTotalesDesdeNube(items) {
+            if (!estado.totalesPorAula) estado.totalesPorAula = {};
+            if (!estado.totalesPorAulaTs) estado.totalesPorAulaTs = {};
+            // Por aula, quedarse con el total de la fila más reciente en la nube
+            const best = {};
+            (items || []).forEach(it => {
+                const n = Number(it.totalEstudiantes);
+                if (!n || n < 1) return;
+                const ctxKey = `${it.bimestre}|${it.grado}|${it.seccion || 'UNICA'}`;
+                const ts = parseCloudTime(it.actualizado) || parseCloudTime(it.totalEstudiantesActualizado) || 0;
+                if (!best[ctxKey] || ts >= (best[ctxKey].ts || 0)) {
+                    best[ctxKey] = { n: n, ts: ts };
+                }
+            });
+            let aplicados = 0, respetados = 0;
+            Object.keys(best).forEach(ctxKey => {
+                const cloud = best[ctxKey];
+                const localTs = Number(estado.totalesPorAulaTs[ctxKey]) || 0;
+                // Sin marca local (solo default) → localTs 0 → la nube gana si trae dato
+                if (cloud.ts >= localTs) {
+                    estado.totalesPorAula[ctxKey] = cloud.n;
+                    // No subir localTs por encima de la nube: alinear a la nube
+                    estado.totalesPorAulaTs[ctxKey] = cloud.ts || localTs;
+                    aplicados++;
+                } else {
+                    respetados++;
+                }
+            });
+            return { aplicados, respetados };
+        }
+
 
 
         // ============================================
@@ -1670,10 +1717,10 @@
                         if (docEl) docEl.value = it.docente;
                     }
 
-                    if (it.totalEstudiantes && Number(it.totalEstudiantes) > 0) {
-                        // no forzar si el usuario ya tiene otro número en pantalla del mismo contexto activo
-                    }
                 });
+                const totRes = aplicarTotalesDesdeNube(items);
+                syncInputTotalEstudiantes();
+
                 if (storageDisponible) {
                     try {
                         const sk = CLOUD_NIVEL === 'primaria' ? 'matriz_IE22375' : 'matriz_SEC_IE22375';
@@ -1690,7 +1737,7 @@
                     if (typeof renderizarCompetencias === 'function') renderizarCompetencias();
                     if (typeof crearGraficosExposicion === 'function') crearGraficosExposicion();
                 }
-                mostrarToast('Combinadas ' + n + ' área(s) desde la nube ✓', 'success');
+                mostrarToast('Combinadas ' + n + ' área(s). N° est.: ' + (totRes.aplicados || 0) + ' de nube, ' + (totRes.respetados || 0) + ' locales más recientes', 'success');
             } catch (err) {
                 console.error(err);
                 mostrarToast('Error al bajar: ' + (err.message || err), 'error');
