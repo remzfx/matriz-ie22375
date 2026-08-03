@@ -332,7 +332,7 @@
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                         <i class="fas fa-user-graduate mr-1.5 text-sky-600"></i>N° Estudiantes
                     </label>
-                    <input type="number" id="totalEstudiantes" min="1" max="60" value="30" onchange="actualizarTotalEstudiantes()" 
+                    <input type="number" id="totalEstudiantes" min="1" max="60" value="" placeholder="—" onchange="actualizarTotalEstudiantes()" 
                            class="w-full bg-white border-2 border-slate-200 rounded-xl px-3 py-3 text-center text-xl font-extrabold text-sky-700 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none">
                 </div>
             </div>
@@ -617,7 +617,7 @@
             bimestre: "I",
             grado: "1°",
             seccion: "A",
-            totalEstudiantes: 30, // legado; se usa totalesPorAula
+            totalEstudiantes: null, // legado; se usa totalesPorAula (vacío = sin definir)
             totalesPorAula: {}, // clave: bimestre|grado|seccion → N° estudiantes
             totalesPorAulaTs: {}, // última modificación LOCAL por aula
             areaActual: null,
@@ -638,13 +638,19 @@
         function getTotalEstudiantes() {
             if (!estado.totalesPorAula) estado.totalesPorAula = {};
             const k = claveAula();
-            if (estado.totalesPorAula[k] != null && estado.totalesPorAula[k] !== '') {
+            if (Object.prototype.hasOwnProperty.call(estado.totalesPorAula, k)) {
                 const v = estado.totalesPorAula[k];
-                if (typeof v === 'object' && v !== null) return Number(v.valor != null ? v.valor : v.n) || 30;
-                return Number(v) || 30;
+                if (v != null && v !== '') {
+                    if (typeof v === 'object' && v !== null) {
+                        const n = Number(v.valor != null ? v.valor : v.n);
+                        return n > 0 ? n : 0;
+                    }
+                    const n = Number(v);
+                    return n > 0 ? n : 0;
+                }
             }
-            // default de pantalla: NO cuenta como "modificado local"
-            return Number(estado.totalEstudiantes) || 30;
+            // Sin dato para esta sección/grado → vacío (0 = no definido)
+            return 0;
         }
         function setTotalEstudiantes(val, ts) {
             if (!estado.totalesPorAula) estado.totalesPorAula = {};
@@ -660,7 +666,9 @@
         }
         function syncInputTotalEstudiantes() {
             const el = document.getElementById('totalEstudiantes');
-            if (el) el.value = getTotalEstudiantes();
+            if (!el) return;
+            const n = getTotalEstudiantes();
+            el.value = n > 0 ? n : '';
         }
         function parseCloudTime(v) {
             if (v == null || v === '') return 0;
@@ -735,7 +743,7 @@
             renderizarResumen();
             syncDocenteTop();
             
-            document.getElementById('totalEstudiantes').value = getTotalEstudiantes();
+            syncInputTotalEstudiantes();
         });
 
         // ============================================
@@ -1444,7 +1452,29 @@
         }
 
         function actualizarTotalEstudiantes() {
-            let val = parseInt(document.getElementById('totalEstudiantes').value) || 30;
+            const raw = document.getElementById('totalEstudiantes').value;
+            if (raw === '' || raw == null) {
+                // Vaciar: quitar dato de ESTA aula
+                if (!estado.totalesPorAula) estado.totalesPorAula = {};
+                if (!estado.totalesPorAulaTs) estado.totalesPorAulaTs = {};
+                const k = claveAula();
+                delete estado.totalesPorAula[k];
+                delete estado.totalesPorAulaTs[k];
+                estado.totalEstudiantes = null;
+                document.getElementById('totalEstudiantes').value = '';
+                guardarDatos();
+                if (estado.areaActual) {
+                    renderizarCompetencias();
+                    renderizarAreaHeader();
+                }
+                renderizarResumen();
+                renderizarAreas();
+                mostrarToast('N° estudiantes vacío para este grado/sección', 'success');
+                return;
+            }
+            let val = parseInt(raw, 10);
+            if (isNaN(val) || val < 1) val = 1;
+            if (val > 60) val = 60;
             val = setTotalEstudiantes(val);
             document.getElementById('totalEstudiantes').value = val;
             guardarDatos();
@@ -1516,7 +1546,7 @@
             
             // Info header
             document.getElementById('tablaInfoGrado').textContent = `GRADO: ${estado.grado}  |  SECCIÓN: ${estado.seccion}`;
-            document.getElementById('tablaInfoBimestre').textContent = `${estado.bimestre} Bimestre  •  ${getTotalEstudiantes()} estudiantes`;
+            document.getElementById('tablaInfoBimestre').textContent = `${estado.bimestre} Bimestre  •  ${getTotalEstudiantes() > 0 ? getTotalEstudiantes() + " estudiantes" : "N° est. sin definir"}`;
             // Listar docentes por área (si hay)
             const k = claveActual();
             const docs = (estado.docentes && estado.docentes[k]) ? estado.docentes[k] : {};
@@ -1805,7 +1835,7 @@
             }
             
             // Sincronizar interfaz
-            document.getElementById('totalEstudiantes').value = getTotalEstudiantes();
+            syncInputTotalEstudiantes();
             if (!estado.docentes) estado.docentes = {};
             actualizarBotonesSeleccion();
             
