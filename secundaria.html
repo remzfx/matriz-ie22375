@@ -617,7 +617,8 @@
             bimestre: "I",
             grado: "1°",
             seccion: "A",
-            totalEstudiantes: 30,
+            totalEstudiantes: 30, // legado; se usa totalesPorAula
+            totalesPorAula: {}, // clave: bimestre|grado|seccion → N° estudiantes
             areaActual: null,
             datos: {},
             docentes: {} // docentes[bim|grado|seccion][area] = "Nombre"
@@ -625,6 +626,35 @@
 
         let charts = {};
         let storageDisponible = true;
+
+
+        // N° estudiantes POR aula (bimestre + grado + sección)
+        function claveAula() {
+            return `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
+        }
+        function getTotalEstudiantes() {
+            if (!estado.totalesPorAula) estado.totalesPorAula = {};
+            const k = claveAula();
+            if (estado.totalesPorAula[k] != null && estado.totalesPorAula[k] !== '') {
+                return Number(estado.totalesPorAula[k]) || 30;
+            }
+            // compatibilidad con datos antiguos (un solo total global)
+            return Number(estado.totalEstudiantes) || 30;
+        }
+        function setTotalEstudiantes(val) {
+            if (!estado.totalesPorAula) estado.totalesPorAula = {};
+            val = parseInt(val) || 30;
+            if (val < 1) val = 1;
+            if (val > 60) val = 60;
+            estado.totalesPorAula[claveAula()] = val;
+            estado.totalEstudiantes = val; // mantener sincronizado el legado
+            return val;
+        }
+        function syncInputTotalEstudiantes() {
+            const el = document.getElementById('totalEstudiantes');
+            if (el) el.value = getTotalEstudiantes();
+        }
+
 
         // ============================================
         // STORAGE SEGURO
@@ -658,7 +688,7 @@
             renderizarResumen();
             syncDocenteTop();
             
-            document.getElementById('totalEstudiantes').value = estado.totalEstudiantes || 30;
+            document.getElementById('totalEstudiantes').value = getTotalEstudiantes();
         });
 
         // ============================================
@@ -715,6 +745,7 @@
             }
             estado.seccion = seccion;
             estado.areaActual = null;
+            syncInputTotalEstudiantes();
             
             document.getElementById('panelCompetencias').classList.add('hidden');
             document.getElementById('vistaTabla').classList.add('hidden');
@@ -739,6 +770,7 @@
         function setBimestre(val) {
             estado.bimestre = val;
             estado.areaActual = null;
+            syncInputTotalEstudiantes();
             
             // Cerrar paneles y volver a la vista de áreas (datos del nuevo bimestre empiezan vacíos o con lo que ya se haya guardado de ese bimestre)
             document.getElementById('panelCompetencias').classList.add('hidden');
@@ -758,6 +790,7 @@
         function setGrado(val) {
             estado.grado = val;
             estado.areaActual = null;
+            syncInputTotalEstudiantes();
             
             document.getElementById('panelCompetencias').classList.add('hidden');
             document.getElementById('vistaTabla').classList.add('hidden');
@@ -954,7 +987,7 @@
             const container = document.getElementById('competenciasContainer');
             container.innerHTML = '';
             const area = ESTRUCTURA_AREAS[estado.areaActual];
-            const totalEst = estado.totalEstudiantes;
+            const totalEst = getTotalEstudiantes();
             const pct = (n) => totalEst > 0 ? Math.round((n / totalEst) * 100) : 0;
             
             // Título de la sección de llenado
@@ -1032,7 +1065,7 @@
             if (!estado.areaActual) return;
             
             const area = ESTRUCTURA_AREAS[estado.areaActual];
-            const totalEst = estado.totalEstudiantes;
+            const totalEst = getTotalEstudiantes();
             const pct = (n) => totalEst > 0 ? Math.round((n / totalEst) * 100) : 0;
             
             // Destruir gráficos anteriores
@@ -1277,7 +1310,7 @@
             if (valor < 0) valor = 0;
             
             const dato = getDato(area, comp);
-            const totalEst = estado.totalEstudiantes;
+            const totalEst = getTotalEstudiantes();
             
             // Suma de los OTROS tres niveles (sin el que se edita)
             const sumaOtros =
@@ -1364,10 +1397,8 @@
         }
 
         function actualizarTotalEstudiantes() {
-            let val = parseInt(document.getElementById('totalEstudiantes').value) || 26;
-            if (val < 1) val = 1;
-            if (val > 60) val = 60;
-            estado.totalEstudiantes = val;
+            let val = parseInt(document.getElementById('totalEstudiantes').value) || 30;
+            val = setTotalEstudiantes(val);
             document.getElementById('totalEstudiantes').value = val;
             guardarDatos();
             if (estado.areaActual) {
@@ -1375,7 +1406,8 @@
                 renderizarAreaHeader();
             }
             renderizarResumen();
-            mostrarToast('Total actualizado', 'success');
+            renderizarAreas();
+            mostrarToast('N° estudiantes de este grado/sección: ' + val, 'success');
         }
 
         // ============================================
@@ -1437,7 +1469,7 @@
             
             // Info header
             document.getElementById('tablaInfoGrado').textContent = `GRADO: ${estado.grado}  |  SECCIÓN: ${estado.seccion}`;
-            document.getElementById('tablaInfoBimestre').textContent = `${estado.bimestre} Bimestre  •  ${estado.totalEstudiantes} estudiantes`;
+            document.getElementById('tablaInfoBimestre').textContent = `${estado.bimestre} Bimestre  •  ${getTotalEstudiantes()} estudiantes`;
             // Listar docentes por área (si hay)
             const k = claveActual();
             const docs = (estado.docentes && estado.docentes[k]) ? estado.docentes[k] : {};
@@ -1463,7 +1495,7 @@
         function renderizarTablaConsolidada() {
             const tbody = document.getElementById('tablaBody');
             tbody.innerHTML = '';
-            const totalEst = estado.totalEstudiantes;
+            const totalEst = getTotalEstudiantes();
             const pct = (n) => totalEst > 0 ? Math.round((n / totalEst) * 100) : 0;
             
             Object.keys(ESTRUCTURA_AREAS).forEach(nombreArea => {
@@ -1726,7 +1758,7 @@
             }
             
             // Sincronizar interfaz
-            document.getElementById('totalEstudiantes').value = estado.totalEstudiantes || 30;
+            document.getElementById('totalEstudiantes').value = getTotalEstudiantes();
             if (!estado.docentes) estado.docentes = {};
             actualizarBotonesSeleccion();
             
@@ -1803,7 +1835,7 @@
                     seccion: estado.seccion || 'UNICA',
                     area: area,
                     clave: cloudClave(area),
-                    totalEstudiantes: estado.totalEstudiantes,
+                    totalEstudiantes: getTotalEstudiantes(),
                     docente: docenteArea,
                     competencias: areaData
                 };
