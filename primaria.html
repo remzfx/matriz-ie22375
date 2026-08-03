@@ -203,6 +203,108 @@
         }
         #modoPresentacion .pres-close:hover { background: rgba(239,68,68,0.85); }
 
+        #modoPresentacion .pres-slides {
+            display: flex;
+            gap: 6px;
+            background: rgba(0,0,0,0.25);
+            padding: 4px;
+            border-radius: 12px;
+        }
+        #modoPresentacion .pres-slide-btn {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: none;
+            background: transparent;
+            color: #cbd5e1;
+            cursor: pointer;
+        }
+        #modoPresentacion .pres-slide-btn.active {
+            background: #fff;
+            color: #0f172a;
+        }
+        #modoPresentacion .pres-body-comp {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            padding: 16px 18px 12px;
+            display: flex;
+            flex-direction: column;
+        }
+        #modoPresentacion .pres-mini-grid {
+            flex: 1;
+            display: grid;
+            gap: 16px;
+            align-content: stretch;
+            /* columnas se fijan por JS según n° de competencias */
+            grid-template-columns: repeat(2, 1fr);
+        }
+        #modoPresentacion .pres-mini-card {
+            background: #fff;
+            color: #0f172a;
+            border-radius: 18px;
+            padding: 14px 16px 16px;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.28);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #modoPresentacion .pres-mini-card h5 {
+            font-size: 15px;
+            font-weight: 800;
+            margin: 0 0 10px 0;
+            line-height: 1.3;
+            color: #1e293b;
+            flex-shrink: 0;
+        }
+        #modoPresentacion .pres-mini-chart {
+            position: relative;
+            flex: 1;
+            min-height: 180px;
+            max-height: 280px;
+        }
+        #modoPresentacion .pres-mini-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 12px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        #modoPresentacion .pres-mini-stats > div {
+            border-radius: 12px;
+            padding: 8px 4px;
+            border: 1.5px solid;
+        }
+        #modoPresentacion .pres-mini-stats .n {
+            font-size: 26px;
+            font-weight: 900;
+            line-height: 1;
+        }
+        #modoPresentacion .pres-mini-stats .p {
+            font-size: 15px;
+            font-weight: 800;
+            margin-top: 4px;
+        }
+        #modoPresentacion .pres-mini-stats .l {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-top: 3px;
+            letter-spacing: 0.04em;
+        }
+        #modoPresentacion #presTitulo { font-size: 1.55rem !important; }
+        #modoPresentacion #presSubtitulo { font-size: 0.95rem !important; }
+        #modoPresentacion .pres-card h4 { font-size: 17px !important; }
+        @media (max-width: 700px) {
+            #modoPresentacion .pres-mini-grid {
+                grid-template-columns: 1fr !important;
+            }
+            #modoPresentacion .pres-mini-stats .n { font-size: 20px; }
+        }
+
+
         .competencia-card {
             animation: slideIn 0.3s ease-out;
         }
@@ -1175,6 +1277,14 @@
             if (!area) return;
             const totalEst = getTotalEstudiantes();
             const pct = (n) => totalEst > 0 ? Math.round((n / totalEst) * 100) : (n > 0 ? '—' : 0);
+            const nComp = (area.competencias || []).length;
+            // Horizontal: 1→1 col, 2→2, 3→3, 4→4, 5+ → 3 cols (wrap)
+            let cols = 1;
+            if (nComp === 2) cols = 2;
+            else if (nComp === 3) cols = 3;
+            else if (nComp === 4) cols = 4;
+            else if (nComp >= 5) cols = 3;
+            grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
             grid.innerHTML = '';
             (area.competencias || []).forEach((comp, idx) => {
                 const d = getDato(estado.areaActual, comp);
@@ -1184,8 +1294,8 @@
                 card.className = 'pres-mini-card';
                 const cid = 'pres-mini-' + idx;
                 card.innerHTML = `
-                    <h5><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:#e2e8f0;font-size:11px;margin-right:6px;">${idx+1}</span>${comp}</h5>
-                    <div style="position:relative;height:190px;"><canvas id="${cid}"></canvas></div>
+                    <h5><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:#e2e8f0;font-size:12px;margin-right:6px;">${idx+1}</span>${comp}</h5>
+                    <div class="pres-mini-chart"><canvas id="${cid}"></canvas></div>
                     <div class="pres-mini-stats">
                         <div style="background:#fef2f2;border-color:#fecaca;color:#b91c1c">
                             <div class="n">${d.inicio||0}</div>
