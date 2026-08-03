@@ -73,6 +73,136 @@
             background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
         }
         
+
+        .nav-area-mini {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1.5px solid #e2e8f0;
+            background: #f8fafc;
+            color: #475569;
+            cursor: pointer;
+            line-height: 1.2;
+            max-width: 160px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: all 0.15s ease;
+        }
+        .nav-area-mini:hover {
+            border-color: #38bdf8;
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+        .nav-area-mini.active {
+            background: #0f172a;
+            border-color: #0f172a;
+            color: #fff;
+            box-shadow: 0 2px 6px rgba(15,23,42,0.2);
+        }
+
+
+        /* Modo presentación gráficos */
+        #modoPresentacion {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: #0f172a;
+            color: #fff;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #modoPresentacion.activo {
+            display: flex;
+        }
+        #modoPresentacion .pres-top {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 16px;
+            background: linear-gradient(90deg, #1e3a8a, #0369a1);
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+        }
+        #modoPresentacion .pres-body {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 16px;
+        }
+        @media (max-width: 900px) {
+            #modoPresentacion .pres-body {
+                grid-template-columns: 1fr;
+            }
+        }
+        #modoPresentacion .pres-card {
+            background: #fff;
+            color: #0f172a;
+            border-radius: 16px;
+            padding: 14px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+            min-height: 280px;
+            display: flex;
+            flex-direction: column;
+        }
+        #modoPresentacion .pres-card h4 {
+            font-size: 14px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: #334155;
+        }
+        #modoPresentacion .pres-chart-wrap {
+            flex: 1;
+            min-height: 260px;
+            position: relative;
+        }
+        #modoPresentacion .pres-nav {
+            flex-shrink: 0;
+            padding: 10px 16px 14px;
+            background: #020617;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        #modoPresentacion .pres-nav-btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+        #modoPresentacion .pres-nav-btns button {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1.5px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.08);
+            color: #e2e8f0;
+            cursor: pointer;
+        }
+        #modoPresentacion .pres-nav-btns button.active {
+            background: #38bdf8;
+            border-color: #38bdf8;
+            color: #0f172a;
+        }
+        #modoPresentacion .pres-close {
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: #fff;
+            font-weight: 700;
+            padding: 8px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        #modoPresentacion .pres-close:hover { background: rgba(239,68,68,0.85); }
+
         .competencia-card {
             animation: slideIn 0.3s ease-out;
         }
@@ -284,7 +414,14 @@
                             <p class="text-sky-100 text-xs">Ideal para proyectar y explicar el avance a los padres / colegas</p>
                         </div>
                     </div>
-                    <span id="graficosAreaNombre" class="bg-white/20 px-3 py-1 rounded-full text-sm font-semibold"></span>
+                    <div class="flex items-center gap-2">
+                        <span id="graficosAreaNombre" class="bg-white/20 px-3 py-1 rounded-full text-sm font-semibold"></span>
+                        <button type="button" onclick="abrirPresentacion()"
+                            class="bg-white text-indigo-700 hover:bg-sky-50 px-3 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 shadow-sm transition"
+                            title="Pantalla completa para proyectar">
+                            <i class="fas fa-expand"></i> Presentar
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="p-5 grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -319,6 +456,14 @@
                     <div id="miniDonasContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         <!-- Se llena por JS -->
                     </div>
+
+                <!-- Navegador mini de áreas (exposición) -->
+                <div id="navAreasExpo" class="px-4 pb-4 pt-2 border-t border-slate-100">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <i class="fas fa-exchange-alt"></i> Cambiar área (sin subir)
+                    </p>
+                    <div id="navAreasExpoBtns" class="flex flex-wrap gap-1.5"></div>
+                </div>
                 </div>
             </div>
         </div>
@@ -420,10 +565,41 @@
 
         <!-- FOOTER -->
         <div class="text-center text-xs text-slate-400 py-4 no-print">
-            <p>IE 22375 Santa Rosa de los Molinos • Sistema de Matriz de Consolidado — PRIMARIA v1 • Datos guardados localmente</p>
-            <p class="mt-1 text-slate-500">Diseño e integración: <strong>Mag. Efrain Ceopa Paredes</strong></p>
+            <p>IE 22375 Santa Rosa de los Molinos • Sistema de Matriz de Consolidado — PRIMARIA v1.1 • Datos guardados localmente</p>
+            <p class="mt-1 text-slate-500">Desarrollo | Diseño e integración: <strong>Mag. Efrain Ceopa Paredes</strong></p>
         </div>
     </main>
+
+    <!-- MODO PRESENTACIÓN PANTALLA COMPLETA -->
+    <div id="modoPresentacion" class="no-print" aria-hidden="true">
+        <div class="pres-top">
+            <div>
+                <div class="text-xs text-sky-200 font-semibold uppercase tracking-wider">Modo presentación</div>
+                <div id="presTitulo" class="text-lg md:text-xl font-bold leading-tight">Área</div>
+                <div id="presSubtitulo" class="text-xs text-sky-100/90"></div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" class="pres-close" onclick="cerrarPresentacion()" title="Salir (Esc)">
+                    <i class="fas fa-times"></i> Salir
+                </button>
+            </div>
+        </div>
+        <div class="pres-body">
+            <div class="pres-card">
+                <h4><i class="fas fa-chart-bar text-indigo-500"></i> Comparativo por competencia</h4>
+                <div class="pres-chart-wrap"><canvas id="chartPresBarras"></canvas></div>
+            </div>
+            <div class="pres-card">
+                <h4><i class="fas fa-chart-pie text-sky-500"></i> Resumen del área</h4>
+                <div class="pres-chart-wrap"><canvas id="chartPresDona"></canvas></div>
+            </div>
+        </div>
+        <div class="pres-nav">
+            <p class="text-center text-[10px] text-slate-400 uppercase font-bold mb-2 tracking-wider">Cambiar área</p>
+            <div id="presNavAreas" class="pres-nav-btns"></div>
+        </div>
+    </div>
+
 
     <!-- TOAST -->
     <div id="toast" class="fixed bottom-6 right-6 bg-slate-800 text-white px-5 py-3 rounded-xl shadow-2xl transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-3 no-print">
@@ -744,6 +920,225 @@
             });
             return comps.length ? Math.round((llenas / comps.length) * 100) : 0;
         }
+
+
+        function abrevArea(nombre) {
+            const map = {
+                'Desarrollo Personal, Ciudadanía y Cívica': 'DPCC',
+                'Ciencias Sociales': 'CC.SS.',
+                'Educación para el Trabajo (EPT)': 'EPT',
+                'Educación Física': 'Ed. Física',
+                'Comunicación': 'Comunicación',
+                'Arte y Cultura': 'Arte y Cultura',
+                'Inglés como Lengua Extranjera': 'Inglés',
+                'Matemática': 'Matemática',
+                'Ciencia y Tecnología': 'CyT',
+                'Educación Religiosa': 'Ed. Religiosa',
+                'Personal Social': 'Pers. Social',
+                'Ciencia y Tecnología': 'CyT',
+                'Educación Física': 'Ed. Física',
+                'Tutoría y Orientación Educativa': 'Tutoría',
+                'Castellano como Segunda Lengua': 'Castellano L2'
+            };
+            if (map[nombre]) return map[nombre];
+            return nombre.length > 22 ? nombre.slice(0, 20) + '…' : nombre;
+        }
+
+        function renderNavegadorAreas() {
+            const cont = document.getElementById('navAreasExpoBtns');
+            if (!cont) return;
+            cont.innerHTML = '';
+            Object.keys(ESTRUCTURA_AREAS).forEach(nombreArea => {
+                const area = ESTRUCTURA_AREAS[nombreArea];
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'nav-area-mini' + (estado.areaActual === nombreArea ? ' active' : '');
+                btn.title = nombreArea;
+                btn.textContent = abrevArea(nombreArea);
+                btn.onclick = () => seleccionarAreaDesdeExpo(nombreArea);
+                cont.appendChild(btn);
+            });
+        }
+
+        function seleccionarAreaDesdeExpo(nombreArea) {
+            estado.areaActual = nombreArea;
+            document.getElementById('mensajeInicial').classList.add('hidden');
+            document.getElementById('panelCompetencias').classList.remove('hidden');
+            const vt = document.getElementById('vistaTabla');
+            if (vt) vt.classList.add('hidden');
+            renderizarAreas();
+            renderizarAreaHeader();
+            renderizarCompetencias();
+            renderizarResumen();
+            renderNavegadorAreas();
+            if (typeof syncDocenteTop === 'function') syncDocenteTop();
+            // Quedarse en la zona de gráficos / navegador (exposición)
+            const dest = document.getElementById('seccionGraficos') || document.getElementById('navAreasExpo');
+            if (dest) dest.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+
+        let chartsPres = { barras: null, dona: null };
+
+        function abrirPresentacion() {
+            if (!estado.areaActual) {
+                mostrarToast('Selecciona un área primero', 'error');
+                return;
+            }
+            const el = document.getElementById('modoPresentacion');
+            if (!el) return;
+            el.classList.add('activo');
+            el.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+            actualizarCabeceraPresentacion();
+            renderPresNavAreas();
+            setTimeout(() => crearGraficosPresentacion(), 80);
+            // Intentar fullscreen del navegador
+            try {
+                const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+                if (req) req.call(el);
+            } catch (e) {}
+        }
+
+        function cerrarPresentacion() {
+            const el = document.getElementById('modoPresentacion');
+            if (!el) return;
+            el.classList.remove('activo');
+            el.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+            try {
+                if (document.fullscreenElement) document.exitFullscreen();
+            } catch (e) {}
+            destruirGraficosPres();
+        }
+
+        function actualizarCabeceraPresentacion() {
+            const area = estado.areaActual || '';
+            const tit = document.getElementById('presTitulo');
+            const sub = document.getElementById('presSubtitulo');
+            if (tit) tit.textContent = area;
+            if (sub) {
+                const sec = estado.seccion && estado.seccion !== 'UNICA' ? ' ' + estado.seccion : (estado.seccion === 'ÚNICA' ? ' Única' : '');
+                sub.textContent = `Bimestre ${estado.bimestre} · ${estado.grado}${sec}` +
+                    (getTotalEstudiantes() > 0 ? ` · ${getTotalEstudiantes()} estudiantes` : '');
+            }
+        }
+
+        function renderPresNavAreas() {
+            const cont = document.getElementById('presNavAreas');
+            if (!cont) return;
+            cont.innerHTML = '';
+            Object.keys(ESTRUCTURA_AREAS).forEach(nombreArea => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = typeof abrevArea === 'function' ? abrevArea(nombreArea) : nombreArea;
+                btn.title = nombreArea;
+                if (estado.areaActual === nombreArea) btn.classList.add('active');
+                btn.onclick = () => {
+                    estado.areaActual = nombreArea;
+                    if (typeof renderizarAreas === 'function') renderizarAreas();
+                    if (typeof renderizarAreaHeader === 'function') renderizarAreaHeader();
+                    if (typeof renderizarCompetencias === 'function') renderizarCompetencias();
+                    if (typeof renderizarResumen === 'function') renderizarResumen();
+                    if (typeof renderNavegadorAreas === 'function') renderNavegadorAreas();
+                    actualizarCabeceraPresentacion();
+                    renderPresNavAreas();
+                    crearGraficosPresentacion();
+                };
+                cont.appendChild(btn);
+            });
+        }
+
+        function destruirGraficosPres() {
+            if (chartsPres.barras) { try { chartsPres.barras.destroy(); } catch(e) {} chartsPres.barras = null; }
+            if (chartsPres.dona) { try { chartsPres.dona.destroy(); } catch(e) {} chartsPres.dona = null; }
+        }
+
+        function crearGraficosPresentacion() {
+            if (typeof Chart === 'undefined' || !estado.areaActual) return;
+            destruirGraficosPres();
+            const area = ESTRUCTURA_AREAS[estado.areaActual];
+            if (!area) return;
+            const comps = area.competencias || [];
+            const labels = comps.map((c, i) => {
+                const t = String(c);
+                return t.length > 28 ? (i + 1) + '. ' + t.slice(0, 26) + '…' : (i + 1) + '. ' + t;
+            });
+            const inicio = [], proceso = [], previsto = [], destacado = [];
+            let tI = 0, tP = 0, tPr = 0, tD = 0;
+            comps.forEach(comp => {
+                const d = getDato(estado.areaActual, comp);
+                inicio.push(d.inicio || 0);
+                proceso.push(d.proceso || 0);
+                previsto.push(d.previsto || 0);
+                destacado.push(d.destacado || 0);
+                tI += d.inicio || 0; tP += d.proceso || 0; tPr += d.previsto || 0; tD += d.destacado || 0;
+            });
+            const ctxB = document.getElementById('chartPresBarras');
+            const ctxD = document.getElementById('chartPresDona');
+            if (ctxB) {
+                chartsPres.barras = new Chart(ctxB, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'Inicio (C)', data: inicio, backgroundColor: '#ef4444' },
+                            { label: 'Proceso (B)', data: proceso, backgroundColor: '#eab308' },
+                            { label: 'Previsto (A)', data: previsto, backgroundColor: '#84cc16' },
+                            { label: 'Destacado (AD)', data: destacado, backgroundColor: '#16a34a' }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                            datalabels: { anchor: 'end', align: 'top', font: { weight: 'bold', size: 10 }, color: '#334155',
+                                formatter: (v) => v > 0 ? v : '' }
+                        },
+                        scales: {
+                            x: { ticks: { font: { size: 10 }, maxRotation: 40 } },
+                            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                        }
+                    }
+                });
+            }
+            if (ctxD) {
+                chartsPres.dona = new Chart(ctxD, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Inicio (C)', 'Proceso (B)', 'Previsto (A)', 'Destacado (AD)'],
+                        datasets: [{
+                            data: [tI, tP, tPr, tD],
+                            backgroundColor: ['#ef4444', '#eab308', '#84cc16', '#16a34a']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 12 } } },
+                            datalabels: {
+                                color: '#fff', font: { weight: 'bold', size: 13 },
+                                formatter: (v, ctx) => {
+                                    const sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                    if (!v || !sum) return '';
+                                    return v + '\n(' + Math.round(v / sum * 100) + '%)';
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const el = document.getElementById('modoPresentacion');
+                if (el && el.classList.contains('activo')) cerrarPresentacion();
+            }
+        });
+
 
         // ============================================
         // SELECCIONAR ÁREA
@@ -1067,11 +1462,27 @@
                     <div class="relative" style="height: 160px;">
                         <canvas id="mini-${idx}"></canvas>
                     </div>
-                    <div class="grid grid-cols-4 gap-1 mt-2 text-center text-[10px] font-bold">
-                        <div class="text-red-600">${d.inicio}<br><span class="font-normal opacity-70">${pct(d.inicio)}%</span></div>
-                        <div class="text-yellow-600">${d.proceso}<br><span class="font-normal opacity-70">${pct(d.proceso)}%</span></div>
-                        <div class="text-lime-600">${d.previsto}<br><span class="font-normal opacity-70">${pct(d.previsto)}%</span></div>
-                        <div class="text-green-600">${d.destacado}<br><span class="font-normal opacity-70">${pct(d.destacado)}%</span></div>
+                    <div class="grid grid-cols-4 gap-1.5 mt-3 text-center">
+                        <div class="rounded-lg bg-red-50 border border-red-200 px-1 py-1.5">
+                            <div class="text-base font-black text-red-700 leading-none">${d.inicio}</div>
+                            <div class="text-[11px] font-bold text-red-600 mt-0.5">${pct(d.inicio)}%</div>
+                            <div class="text-[9px] font-semibold text-red-500/90 uppercase tracking-wide">C</div>
+                        </div>
+                        <div class="rounded-lg bg-amber-50 border border-amber-200 px-1 py-1.5">
+                            <div class="text-base font-black text-amber-700 leading-none">${d.proceso}</div>
+                            <div class="text-[11px] font-bold text-amber-700 mt-0.5">${pct(d.proceso)}%</div>
+                            <div class="text-[9px] font-semibold text-amber-600 uppercase tracking-wide">B</div>
+                        </div>
+                        <div class="rounded-lg bg-lime-50 border border-lime-300 px-1 py-1.5">
+                            <div class="text-base font-black text-lime-800 leading-none">${d.previsto}</div>
+                            <div class="text-[11px] font-bold text-lime-700 mt-0.5">${pct(d.previsto)}%</div>
+                            <div class="text-[9px] font-semibold text-lime-700 uppercase tracking-wide">A</div>
+                        </div>
+                        <div class="rounded-lg bg-emerald-50 border border-emerald-300 px-1 py-1.5">
+                            <div class="text-base font-black text-emerald-800 leading-none">${d.destacado}</div>
+                            <div class="text-[11px] font-bold text-emerald-700 mt-0.5">${pct(d.destacado)}%</div>
+                            <div class="text-[9px] font-semibold text-emerald-700 uppercase tracking-wide">AD</div>
+                        </div>
                     </div>
                 `;
                 miniContainer.appendChild(card);
