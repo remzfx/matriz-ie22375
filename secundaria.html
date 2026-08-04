@@ -221,6 +221,7 @@
             color: #fff;
             flex-direction: column;
             overflow: hidden;
+            /* overflow hidden en el root; el body y nav hacen scroll interno */
         }
         #modoPresentacion.activo {
             display: flex;
@@ -236,13 +237,14 @@
             border-bottom: 1px solid rgba(255,255,255,0.12);
         }
         #modoPresentacion .pres-body {
-            flex: 1;
+            flex: 1 1 auto;
             min-height: 0;
             overflow: auto;
             padding: 16px;
             display: grid;
             grid-template-columns: 1.2fr 1fr;
             gap: 16px;
+            align-content: stretch;
         }
         @media (max-width: 900px) {
             #modoPresentacion .pres-body {
@@ -267,14 +269,16 @@
         }
         #modoPresentacion .pres-chart-wrap {
             flex: 1;
-            min-height: 260px;
+            min-height: 200px;
             position: relative;
         }
         #modoPresentacion .pres-nav {
-            flex-shrink: 0;
+            flex: 0 0 auto;
             padding: 10px 16px 14px;
             background: #020617;
             border-top: 1px solid rgba(255,255,255,0.1);
+            max-height: 26vh;
+            overflow-y: auto;
         }
         #modoPresentacion .pres-nav-btns {
             display: flex;
@@ -310,6 +314,49 @@
             gap: 6px;
         }
         #modoPresentacion .pres-close:hover { background: rgba(239,68,68,0.85); }
+
+        /* Ajuste proyector / pantallas bajas */
+        @media (max-height: 900px) {
+            #modoPresentacion .pres-top {
+                padding: 8px 12px !important;
+            }
+            #modoPresentacion #presTitulo {
+                font-size: 1.25rem !important;
+            }
+            #modoPresentacion .pres-body {
+                padding: 10px !important;
+                gap: 10px !important;
+            }
+            #modoPresentacion .pres-chart-wrap {
+                min-height: 180px;
+            }
+            #modoPresentacion .pres-nav {
+                max-height: 22vh;
+                padding: 6px 10px 8px !important;
+            }
+            #modoPresentacion .pres-nav-btns button {
+                font-size: 10px !important;
+                padding: 5px 8px !important;
+            }
+            #modoPresentacion .pres-mini-chart {
+                min-height: 120px !important;
+                max-height: 180px !important;
+            }
+            #modoPresentacion .pres-mini-stats .n { font-size: 20px !important; }
+            #modoPresentacion .pres-mini-stats .p { font-size: 13px !important; }
+        }
+        @media (max-height: 700px) {
+            #modoPresentacion .pres-body {
+                grid-template-columns: 1fr 1fr !important;
+            }
+            #modoPresentacion .pres-chart-wrap {
+                min-height: 140px;
+            }
+            #modoPresentacion .pres-nav {
+                max-height: 18vh;
+            }
+        }
+
 
         #modoPresentacion .pres-nav-grados button {
             font-size: 11px;
