@@ -419,7 +419,7 @@
                         <i class="fas fa-file-import"></i> Importar
                         <input type="file" accept=".json" onchange="importarDatos(event)" class="hidden">
                     </label>
-                    <button onclick="subirNube()" class="bg-emerald-500/90 hover:bg-emerald-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition" title="Guardar en Google Sheets">
+                    <button onclick="subirNube()" class="bg-emerald-500/90 hover:bg-emerald-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition" title="Subir área actual o todo el grado">
                         <i class="fas fa-cloud-upload-alt"></i> Subir nube
                     </button>
                     <button onclick="bajarNube()" class="bg-sky-500/90 hover:bg-sky-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition" title="Cargar desde Google Sheets">
@@ -490,7 +490,7 @@
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
                         <i class="fas fa-chalkboard-teacher mr-1.5 text-sky-600"></i>Docente responsable
                     </label>
-                    <input type="text" id="nombreDocente" placeholder="Nombre del docente" onchange="guardarDatos()"
+                    <input type="text" id="nombreDocente" placeholder="Nombre del docente" onchange="actualizarNombreDocente()" oninput="(function(){ const el=document.getElementById('nombreDocente'); if(el){ setNombreDocente(el.value); } })()"
                            class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none">
                 </div>
             </div>
@@ -814,7 +814,9 @@
             totalEstudiantes: null, // legado; se usa totalesPorAula (vacío = sin definir)
             totalesPorAula: {}, // clave: bimestre|grado|seccion → N° estudiantes
             totalesPorAulaTs: {}, // última modificación LOCAL por aula
-            nombreDocente: "",
+            nombreDocente: "", // legado / vista actual
+            docentesPorAula: {}, // clave aula → nombre
+            docentesPorAulaTs: {}, // última modificación LOCAL del nombre
             areaActual: null,
             datos: {}
         };
@@ -864,6 +866,63 @@
             const n = getTotalEstudiantes();
             el.value = n > 0 ? n : '';
         }
+
+        function getNombreDocente() {
+            if (!estado.docentesPorAula) estado.docentesPorAula = {};
+            const k = claveAula();
+            if (Object.prototype.hasOwnProperty.call(estado.docentesPorAula, k)) {
+                return estado.docentesPorAula[k] || '';
+            }
+            // legado: un solo nombre global (solo si no hay por aula)
+            return estado.nombreDocente || '';
+        }
+        function setNombreDocente(nombre, ts) {
+            if (!estado.docentesPorAula) estado.docentesPorAula = {};
+            if (!estado.docentesPorAulaTs) estado.docentesPorAulaTs = {};
+            const k = claveAula();
+            nombre = (nombre || '').trim();
+            estado.docentesPorAula[k] = nombre;
+            estado.docentesPorAulaTs[k] = (ts != null ? Number(ts) : Date.now());
+            estado.nombreDocente = nombre; // sincroniza legado / firmas
+            return nombre;
+        }
+        function syncInputDocente() {
+            const el = document.getElementById('nombreDocente');
+            if (el) el.value = getNombreDocente();
+        }
+        /** Docentes desde la nube: gana el registro con fecha más reciente */
+        function aplicarDocentesDesdeNube(items) {
+            if (!estado.docentesPorAula) estado.docentesPorAula = {};
+            if (!estado.docentesPorAulaTs) estado.docentesPorAulaTs = {};
+            // Por aula, el docente de la fila más reciente en la nube
+            const best = {};
+            (items || []).forEach(it => {
+                const nombre = (it.docente || '').toString().trim();
+                if (!nombre) return;
+                const ctxKey = `${it.bimestre}|${it.grado}|${it.seccion || 'UNICA'}`;
+                const ts = parseCloudTime(it.actualizado) || 0;
+                if (!best[ctxKey] || ts >= (best[ctxKey].ts || 0)) {
+                    best[ctxKey] = { nombre, ts };
+                }
+            });
+            let aplicados = 0, respetados = 0;
+            Object.keys(best).forEach(ctxKey => {
+                const cloud = best[ctxKey];
+                const localTs = Number(estado.docentesPorAulaTs[ctxKey]) || 0;
+                if (cloud.ts >= localTs) {
+                    estado.docentesPorAula[ctxKey] = cloud.nombre;
+                    estado.docentesPorAulaTs[ctxKey] = cloud.ts || localTs;
+                    aplicados++;
+                } else {
+                    respetados++;
+                }
+            });
+            // Actualizar legado al aula actual
+            estado.nombreDocente = getNombreDocente();
+            return { aplicados, respetados };
+        }
+
+
         function parseCloudTime(v) {
             if (v == null || v === '') return 0;
             if (typeof v === 'number' && !isNaN(v)) return v < 1e12 ? v * 1000 : v;
@@ -937,7 +996,7 @@
             renderizarResumen();
             
             syncInputTotalEstudiantes();
-            document.getElementById('nombreDocente').value = estado.nombreDocente || '';
+            syncInputDocente();
         });
 
         // ============================================
@@ -958,6 +1017,7 @@
             estado.bimestre = val;
             estado.areaActual = null;
             syncInputTotalEstudiantes();
+            syncInputDocente();
             
             // Cerrar paneles y volver a la vista de áreas (datos del nuevo bimestre empiezan vacíos o con lo que ya se haya guardado de ese bimestre)
             document.getElementById('panelCompetencias').classList.add('hidden');
@@ -977,6 +1037,7 @@
             estado.grado = val;
             estado.areaActual = null;
             syncInputTotalEstudiantes();
+            syncInputDocente();
             
             document.getElementById('panelCompetencias').classList.add('hidden');
             document.getElementById('vistaTabla').classList.add('hidden');
@@ -1913,6 +1974,15 @@
             }, 400);
         }
 
+
+        function actualizarNombreDocente(silencioso) {
+            const el = document.getElementById('nombreDocente');
+            const val = el ? el.value : '';
+            setNombreDocente(val);
+            guardarDatos();
+            if (!silencioso) mostrarToast('Docente guardado para este grado', 'success');
+        }
+
         function actualizarTotalEstudiantes() {
             const raw = document.getElementById('totalEstudiantes').value;
             if (raw === '' || raw == null) {
@@ -2009,8 +2079,8 @@
             // Info header
             document.getElementById('tablaInfoGrado').textContent = `GRADO: ${estado.grado}`;
             document.getElementById('tablaInfoBimestre').textContent = `${estado.bimestre} Bimestre  •  ${getTotalEstudiantes() > 0 ? getTotalEstudiantes() + " estudiantes" : "N° est. sin definir"}`;
-            document.getElementById('tablaInfoDocente').textContent = estado.nombreDocente ? `Docente: ${estado.nombreDocente}` : '';
-            document.getElementById('firmaDocente').textContent = estado.nombreDocente || '';
+            document.getElementById('tablaInfoDocente').textContent = getNombreDocente() ? `Docente: ${getNombreDocente()}` : '';
+            document.getElementById('firmaDocente').textContent = getNombreDocente() || '';
             document.getElementById('fechaGeneracion').textContent = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric' });
             
             renderizarTablaConsolidada();
@@ -2092,7 +2162,7 @@
         function guardarDatos() {
             try {
                 const doc = document.getElementById('nombreDocente');
-                if (doc) estado.nombreDocente = doc.value;
+                if (doc) setNombreDocente(doc.value);
                 
                 if (storageDisponible) {
                     localStorage.setItem('matriz_IE22375', JSON.stringify(estado));
@@ -2297,7 +2367,7 @@
             
             // Sincronizar interfaz
             syncInputTotalEstudiantes();
-            document.getElementById('nombreDocente').value = estado.nombreDocente || '';
+            syncInputDocente();
             actualizarBotonesSeleccion();
             
             if (storageDisponible) {
@@ -2347,58 +2417,127 @@
             return [CLOUD_NIVEL, estado.bimestre, estado.grado, sec, area].join('|');
         }
 
-        async function subirNube() {
-            try {
-                const area = estado.areaActual;
-                if (!area) {
-                    mostrarToast('Primero selecciona un área para subir', 'error');
-                    return;
-                }
-                // Datos solo de ESTA área en el bimestre/grado/sección actual
-                const ctxKey = `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
-                const areaData = (estado.datos[ctxKey] && estado.datos[ctxKey][area])
-                    ? estado.datos[ctxKey][area]
-                    : {};
 
-                let docenteArea = (document.getElementById('nombreDocente') || {}).value || estado.nombreDocente || '';
-
-                const payload = {
-                    action: 'saveArea',
-                    nivel: CLOUD_NIVEL,
-                    bimestre: estado.bimestre,
-                    grado: estado.grado,
-                    seccion: estado.seccion || 'UNICA',
-                    area: area,
-                    clave: cloudClave(area),
-                    totalEstudiantes: getTotalEstudiantes(),
-                    docente: docenteArea,
-                    competencias: areaData
-                };
-
-                mostrarToast('Subiendo área "' + area + '"...', 'success');
-                const res = await fetch(CLOUD_API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify(payload)
+        function areasConDatosDelGrado() {
+            const ctxKey = `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
+            const bloque = (estado.datos && estado.datos[ctxKey]) ? estado.datos[ctxKey] : {};
+            const lista = [];
+            Object.keys(ESTRUCTURA_AREAS).forEach(area => {
+                const comps = bloque[area];
+                if (!comps) return;
+                const tiene = Object.keys(comps).some(c => {
+                    const d = comps[c] || {};
+                    return (d.inicio||0) + (d.proceso||0) + (d.previsto||0) + (d.destacado||0) > 0;
                 });
-                const text = await res.text();
-                let data;
-                try { data = JSON.parse(text); } catch(e) {
-                    throw new Error('Respuesta inválida del servidor');
+                if (tiene) lista.push(area);
+            });
+            return lista;
+        }
+
+        async function enviarAreaANube(area) {
+            const ctxKey = `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
+            const areaData = (estado.datos[ctxKey] && estado.datos[ctxKey][area])
+                ? estado.datos[ctxKey][area]
+                : {};
+            const docenteArea = getNombreDocente() || (document.getElementById('nombreDocente') || {}).value || '';
+            const payload = {
+                action: 'saveArea',
+                nivel: CLOUD_NIVEL,
+                bimestre: estado.bimestre,
+                grado: estado.grado,
+                seccion: estado.seccion || 'UNICA',
+                area: area,
+                clave: cloudClave(area),
+                totalEstudiantes: getTotalEstudiantes(),
+                docente: docenteArea,
+                competencias: areaData
+            };
+            const res = await fetch(CLOUD_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            });
+            const text = await res.text();
+            let data;
+            try { data = JSON.parse(text); } catch(e) {
+                throw new Error('Respuesta inválida del servidor');
+            }
+            if (!data.ok) throw new Error(data.error || 'Error al guardar ' + area);
+            return data;
+        }
+
+        function cerrarModalSubirNube() {
+            const m = document.getElementById('modalSubirNube');
+            if (m) m.remove();
+        }
+
+        function subirNube() {
+            const areasDatos = areasConDatosDelGrado();
+            const areaAct = estado.areaActual;
+            const gradoLabel = estado.grado || '';
+            const bim = estado.bimestre || '';
+
+            const existente = document.getElementById('modalSubirNube');
+            if (existente) existente.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'modalSubirNube';
+            modal.className = 'fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/50 no-print';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-5 space-y-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800"><i class="fas fa-cloud-upload-alt text-emerald-600 mr-2"></i>Subir a la nube</h3>
+                            <p class="text-sm text-slate-500 mt-1">Primaria: el docente del grado puede subir <strong>una área</strong> o <strong>todas las del grado</strong> según su avance.</p>
+                            <p class="text-xs text-sky-700 mt-2 font-semibold">Bimestre ${bim} · ${gradoLabel}</p>
+                        </div>
+                        <button type="button" onclick="cerrarModalSubirNube()" class="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+                    </div>
+                    <div class="space-y-2">
+                        <button type="button" id="btnSubirSoloArea" class="w-full text-left px-4 py-3 rounded-xl border-2 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 transition ${areaAct ? '' : 'opacity-50 cursor-not-allowed'}" ${areaAct ? '' : 'disabled'}>
+                            <div class="font-bold text-slate-800 text-sm"><i class="fas fa-bookmark text-emerald-600 mr-1.5"></i> Solo el área actual</div>
+                            <div class="text-xs text-slate-500 mt-0.5">${areaAct ? areaAct : 'Selecciona un área primero'}</div>
+                        </button>
+                        <button type="button" id="btnSubirGrado" class="w-full text-left px-4 py-3 rounded-xl border-2 border-slate-200 hover:border-sky-400 hover:bg-sky-50 transition ${areasDatos.length ? '' : 'opacity-50 cursor-not-allowed'}" ${areasDatos.length ? '' : 'disabled'}>
+                            <div class="font-bold text-slate-800 text-sm"><i class="fas fa-layer-group text-sky-600 mr-1.5"></i> Todo el grado (áreas con avance)</div>
+                            <div class="text-xs text-slate-500 mt-0.5">${areasDatos.length ? (areasDatos.length + ' área(s): ' + areasDatos.join(', ')) : 'Aún no hay áreas con datos en este grado'}</div>
+                        </button>
+                    </div>
+                    <button type="button" onclick="cerrarModalSubirNube()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl px-4 py-2.5 text-sm font-medium">Cancelar</button>
+                </div>`;
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => { if (e.target === modal) cerrarModalSubirNube(); });
+
+            const b1 = document.getElementById('btnSubirSoloArea');
+            const b2 = document.getElementById('btnSubirGrado');
+            if (b1 && areaAct) b1.onclick = () => { cerrarModalSubirNube(); ejecutarSubidaAreas([areaAct]); };
+            if (b2 && areasDatos.length) b2.onclick = () => { cerrarModalSubirNube(); ejecutarSubidaAreas(areasDatos); };
+        }
+
+        async function ejecutarSubidaAreas(listaAreas) {
+            if (!listaAreas || !listaAreas.length) {
+                mostrarToast('No hay áreas para subir', 'error');
+                return;
+            }
+            try {
+                mostrarToast('Subiendo ' + listaAreas.length + ' área(s) del grado...', 'success');
+                let ok = 0;
+                for (const area of listaAreas) {
+                    await enviarAreaANube(area);
+                    ok++;
                 }
-                if (!data.ok) throw new Error(data.error || 'Error al guardar');
                 if (storageDisponible) {
-                    try {
-                        const sk = CLOUD_NIVEL === 'primaria' ? 'matriz_IE22375' : 'matriz_SEC_IE22375';
-                        localStorage.setItem(sk, JSON.stringify(estado));
-                    } catch(e) {}
+                    try { localStorage.setItem('matriz_IE22375', JSON.stringify(estado)); } catch(e) {}
                 }
-                mostrarToast('Área guardada en la nube (no borra otras) ✓', 'success');
+                mostrarToast(ok === 1
+                    ? ('Área "' + listaAreas[0] + '" guardada en la nube ✓')
+                    : (ok + ' áreas del grado subidas (no pisan otros grados) ✓'), 'success');
             } catch (err) {
                 console.error(err);
                 mostrarToast('Error al subir: ' + (err.message || err), 'error');
             }
         }
+
 
         async function bajarNube() {
             if (!confirm('¿Traer de la nube las áreas de este nivel?\n\nSe combinan con lo local: cada área de la nube actualiza solo esa área.')) return;
@@ -2427,15 +2566,11 @@
                         n++;
                     }
 
-                    if (it.docente && !estado.nombreDocente) {
-                        estado.nombreDocente = it.docente;
-                        const docEl = document.getElementById('nombreDocente');
-                        if (docEl) docEl.value = it.docente;
-                    }
-
                 });
                 const totRes = aplicarTotalesDesdeNube(items);
+                const docRes = aplicarDocentesDesdeNube(items);
                 syncInputTotalEstudiantes();
+                syncInputDocente();
 
                 if (storageDisponible) {
                     try {
@@ -2453,7 +2588,7 @@
                     if (typeof renderizarCompetencias === 'function') renderizarCompetencias();
                     if (typeof crearGraficosExposicion === 'function') crearGraficosExposicion();
                 }
-                mostrarToast('Combinadas ' + n + ' área(s). N° est.: ' + (totRes.aplicados || 0) + ' de nube, ' + (totRes.respetados || 0) + ' locales más recientes', 'success');
+                mostrarToast('Combinadas ' + n + ' área(s). Est: ' + (totRes.aplicados||0) + ' nube / Docentes: ' + (docRes.aplicados||0) + ' actualizados', 'success');
             } catch (err) {
                 console.error(err);
                 mostrarToast('Error al bajar: ' + (err.message || err), 'error');
