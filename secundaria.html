@@ -920,6 +920,7 @@
             totalesPorAulaTs: {}, // última modificación LOCAL por aula
             areaActual: null,
             datos: {},
+            ultimaModificacion: 0 // ms — última edición local de datos,
             docentes: {} // docentes[bim|grado|seccion][area] = "Nombre"
         };
 
@@ -2323,7 +2324,10 @@
         // ============================================
         function guardarDatos() {
             try {
+            try { estado.ultimaModificacion = Date.now(); } catch(e) {}
+            
                 if (storageDisponible) {
+                    try { estado.ultimaModificacion = Date.now(); } catch(e) {}
                     localStorage.setItem('matriz_SEC_IE22375', JSON.stringify(estado));
                 }
             } catch(e) {
@@ -2349,6 +2353,7 @@
         // ============================================
         function exportarDatos() {
             try {
+                estado.ultimaModificacion = Date.now();
                 const dataStr = JSON.stringify(estado, null, 2);
                 const blob = new Blob([dataStr], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -2430,8 +2435,8 @@
                                 class="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-4 py-3.5 text-left flex items-start gap-3 transition shadow-md">
                                 <i class="fas fa-code-branch mt-0.5 text-lg"></i>
                                 <div>
-                                    <div class="font-bold">Combinar / Sumar datos</div>
-                                    <div class="text-xs text-emerald-100 mt-0.5">Mantiene lo tuyo y agrega lo del colega (recomendado)</div>
+                                    <div class="font-bold">Combinar (sin duplicar)</div>
+                                    <div class="text-xs text-emerald-100 mt-0.5">Une sin duplicar: si ambos tienen datos, gana el más reciente</div>
                                 </div>
                             </button>
                             
@@ -2476,8 +2481,12 @@
                 };
                 mostrarToast('Datos reemplazados correctamente', 'success');
             } else {
-                // ===== MODO COMBINAR =====
-                // Mantiene tus datos y suma/agrega los del colega
+                // ===== MODO COMBINAR (sin sumar: gana el más reciente) =====
+                const localTs = Number(estado.ultimaModificacion) || 0;
+                const importTs = Number(imported.ultimaModificacion) || 0;
+                // JSON con fecha >= local → preferir importado si ambos tienen datos
+                // JSON antiguo sin fecha → no pisar local cuando ambos tienen datos
+                const preferirImportado = importTs > 0 && importTs >= localTs;
                 const datosNuevos = imported.datos || {};
                 
                 Object.keys(datosNuevos).forEach(gradoSecKey => {
@@ -2498,19 +2507,16 @@
                             const totalActual = actual.inicio + actual.proceso + actual.previsto + actual.destacado;
                             
                             if (totalActual === 0 && totalImportado > 0) {
-                                // Tú no tenías nada → tomar lo importado
+                                // Solo el importado tiene datos
                                 estado.datos[gradoSecKey][area][comp] = { ...importado };
                             } else if (totalImportado === 0) {
-                                // El importado no tiene nada → dejar lo tuyo
-                                // (no hacer nada)
+                                // Solo local tiene datos → se mantiene
                             } else {
-                                // Ambos tienen datos → SUMAR los valores
-                                estado.datos[gradoSecKey][area][comp] = {
-                                    inicio: (actual.inicio || 0) + (importado.inicio || 0),
-                                    proceso: (actual.proceso || 0) + (importado.proceso || 0),
-                                    previsto: (actual.previsto || 0) + (importado.previsto || 0),
-                                    destacado: (actual.destacado || 0) + (importado.destacado || 0)
-                                };
+                                // Ambos tienen datos → GANA EL MÁS RECIENTE (no sumar)
+                                if (preferirImportado) {
+                                    estado.datos[gradoSecKey][area][comp] = { ...importado };
+                                }
+                                // si no, se deja "actual" (local)
                             }
                         });
                     });
@@ -2521,7 +2527,7 @@
                     estado.totalEstudiantes = imported.totalEstudiantes;
                 }
                 
-                mostrarToast('Datos combinados correctamente (se sumaron los valores)', 'success');
+                mostrarToast(preferirImportado ? 'Datos combinados (ganó el JSON: más reciente)' : 'Datos combinados (se conservó lo local más reciente o sin fecha en JSON)', 'success');
             }
             
             // Sincronizar interfaz
@@ -2530,7 +2536,8 @@
             actualizarBotonesSeleccion();
             
             if (storageDisponible) {
-                try { localStorage.setItem('matriz_SEC_IE22375', JSON.stringify(estado)); } catch(err) {}
+                try { try { estado.ultimaModificacion = Date.now(); } catch(e) {}
+                    localStorage.setItem('matriz_SEC_IE22375', JSON.stringify(estado)); } catch(err) {}
             }
             
             estado.areaActual = null;
