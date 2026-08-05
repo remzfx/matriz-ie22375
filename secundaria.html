@@ -393,7 +393,7 @@
         #modoPresentacion .pres-body-comp {
             flex: 1;
             min-height: 0;
-            overflow: auto;
+            overflow: hidden;
             padding: 8px 10px 6px;
             display: flex;
             flex-direction: column;
@@ -404,22 +404,22 @@
             gap: 12px;
             align-content: stretch;
             align-items: stretch;
-            /* columnas se fijan por JS según n° de competencias */
             grid-template-columns: repeat(2, 1fr);
             min-height: 0;
             height: 100%;
+            grid-auto-rows: 1fr;
         }
         #modoPresentacion .pres-mini-card {
             background: #fff;
             color: #0f172a;
             border-radius: 16px;
-            padding: 10px 12px 12px;
+            padding: 10px 12px 10px;
             box-shadow: 0 10px 28px rgba(0,0,0,0.28);
             display: flex;
             flex-direction: column;
             min-height: 0;
             height: 100%;
-            overflow: visible;
+            overflow: hidden;
         }
         #modoPresentacion .pres-mini-card h5 {
             font-size: 13px;
@@ -439,15 +439,17 @@
         #modoPresentacion .pres-mini-chart {
             position: relative;
             flex: 1 1 auto;
-            min-height: 280px;
+            min-height: 0;
+            height: 100%;
             max-height: none;
-            overflow: visible;
+            overflow: hidden;
         }
         #modoPresentacion .pres-mini-stats {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 6px;
-            margin-top: 8px;
+            margin-top: auto;
+            padding-top: 10px;
             text-align: center;
             flex-shrink: 0;
         }
@@ -594,11 +596,15 @@
 
 
         @media (max-width: 900px) {
+            #modoPresentacion .pres-body-comp {
+                overflow: auto !important;
+            }
             #modoPresentacion .pres-mini-grid {
                 grid-template-columns: 1fr !important;
+                grid-auto-rows: minmax(320px, auto) !important;
             }
             #modoPresentacion .pres-mini-chart {
-                min-height: 240px !important;
+                min-height: 260px !important;
             }
             #modoPresentacion .pres-body {
                 grid-template-columns: 1fr !important;
@@ -1805,7 +1811,7 @@
                 const cid = 'pres-mini-' + idx;
                 card.innerHTML = `
                     <h5 data-tip="${String(comp).replace(/"/g, '&quot;')}"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:#e2e8f0;font-size:12px;margin-right:6px;flex-shrink:0;">${idx+1}</span>${comp}</h5>
-                    <div class="pres-mini-chart" style="min-height:340px;flex:1 1 auto;"><canvas id="${cid}"></canvas></div>
+                    <div class="pres-mini-chart" style="flex:1 1 auto;min-height:220px;"><canvas id="${cid}"></canvas></div>
                     <div class="pres-mini-stats">
                         <div style="background:#fef2f2;border-color:#fecaca;color:#b91c1c">
                             <div class="n">${d.inicio||0}</div>
@@ -1832,86 +1838,6 @@
                 setTimeout(() => {
                     const canvas = document.getElementById(cid);
                     if (!canvas) return;
-                    const pluginNombresDona = {
-                        id: 'nombresDonaPres-' + idx,
-                        afterDraw(chart) {
-                            if (!tiene) return;
-                            const meta = chart.getDatasetMeta(0);
-                            if (!meta || !meta.data) return;
-                            const ctx = chart.ctx;
-                            const noms = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
-                            const cols = ['#dc2626', '#ca8a04', '#65a30d', '#059669'];
-                            const data = chart.data.datasets[0].data || [];
-                            const FONT = '800 11px system-ui, -apple-system, Segoe UI, sans-serif';
-                            ctx.font = FONT;
-
-                            let items = [];
-                            meta.data.forEach((arc, i) => {
-                                const v = Number(data[i]) || 0;
-                                if (v <= 0 || !arc) return;
-                                items.push({
-                                    i,
-                                    mid: (arc.startAngle + arc.endAngle) / 2,
-                                    cx: arc.x, cy: arc.y,
-                                    or: arc.outerRadius,
-                                    name: noms[i],
-                                    color: cols[i],
-                                    side: 0 // desplazamiento tangencial (izq/der)
-                                });
-                            });
-                            if (items.length < 2) {
-                                // dibujar igual
-                            } else {
-                                // Detectar pares cercanos y empujar a lados opuestos
-                                for (let a = 0; a < items.length; a++) {
-                                    for (let b = a + 1; b < items.length; b++) {
-                                        let diff = Math.abs(items[a].mid - items[b].mid);
-                                        diff = Math.min(diff, Math.PI * 2 - diff);
-                                        if (diff < 0.55) {
-                                            // uno a la "izquierda" tangencial, otro a la derecha
-                                            const push = diff < 0.3 ? 16 : 11;
-                                            if (items[a].mid <= items[b].mid) {
-                                                items[a].side -= push;
-                                                items[b].side += push;
-                                            } else {
-                                                items[a].side += push;
-                                                items[b].side -= push;
-                                            }
-                                            // separar un poco el ángulo también
-                                            const sep = diff < 0.3 ? 0.12 : 0.07;
-                                            if (items[a].mid <= items[b].mid) {
-                                                items[a].mid -= sep;
-                                                items[b].mid += sep;
-                                            } else {
-                                                items[a].mid += sep;
-                                                items[b].mid -= sep;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            items.forEach((L) => {
-                                const r = L.or + 14;
-                                // base radial
-                                let x = L.cx + Math.cos(L.mid) * r;
-                                let y = L.cy + Math.sin(L.mid) * r;
-                                // desplazamiento izq/der (tangencial)
-                                const tx = -Math.sin(L.mid) * L.side;
-                                const ty = Math.cos(L.mid) * L.side;
-                                x += tx;
-                                y += ty;
-
-                                ctx.save();
-                                ctx.font = FONT;
-                                ctx.fillStyle = L.color;
-                                ctx.textAlign = 'center';
-                                ctx.textBaseline = 'middle';
-                                ctx.fillText(L.name, x, y);
-                                ctx.restore();
-                            });
-                        }
-                    };
                     chartsPres.minis[cid] = new Chart(canvas, {
                         type: 'doughnut',
                         data: {
@@ -1919,31 +1845,30 @@
                             datasets: [{
                                 data: tiene ? [d.inicio||0, d.proceso||0, d.previsto||0, d.destacado||0] : [1],
                                 backgroundColor: tiene ? ['#ef4444','#eab308','#84cc16','#16a34a'] : ['#e2e8f0'],
-                                borderWidth: 2,
+                                borderWidth: 3,
                                 borderColor: '#fff'
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            layout: { padding: { top: 26, right: 22, bottom: 22, left: 22 } },
+                            layout: { padding: 8 },
                             plugins: {
                                 legend: { display: false },
                                 datalabels: {
-                                    // solo números dentro
                                     anchor: 'center',
                                     align: 'center',
                                     color: '#fff',
-                                    font: { weight: 'bold', size: 16 },
-                                    textStrokeColor: 'rgba(0,0,0,0.3)',
+                                    font: { weight: 'bold', size: 18 },
+                                    textStrokeColor: 'rgba(0,0,0,0.25)',
                                     textStrokeWidth: 2,
                                     formatter: (v) => (tiene && v > 0) ? v : ''
                                 }
                             },
-                            cutout: '55%'
-                        },
-                        plugins: [pluginNombresDona]
+                            cutout: '52%'
+                        }
                     });
+
 
 
 
