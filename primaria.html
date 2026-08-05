@@ -412,6 +412,69 @@
             white-space: nowrap;
         }
 
+
+        /* Tooltip elegante (reemplaza el title nativo donde se use data-tip) */
+        [data-tip] {
+            position: relative;
+            cursor: default;
+        }
+        [data-tip]::after {
+            content: attr(data-tip);
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 8px);
+            transform: translateX(-50%) translateY(4px);
+            background: #0f172a;
+            color: #f8fafc;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.35;
+            padding: 8px 12px;
+            border-radius: 10px;
+            white-space: normal;
+            max-width: min(320px, 70vw);
+            width: max-content;
+            text-align: center;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.35);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+            z-index: 10050;
+        }
+        [data-tip]::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 2px);
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #0f172a;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease, visibility 0.15s;
+            z-index: 10050;
+        }
+        [data-tip]:hover::after,
+        [data-tip]:hover::before,
+        [data-tip]:focus-visible::after,
+        [data-tip]:focus-visible::before {
+            opacity: 1;
+            visibility: visible;
+        }
+        [data-tip]:hover::after,
+        [data-tip]:focus-visible::after {
+            transform: translateX(-50%) translateY(0);
+        }
+        /* En modo presentación: tooltip más legible al proyectar */
+        #modoPresentacion [data-tip]::after {
+            font-size: 13px;
+            padding: 10px 14px;
+            max-width: min(420px, 80vw);
+            background: #1e293b;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+
         .competencia-card {
             animation: slideIn 0.3s ease-out;
         }
@@ -1242,6 +1305,7 @@
                 btn.type = 'button';
                 btn.className = 'nav-area-mini' + (estado.areaActual === nombreArea ? ' active' : '');
                 btn.title = nombreArea;
+                btn.setAttribute('data-tip', nombreArea);
                 btn.textContent = abrevArea(nombreArea);
                 btn.onclick = () => seleccionarAreaDesdeExpo(nombreArea);
                 cont.appendChild(btn);
@@ -1339,6 +1403,7 @@
                     btn.type = 'button';
                     btn.textContent = typeof abrevArea === 'function' ? abrevArea(nombreArea) : nombreArea;
                     btn.title = nombreArea;
+                    btn.setAttribute('data-tip', nombreArea);
                     if (estado.areaActual === nombreArea) btn.classList.add('active');
                     btn.onclick = () => {
                         estado.areaActual = nombreArea;
@@ -1580,7 +1645,7 @@
                 card.className = 'pres-mini-card';
                 const cid = 'pres-mini-' + idx;
                 card.innerHTML = `
-                    <h5 class="texto-truncar-2" title="${String(comp).replace(/"/g, '&quot;')}"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:#e2e8f0;font-size:12px;margin-right:6px;flex-shrink:0;">${idx+1}</span>${comp}</h5>
+                    <h5 class="texto-truncar-2" data-tip="${String(comp).replace(/"/g, '&quot;')}"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:#e2e8f0;font-size:12px;margin-right:6px;flex-shrink:0;">${idx+1}</span>${comp}</h5>
                     <div class="pres-mini-chart" style="min-height:340px;flex:1 1 auto;"><canvas id="${cid}"></canvas></div>
                     <div class="pres-mini-stats">
                         <div style="background:#fef2f2;border-color:#fecaca;color:#b91c1c">
@@ -1608,6 +1673,68 @@
                 setTimeout(() => {
                     const canvas = document.getElementById(cid);
                     if (!canvas) return;
+                    const pluginGuiasDona = {
+                        id: 'guiasDonaPres-' + idx,
+                        afterDraw(chart) {
+                            if (!tiene) return;
+                            const meta = chart.getDatasetMeta(0);
+                            if (!meta || !meta.data || !meta.data.length) return;
+                            const ctx = chart.ctx;
+                            const noms = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
+                            const cols = ['#dc2626', '#ca8a04', '#65a30d', '#059669'];
+                            const data = chart.data.datasets[0].data || [];
+                            const items = [];
+                            meta.data.forEach((arc, i) => {
+                                const v = Number(data[i]) || 0;
+                                if (v <= 0 || !arc) return;
+                                const mid = (arc.startAngle + arc.endAngle) / 2;
+                                items.push({
+                                    i, mid, v,
+                                    cx: arc.x, cy: arc.y,
+                                    or: arc.outerRadius,
+                                    name: noms[i],
+                                    color: cols[i]
+                                });
+                            });
+                            // Si dos ángulos están muy cerca, alejar más la etiqueta (línea guía más larga)
+                            items.forEach((L) => {
+                                let extra = 0;
+                                items.forEach((O) => {
+                                    if (O.i === L.i) return;
+                                    let diff = Math.abs(L.mid - O.mid);
+                                    diff = Math.min(diff, Math.PI * 2 - diff);
+                                    if (diff < 0.45) extra = Math.max(extra, 22);
+                                    if (diff < 0.28) extra = Math.max(extra, 34);
+                                });
+                                const rArc = L.or + 4;
+                                const rTxt = L.or + 22 + extra;
+                                const x1 = L.cx + Math.cos(L.mid) * rArc;
+                                const y1 = L.cy + Math.sin(L.mid) * rArc;
+                                const x2 = L.cx + Math.cos(L.mid) * rTxt;
+                                const y2 = L.cy + Math.sin(L.mid) * rTxt;
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.moveTo(x1, y1);
+                                ctx.lineTo(x2, y2);
+                                ctx.strokeStyle = L.color;
+                                ctx.lineWidth = 1.6;
+                                ctx.stroke();
+                                // punto en el anillo
+                                ctx.beginPath();
+                                ctx.arc(x1, y1, 2.2, 0, Math.PI * 2);
+                                ctx.fillStyle = L.color;
+                                ctx.fill();
+                                // Texto MISMO tamaño para todos
+                                ctx.font = '800 12px system-ui, -apple-system, Segoe UI, sans-serif';
+                                ctx.fillStyle = L.color;
+                                ctx.textAlign = x2 >= L.cx ? 'left' : 'right';
+                                ctx.textBaseline = 'middle';
+                                const tx = x2 + (x2 >= L.cx ? 5 : -5);
+                                ctx.fillText(L.name, tx, y2);
+                                ctx.restore();
+                            });
+                        }
+                    };
                     chartsPres.minis[cid] = new Chart(canvas, {
                         type: 'doughnut',
                         data: {
@@ -1622,57 +1749,23 @@
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            // Espacio para nombres alrededor del anillo
-                            layout: { padding: 36 },
+                            layout: { padding: 42 },
                             plugins: {
                                 legend: { display: false },
                                 datalabels: {
-                                    labels: {
-                                        // Número DENTRO del segmento
-                                        valor: {
-                                            anchor: 'center',
-                                            align: 'center',
-                                            color: '#fff',
-                                            font: { weight: 'bold', size: 16 },
-                                            textStrokeColor: 'rgba(0,0,0,0.3)',
-                                            textStrokeWidth: 2,
-                                            formatter: (v) => (tiene && v > 0) ? v : ''
-                                        },
-                                        // Nombre ALREDEDOR de la dona
-                                        nombre: {
-                                            anchor: 'end',
-                                            align: 'end',
-                                            offset: 14,
-                                            clamp: false,
-                                            clip: false,
-                                            font: function(ctx) {
-                                                const v = Number(ctx.dataset.data[ctx.dataIndex]) || 0;
-                                                const data = ctx.dataset.data || [];
-                                                const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
-                                                const pct = total > 0 ? (v / total) * 100 : 0;
-                                                // Siempre nombre completo; letra más chica si el segmento es estrecho
-                                                let size = 13;
-                                                if (pct < 25) size = 11;
-                                                if (pct < 12) size = 9;
-                                                if (pct < 6) size = 8;
-                                                return { weight: '800', size: size };
-                                            },
-                                            color: function(ctx) {
-                                                const cols = ['#dc2626', '#ca8a04', '#65a30d', '#059669'];
-                                                return cols[ctx.dataIndex] || '#334155';
-                                            },
-                                            formatter: function(v, ctx) {
-                                                // Siempre el nombre completo si hay valor > 0
-                                                if (!tiene || !v || v <= 0) return '';
-                                                const noms = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
-                                                return noms[ctx.dataIndex] || '';
-                                            }
-                                        }
-                                    }
+                                    // Solo número dentro; nombres van con líneas guía
+                                    anchor: 'center',
+                                    align: 'center',
+                                    color: '#fff',
+                                    font: { weight: 'bold', size: 16 },
+                                    textStrokeColor: 'rgba(0,0,0,0.3)',
+                                    textStrokeWidth: 2,
+                                    formatter: (v) => (tiene && v > 0) ? v : ''
                                 }
                             },
                             cutout: '55%'
-                        }
+                        },
+                        plugins: [pluginGuiasDona]
                     });
                 }, 30 + idx * 20);
             });
@@ -2041,7 +2134,7 @@
                 const card = document.createElement('div');
                 card.className = 'bg-slate-50 rounded-xl border border-slate-100 p-3';
                 card.innerHTML = `
-                    <div class="text-xs font-semibold text-slate-700 mb-2 leading-tight min-h-[32px] texto-truncar-2" title="${String(comp).replace(/"/g, '&quot;')}">
+                    <div class="text-xs font-semibold text-slate-700 mb-2 leading-tight min-h-[32px] texto-truncar-2" data-tip="${String(comp).replace(/"/g, '&quot;')}">
                         <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-200 text-[10px] font-bold mr-1">${idx + 1}</span>
                         ${comp}
                     </div>
