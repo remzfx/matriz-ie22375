@@ -274,10 +274,10 @@
         }
         #modoPresentacion .pres-nav {
             flex: 0 0 auto;
-            padding: 10px 16px 14px;
+            padding: 6px 12px 8px;
             background: #020617;
             border-top: 1px solid rgba(255,255,255,0.1);
-            max-height: 26vh;
+            max-height: 20vh;
             overflow-y: auto;
         }
         #modoPresentacion .pres-nav-btns {
@@ -394,7 +394,7 @@
             flex: 1;
             min-height: 0;
             overflow: auto;
-            padding: 10px 12px 8px;
+            padding: 6px 10px 4px;
             display: flex;
             flex-direction: column;
         }
@@ -431,7 +431,7 @@
         #modoPresentacion .pres-mini-chart {
             position: relative;
             flex: 1 1 auto;
-            min-height: 260px;
+            min-height: 320px;
             max-height: none;
         }
         #modoPresentacion .pres-mini-stats {
@@ -443,19 +443,19 @@
             flex-shrink: 0;
         }
         #modoPresentacion .pres-mini-stats > div {
-            border-radius: 12px;
-            padding: 8px 4px;
+            border-radius: 10px;
+            padding: 5px 3px;
             border: 1.5px solid;
         }
         #modoPresentacion .pres-mini-stats .n {
-            font-size: 22px;
+            font-size: 18px;
             font-weight: 900;
             line-height: 1;
         }
         #modoPresentacion .pres-mini-stats .p {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 800;
-            margin-top: 2px;
+            margin-top: 1px;
         }
         #modoPresentacion .pres-mini-stats .l {
             font-size: 11px;
@@ -1638,7 +1638,7 @@
                 const cid = 'pres-mini-' + idx;
                 card.innerHTML = `
                     <h5><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:#e2e8f0;font-size:12px;margin-right:6px;">${idx+1}</span>${comp}</h5>
-                    <div class="pres-mini-chart" style="min-height:300px;flex:1;"><canvas id="${cid}"></canvas></div>
+                    <div class="pres-mini-chart" style="min-height:340px;flex:1 1 auto;"><canvas id="${cid}"></canvas></div>
                     <div class="pres-mini-stats">
                         <div style="background:#fef2f2;border-color:#fecaca;color:#b91c1c">
                             <div class="n">${d.inicio||0}</div>
@@ -1680,7 +1680,7 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             // Espacio para nombres alrededor del anillo
-                            layout: { padding: 26 },
+                            layout: { padding: 36 },
                             plugins: {
                                 legend: { display: false },
                                 datalabels: {
@@ -1699,7 +1699,7 @@
                                         nombre: {
                                             anchor: 'end',
                                             align: 'end',
-                                            offset: 8,
+                                            offset: 14,
                                             clamp: false,
                                             clip: false,
                                             font: function(ctx) {
@@ -1707,10 +1707,11 @@
                                                 const data = ctx.dataset.data || [];
                                                 const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
                                                 const pct = total > 0 ? (v / total) * 100 : 0;
-                                                // Más chico si el segmento es estrecho
-                                                let size = 12;
-                                                if (pct < 20) size = 10;
+                                                // Siempre nombre completo; letra más chica si el segmento es estrecho
+                                                let size = 13;
+                                                if (pct < 25) size = 11;
                                                 if (pct < 12) size = 9;
+                                                if (pct < 6) size = 8;
                                                 return { weight: '800', size: size };
                                             },
                                             color: function(ctx) {
@@ -1718,16 +1719,9 @@
                                                 return cols[ctx.dataIndex] || '#334155';
                                             },
                                             formatter: function(v, ctx) {
+                                                // Siempre el nombre completo si hay valor > 0
                                                 if (!tiene || !v || v <= 0) return '';
-                                                const data = ctx.dataset.data || [];
-                                                const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
-                                                const pct = total > 0 ? (v / total) * 100 : 0;
-                                                // Segmentos muy chicos: no poner nombre alrededor (evita "PREVISINICIO")
-                                                // La info sigue en las cajitas de abajo
-                                                if (pct < 8 || v < 2) return '';
                                                 const noms = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
-                                                const short = ['INI', 'PRO', 'PREV', 'DES'];
-                                                if (pct < 14) return short[ctx.dataIndex];
                                                 return noms[ctx.dataIndex] || '';
                                             }
                                         }
