@@ -1529,22 +1529,22 @@
                         <div style="background:#fef2f2;border-color:#fecaca;color:#b91c1c">
                             <div class="n">${d.inicio||0}</div>
                             <div class="p">${totalEst > 0 ? pct(d.inicio||0) + '%' : '—'}</div>
-                            <div class="l">C</div>
+                            <div class="l">Inicio</div>
                         </div>
                         <div style="background:#fffbeb;border-color:#fde68a;color:#a16207">
                             <div class="n">${d.proceso||0}</div>
                             <div class="p">${totalEst > 0 ? pct(d.proceso||0) + '%' : '—'}</div>
-                            <div class="l">B</div>
+                            <div class="l">Proceso</div>
                         </div>
                         <div style="background:#f7fee7;border-color:#bef264;color:#3f6212">
                             <div class="n">${d.previsto||0}</div>
                             <div class="p">${totalEst > 0 ? pct(d.previsto||0) + '%' : '—'}</div>
-                            <div class="l">A</div>
+                            <div class="l">Previsto</div>
                         </div>
                         <div style="background:#ecfdf5;border-color:#6ee7b7;color:#047857">
                             <div class="n">${d.destacado||0}</div>
                             <div class="p">${totalEst > 0 ? pct(d.destacado||0) + '%' : '—'}</div>
-                            <div class="l">AD</div>
+                            <div class="l">Destacado</div>
                         </div>
                     </div>`;
                 grid.appendChild(card);
@@ -1946,29 +1946,29 @@
                         <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-200 text-[10px] font-bold mr-1">${idx + 1}</span>
                         ${comp.length > 50 ? comp.substring(0, 48) + '…' : comp}
                     </div>
-                    <div class="relative" style="height: 160px;">
+                    <div class="relative" style="height: 200px;">
                         <canvas id="mini-${idx}"></canvas>
                     </div>
                     <div class="grid grid-cols-4 gap-1.5 mt-3 text-center">
                         <div class="rounded-lg bg-red-50 border border-red-200 px-1 py-1.5">
-                            <div class="text-base font-black text-red-700 leading-none">${d.inicio}</div>
+                            <div class="text-[9px] font-extrabold text-red-600 uppercase tracking-wide leading-tight">Inicio</div>
+                            <div class="text-base font-black text-red-700 leading-none mt-0.5">${d.inicio}</div>
                             <div class="text-[11px] font-bold text-red-600 mt-0.5">${pct(d.inicio)}%</div>
-                            <div class="text-[9px] font-semibold text-red-500/90 uppercase tracking-wide">C</div>
                         </div>
                         <div class="rounded-lg bg-amber-50 border border-amber-200 px-1 py-1.5">
-                            <div class="text-base font-black text-amber-700 leading-none">${d.proceso}</div>
+                            <div class="text-[9px] font-extrabold text-amber-700 uppercase tracking-wide leading-tight">Proceso</div>
+                            <div class="text-base font-black text-amber-700 leading-none mt-0.5">${d.proceso}</div>
                             <div class="text-[11px] font-bold text-amber-700 mt-0.5">${pct(d.proceso)}%</div>
-                            <div class="text-[9px] font-semibold text-amber-600 uppercase tracking-wide">B</div>
                         </div>
                         <div class="rounded-lg bg-lime-50 border border-lime-300 px-1 py-1.5">
-                            <div class="text-base font-black text-lime-800 leading-none">${d.previsto}</div>
+                            <div class="text-[9px] font-extrabold text-lime-700 uppercase tracking-wide leading-tight">Previsto</div>
+                            <div class="text-base font-black text-lime-800 leading-none mt-0.5">${d.previsto}</div>
                             <div class="text-[11px] font-bold text-lime-700 mt-0.5">${pct(d.previsto)}%</div>
-                            <div class="text-[9px] font-semibold text-lime-700 uppercase tracking-wide">A</div>
                         </div>
                         <div class="rounded-lg bg-emerald-50 border border-emerald-300 px-1 py-1.5">
-                            <div class="text-base font-black text-emerald-800 leading-none">${d.destacado}</div>
+                            <div class="text-[9px] font-extrabold text-emerald-700 uppercase tracking-wide leading-tight">Destacado</div>
+                            <div class="text-base font-black text-emerald-800 leading-none mt-0.5">${d.destacado}</div>
                             <div class="text-[11px] font-bold text-emerald-700 mt-0.5">${pct(d.destacado)}%</div>
-                            <div class="text-[9px] font-semibold text-emerald-700 uppercase tracking-wide">AD</div>
                         </div>
                     </div>
                 `;
@@ -1984,14 +1984,27 @@
                             datasets: [{
                                 data: tiene ? [d.inicio, d.proceso, d.previsto, d.destacado] : [1],
                                 backgroundColor: tiene ? ['#ef4444', '#eab308', '#84cc16', '#16a34a'] : ['#e2e8f0'],
-                                borderWidth: 0
+                                borderWidth: 2,
+                                borderColor: '#fff'
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                legend: { display: false },
+                                legend: {
+                                    display: true,
+                                    position: 'bottom',
+                                    labels: {
+                                        boxWidth: 10,
+                                        boxHeight: 10,
+                                        padding: 8,
+                                        font: { size: 10, weight: '600' },
+                                        color: '#475569',
+                                        usePointStyle: true,
+                                        pointStyle: 'circle'
+                                    }
+                                },
                                 tooltip: {
                                     callbacks: {
                                         label: (ctx) => {
