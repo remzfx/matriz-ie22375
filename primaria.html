@@ -1722,6 +1722,86 @@
                 setTimeout(() => {
                     const canvas = document.getElementById(cid);
                     if (!canvas) return;
+                    const pluginNombresDona = {
+                        id: 'nombresDonaPres-' + idx,
+                        afterDraw(chart) {
+                            if (!tiene) return;
+                            const meta = chart.getDatasetMeta(0);
+                            if (!meta || !meta.data) return;
+                            const ctx = chart.ctx;
+                            const noms = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
+                            const cols = ['#dc2626', '#ca8a04', '#65a30d', '#059669'];
+                            const data = chart.data.datasets[0].data || [];
+                            const FONT = '800 11px system-ui, -apple-system, Segoe UI, sans-serif';
+                            ctx.font = FONT;
+
+                            let items = [];
+                            meta.data.forEach((arc, i) => {
+                                const v = Number(data[i]) || 0;
+                                if (v <= 0 || !arc) return;
+                                items.push({
+                                    i,
+                                    mid: (arc.startAngle + arc.endAngle) / 2,
+                                    cx: arc.x, cy: arc.y,
+                                    or: arc.outerRadius,
+                                    name: noms[i],
+                                    color: cols[i],
+                                    side: 0 // desplazamiento tangencial (izq/der)
+                                });
+                            });
+                            if (items.length < 2) {
+                                // dibujar igual
+                            } else {
+                                // Detectar pares cercanos y empujar a lados opuestos
+                                for (let a = 0; a < items.length; a++) {
+                                    for (let b = a + 1; b < items.length; b++) {
+                                        let diff = Math.abs(items[a].mid - items[b].mid);
+                                        diff = Math.min(diff, Math.PI * 2 - diff);
+                                        if (diff < 0.55) {
+                                            // uno a la "izquierda" tangencial, otro a la derecha
+                                            const push = diff < 0.3 ? 16 : 11;
+                                            if (items[a].mid <= items[b].mid) {
+                                                items[a].side -= push;
+                                                items[b].side += push;
+                                            } else {
+                                                items[a].side += push;
+                                                items[b].side -= push;
+                                            }
+                                            // separar un poco el ángulo también
+                                            const sep = diff < 0.3 ? 0.12 : 0.07;
+                                            if (items[a].mid <= items[b].mid) {
+                                                items[a].mid -= sep;
+                                                items[b].mid += sep;
+                                            } else {
+                                                items[a].mid += sep;
+                                                items[b].mid -= sep;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            items.forEach((L) => {
+                                const r = L.or + 14;
+                                // base radial
+                                let x = L.cx + Math.cos(L.mid) * r;
+                                let y = L.cy + Math.sin(L.mid) * r;
+                                // desplazamiento izq/der (tangencial)
+                                const tx = -Math.sin(L.mid) * L.side;
+                                const ty = Math.cos(L.mid) * L.side;
+                                x += tx;
+                                y += ty;
+
+                                ctx.save();
+                                ctx.font = FONT;
+                                ctx.fillStyle = L.color;
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(L.name, x, y);
+                                ctx.restore();
+                            });
+                        }
+                    };
                     chartsPres.minis[cid] = new Chart(canvas, {
                         type: 'doughnut',
                         data: {
@@ -1736,43 +1816,25 @@
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            layout: { padding: { top: 28, right: 20, bottom: 24, left: 20 } },
+                            layout: { padding: { top: 26, right: 22, bottom: 22, left: 22 } },
                             plugins: {
                                 legend: { display: false },
                                 datalabels: {
-                                    labels: {
-                                        valor: {
-                                            anchor: 'center',
-                                            align: 'center',
-                                            color: '#fff',
-                                            font: { weight: 'bold', size: 16 },
-                                            textStrokeColor: 'rgba(0,0,0,0.3)',
-                                            textStrokeWidth: 2,
-                                            formatter: (v) => (tiene && v > 0) ? v : ''
-                                        },
-                                        nombre: {
-                                            anchor: 'end',
-                                            align: 'end',
-                                            offset: 6,
-                                            clamp: false,
-                                            clip: false,
-                                            font: { weight: '800', size: 11 },
-                                            color: function(ctx) {
-                                                const cols = ['#dc2626', '#ca8a04', '#65a30d', '#059669'];
-                                                return cols[ctx.dataIndex] || '#334155';
-                                            },
-                                            formatter: function(v, ctx) {
-                                                if (!tiene || !v || v <= 0) return '';
-                                                const noms = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
-                                                return noms[ctx.dataIndex] || '';
-                                            }
-                                        }
-                                    }
+                                    // solo números dentro
+                                    anchor: 'center',
+                                    align: 'center',
+                                    color: '#fff',
+                                    font: { weight: 'bold', size: 16 },
+                                    textStrokeColor: 'rgba(0,0,0,0.3)',
+                                    textStrokeWidth: 2,
+                                    formatter: (v) => (tiene && v > 0) ? v : ''
                                 }
                             },
                             cutout: '55%'
-                        }
+                        },
+                        plugins: [pluginNombresDona]
                     });
+
 
 
                 }, 30 + idx * 20);
