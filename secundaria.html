@@ -1680,7 +1680,7 @@
                             responsive: true,
                             maintainAspectRatio: false,
                             // Espacio para nombres alrededor del anillo
-                            layout: { padding: 22 },
+                            layout: { padding: 26 },
                             plugins: {
                                 legend: { display: false },
                                 datalabels: {
@@ -1699,17 +1699,35 @@
                                         nombre: {
                                             anchor: 'end',
                                             align: 'end',
-                                            offset: 6,
+                                            offset: 8,
                                             clamp: false,
                                             clip: false,
-                                            font: { weight: '800', size: 12 },
+                                            font: function(ctx) {
+                                                const v = Number(ctx.dataset.data[ctx.dataIndex]) || 0;
+                                                const data = ctx.dataset.data || [];
+                                                const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
+                                                const pct = total > 0 ? (v / total) * 100 : 0;
+                                                // Más chico si el segmento es estrecho
+                                                let size = 12;
+                                                if (pct < 20) size = 10;
+                                                if (pct < 12) size = 9;
+                                                return { weight: '800', size: size };
+                                            },
                                             color: function(ctx) {
                                                 const cols = ['#dc2626', '#ca8a04', '#65a30d', '#059669'];
                                                 return cols[ctx.dataIndex] || '#334155';
                                             },
                                             formatter: function(v, ctx) {
                                                 if (!tiene || !v || v <= 0) return '';
+                                                const data = ctx.dataset.data || [];
+                                                const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
+                                                const pct = total > 0 ? (v / total) * 100 : 0;
+                                                // Segmentos muy chicos: no poner nombre alrededor (evita "PREVISINICIO")
+                                                // La info sigue en las cajitas de abajo
+                                                if (pct < 8 || v < 2) return '';
                                                 const noms = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
+                                                const short = ['INI', 'PRO', 'PREV', 'DES'];
+                                                if (pct < 14) return short[ctx.dataIndex];
                                                 return noms[ctx.dataIndex] || '';
                                             }
                                         }
