@@ -1673,68 +1673,6 @@
                 setTimeout(() => {
                     const canvas = document.getElementById(cid);
                     if (!canvas) return;
-                    const pluginGuiasDona = {
-                        id: 'guiasDonaPres-' + idx,
-                        afterDraw(chart) {
-                            if (!tiene) return;
-                            const meta = chart.getDatasetMeta(0);
-                            if (!meta || !meta.data || !meta.data.length) return;
-                            const ctx = chart.ctx;
-                            const noms = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
-                            const cols = ['#dc2626', '#ca8a04', '#65a30d', '#059669'];
-                            const data = chart.data.datasets[0].data || [];
-                            const items = [];
-                            meta.data.forEach((arc, i) => {
-                                const v = Number(data[i]) || 0;
-                                if (v <= 0 || !arc) return;
-                                const mid = (arc.startAngle + arc.endAngle) / 2;
-                                items.push({
-                                    i, mid, v,
-                                    cx: arc.x, cy: arc.y,
-                                    or: arc.outerRadius,
-                                    name: noms[i],
-                                    color: cols[i]
-                                });
-                            });
-                            // Si dos ángulos están muy cerca, alejar más la etiqueta (línea guía más larga)
-                            items.forEach((L) => {
-                                let extra = 0;
-                                items.forEach((O) => {
-                                    if (O.i === L.i) return;
-                                    let diff = Math.abs(L.mid - O.mid);
-                                    diff = Math.min(diff, Math.PI * 2 - diff);
-                                    if (diff < 0.45) extra = Math.max(extra, 22);
-                                    if (diff < 0.28) extra = Math.max(extra, 34);
-                                });
-                                const rArc = L.or + 4;
-                                const rTxt = L.or + 22 + extra;
-                                const x1 = L.cx + Math.cos(L.mid) * rArc;
-                                const y1 = L.cy + Math.sin(L.mid) * rArc;
-                                const x2 = L.cx + Math.cos(L.mid) * rTxt;
-                                const y2 = L.cy + Math.sin(L.mid) * rTxt;
-                                ctx.save();
-                                ctx.beginPath();
-                                ctx.moveTo(x1, y1);
-                                ctx.lineTo(x2, y2);
-                                ctx.strokeStyle = L.color;
-                                ctx.lineWidth = 1.6;
-                                ctx.stroke();
-                                // punto en el anillo
-                                ctx.beginPath();
-                                ctx.arc(x1, y1, 2.2, 0, Math.PI * 2);
-                                ctx.fillStyle = L.color;
-                                ctx.fill();
-                                // Texto MISMO tamaño para todos
-                                ctx.font = '800 12px system-ui, -apple-system, Segoe UI, sans-serif';
-                                ctx.fillStyle = L.color;
-                                ctx.textAlign = x2 >= L.cx ? 'left' : 'right';
-                                ctx.textBaseline = 'middle';
-                                const tx = x2 + (x2 >= L.cx ? 5 : -5);
-                                ctx.fillText(L.name, tx, y2);
-                                ctx.restore();
-                            });
-                        }
-                    };
                     chartsPres.minis[cid] = new Chart(canvas, {
                         type: 'doughnut',
                         data: {
@@ -1749,24 +1687,45 @@
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            layout: { padding: 42 },
+                            layout: { padding: 18 },
                             plugins: {
                                 legend: { display: false },
                                 datalabels: {
-                                    // Solo número dentro; nombres van con líneas guía
-                                    anchor: 'center',
-                                    align: 'center',
-                                    color: '#fff',
-                                    font: { weight: 'bold', size: 16 },
-                                    textStrokeColor: 'rgba(0,0,0,0.3)',
-                                    textStrokeWidth: 2,
-                                    formatter: (v) => (tiene && v > 0) ? v : ''
+                                    labels: {
+                                        valor: {
+                                            anchor: 'center',
+                                            align: 'center',
+                                            color: '#fff',
+                                            font: { weight: 'bold', size: 16 },
+                                            textStrokeColor: 'rgba(0,0,0,0.3)',
+                                            textStrokeWidth: 2,
+                                            formatter: (v) => (tiene && v > 0) ? v : ''
+                                        },
+                                        nombre: {
+                                            anchor: 'end',
+                                            align: 'end',
+                                            offset: 6,
+                                            clamp: false,
+                                            clip: false,
+                                            font: { weight: '800', size: 11 },
+                                            color: function(ctx) {
+                                                const cols = ['#dc2626', '#ca8a04', '#65a30d', '#059669'];
+                                                return cols[ctx.dataIndex] || '#334155';
+                                            },
+                                            formatter: function(v, ctx) {
+                                                if (!tiene || !v || v <= 0) return '';
+                                                const noms = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
+                                                return noms[ctx.dataIndex] || '';
+                                            }
+                                        }
+                                    }
                                 }
                             },
                             cutout: '55%'
-                        },
-                        plugins: [pluginGuiasDona]
+                        }
                     });
+
+
                 }, 30 + idx * 20);
             });
         }
