@@ -1410,14 +1410,32 @@
                         plugins: {
                             legend: { position: 'bottom', labels: { boxWidth: 16, font: { size: 14, weight: 'bold' } } },
                             datalabels: {
-                                anchor: 'end',
-                                align: 'top',
-                                offset: 0,
+                                anchor: 'center',
+                                align: 'center',
                                 clamp: true,
-                                clip: false,
-                                font: { weight: 'bold', size: 16 },
-                                color: '#0f172a',
-                                formatter: (v) => v > 0 ? v : ''
+                                clip: true,
+                                color: '#fff',
+                                textStrokeColor: 'rgba(0,0,0,0.35)',
+                                textStrokeWidth: 3,
+                                textAlign: 'center',
+                                font: function(ctx) {
+                                    const v = Number(ctx.dataset.data[ctx.dataIndex]) || 0;
+                                    let size = 9;
+                                    if (v >= 18) size = 14;
+                                    else if (v >= 12) size = 12;
+                                    else if (v >= 7) size = 11;
+                                    else if (v >= 4) size = 10;
+                                    return { weight: 'bold', size: size };
+                                },
+                                formatter: function(v, ctx) {
+                                    if (!v || v <= 0) return '';
+                                    const full = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
+                                    const short = ['C', 'B', 'A', 'AD'];
+                                    const i = ctx.datasetIndex;
+                                    if (v <= 2) return String(v);
+                                    if (v <= 5) return short[i] + '\n' + v;
+                                    return full[i] + '\n' + v;
+                                }
                             }
                         },
                         layout: { padding: { top: 28, right: 8 } },
@@ -1776,14 +1794,32 @@
                                 }
                             },
                             datalabels: {
-                                anchor: 'end',
-                                align: 'top',
-                                offset: 0,
+                                anchor: 'center',
+                                align: 'center',
                                 clamp: true,
-                                clip: false,
-                                font: { size: 10, weight: 'bold' },
-                                color: '#334155',
-                                formatter: (val) => val > 0 ? val : ''
+                                clip: true,
+                                color: '#fff',
+                                textStrokeColor: 'rgba(0,0,0,0.35)',
+                                textStrokeWidth: 2,
+                                textAlign: 'center',
+                                font: function(ctx) {
+                                    const v = Number(ctx.dataset.data[ctx.dataIndex]) || 0;
+                                    let size = 8;
+                                    if (v >= 16) size = 12;
+                                    else if (v >= 10) size = 11;
+                                    else if (v >= 6) size = 10;
+                                    else if (v >= 4) size = 9;
+                                    return { weight: 'bold', size: size };
+                                },
+                                formatter: function(val, ctx) {
+                                    if (!val || val <= 0) return '';
+                                    const full = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
+                                    const short = ['C', 'B', 'A', 'AD'];
+                                    const i = ctx.datasetIndex;
+                                    if (val <= 2) return String(val);
+                                    if (val <= 5) return short[i] + '\n' + val;
+                                    return full[i] + '\n' + val;
+                                }
                             }
                         },
                         layout: { padding: { top: 18 } },
