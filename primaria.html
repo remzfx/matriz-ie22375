@@ -1422,19 +1422,21 @@
                                         textStrokeWidth: 3,
                                         font: function(ctx) {
                                             const v = Number(ctx.dataset.data[ctx.dataIndex]) || 0;
-                                            let size = 9;
-                                            if (v >= 18) size = 13;
-                                            else if (v >= 12) size = 12;
-                                            else if (v >= 8) size = 11;
+                                            // Escala continua: barras chicas → letra chica, siempre el nombre
+                                            let size = 7;
+                                            if (v >= 20) size = 14;
+                                            else if (v >= 15) size = 13;
+                                            else if (v >= 10) size = 12;
+                                            else if (v >= 7) size = 11;
                                             else if (v >= 5) size = 10;
+                                            else if (v >= 3) size = 9;
+                                            else if (v >= 2) size = 8;
                                             return { weight: 'bold', size: size };
                                         },
                                         formatter: function(v, ctx) {
-                                            if (!v || v < 4) return '';
+                                            if (!v || v <= 0) return '';
                                             const full = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
-                                            const short = ['C', 'B', 'A', 'AD'];
-                                            const i = ctx.datasetIndex;
-                                            return v >= 7 ? full[i] : short[i];
+                                            return full[ctx.datasetIndex] || '';
                                         }
                                     },
                                     valor: {
@@ -1818,18 +1820,18 @@
                                         textStrokeWidth: 2,
                                         font: function(ctx) {
                                             const v = Number(ctx.dataset.data[ctx.dataIndex]) || 0;
-                                            let size = 8;
-                                            if (v >= 16) size = 11;
-                                            else if (v >= 10) size = 10;
-                                            else if (v >= 6) size = 9;
+                                            let size = 7;
+                                            if (v >= 18) size = 12;
+                                            else if (v >= 12) size = 11;
+                                            else if (v >= 8) size = 10;
+                                            else if (v >= 5) size = 9;
+                                            else if (v >= 3) size = 8;
                                             return { weight: 'bold', size: size };
                                         },
                                         formatter: function(val, ctx) {
-                                            if (!val || val < 4) return '';
+                                            if (!val || val <= 0) return '';
                                             const full = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
-                                            const short = ['C', 'B', 'A', 'AD'];
-                                            const i = ctx.datasetIndex;
-                                            return val >= 7 ? full[i] : short[i];
+                                            return full[ctx.datasetIndex] || '';
                                         }
                                     },
                                     valor: {
