@@ -394,7 +394,7 @@
             flex: 1;
             min-height: 0;
             overflow: auto;
-            padding: 6px 10px 4px;
+            padding: 8px 10px 6px;
             display: flex;
             flex-direction: column;
         }
@@ -419,20 +419,29 @@
             flex-direction: column;
             min-height: 0;
             height: 100%;
+            overflow: visible;
         }
         #modoPresentacion .pres-mini-card h5 {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 800;
-            margin: 0 0 6px 0;
-            line-height: 1.25;
+            margin: 0 0 8px 0;
+            line-height: 1.3;
             color: #1e293b;
             flex-shrink: 0;
+            display: block !important;
+            -webkit-line-clamp: unset !important;
+            line-clamp: unset !important;
+            max-height: none !important;
+            overflow: visible !important;
+            white-space: normal !important;
+            text-overflow: unset !important;
         }
         #modoPresentacion .pres-mini-chart {
             position: relative;
             flex: 1 1 auto;
-            min-height: 320px;
+            min-height: 280px;
             max-height: none;
+            overflow: visible;
         }
         #modoPresentacion .pres-mini-stats {
             display: grid;
@@ -581,6 +590,41 @@
             max-width: min(420px, 80vw);
             background: #1e293b;
             border: 1px solid rgba(148, 163, 184, 0.35);
+        }
+
+
+        @media (max-width: 900px) {
+            #modoPresentacion .pres-mini-grid {
+                grid-template-columns: 1fr !important;
+            }
+            #modoPresentacion .pres-mini-chart {
+                min-height: 240px !important;
+            }
+            #modoPresentacion .pres-body {
+                grid-template-columns: 1fr !important;
+            }
+            #modoPresentacion .pres-top {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            #modoPresentacion #presTitulo {
+                font-size: 1.1rem !important;
+                max-width: 100%;
+                white-space: normal;
+            }
+            #modoPresentacion .pres-nav-btns {
+                justify-content: flex-start;
+            }
+            #modoPresentacion .pres-mini-stats .n { font-size: 16px !important; }
+            #modoPresentacion .pres-mini-stats .l { font-size: 9px !important; }
+        }
+        @media (max-width: 600px) {
+            #modoPresentacion .pres-nav {
+                max-height: 28vh;
+            }
+            #modoPresentacion .pres-mini-chart {
+                min-height: 220px !important;
+            }
         }
 
         .competencia-card {
@@ -1741,10 +1785,15 @@
             const nComp = (area.competencias || []).length;
             // Horizontal: 1→1 col, 2→2, 3→3, 4→4, 5+ → 3 cols (wrap)
             let cols = 1;
-            if (nComp === 2) cols = 2;
-            else if (nComp === 3) cols = 3;
-            else if (nComp === 4) cols = 4;
-            else if (nComp >= 5) cols = 3;
+            const ancho = window.innerWidth || 1200;
+            if (ancho < 900) {
+                cols = 1; // celular / tablet angosto: una competencia por fila
+            } else {
+                if (nComp === 2) cols = 2;
+                else if (nComp === 3) cols = 3;
+                else if (nComp === 4) cols = 4;
+                else if (nComp >= 5) cols = 3;
+            }
             grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
             grid.innerHTML = '';
             (area.competencias || []).forEach((comp, idx) => {
@@ -1755,7 +1804,7 @@
                 card.className = 'pres-mini-card';
                 const cid = 'pres-mini-' + idx;
                 card.innerHTML = `
-                    <h5 class="texto-truncar-2" data-tip="${String(comp).replace(/"/g, '&quot;')}"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:#e2e8f0;font-size:12px;margin-right:6px;flex-shrink:0;">${idx+1}</span>${comp}</h5>
+                    <h5 data-tip="${String(comp).replace(/"/g, '&quot;')}"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:#e2e8f0;font-size:12px;margin-right:6px;flex-shrink:0;">${idx+1}</span>${comp}</h5>
                     <div class="pres-mini-chart" style="min-height:340px;flex:1 1 auto;"><canvas id="${cid}"></canvas></div>
                     <div class="pres-mini-stats">
                         <div style="background:#fef2f2;border-color:#fecaca;color:#b91c1c">
@@ -1797,7 +1846,7 @@
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            layout: { padding: 18 },
+                            layout: { padding: { top: 28, right: 20, bottom: 24, left: 20 } },
                             plugins: {
                                 legend: { display: false },
                                 datalabels: {
