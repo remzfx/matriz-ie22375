@@ -1389,12 +1389,25 @@
                         maintainAspectRatio: false,
                         plugins: {
                             legend: { position: 'bottom', labels: { boxWidth: 16, font: { size: 14, weight: 'bold' } } },
-                            datalabels: { anchor: 'end', align: 'top', font: { weight: 'bold', size: 16 }, color: '#0f172a',
-                                formatter: (v) => v > 0 ? v : '' }
+                            datalabels: {
+                                anchor: 'end',
+                                align: 'top',
+                                offset: 0,
+                                clamp: true,
+                                clip: false,
+                                font: { weight: 'bold', size: 16 },
+                                color: '#0f172a',
+                                formatter: (v) => v > 0 ? v : ''
+                            }
                         },
+                        layout: { padding: { top: 28, right: 8 } },
                         scales: {
                             x: { ticks: { font: { size: 13, weight: '600' }, maxRotation: 40 } },
-                            y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 14, weight: '600' } } }
+                            y: {
+                                beginAtZero: true,
+                                grace: '18%',
+                                ticks: { stepSize: 1, font: { size: 14, weight: '600' } }
+                            }
                         }
                     }
                 });
@@ -1415,11 +1428,11 @@
                         plugins: {
                             legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 12 } } },
                             datalabels: {
-                                color: '#fff', font: { weight: 'bold', size: 13 },
+                                color: '#fff', font: { weight: 'bold', size: 18 },
                                 formatter: (v, ctx) => {
                                     const sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
                                     if (!v || !sum) return '';
-                                    return v + '\n(' + Math.round(v / sum * 100) + '%)';
+                                    return Math.round(v / sum * 100) + '%';
                                 }
                             }
                         }
@@ -1744,12 +1757,15 @@
                             datalabels: {
                                 anchor: 'end',
                                 align: 'top',
-                                offset: -2,
+                                offset: 0,
+                                clamp: true,
+                                clip: false,
                                 font: { size: 10, weight: 'bold' },
                                 color: '#334155',
                                 formatter: (val) => val > 0 ? val : ''
                             }
                         },
+                        layout: { padding: { top: 18 } },
                         scales: {
                             x: {
                                 ticks: { font: { size: 10 }, maxRotation: 35, minRotation: 0 },
@@ -1757,7 +1773,7 @@
                             },
                             y: {
                                 beginAtZero: true,
-                                suggestedMax: totalEst,
+                                grace: '15%',
                                 ticks: { stepSize: 1, font: { size: 11 } },
                                 title: { display: true, text: 'N° de estudiantes', font: { size: 11 } }
                             }
@@ -1777,10 +1793,10 @@
                     type: 'doughnut',
                     data: {
                         labels: [
-                            `Inicio (C): ${sumInicio} (${pct(sumInicio)}%)`,
-                            `En Proceso (B): ${sumProceso} (${pct(sumProceso)}%)`,
-                            `Previsto (A): ${sumPrevisto} (${pct(sumPrevisto)}%)`,
-                            `Destacado (AD): ${sumDestacado} (${pct(sumDestacado)}%)`
+                            `Inicio (C): ${pct(sumInicio)}%`,
+                            `En Proceso (B): ${pct(sumProceso)}%`,
+                            `Previsto (A): ${pct(sumPrevisto)}%`,
+                            `Destacado (AD): ${pct(sumDestacado)}%`
                         ],
                         datasets: [{
                             data: tieneDatosArea ? [sumInicio, sumProceso, sumPrevisto, sumDestacado] : [1],
@@ -1813,10 +1829,10 @@
                             },
                             datalabels: {
                                 color: '#fff',
-                                font: { weight: 'bold', size: 13 },
+                                font: { weight: 'bold', size: 16 },
                                 formatter: (val) => {
                                     if (!tieneDatosArea || val === 0) return '';
-                                    return val + '\n(' + pct(val) + '%)';
+                                    return pct(val) + '%';
                                 },
                                 textAlign: 'center'
                             }
