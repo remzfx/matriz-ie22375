@@ -1524,7 +1524,7 @@
                 const cid = 'pres-mini-' + idx;
                 card.innerHTML = `
                     <h5><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:#e2e8f0;font-size:12px;margin-right:6px;">${idx+1}</span>${comp}</h5>
-                    <div class="pres-mini-chart"><canvas id="${cid}"></canvas></div>
+                    <div class="pres-mini-chart" style="min-height:220px;"><canvas id="${cid}"></canvas></div>
                     <div class="pres-mini-stats">
                         <div style="background:#fef2f2;border-color:#fecaca;color:#b91c1c">
                             <div class="n">${d.inicio||0}</div>
@@ -1554,25 +1554,41 @@
                     chartsPres.minis[cid] = new Chart(canvas, {
                         type: 'doughnut',
                         data: {
-                            labels: ['C','B','A','AD'],
+                            labels: ['Inicio', 'Proceso', 'Previsto', 'Destacado'],
                             datasets: [{
                                 data: tiene ? [d.inicio||0, d.proceso||0, d.previsto||0, d.destacado||0] : [1],
                                 backgroundColor: tiene ? ['#ef4444','#eab308','#84cc16','#16a34a'] : ['#e2e8f0'],
-                                borderWidth: 0
+                                borderWidth: 2,
+                                borderColor: '#fff'
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
+                            layout: { padding: { top: 4, bottom: 4 } },
                             plugins: {
-                                legend: { display: false },
+                                legend: {
+                                    display: true,
+                                    position: 'bottom',
+                                    labels: {
+                                        boxWidth: 12,
+                                        boxHeight: 12,
+                                        padding: 10,
+                                        font: { size: 12, weight: '700' },
+                                        color: '#334155',
+                                        usePointStyle: true,
+                                        pointStyle: 'circle'
+                                    }
+                                },
                                 datalabels: {
                                     color: '#fff',
-                                    font: { weight: 'bold', size: 18 },
+                                    font: { weight: 'bold', size: 15 },
+                                    textStrokeColor: 'rgba(0,0,0,0.25)',
+                                    textStrokeWidth: 2,
                                     formatter: (v) => (tiene && v > 0) ? v : ''
                                 }
                             },
-                            cutout: '55%'
+                            cutout: '52%'
                         }
                     });
                 }, 30 + idx * 20);
