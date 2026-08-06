@@ -633,6 +633,127 @@
             }
         }
 
+
+        /* Presentación móvil: no cortar gráficos */
+        @media (max-width: 900px) {
+            #modoPresentacion .pres-top {
+                flex-wrap: wrap;
+                padding: 10px 12px !important;
+                gap: 8px;
+            }
+            #modoPresentacion .pres-body {
+                grid-template-columns: 1fr !important;
+                padding: 10px !important;
+                gap: 12px !important;
+                overflow: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+            #modoPresentacion .pres-card {
+                min-height: 260px;
+                padding: 12px;
+            }
+            #modoPresentacion .pres-chart-wrap {
+                min-height: 220px !important;
+                height: 240px;
+            }
+            #modoPresentacion .pres-body-comp {
+                overflow: auto !important;
+                -webkit-overflow-scrolling: touch;
+                padding: 10px !important;
+            }
+            #modoPresentacion .pres-mini-grid {
+                grid-template-columns: 1fr !important;
+                grid-auto-rows: auto !important;
+                height: auto !important;
+                gap: 14px !important;
+            }
+            #modoPresentacion .pres-mini-card {
+                height: auto !important;
+                min-height: 0;
+                overflow: visible !important;
+            }
+            #modoPresentacion .pres-mini-chart {
+                min-height: 200px !important;
+                height: 220px !important;
+                flex: none !important;
+            }
+            #modoPresentacion .pres-mini-stats {
+                margin-top: 10px !important;
+                padding-bottom: 4px;
+            }
+            #modoPresentacion .pres-mini-stats .n { font-size: 16px !important; }
+            #modoPresentacion .pres-mini-stats .p { font-size: 11px !important; }
+            #modoPresentacion .pres-mini-stats .l { font-size: 9px !important; }
+            #modoPresentacion .pres-nav {
+                max-height: 32vh !important;
+                padding: 8px 10px 12px !important;
+            }
+            #modoPresentacion .pres-nav-btns button {
+                font-size: 11px !important;
+                padding: 6px 10px !important;
+            }
+        }
+
+
+        /* ===== Presentación móvil: gráficos completos, sin recortes ===== */
+        @media (max-width: 900px) {
+            #modoPresentacion .pres-top {
+                padding: 8px 10px !important;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            #modoPresentacion #presTitulo {
+                font-size: 1.15rem !important;
+                max-width: 100%;
+                white-space: normal !important;
+            }
+            #modoPresentacion .pres-body {
+                grid-template-columns: 1fr !important;
+                padding: 10px !important;
+                gap: 12px !important;
+                overflow: auto !important;
+            }
+            #modoPresentacion .pres-card {
+                min-height: 340px !important;
+            }
+            #modoPresentacion .pres-chart-wrap {
+                min-height: 300px !important;
+                height: 300px !important;
+            }
+            #modoPresentacion .pres-body-comp {
+                overflow: auto !important;
+                padding: 8px !important;
+            }
+            #modoPresentacion .pres-mini-grid {
+                grid-template-columns: 1fr !important;
+                grid-auto-rows: minmax(380px, auto) !important;
+                height: auto !important;
+                gap: 14px !important;
+            }
+            #modoPresentacion .pres-mini-card {
+                height: auto !important;
+                min-height: 380px;
+                overflow: visible !important;
+            }
+            #modoPresentacion .pres-mini-chart {
+                min-height: 280px !important;
+                height: 280px !important;
+                flex: 0 0 auto !important;
+            }
+            #modoPresentacion .pres-nav {
+                max-height: 26vh !important;
+                overflow-y: auto !important;
+                padding: 6px 8px 10px !important;
+            }
+            #modoPresentacion .pres-nav-btns button {
+                font-size: 11px !important;
+                padding: 6px 10px !important;
+            }
+            #modoPresentacion .pres-mini-stats .n { font-size: 18px !important; }
+            #modoPresentacion .pres-mini-stats .p { font-size: 12px !important; }
+            #modoPresentacion .pres-mini-stats .l { font-size: 9px !important; }
+        }
+
         .competencia-card {
             animation: slideIn 0.3s ease-out;
         }
@@ -1675,10 +1796,15 @@
             const ctxB = document.getElementById('chartPresBarras');
             const ctxD = document.getElementById('chartPresDona');
             if (ctxB) {
+                const esMovil = (window.innerWidth || 900) < 900;
+                // En móvil: etiquetas cortas y barras horizontales para ver el gráfico completo
+                const labelsBarras = esMovil
+                    ? comps.map((_, i) => 'C' + (i + 1))
+                    : labels;
                 chartsPres.barras = new Chart(ctxB, {
                     type: 'bar',
                     data: {
-                        labels,
+                        labels: labelsBarras,
                         datasets: [
                             { label: 'Inicio (C)', data: inicio, backgroundColor: '#ef4444' },
                             { label: 'Proceso (B)', data: proceso, backgroundColor: '#eab308' },
@@ -1687,11 +1813,28 @@
                         ]
                     },
                     options: {
+                        indexAxis: esMovil ? 'y' : 'x',
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: { position: 'bottom', labels: { boxWidth: 16, font: { size: 14, weight: 'bold' } } },
-                                                        datalabels: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: esMovil ? 10 : 16,
+                                    font: { size: esMovil ? 10 : 14, weight: 'bold' },
+                                    padding: esMovil ? 6 : 12
+                                }
+                            },
+                            datalabels: esMovil ? {
+                                // Solo números, legibles en horizontal
+                                anchor: 'end',
+                                align: 'right',
+                                clamp: true,
+                                clip: false,
+                                color: '#0f172a',
+                                font: { weight: 'bold', size: 11 },
+                                formatter: (v) => v > 0 ? v : ''
+                            } : {
                                 labels: {
                                     titulo: {
                                         anchor: 'center',
@@ -1704,7 +1847,6 @@
                                         textStrokeWidth: 3,
                                         font: function(ctx) {
                                             const v = Number(ctx.dataset.data[ctx.dataIndex]) || 0;
-                                            // Escala continua: barras chicas → letra chica, siempre el nombre
                                             let size = 7;
                                             if (v >= 20) size = 14;
                                             else if (v >= 15) size = 13;
@@ -1734,9 +1876,25 @@
                                 }
                             }
                         },
-                        layout: { padding: { top: 28, right: 8 } },
-                        scales: {
-                            x: { ticks: { font: { size: 13, weight: '600' }, maxRotation: 40 } },
+                        layout: { padding: esMovil ? { top: 4, right: 28, bottom: 4, left: 4 } : { top: 28, right: 8, bottom: 0, left: 0 } },
+                        scales: esMovil ? {
+                            x: {
+                                beginAtZero: true,
+                                grace: '10%',
+                                ticks: { stepSize: 1, font: { size: 10, weight: '600' } }
+                            },
+                            y: {
+                                ticks: { font: { size: 12, weight: '700' }, autoSkip: false }
+                            }
+                        } : {
+                            x: {
+                                ticks: {
+                                    font: { size: 13, weight: '600' },
+                                    maxRotation: 40,
+                                    minRotation: 0,
+                                    autoSkip: false
+                                }
+                            },
                             y: {
                                 beginAtZero: true,
                                 grace: '18%',
@@ -1745,6 +1903,7 @@
                         }
                     }
                 });
+
             }
             if (ctxD) {
                 const pctsPres = porcentajesQueSuman100([tI, tP, tPr, tD]);
@@ -1859,7 +2018,7 @@
                                     anchor: 'center',
                                     align: 'center',
                                     color: '#fff',
-                                    font: { weight: 'bold', size: 18 },
+                                    font: { weight: 'bold', size: (window.innerWidth || 900) < 900 ? 14 : 18 },
                                     textStrokeColor: 'rgba(0,0,0,0.25)',
                                     textStrokeWidth: 2,
                                     formatter: (v) => (tiene && v > 0) ? v : ''
