@@ -25,8 +25,15 @@
   table.data th { text-align:left; padding:8px 10px; background:#f8fafc; color:#475569; font-weight:700; border-bottom:1px solid #e2e8f0; position:sticky; top:0; }
   table.data td { padding:8px 10px; border-bottom:1px solid #f1f5f9; }
   table.data tr:hover td { background:#f8fafc; }
-  .screen { display:none; }
-  .screen.active { display:block; }
+  .screen { display: none !important; }
+  .screen.active { display: block !important; }
+  #screenLogin.screen.active {
+    display: flex !important;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+  }
+  #screenApp.screen.active { display: block !important; }
   input, select, textarea { border:1px solid #cbd5e1; border-radius:10px; padding:.55rem .75rem; width:100%; }
   input:focus, select:focus, textarea:focus { outline:2px solid #7dd3fc; border-color:#0ea5e9; }
 </style>
@@ -241,20 +248,28 @@ function getPass() {
 }
 
 function doLogin() {
-  const v = document.getElementById('loginPass').value || '';
+  const v = (document.getElementById('loginPass').value || '').trim();
   if (v === getPass()) {
     document.getElementById('loginError').classList.add('hidden');
+    document.getElementById('loginError').style.display = 'none';
     document.getElementById('screenLogin').classList.remove('active');
     document.getElementById('screenApp').classList.add('active');
     sessionStorage.setItem('ie22375_admin_ok', '1');
-    loadEstado();
-    initPeriodosUI();
-    actualizarResumen();
-    fillFiltros();
-    renderTabla();
-    showTab('menu');
+    try {
+      loadEstado();
+      initPeriodosUI();
+      actualizarResumen();
+      fillFiltros();
+      renderTabla();
+      showTab('menu');
+    } catch (err) {
+      console.error(err);
+      alert('Entró, pero hubo un aviso al cargar datos: ' + err.message);
+    }
   } else {
-    document.getElementById('loginError').classList.remove('hidden');
+    const e = document.getElementById('loginError');
+    e.classList.remove('hidden');
+    e.style.display = 'block';
   }
 }
 
