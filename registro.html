@@ -2,21 +2,18 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f172a">
 <title>Registro auxiliar · IE 22375</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; }
+  :root { --hdr: 56px; --ctx: auto; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
   .card { background:#fff; border-radius:16px; box-shadow:0 6px 24px rgba(15,23,42,.08); }
-  .btn { border-radius:12px; font-weight:700; padding:.55rem 1rem; transition:.15s; }
+  .btn { border-radius:12px; font-weight:700; padding:.55rem 1rem; transition:.15s; border:0; cursor:pointer; }
   .btn-primary { background:#0284c7; color:#fff; }
-  .btn-primary:hover { background:#0369a1; }
-  .btn-dark { background:#0f172a; color:#fff; }
   .btn-ghost { background:#e2e8f0; color:#0f172a; }
-  .chip { display:inline-flex; align-items:center; padding:.35rem .75rem; border-radius:999px; font-size:12px; font-weight:800; border:2px solid transparent; cursor:pointer; }
-  .chip-off { background:#f1f5f9; color:#64748b; }
-  .chip-on { background:#e0f2fe; color:#0369a1; border-color:#7dd3fc; }
+  .chip { display:inline-flex; align-items:center; justify-content:center; min-width:2.4rem; padding:.4rem .65rem; border-radius:999px; font-size:13px; font-weight:800; border:2px solid transparent; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .nivel-c { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
   .nivel-c.on { background:#dc2626; color:#fff; border-color:#dc2626; }
   .nivel-b { background:#fffbeb; color:#a16207; border-color:#fde68a; }
@@ -25,125 +22,132 @@
   .nivel-a.on { background:#84cc16; color:#fff; border-color:#84cc16; }
   .nivel-ad { background:#ecfdf5; color:#047857; border-color:#6ee7b7; }
   .nivel-ad.on { background:#16a34a; color:#fff; border-color:#16a34a; }
-  .stu-row { border-bottom:1px solid #f1f5f9; padding:10px 0; }
+  .stu-row { border-bottom:1px solid #f1f5f9; padding:12px 0; }
   .stu-row:last-child { border-bottom:0; }
-  input, select, textarea { border:1px solid #cbd5e1; border-radius:10px; padding:.5rem .7rem; width:100%; }
-  input:focus, select:focus, textarea:focus { outline:2px solid #7dd3fc; border-color:#0ea5e9; }
-  .sticky-bar { position:sticky; top:0; z-index:30; }
-  .area-btn { font-size:11px; padding:.4rem .65rem; border-radius:10px; font-weight:800; background:#f1f5f9; color:#475569; }
+  select, input, textarea {
+    border:1.5px solid #cbd5e1; border-radius:12px; padding:.65rem .75rem;
+    width:100%; font-size:16px; background:#fff; color:#0f172a;
+    min-height:44px; /* iOS touch */
+  }
+  select { appearance:auto; -webkit-appearance:menulist; }
+  .area-btn { font-size:12px; padding:.45rem .7rem; border-radius:10px; font-weight:800; background:#f1f5f9; color:#475569; border:0; cursor:pointer; }
   .area-btn.on { background:#0ea5e9; color:#fff; }
-  .comp-btn { text-align:left; width:100%; padding:.65rem .85rem; border-radius:12px; border:2px solid #e2e8f0; background:#fff; font-size:13px; font-weight:600; color:#334155; }
+  .comp-btn { text-align:left; width:100%; padding:.7rem .85rem; border-radius:12px; border:2px solid #e2e8f0; background:#fff; font-size:13px; font-weight:600; color:#334155; cursor:pointer; }
   .comp-btn.on { border-color:#0ea5e9; background:#f0f9ff; color:#0c4a6e; }
+  .sticky-top { position:sticky; top:0; z-index:40; }
+  .ctx-bar { position:sticky; top:var(--hdr); z-index:35; background:#f1f5f9; padding:8px 0; border-bottom:1px solid #e2e8f0; }
+  .cap-box { background:#f8fafc; border-radius:12px; padding:8px 10px; margin-top:8px; border:1px solid #e2e8f0; }
+  .cap-row { padding:8px 0; border-bottom:1px dashed #e2e8f0; }
+  .cap-row:last-child { border-bottom:0; }
 </style>
 </head>
 <body class="min-h-screen text-slate-800">
 
-<!-- HOME -->
 <div id="viewHome" class="max-w-lg mx-auto p-4 pt-10">
   <div class="text-center mb-6">
     <div class="text-xs font-bold tracking-widest text-sky-600">IE 22375 SANTA ROSA DE LOS MOLINOS</div>
     <h1 class="text-2xl font-black mt-1">Registro auxiliar</h1>
-    <p class="text-sm text-slate-500 mt-1">Evaluación por competencias · 2026</p>
+    <p class="text-sm text-slate-500 mt-1">Competencias y capacidades · 2026</p>
   </div>
   <div class="grid gap-3">
-    <button class="card p-5 text-left hover:ring-2 hover:ring-sky-300" onclick="entrarNivel('primaria')">
+    <button class="card p-5 text-left" onclick="entrarNivel('primaria')">
       <div class="text-xs font-bold text-sky-600">NIVEL</div>
       <div class="text-xl font-black">Primaria</div>
       <div class="text-sm text-slate-500">1°–6° · Sección única · Todas las áreas</div>
     </button>
-    <button class="card p-5 text-left hover:ring-2 hover:ring-emerald-300" onclick="entrarNivel('secundaria')">
+    <button class="card p-5 text-left" onclick="entrarNivel('secundaria')">
       <div class="text-xs font-bold text-emerald-600">NIVEL</div>
       <div class="text-xl font-black">Secundaria</div>
       <div class="text-sm text-slate-500">1°–5° · A/B o Única · Por área</div>
     </button>
   </div>
   <div class="mt-6 text-center space-x-3 text-sm">
-    <a href="index.html" class="text-slate-500 hover:text-sky-600">← Inicio</a>
-    <a href="admin.html" class="text-slate-500 hover:text-sky-600">Admin BD</a>
+    <a href="index.html" class="text-slate-500">← Inicio</a>
+    <a href="admin.html" class="text-slate-500">Admin BD</a>
   </div>
   <p class="text-[11px] text-center text-slate-400 mt-8">Desarrollo · Diseño e integración Mag. Efrain Ceopa Paredes</p>
 </div>
 
-<!-- APP -->
 <div id="viewApp" class="hidden">
-  <header class="sticky-bar bg-gradient-to-r from-slate-900 to-sky-900 text-white">
-    <div class="max-w-3xl mx-auto px-3 py-2.5 flex flex-wrap items-center justify-between gap-2">
-      <div>
+  <header class="sticky-top bg-gradient-to-r from-slate-900 to-sky-900 text-white" id="appHdr">
+    <div class="max-w-3xl mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
+      <div class="min-w-0">
         <div class="text-[10px] font-bold tracking-widest text-sky-200">REGISTRO AUXILIAR</div>
-        <div class="font-black leading-tight" id="hdrTitulo">—</div>
-        <div class="text-xs text-sky-100/90" id="hdrSub">—</div>
+        <div class="font-black leading-tight truncate" id="hdrTitulo">—</div>
+        <div class="text-xs text-sky-100/90 truncate" id="hdrSub">—</div>
       </div>
-      <div class="flex gap-2">
-        <button class="btn btn-ghost text-xs !py-1.5 !px-2.5" onclick="guardarNotas(); alert('Guardado en este dispositivo')">💾</button>
-        <button class="btn btn-ghost text-xs !py-1.5 !px-2.5" onclick="volverHome()">Salir</button>
+      <div class="flex gap-2 shrink-0">
+        <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="guardarNotas(); toast('Guardado')">💾</button>
+        <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="volverHome()">Salir</button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-3xl mx-auto px-3 py-3 space-y-3 pb-28">
-    <!-- Contexto -->
-    <div class="card p-3 space-y-2">
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div>
-          <label class="text-[10px] font-bold text-slate-500">Bimestre</label>
-          <select id="selBim" onchange="onContexto()"></select>
+  <!-- Barra de contexto SIEMPRE visible en móvil -->
+  <div class="ctx-bar">
+    <div class="max-w-3xl mx-auto px-3">
+      <div class="card p-3">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <label class="text-[10px] font-bold text-slate-500">Bimestre</label>
+            <select id="selBim" onchange="onContexto()"></select>
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-slate-500">Grado</label>
+            <select id="selGrado" onchange="onGrado()"></select>
+          </div>
+          <div id="wrapSeccion">
+            <label class="text-[10px] font-bold text-slate-500">Sección</label>
+            <select id="selSeccion" onchange="onContexto()"></select>
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-slate-500">Estudiantes</label>
+            <div class="font-black text-xl px-1 pt-1" id="lblN">0</div>
+          </div>
         </div>
-        <div>
-          <label class="text-[10px] font-bold text-slate-500">Grado</label>
-          <select id="selGrado" onchange="onGrado()"></select>
+        <div class="mt-2">
+          <label class="text-[10px] font-bold text-slate-500">Docente responsable</label>
+          <input id="inpDocente" placeholder="Apellidos y nombres del docente" onchange="guardarNotas()">
         </div>
-        <div id="wrapSeccion">
-          <label class="text-[10px] font-bold text-slate-500">Sección</label>
-          <select id="selSeccion" onchange="onContexto()"></select>
-        </div>
-        <div>
-          <label class="text-[10px] font-bold text-slate-500">Estudiantes</label>
-          <div class="font-black text-lg px-2" id="lblN">0</div>
-        </div>
-      </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Docente responsable</label>
-        <input id="inpDocente" placeholder="Apellidos y nombres del docente" onchange="guardarNotas()">
       </div>
     </div>
+  </div>
 
-    <!-- Áreas -->
+  <main class="max-w-3xl mx-auto px-3 py-3 space-y-3" style="padding-bottom:100px">
     <div class="card p-3">
       <div class="text-[10px] font-bold text-slate-500 mb-2">ÁREA</div>
       <div id="areaBtns" class="flex flex-wrap gap-1.5"></div>
     </div>
 
-    <!-- Competencias -->
     <div class="card p-3">
       <div class="text-[10px] font-bold text-slate-500 mb-2">COMPETENCIA</div>
       <div id="compList" class="space-y-1.5"></div>
     </div>
 
-    <!-- Alumnos -->
     <div class="card p-3">
-      <div class="flex items-center justify-between mb-2">
-        <div class="text-[10px] font-bold text-slate-500">CALIFICAR · <span id="lblCompCorta">—</span></div>
-        <div class="text-[10px] text-slate-400" id="lblProgreso"></div>
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <div class="text-[10px] font-bold text-slate-500">EVALUAR</div>
+        <button type="button" id="btnToggleCap" class="text-xs font-bold text-sky-600" onclick="toggleModoCap()">Ver capacidades</button>
       </div>
+      <div class="text-sm font-bold text-slate-700 mb-2" id="lblCompCorta">—</div>
+      <p class="text-[11px] text-slate-500 mb-2" id="lblAyuda">Marca el nivel de logro de la <b>competencia</b>. Si usas capacidades, ábrelas y califica cada una; luego puedes sugerir la nota de la competencia.</p>
       <div id="stuList"></div>
     </div>
   </main>
 
-  <!-- Resumen flotante -->
-  <div class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 backdrop-blur z-20">
+  <div class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
     <div class="max-w-3xl mx-auto px-3 py-2 flex flex-wrap gap-2 items-center justify-between text-xs font-bold">
-      <div class="flex gap-2 flex-wrap">
+      <div class="flex gap-1.5 flex-wrap">
         <span class="px-2 py-1 rounded-lg bg-red-50 text-red-700">C <span id="cC">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-700">B <span id="cB">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-lime-50 text-lime-700">A <span id="cA">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
-      <button class="btn btn-primary text-xs !py-1.5" onclick="guardarNotas(); alert('Guardado')">Guardar</button>
+      <button type="button" class="btn btn-primary text-xs !py-2" onclick="guardarNotas(); toast('Guardado')">Guardar</button>
     </div>
   </div>
 </div>
 
-<!-- Modal conclusión -->
 <div id="modalConc" class="hidden fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-3">
   <div class="card w-full max-w-md p-4">
     <div class="font-black mb-1">Conclusión descriptiva</div>
@@ -151,11 +155,13 @@
     <p class="text-[11px] text-amber-700 bg-amber-50 rounded-lg p-2 mb-2">Obligatoria cuando el nivel es <b>C (Inicio)</b>.</p>
     <textarea id="modalText" rows="4" placeholder="Describe el logro del estudiante…"></textarea>
     <div class="flex gap-2 mt-3">
-      <button class="btn btn-ghost flex-1" onclick="cerrarModal(false)">Cancelar</button>
-      <button class="btn btn-primary flex-1" onclick="cerrarModal(true)">Guardar</button>
+      <button type="button" class="btn btn-ghost flex-1" onclick="cerrarModal(false)">Cancelar</button>
+      <button type="button" class="btn btn-primary flex-1" onclick="cerrarModal(true)">Guardar</button>
     </div>
   </div>
 </div>
+
+<div id="toast" class="hidden fixed left-1/2 -translate-x-1/2 bottom-24 z-50 bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg"></div>
 
 <script>
 const BD_ADMIN_KEY = 'ie22375_admin_bd_v1';
@@ -164,11 +170,31 @@ const BD_EMP = {"anio":2026,"ie":"IE 22375 Santa Rosa de los Molinos","primaria"
 const EST_PRIM = {"Personal Social":{"competencias":["Construye su Identidad","Convive y participa democráticamente","Construye interpretaciones históricas","Gestiona responsablemente el espacio y el ambiente","Gestiona responsablemente los recursos económicos"]},"Educación Física":{"competencias":["Se desenvuelve de manera autónoma a través de su motricidad","Asume una vida saludable","Interactúa a través de sus habilidades sociomotrices"]},"Comunicación":{"competencias":["Se comunica oralmente en su lengua materna","Lee diversos tipos de textos escritos en su lengua materna","Escribe diversos tipos de textos en su lengua materna"]},"Arte y Cultura":{"competencias":["Aprecia de manera crítica manifestaciones artístico-culturales","Crea proyectos artísticos desde los lenguajes artísticos"]},"Matemática":{"competencias":["Resuelve problemas de cantidad","Resuelve problemas de regularidad, equivalencia y cambio","Resuelve problemas de forma, movimiento y localización","Resuelve problemas de gestión de datos e incertidumbre"]},"Ciencia y Tecnología":{"competencias":["Indaga mediante métodos científicos para construir sus conocimientos","Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo","Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"]},"Educación Religiosa":{"competencias":["Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas","Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"]},"Competencias Transversales":{"competencias":["Se desenvuelven en entornos virtuales generados por las TIC","Gestiona su aprendizaje de manera autónoma"]}};
 const EST_SEC = {"Desarrollo Personal, Ciudadanía y Cívica":{"competencias":["Construye su identidad","Convive y participa democráticamente en la búsqueda del bien común"]},"Ciencias Sociales":{"competencias":["Construye interpretaciones históricas","Gestiona responsablemente el espacio y el ambiente","Gestiona responsablemente los recursos económicos"]},"Educación para el Trabajo (EPT)":{"competencias":["Gestiona proyectos de emprendimiento económico o social"]},"Educación Física":{"competencias":["Se desenvuelve de manera autónoma a través de su motricidad","Asume una vida saludable","Interactúa a través de sus habilidades sociomotrices"]},"Comunicación":{"competencias":["Se comunica oralmente en su lengua materna","Lee diversos tipos de textos escritos en su lengua materna","Escribe diversos tipos de textos en su lengua materna"]},"Arte y Cultura":{"competencias":["Aprecia de manera crítica manifestaciones artístico-culturales","Crea proyectos artísticos desde los lenguajes artísticos"]},"Inglés":{"competencias":["Se comunica oralmente en inglés como lengua extranjera","Lee diversos tipos de texto en inglés como lengua extranjera","Escribe diversos tipos de textos en inglés como lengua extranjera"]},"Matemática":{"competencias":["Resuelve problemas de cantidad","Resuelve problemas de regularidad, equivalencia y cambio","Resuelve problemas de forma, movimiento y localización","Resuelve problemas de gestión de datos e incertidumbre"]},"Ciencia y Tecnología":{"competencias":["Indaga mediante métodos científicos para construir sus conocimientos","Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo","Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"]},"Educación Religiosa":{"competencias":["Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas","Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"]},"Competencias Transversales":{"competencias":["Se desenvuelven en entornos virtuales generados por las TIC","Gestiona su aprendizaje de manera autónoma"]}};
 
+/* Capacidades genéricas por índice de competencia (v1).
+   Luego se pueden reemplazar por el desglose oficial CNEB por área. */
+function capacidadesDe(compNombre) {
+  // Si el nombre sugiere, usamos textos cortos genéricos numerados
+  return [
+    'Capacidad 1 · Observa / obtiene información',
+    'Capacidad 2 · Procesa / interpreta',
+    'Capacidad 3 · Comunica / aplica'
+  ];
+}
+
 let nivel = null;
 let areaActual = null;
 let compIdx = 0;
-let notas = {}; // key -> { nivel: 'C'|'B'|'A'|'AD', conclusion: '' }
+let modoCap = false; // false = solo competencia; true = capacidades abiertas
+let notas = {}; // nombre -> { nivel, conclusion, caps: {0: 'B', 1:'A'} }
 let modalCtx = null;
+let expandStu = {}; // nombre -> bool
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 1600);
+}
 
 function loadBD() {
   try {
@@ -177,7 +203,6 @@ function loadBD() {
   } catch(e) {}
   return JSON.parse(JSON.stringify(BD_EMP));
 }
-
 function loadNotasStore() {
   try {
     const raw = localStorage.getItem(NOTAS_KEY);
@@ -185,13 +210,8 @@ function loadNotasStore() {
   } catch(e) {}
   return {};
 }
-
 function saveNotasStore(all) {
   localStorage.setItem(NOTAS_KEY, JSON.stringify(all));
-}
-
-function notaKey(bim, grado, seccion, area, comp, nombre) {
-  return [nivel, bim, grado, seccion, area, comp, nombre].join('||');
 }
 
 function estudiantes() {
@@ -203,41 +223,36 @@ function estudiantes() {
   list.sort((a,b) => (a.orden||0)-(b.orden||0) || a.nombre.localeCompare(b.nombre));
   return list;
 }
-
-function estructura() {
-  return nivel === 'primaria' ? EST_PRIM : EST_SEC;
-}
-
-function areas() {
-  return Object.keys(estructura());
-}
-
+function estructura() { return nivel === 'primaria' ? EST_PRIM : EST_SEC; }
+function areas() { return Object.keys(estructura()); }
 function competencias() {
   const e = estructura()[areaActual];
   return (e && e.competencias) ? e.competencias : [];
+}
+
+function fixHdrHeight() {
+  const h = document.getElementById('appHdr');
+  if (h) document.documentElement.style.setProperty('--hdr', h.offsetHeight + 'px');
 }
 
 function entrarNivel(n) {
   nivel = n;
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
-  // bimestres
   const sb = document.getElementById('selBim');
-  sb.innerHTML = ['I','II','III','IV'].map(b => `<option value="${b}">${b}</option>`).join('');
-  // grados
+  sb.innerHTML = ['I','II','III','IV'].map(b => `<option value="${b}">Bimestre ${b}</option>`).join('');
   const bd = loadBD();
   const list = (bd[n] && bd[n].estudiantes) || [];
   const grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
   document.getElementById('selGrado').innerHTML = grados.map(g => `<option value="${g}">${g}°</option>`).join('');
   onGrado();
-  // areas
-  const ar = areas();
-  areaActual = ar[0];
+  areaActual = areas()[0];
   renderAreas();
   renderComps();
   cargarNotasMemoria();
   renderStudents();
   updateHdr();
+  setTimeout(fixHdrHeight, 50);
 }
 
 function onGrado() {
@@ -247,17 +262,14 @@ function onGrado() {
   const secs = [...new Set(list.map(a => a.seccion))].sort();
   const ss = document.getElementById('selSeccion');
   ss.innerHTML = secs.map(s => `<option value="${s}">${s}</option>`).join('');
-  // hide seccion if only one and primaria unica
-  document.getElementById('wrapSeccion').style.display = secs.length <= 1 && nivel==='primaria' ? 'none' : 'block';
+  document.getElementById('wrapSeccion').style.display = (secs.length <= 1 && nivel==='primaria') ? 'none' : 'block';
   onContexto();
 }
-
 function onContexto() {
   cargarNotasMemoria();
   renderStudents();
   updateHdr();
 }
-
 function updateHdr() {
   const g = document.getElementById('selGrado').value;
   const s = document.getElementById('selSeccion').value;
@@ -265,43 +277,29 @@ function updateHdr() {
   document.getElementById('hdrTitulo').textContent = (nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + g + '° ' + s;
   document.getElementById('hdrSub').textContent = 'Bimestre ' + b + (areaActual ? ' · ' + areaActual : '');
   document.getElementById('lblN').textContent = estudiantes().length;
+  fixHdrHeight();
 }
-
 function renderAreas() {
-  const box = document.getElementById('areaBtns');
-  box.innerHTML = areas().map(a => {
+  document.getElementById('areaBtns').innerHTML = areas().map(a => {
     const on = a === areaActual ? 'on' : '';
-    const short = a.length > 22 ? a.slice(0,20)+'…' : a;
-    return `<button type="button" class="area-btn ${on}" onclick="setArea(this.dataset.a)" data-a="${a.replace(/"/g,'&quot;')}">${short}</button>`;
+    const short = a.length > 24 ? a.slice(0,22)+'…' : a;
+    return `<button type="button" class="area-btn ${on}" data-a="${encodeURIComponent(a)}" onclick="setArea(decodeURIComponent(this.dataset.a))">${short}</button>`;
   }).join('');
 }
-
 function setArea(a) {
-  areaActual = a;
-  compIdx = 0;
-  renderAreas();
-  renderComps();
-  cargarNotasMemoria();
-  renderStudents();
-  updateHdr();
+  areaActual = a; compIdx = 0;
+  renderAreas(); renderComps(); cargarNotasMemoria(); renderStudents(); updateHdr();
 }
-
 function renderComps() {
   const comps = competencias();
-  const box = document.getElementById('compList');
-  if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400">Sin competencias</p>'; return; }
-  box.innerHTML = comps.map((c,i) => {
+  document.getElementById('compList').innerHTML = comps.map((c,i) => {
     const on = i === compIdx ? 'on' : '';
     return `<button type="button" class="comp-btn ${on}" onclick="setComp(${i})"><span class="text-sky-600 font-black mr-1">${i+1}.</span>${c}</button>`;
-  }).join('');
-  document.getElementById('lblCompCorta').textContent = (compIdx+1) + '. ' + (comps[compIdx]||'').slice(0,40);
+  }).join('') || '<p class="text-sm text-slate-400">Sin competencias</p>';
+  document.getElementById('lblCompCorta').textContent = comps[compIdx] ? ((compIdx+1)+'. '+comps[compIdx]) : '—';
 }
-
 function setComp(i) {
-  compIdx = i;
-  renderComps();
-  cargarNotasMemoria();
-  renderStudents();
+  compIdx = i; renderComps(); cargarNotasMemoria(); renderStudents();
 }
 
 function ctxParts() {
@@ -320,26 +318,21 @@ function cargarNotasMemoria() {
   const prefix = [nivel, bim, grado, seccion, area, comp].join('||') + '||';
   notas = {};
   Object.keys(all).forEach(k => {
-    if (k.startsWith(prefix)) {
+    if (k.startsWith(prefix) && !k.includes('||cap||')) {
       const nombre = k.slice(prefix.length);
-      notas[nombre] = all[k];
+      if (nombre && !nombre.startsWith('doc')) notas[nombre] = all[k];
     }
   });
-  // docente
   const dk = ['doc', nivel, bim, grado, seccion, area].join('||');
-  if (all[dk]) document.getElementById('inpDocente').value = all[dk];
-  else document.getElementById('inpDocente').value = '';
+  document.getElementById('inpDocente').value = all[dk] || '';
 }
 
 function guardarNotas() {
   const all = loadNotasStore();
   const {bim, grado, seccion, area, comp} = ctxParts();
-  // clear current competency keys then write
   const prefix = [nivel, bim, grado, seccion, area, comp].join('||') + '||';
   Object.keys(all).forEach(k => { if (k.startsWith(prefix)) delete all[k]; });
-  Object.keys(notas).forEach(nombre => {
-    all[prefix + nombre] = notas[nombre];
-  });
+  Object.keys(notas).forEach(nombre => { all[prefix + nombre] = notas[nombre]; });
   const dk = ['doc', nivel, bim, grado, seccion, area].join('||');
   all[dk] = document.getElementById('inpDocente').value.trim();
   all._ts = Date.now();
@@ -347,27 +340,82 @@ function guardarNotas() {
   actualizarContadores();
 }
 
+function toggleModoCap() {
+  modoCap = !modoCap;
+  document.getElementById('btnToggleCap').textContent = modoCap ? 'Ocultar capacidades' : 'Ver capacidades';
+  document.getElementById('lblAyuda').innerHTML = modoCap
+    ? 'Califica cada <b>capacidad</b>. Usa <b>Sugerir</b> para proponer la nota de la competencia (el docente confirma).'
+    : 'Marca el nivel de logro de la <b>competencia</b>. Si usas capacidades, ábrelas y califica cada una.';
+  renderStudents();
+}
+
 function setNivel(nombre, niv) {
+  if (!notas[nombre]) notas[nombre] = { nivel:'', conclusion:'', caps:{} };
   if (niv === 'C') {
-    modalCtx = { nombre, niv };
-    document.getElementById('modalStu').textContent = nombre;
-    document.getElementById('modalText').value = (notas[nombre] && notas[nombre].conclusion) || '';
+    modalCtx = { nombre, niv, tipo:'comp' };
+    document.getElementById('modalStu').textContent = nombre + ' · Competencia';
+    document.getElementById('modalText').value = notas[nombre].conclusion || '';
     document.getElementById('modalConc').classList.remove('hidden');
     return;
   }
-  notas[nombre] = { nivel: niv, conclusion: (notas[nombre] && notas[nombre].conclusion) || '' };
+  notas[nombre].nivel = niv;
   guardarNotas();
   renderStudents();
+}
+
+function setCap(nombre, capIdx, niv) {
+  if (!notas[nombre]) notas[nombre] = { nivel:'', conclusion:'', caps:{} };
+  if (!notas[nombre].caps) notas[nombre].caps = {};
+  if (niv === 'C') {
+    modalCtx = { nombre, niv, tipo:'cap', capIdx };
+    document.getElementById('modalStu').textContent = nombre + ' · Capacidad ' + (capIdx+1);
+    document.getElementById('modalText').value = (notas[nombre].capConc && notas[nombre].capConc[capIdx]) || '';
+    document.getElementById('modalConc').classList.remove('hidden');
+    return;
+  }
+  notas[nombre].caps[capIdx] = niv;
+  guardarNotas();
+  renderStudents();
+}
+
+function sugerirCompetencia(nombre) {
+  const n = notas[nombre];
+  if (!n || !n.caps) return;
+  const vals = Object.values(n.caps).filter(Boolean);
+  if (!vals.length) { toast('Sin capacidades calificadas'); return; }
+  // Regla simple ordinal: C=0,B=1,A=2,AD=3 → promedio redondeado
+  const map = {C:0,B:1,A:2,AD:3};
+  const inv = ['C','B','A','AD'];
+  const avg = vals.reduce((s,v)=>s+(map[v]??1),0) / vals.length;
+  const sug = inv[Math.round(avg)];
+  if (sug === 'C') {
+    modalCtx = { nombre, niv:'C', tipo:'comp', sugerido:true };
+    document.getElementById('modalStu').textContent = nombre + ' · Sugerido: C';
+    document.getElementById('modalText').value = n.conclusion || '';
+    document.getElementById('modalConc').classList.remove('hidden');
+  } else {
+    n.nivel = sug;
+    guardarNotas();
+    toast('Competencia → ' + sug);
+    renderStudents();
+  }
 }
 
 function cerrarModal(ok) {
   if (ok && modalCtx) {
     const text = document.getElementById('modalText').value.trim();
-    if (!text) {
-      alert('La conclusión descriptiva es obligatoria para nivel C');
-      return;
+    if (!text) { alert('La conclusión descriptiva es obligatoria para nivel C'); return; }
+    const nombre = modalCtx.nombre;
+    if (!notas[nombre]) notas[nombre] = { nivel:'', conclusion:'', caps:{}, capConc:{} };
+    if (modalCtx.tipo === 'cap') {
+      notas[nombre].caps = notas[nombre].caps || {};
+      notas[nombre].caps[modalCtx.capIdx] = 'C';
+      notas[nombre].capConc = notas[nombre].capConc || {};
+      notas[nombre].capConc[modalCtx.capIdx] = text;
+    } else {
+      notas[nombre].nivel = 'C';
+      notas[nombre].conclusion = text;
     }
-    notas[modalCtx.nombre] = { nivel: 'C', conclusion: text };
     guardarNotas();
   }
   modalCtx = null;
@@ -375,46 +423,82 @@ function cerrarModal(ok) {
   renderStudents();
 }
 
+function chipRow(nombre, actual, setterPrefix) {
+  // setterPrefix unused - we use inline
+  return ['C','B','A','AD'].map(n => {
+    const cls = 'nivel-' + n.toLowerCase() + (actual===n?' on':'');
+    return `<button type="button" class="chip ${cls}" data-n="${encodeURIComponent(nombre)}" data-v="${n}">${n}</button>`;
+  }).join('');
+}
+
 function renderStudents() {
   const list = estudiantes();
   const box = document.getElementById('stuList');
+  const caps = capacidadesDe(competencias()[compIdx] || '');
   if (!list.length) {
-    box.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">No hay estudiantes en este grado/sección. Carga la BD en Admin.</p>';
+    box.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">No hay estudiantes. Revisa la BD en Admin.</p>';
     actualizarContadores();
     return;
   }
   box.innerHTML = list.map((al, i) => {
-    const n = notas[al.nombre] || {};
+    const n = notas[al.nombre] || { nivel:'', conclusion:'', caps:{} };
     const niv = n.nivel || '';
-    const hasC = niv === 'C';
-    return `<div class="stu-row">
+    const enc = encodeURIComponent(al.nombre);
+    let capsHtml = '';
+    if (modoCap) {
+      capsHtml = `<div class="cap-box">
+        ${caps.map((ct, ci) => {
+          const cv = (n.caps && n.caps[ci]) || '';
+          return `<div class="cap-row">
+            <div class="text-[11px] font-semibold text-slate-600 mb-1">${ci+1}. ${ct}</div>
+            <div class="flex flex-wrap gap-1" data-cap="${ci}" data-stu="${enc}">
+              ${['C','B','A','AD'].map(v => `<button type="button" class="chip nivel-${v.toLowerCase()} ${cv===v?'on':''}" data-cap-set="${v}">${v}</button>`).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+        <button type="button" class="btn btn-ghost text-xs mt-2 w-full" data-sug="${enc}">Sugerir nota de competencia</button>
+      </div>`;
+    }
+    return `<div class="stu-row" data-stu-row="${enc}">
       <div class="flex gap-2 items-start">
         <div class="text-xs font-bold text-slate-400 w-6 pt-1">${al.orden || i+1}</div>
         <div class="flex-1 min-w-0">
           <div class="font-bold text-sm leading-snug">${al.nombre}</div>
-          <div class="flex flex-wrap gap-1 mt-1.5">
-            <button type="button" class="chip nivel-c ${niv==='C'?'on':''}" onclick="setNivel(decodeURIComponent('${encodeURIComponent(al.nombre)}'),'C')">C</button>
-            <button type="button" class="chip nivel-b ${niv==='B'?'on':''}" onclick="setNivel(decodeURIComponent('${encodeURIComponent(al.nombre)}'),'B')">B</button>
-            <button type="button" class="chip nivel-a ${niv==='A'?'on':''}" onclick="setNivel(decodeURIComponent('${encodeURIComponent(al.nombre)}'),'A')">A</button>
-            <button type="button" class="chip nivel-ad ${niv==='AD'?'on':''}" onclick="setNivel(decodeURIComponent('${encodeURIComponent(al.nombre)}'),'AD')">AD</button>
+          <div class="text-[10px] font-bold text-slate-400 mt-1">COMPETENCIA</div>
+          <div class="flex flex-wrap gap-1 mt-1" data-comp-set="${enc}">
+            ${['C','B','A','AD'].map(v => `<button type="button" class="chip nivel-${v.toLowerCase()} ${niv===v?'on':''}" data-comp-val="${v}">${v}</button>`).join('')}
           </div>
-          ${hasC ? `<div class="text-[11px] text-red-700 mt-1 bg-red-50 rounded-lg px-2 py-1">${(n.conclusion||'').slice(0,120) || 'Sin conclusión'}${n.conclusion && n.conclusion.length>120?'…':''} <button class="underline font-bold" onclick="setNivel(decodeURIComponent('${encodeURIComponent(al.nombre)}'),'C')">editar</button></div>` : ''}
+          ${niv==='C' ? `<div class="text-[11px] text-red-700 mt-1 bg-red-50 rounded-lg px-2 py-1">${(n.conclusion||'Sin conclusión').slice(0,140)}</div>` : ''}
+          ${capsHtml}
         </div>
       </div>
     </div>`;
   }).join('');
+
+  // Event delegation (más fiable en móvil que onclick inline)
+  box.onclick = function(ev) {
+    const t = ev.target.closest('button');
+    if (!t) return;
+    if (t.dataset.compVal) {
+      const nombre = decodeURIComponent(t.closest('[data-comp-set]').dataset.compSet);
+      setNivel(nombre, t.dataset.compVal);
+    } else if (t.dataset.capSet) {
+      const wrap = t.closest('[data-cap]');
+      const nombre = decodeURIComponent(wrap.dataset.stu);
+      setCap(nombre, parseInt(wrap.dataset.cap,10), t.dataset.capSet);
+    } else if (t.dataset.sug) {
+      sugerirCompetencia(decodeURIComponent(t.dataset.sug));
+    }
+  };
+
   actualizarContadores();
-  const marcados = list.filter(a => notas[a.nombre] && notas[a.nombre].nivel).length;
-  document.getElementById('lblProgreso').textContent = marcados + '/' + list.length + ' calificados';
 }
 
 function actualizarContadores() {
   let c=0,b=0,a=0,ad=0;
   Object.values(notas).forEach(n => {
-    if (n.nivel==='C') c++;
-    else if (n.nivel==='B') b++;
-    else if (n.nivel==='A') a++;
-    else if (n.nivel==='AD') ad++;
+    if (n.nivel==='C') c++; else if (n.nivel==='B') b++;
+    else if (n.nivel==='A') a++; else if (n.nivel==='AD') ad++;
   });
   document.getElementById('cC').textContent = c;
   document.getElementById('cB').textContent = b;
@@ -428,6 +512,8 @@ function volverHome() {
   document.getElementById('viewHome').classList.remove('hidden');
   nivel = null;
 }
+
+window.addEventListener('resize', fixHdrHeight);
 </script>
 </body>
 </html>
