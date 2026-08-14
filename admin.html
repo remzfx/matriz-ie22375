@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Admin · Registro auxiliar · IE 22375</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .card { background:#fff; border-radius:16px; box-shadow:0 8px 28px rgba(15,23,42,.12); }
+  .btn { border-radius:12px; font-weight:700; padding:.6rem 1rem; transition:.15s; }
+  .btn-primary { background:#0284c7; color:#fff; }
+  .btn-primary:hover { background:#0369a1; }
+  .btn-dark { background:#0f172a; color:#fff; }
+  .btn-ghost { background:#f1f5f9; color:#0f172a; }
+  .btn-danger { background:#dc2626; color:#fff; }
+  .btn-ok { background:#16a34a; color:#fff; }
+  .chip { display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .65rem; border-radius:999px; font-size:12px; font-weight:700; }
+  .chip-on { background:#e0f2fe; color:#0369a1; }
+  .chip-off { background:#f1f5f9; color:#64748b; }
+  .chip-closed { background:#fee2e2; color:#b91c1c; }
+  .chip-open { background:#dcfce7; color:#15803d; }
+  table.data { width:100%; border-collapse:collapse; font-size:13px; }
+  table.data th { text-align:left; padding:8px 10px; background:#f8fafc; color:#475569; font-weight:700; border-bottom:1px solid #e2e8f0; position:sticky; top:0; }
+  table.data td { padding:8px 10px; border-bottom:1px solid #f1f5f9; }
+  table.data tr:hover td { background:#f8fafc; }
+  .screen { display:none; }
+  .screen.active { display:block; }
+  input, select, textarea { border:1px solid #cbd5e1; border-radius:10px; padding:.55rem .75rem; width:100%; }
+  input:focus, select:focus, textarea:focus { outline:2px solid #7dd3fc; border-color:#0ea5e9; }
+</style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+<!-- LOGIN -->
+<div id="screenLogin" class="screen active min-h-screen flex items-center justify-center p-4">
+  <div class="card w-full max-w-md p-6">
+    <div class="text-center mb-5">
+      <div class="text-xs font-bold tracking-widest text-sky-600">IE 22375</div>
+      <h1 class="text-xl font-black text-slate-900 mt-1">Panel de administración</h1>
+      <p class="text-sm text-slate-500 mt-1">Registro auxiliar · Base oficial de estudiantes</p>
+    </div>
+    <label class="text-xs font-bold text-slate-500">Contraseña</label>
+    <input id="loginPass" type="password" class="mt-1 mb-3" placeholder="Ingrese clave de admin" autocomplete="current-password">
+    <p id="loginError" class="text-red-600 text-sm mb-2 hidden">Contraseña incorrecta</p>
+    <button class="btn btn-primary w-full" onclick="doLogin()">Entrar</button>
+    <p class="text-[11px] text-slate-400 mt-4 text-center">Clave por defecto: <b>admin22375</b> · cámbiala en Configuración</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="screenApp" class="screen">
+  <header class="bg-gradient-to-r from-slate-900 to-sky-900 text-white sticky top-0 z-20">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <div class="text-[10px] font-bold tracking-widest text-sky-200">ADMIN · IE 22375</div>
+        <div class="font-black text-lg leading-tight">Registro auxiliar</div>
+        <div class="text-xs text-sky-100/80" id="hdrAnio">Año 2026</div>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="index.html" class="btn btn-ghost text-xs !py-1.5 !px-3">Inicio</a>
+        <button class="btn btn-ghost text-xs !py-1.5 !px-3" onclick="logout()">Salir</button>
+      </div>
+    </div>
+    <nav class="max-w-5xl mx-auto px-4 pb-3 flex flex-wrap gap-2">
+      <button class="navbtn chip chip-on" data-tab="menu" onclick="showTab('menu')">Menú</button>
+      <button class="navbtn chip chip-off" data-tab="bd" onclick="showTab('bd')">Estudiantes</button>
+      <button class="navbtn chip chip-off" data-tab="periodos" onclick="showTab('periodos')">Bimestres</button>
+      <button class="navbtn chip chip-off" data-tab="import" onclick="showTab('import')">Importar</button>
+      <button class="navbtn chip chip-off" data-tab="config" onclick="showTab('config')">Config</button>
+    </nav>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-4 space-y-4">
+
+    <!-- MENU -->
+    <section id="tab-menu" class="tab">
+      <div class="grid sm:grid-cols-2 gap-3">
+        <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('bd')">
+          <div class="text-2xl mb-1">👥</div>
+          <div class="font-black">Base de estudiantes</div>
+          <div class="text-sm text-slate-500">Ver, buscar y editar la lista oficial</div>
+          <div class="mt-2 text-xs font-bold text-sky-700" id="statAlumnos">— alumnos</div>
+        </button>
+        <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('import')">
+          <div class="text-2xl mb-1">📤</div>
+          <div class="font-black">Importar BD oficial</div>
+          <div class="text-sm text-slate-500">Subir Excel/CSV o restaurar desde archivo JSON</div>
+        </button>
+        <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('periodos')">
+          <div class="text-2xl mb-1">📅</div>
+          <div class="font-black">Año y bimestres</div>
+          <div class="text-sm text-slate-500">Abrir o cerrar periodos de carga</div>
+        </button>
+        <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('config')">
+          <div class="text-2xl mb-1">⚙️</div>
+          <div class="font-black">Configuración</div>
+          <div class="text-sm text-slate-500">Clave admin y respaldo</div>
+        </button>
+      </div>
+      <div class="card p-4 mt-3">
+        <div class="font-bold text-sm text-slate-600 mb-2">Resumen rápido</div>
+        <div id="resumenRapido" class="text-sm text-slate-700 space-y-1"></div>
+      </div>
+    </section>
+
+    <!-- BD -->
+    <section id="tab-bd" class="tab hidden">
+      <div class="card p-4">
+        <div class="flex flex-wrap gap-2 items-end mb-3">
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Nivel</label>
+            <select id="filtroNivel" onchange="renderTabla()">
+              <option value="primaria">Primaria</option>
+              <option value="secundaria">Secundaria</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Grado</label>
+            <select id="filtroGrado" onchange="renderTabla()"><option value="">Todos</option></select>
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Sección</label>
+            <select id="filtroSeccion" onchange="renderTabla()"><option value="">Todas</option></select>
+          </div>
+          <div class="flex-1 min-w-[140px]">
+            <label class="text-[11px] font-bold text-slate-500">Buscar</label>
+            <input id="filtroBuscar" placeholder="Apellido o nombre" oninput="renderTabla()">
+          </div>
+        </div>
+        <div class="text-xs text-slate-500 mb-2" id="bdCount"></div>
+        <div class="overflow-auto max-h-[60vh] border border-slate-100 rounded-xl">
+          <table class="data">
+            <thead><tr><th>Nº</th><th>Grado</th><th>Sección</th><th>Apellidos y nombres</th><th></th></tr></thead>
+            <tbody id="bdBody"></tbody>
+          </table>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button class="btn btn-ghost text-sm" onclick="agregarAlumno()">+ Agregar alumno</button>
+          <button class="btn btn-primary text-sm" onclick="guardarBD()">Guardar cambios</button>
+          <button class="btn btn-ghost text-sm" onclick="exportarJSON()">Descargar JSON</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- IMPORT -->
+    <section id="tab-import" class="tab hidden">
+      <div class="card p-4 space-y-3">
+        <h2 class="font-black text-lg">Importar base oficial</h2>
+        <p class="text-sm text-slate-600">Sube un CSV o JSON. Columnas sugeridas: <code class="bg-slate-100 px-1 rounded">nivel,grado,seccion,orden,nombre</code></p>
+        <div>
+          <label class="text-[11px] font-bold text-slate-500">Nivel destino</label>
+          <select id="importNivel">
+            <option value="primaria">Primaria</option>
+            <option value="secundaria">Secundaria</option>
+            <option value="ambos">Ambos (solo JSON completo)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] font-bold text-slate-500">Archivo CSV / JSON</label>
+          <input type="file" id="importFile" accept=".csv,.json,.txt">
+        </div>
+        <div>
+          <label class="text-[11px] font-bold text-slate-500">Modo</label>
+          <select id="importModo">
+            <option value="replace">Reemplazar lista del nivel</option>
+            <option value="merge">Agregar solo nombres nuevos</option>
+          </select>
+        </div>
+        <pre id="importPreview" class="bg-slate-50 text-xs p-3 rounded-xl max-h-40 overflow-auto hidden"></pre>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-primary text-sm" onclick="procesarImport()">Confirmar importación</button>
+          <button class="btn btn-ghost text-sm" onclick="restaurarEmpotrada()">Restaurar BD desde Excel 2026</button>
+        </div>
+        <p class="text-[11px] text-slate-400">“Restaurar BD desde Excel 2026” vuelve a cargar los alumnos extraídos de tus archivos REGISTROS PRIM/SEC.</p>
+      </div>
+    </section>
+
+    <!-- PERIODOS -->
+    <section id="tab-periodos" class="tab hidden">
+      <div class="card p-4">
+        <h2 class="font-black text-lg mb-3">Control de bimestres</h2>
+        <div class="mb-3">
+          <label class="text-[11px] font-bold text-slate-500">Año lectivo</label>
+          <input id="cfgAnio" type="number" value="2026" class="max-w-[120px]" onchange="savePeriodos()">
+        </div>
+        <div class="space-y-2" id="listaBimestres"></div>
+        <p class="text-xs text-slate-500 mt-3">Al <b>cerrar</b> un bimestre, los docentes no deberían editar notas de ese periodo (se aplicará en el registro auxiliar).</p>
+        <button class="btn btn-primary text-sm mt-3" onclick="savePeriodos()">Guardar periodos</button>
+      </div>
+    </section>
+
+    <!-- CONFIG -->
+    <section id="tab-config" class="tab hidden">
+      <div class="card p-4 space-y-3">
+        <h2 class="font-black text-lg">Configuración</h2>
+        <div>
+          <label class="text-[11px] font-bold text-slate-500">Nueva contraseña admin</label>
+          <input id="cfgPass" type="password" placeholder="Dejar vacío para no cambiar">
+        </div>
+        <button class="btn btn-dark text-sm" onclick="cambiarClave()">Actualizar clave</button>
+        <hr class="border-slate-100">
+        <button class="btn btn-ghost text-sm" onclick="exportarJSON()">Descargar respaldo JSON completo</button>
+        <button class="btn btn-ghost text-sm" onclick="exportarCSV()">Descargar CSV del nivel filtrado</button>
+      </div>
+    </section>
+
+  </main>
+  <footer class="text-center text-[11px] text-slate-400 py-6">
+    Desarrollo · Diseño e integración Mag. Efrain Ceopa Paredes · IE 22375
+  </footer>
+</div>
+
+<script>
+/* ===== Datos empotrados desde Excel REGISTROS 2026 ===== */
+const BD_EMPOTRADA = {"anio":2026,"ie":"IE 22375 Santa Rosa de los Molinos","primaria":{"estudiantes":[{"nivel":"primaria","grado":1,"seccion":"Única","orden":1,"nombre":"CANCHO HUAMAN, LUIS SANDRO"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":2,"nombre":"CORTEZ PEÑA, ILLARI VALEZKA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":3,"nombre":"CURI LOPEZ, KEVIN DAVID"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":4,"nombre":"GOMEZ LABIOS, ALEXANDRA MARIA YOLANDA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":5,"nombre":"GOMEZ NIETO, LIAM JESÚS"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":6,"nombre":"HUARCAYA CONTRERAS, KHALEY MARÍA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":7,"nombre":"INJANTE TOLEDO, DALESKA ORIANA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":8,"nombre":"JIMENEZ CHACALIAZA, BRIANA VALERIA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":9,"nombre":"LEON CASTILLO, DALEXA ALEXANDRA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":10,"nombre":"MATTA GRADOS, LUCAS ARIAM"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":11,"nombre":"MENDOZA PAUCAR, JHEREMY GHALED"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":12,"nombre":"PARIONA CANCHO, GAEL VALENTINO"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":13,"nombre":"PERALTA PINEDA, IRIANA ISABELLA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":14,"nombre":"PEVES SANCHEZ, AMIT EIAL"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":15,"nombre":"ROJAS MARTINEZ, IVANA ANTONELLA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":16,"nombre":"TAME BELLIDO, JHONATAN BENJAMÍN"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":17,"nombre":"TINEO GALINDO, SOLANGE AMIRA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":1,"nombre":"ACOSTA ASCAMA, DANIELLA MIRTHA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":2,"nombre":"ANICAMA PEVES, SOLANGE ISABELLA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":3,"nombre":"BELLIDO TELLO, ARELLYS LUNA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":4,"nombre":"CHAUCA ESPINOZA, ASHLY DARIA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":5,"nombre":"CORTEZ ZAPATA, EYDAN ALEXÁNDER"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":6,"nombre":"ESPINO NAVARRETE, OSCAR EMILIANO"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":7,"nombre":"ESPINO VELARDE, FABRICIO MATEO"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":8,"nombre":"ESPINO VELARDE, MOISES EMILIO"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":9,"nombre":"JANAMPA GUERRA, ASHLEY THAYSA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":10,"nombre":"LABIOS JAYO, AXEL MATEO"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":11,"nombre":"MARTEL CONDORI, DAYANA THAIZA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":12,"nombre":"NAVARRO TOLEDO, BRIANA CAMILA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":13,"nombre":"PARIONA VELARDE, ZOE SHAMIRA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":14,"nombre":"QUICHUA CHIRA, LUZ DANIELA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":15,"nombre":"QUILCA ROMERO, IHAN GAEL JOSE"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":16,"nombre":"QUISPE ALVAREZ, YORYELI DALESKA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":17,"nombre":"SILVA VELARDE, ESTEFANO ANDRE"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":18,"nombre":"SUAREZ PISCONTE, IVANNA YARÉLI"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":19,"nombre":"TOLEDO GARCIA, DYLAN DAVID ROGGER"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":20,"nombre":"VALENCIA HUAMAN, ASHLEY AYLEN"},{"nivel":"primaria","grado":3,"seccion":"B","orden":41,"nombre":"ROJAS RAMIREZ, JOSE CARLOS MAGDALENO"},{"nivel":"primaria","grado":3,"seccion":"B","orden":42,"nombre":"SEMINARIO DONAYRE, ROSARIO CRISTINA"},{"nivel":"primaria","grado":3,"seccion":"B","orden":43,"nombre":"VALDIVIA RUIZ, PAULA RUTH"},{"nivel":"primaria","grado":3,"seccion":"B","orden":44,"nombre":"VELARDE LEÓN, ANDY JOSÉ ALDAIR"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":1,"nombre":"BARRIENTOS ORMEÑO, MATEO"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":2,"nombre":"BERNAOLA FERNANDEZ, DARIANA SAORI"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":3,"nombre":"CANELA PEÑA, ADIEL ALEXANDRO"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":4,"nombre":"CARMONA HUAYAMARES, BRIANA RAPHAELA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":5,"nombre":"CORTEZ PEÑA, SOHE SALOME"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":6,"nombre":"DE LA CRUZ QUICHCA, BRIANA ALONDRA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":7,"nombre":"DUENDE APARICIO, BRIANA KAORY"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":8,"nombre":"EVANGELISTA SOTO, DILAN WILBER"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":9,"nombre":"FAJARDO VELARDE, IKER ANDRÉ"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":10,"nombre":"FIGUEROA CURI, LENNER NICOLAS"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":11,"nombre":"GOMEZ LOPEZ, KHALESSI VALENTINA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":12,"nombre":"GUTIERREZ ANDIA, PABLO BENJAMÍN"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":13,"nombre":"HUAMANCOLI MARTINEZ, ESTRELLA DE LOS ANGELES"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":14,"nombre":"HUARCAYA JAYO, OSTIN LIAN"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":15,"nombre":"LEVANO DONAYRE, ASHLEY LUCIANA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":16,"nombre":"MARTINEZ MIRANDA, ZHOE VALENTINA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":17,"nombre":"MUÑOZ URIBE, LIA KALESSY"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":18,"nombre":"PACO ALLCCAHUAMAN, KIARA ALLISON"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":19,"nombre":"PEVE APARICIO, DAYANA VALENTINA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":20,"nombre":"RIVERA GARIBAY, ROUSSE MARGARETH"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":21,"nombre":"SOTELO CUSI, JOSHSUA YMANOLL"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":22,"nombre":"URIBE BERNALES, HEDINZON ALEJANDRO"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":23,"nombre":"VALENCIA LABIOS, LIAM SEBASTIAN"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":1,"nombre":"ANDIA ARAPA, FLOR DE MARÍA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":2,"nombre":"ANICAMA HERNANDEZ, ITALO FRANCISCO ABILIO"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":3,"nombre":"ANICAMA PEVES, JHOSUA DANIEL"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":4,"nombre":"ARONI QUISPE, YOSHUA LEONARDO"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":5,"nombre":"BAUTISTA ZAPATA, LUZ MARIA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":6,"nombre":"CARMONA PALOMINO, XIMENA GUADALUPE"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":7,"nombre":"CARPIO BARRETO, JORDY ALEJANDRO"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":8,"nombre":"FRANCO DONAYRE, PAOLO VALENTINO"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":9,"nombre":"GARCIA GOMEZ, VANIA MASIEL"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":10,"nombre":"HUAYASCACHI LOAYZA, DADSHA YATZARY CHANNEL"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":11,"nombre":"IPANAQUE CARMONA, BRAD MILAN JOSE"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":12,"nombre":"JIMENEZ CHACALIAZA, SHANTALL LUCIANA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":13,"nombre":"LLANOS RAMOS, DANIEL ALEXANDER"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":14,"nombre":"MELGAR UNTIVEROS, MARYORIE MILAGROS"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":15,"nombre":"MORALES TUEROS, MISHELL XIMENA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":16,"nombre":"MORAN HUARACHI, MILAN GIOVANI"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":17,"nombre":"MUÑOZ URIBE, JEYCO MANUELL"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":18,"nombre":"PANUERA HUAMAN, HANDSEL ALID NAZARIT"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":19,"nombre":"QUISPE CUSI, NYCOL SOLEDAD"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":20,"nombre":"RAMIREZ MIRANDA, MARIA DEL PILAR"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":21,"nombre":"RAVELLO SAYRITUPAC, PATRICIO VALENTINO"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":22,"nombre":"RUIZ TAME, ALANIS VALENTINA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":23,"nombre":"RUIZ TAME, JUAN ALAIN"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":24,"nombre":"SALAZAR MEZA, GIA KIMBERLY"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":25,"nombre":"SANCHEZ ALVAREZ, DANIELA YAMILET"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":26,"nombre":"SOTO MENDOZA, LIAM LEONARDO"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":27,"nombre":"TAYPE PUMA, CAMILA VALESKA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":41,"nombre":"PASACHE CURI, NICOLLE FERNANDA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":42,"nombre":"PEÑA AQUIJE, JUAN ANGEL"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":43,"nombre":"RAMIREZ LAGOS, STIVEN LEONARDO"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":44,"nombre":"TAYPE PUMA, CIELO VALENTINA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":45,"nombre":"VELARDE YNJANTE, KAORY LUCIANA SANYÚ"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":1,"nombre":"ALLCCAHUAMAN JANAMPA, CORAL MARIAPAZ"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":2,"nombre":"ASTORGA ARANGO, FERNANDA CLAUDIA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":3,"nombre":"ASTORGA QUINTANILLA, REBECA VALENTINA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":4,"nombre":"ATIQUIPA ALLCCAHUAMAN, JHANDI CELESTE"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":5,"nombre":"CANELA PEVES, YVANA MARIA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":6,"nombre":"CARMONA CASTRO, MOIRA MILET"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":7,"nombre":"CONDE ASCAMA, JHANDY JASSURY"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":8,"nombre":"ESPINO NAVARRETE, ARIAPNA GUADALUPE"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":9,"nombre":"GARCIA ESPINO, XAVI GERARD"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":10,"nombre":"GOMEZ LABIOS, JESÚS BENJAMÍN OBDULIO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":11,"nombre":"HUARCAYA SALCEDO, ALIX DARLIN"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":12,"nombre":"JAYO DONAYRE, JESUS SEBASTIAN"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":13,"nombre":"MARTEL CONDORI, ANDRES SEBASTIAN"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":14,"nombre":"MARTINEZ SANTIAGO, ALESSANDER MANUEL"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":15,"nombre":"MENDOZA CANCHO, LUZ ANAINA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":16,"nombre":"MUÑOZ FLORES, REBECA ALEXANDRA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":17,"nombre":"NAVARRO TOLEDO, YADIR ANGELO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":18,"nombre":"OSORIO CHACALIAZA, LEANDRO JOSÉ"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":19,"nombre":"PARIONA VELARDE, GIA ALESSANDRA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":20,"nombre":"PARIONA VELARDE, MAGGI ALEJANDRA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":21,"nombre":"PASACHE SIVERUERO, DAMARIS JASEL"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":22,"nombre":"PINEDA MUÑOZ, IKER KARLETH"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":23,"nombre":"PURILLA PASACHE, IHAN JHOAO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":24,"nombre":"SALAZAR ORTEGA, LIAM ARMANDO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":25,"nombre":"TOLEDO TOLEDO, LIAM NICOLAZ"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":26,"nombre":"URIBE SANCHEZ, LEONARD ITZAE"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":27,"nombre":"VELARDE CONDORI, CLAUDIA MILET"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":28,"nombre":"VILLA BENDEZ, DILAN KEFREE"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":29,"nombre":"VIVANCO AÑANCA, DOMENICA KAORI"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":1,"nombre":"AGUIRRE CHIRA, LUIS"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":2,"nombre":"ALARCON PURILLA, LUANA ISABEL"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":3,"nombre":"BARRIENTOS ORMEÑO, MARIA PAZ VALENTINA"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":4,"nombre":"CAMPOS ALVAREZ, SASHYRA"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":5,"nombre":"CAMPOS GALINDO, MILAN YOSUE"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":6,"nombre":"CARHUAS CCAULLA, BREYNER THIAGO"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":7,"nombre":"CHOQUEHUANCA FUENTES, FRANK LINCOLN"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":8,"nombre":"CORTEZ ALVAREZ, MIGUEL ANGEL"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":9,"nombre":"CORTEZ PISCONTE, DAYRO FABIAN"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":10,"nombre":"CURI LOPEZ, CAMILA LISET"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":11,"nombre":"FERNANDEZ ZARATE, DIEGO ALESSANDRO"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":12,"nombre":"HUAMANCOLI MARTINEZ, CARLOS ANDRES"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":13,"nombre":"JAYO LICAS, DAYRON DAYIRO"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":14,"nombre":"LOPEZ GARIBAY, MATIAS ALESSANDRO"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":15,"nombre":"MAYAUTE APARCANA, MILETH KAHORI"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":16,"nombre":"MOLINA ORTEGA, JEREMY LEONNEL"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":17,"nombre":"OCAÑA LABIOS, DAYRON JESUS"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":18,"nombre":"PARIONA ESPINO, DAYRON JHOSYMAR"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":19,"nombre":"RAMOS MORENO, JUAN MARTÍN SEBASTHIÁN"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":20,"nombre":"RAYME MUÑOZ, DAYRO ESMITH"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":21,"nombre":"ROJAS JANAMPA, ALICE RENEZME"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":22,"nombre":"SANCHEZ HUAMAN, MICHELLE VALENTINA"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":23,"nombre":"SIGUAS MARTINEZ, JADIEL KEYNER"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":24,"nombre":"UNTIVEROS ZALASAR, LESLIE TAMARA"}],"docentes":["Cabrera Rios, Gonzalo Celestino","Carhuayo Gutierrez, Eudelia Madeleine","Chacaliaza Condorí, Luisa Victoria","Diaz Saavedra, Robert Jhonny","Ferreyra Guillen, Alejandra irma","Servellón Otiniano, César Augusto","Villamares Hernandez, Ana Fiorella"]},"secundaria":{"estudiantes":[{"nivel":"secundaria","grado":1,"seccion":"A","orden":1,"nombre":"ANICAMA HERNANDEZ, WENCESLAO GADIEL"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":2,"nombre":"ANICAMA HERNANDEZ, YORDY JULIO CESAR"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":3,"nombre":"ARANGO GAMBOA, ADRIANA ISABELA"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":4,"nombre":"BALBUENA NIETO, ANDREY VALENTINO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":5,"nombre":"BERNALES HUAMANI, MAKEYLA DEL PILAR"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":6,"nombre":"CANALES HUAMAN, JHOSUHAN YOVI"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":7,"nombre":"CANCHO HUAMAN, JESUS JHAIR"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":8,"nombre":"CARDENAS PINEDO, JOEL DEL PIERO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":9,"nombre":"CASIANO ANTACAYO, JESUS GABRIEL"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":10,"nombre":"GALINDO CAMPOS, ANGEL DAYIRO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":11,"nombre":"GOMEZ SALCEDO, LUIS ALFONSO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":12,"nombre":"GOMEZ TAIPE, JHAIRO JOSUE"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":13,"nombre":"HERNANDEZ GARCIA, THIAGO JESUS"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":14,"nombre":"JANAMPA GUERRA, JASURY CIELO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":15,"nombre":"JANAMPA HUAYLLA, YELSID MELANIA"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":16,"nombre":"MORAN HUARACHI, DAMILETH CAMILA"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":17,"nombre":"MUÑOZ MARCELO, CAMILA JAZMIN"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":18,"nombre":"NUÑEZ RAMOS, ARIANA VICTORIA"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":19,"nombre":"ORTEGA PEREZ, ANGEL MATHIAS"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":20,"nombre":"PAREDES PEÑA, STEFANNY CRISTEL"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":21,"nombre":"QUISPE ALVAREZ, DAMARIS ARELY"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":22,"nombre":"QUISPE PISCONTE, ELEONOR KAORI"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":23,"nombre":"RAVELLO JAYO, ALEX MARIANO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":24,"nombre":"RAVELLO SAYRITUPAC, HILDA CAMILA"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":25,"nombre":"REYES LEIVA, JUAN ALBERTO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":26,"nombre":"SANTIAGO CARMONA, EMILY LUANA"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":27,"nombre":"SUAREZ MARTINEZ, ALEXANDRA DAYLINE"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":28,"nombre":"VALDIVIA RUIZ, ARON"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":29,"nombre":"VELARDE CONDORI, ALEXANDER SNAYDER"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":30,"nombre":"ZURITA TAPIA, CIELO ALEJANDRA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":1,"nombre":"ALEGRIA LINAREZ, JHADIRA MARISOL"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":2,"nombre":"CACSIRE DONAYRE, VANIA VALERIA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":3,"nombre":"CARMONA TAYPECCAHUANA, YOJHAN ANTONY"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":4,"nombre":"CASTRO YARASCA, THIAGO YAEL"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":5,"nombre":"CHACCERE LINAREZ, ANA MILAGROS"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":6,"nombre":"CHACON HUAMAN, GERARDO FIDEL"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":7,"nombre":"FAJARDO MAYURI, JOSE SANTIAGO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":8,"nombre":"GARCIA SOLDEVILLA, JORGE NEYMAR"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":9,"nombre":"HUARCAYA CUETO, NICOLAS LUCIANO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":10,"nombre":"LIMA CANELA, FLAVIA NICOLLE"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":11,"nombre":"MALQUI CHOQUE, DIEGO ALEXANDER"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":12,"nombre":"MILACHAY MORON, GUADALUPE LUHANA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":13,"nombre":"PACO ALLCCAHUAMAN, ANTHONY GERMAN"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":14,"nombre":"PARIONA CURI, GUIORDANO JOSUE"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":15,"nombre":"PARIONA VELARDE, JESUS ADRIAN"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":16,"nombre":"PASACHE CALDERON, DANNA LUCERO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":17,"nombre":"PERALTA BERNAOLA, EDELAY NAIARA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":18,"nombre":"PEVE ROMANO, JUAN JOSE JUNIOR"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":19,"nombre":"PISCONTE RAMOS, DAFANI YASMIN"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":20,"nombre":"QUICHUA MENDEZ, JOSUE DAVID"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":21,"nombre":"QUINTANILLA MARTINEZ, LUCIANA RAFAELA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":22,"nombre":"QUISPE CURI, WILLY NADIR"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":23,"nombre":"QUISPE MARTINEZ, JESUS MATEO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":24,"nombre":"QUISPE PACHAS, JESUS EDUARDO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":25,"nombre":"ROJAS LAGOS, ADRIANO YOAO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":26,"nombre":"TATAJE TAME, JAMES JOICE"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":27,"nombre":"UGARTE GUTIERREZ, VICTORIA GUADALUPE"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":28,"nombre":"URIBE BERNALES, JULIO SALVADOR"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":29,"nombre":"VARGAS PACHECO, ALESSIA FABIANA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":30,"nombre":"VILCA SANCHES, ADRIANO DEL PIERO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":1,"nombre":"APARCANA BAUTISTA, JESUS ALEXANDER"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":2,"nombre":"CARHUAS OLIVARES, GIANELLA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":3,"nombre":"CARMONA GARCIA, HRISTO KALET"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":4,"nombre":"CHAPILLIQUEN CHACAYA, RODRIGO FERNANDO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":5,"nombre":"DE LA CRUZ QUICHCA, CARMEN FERNANDA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":6,"nombre":"ELIAS ROMERO, GUADALUPE DEL ROSARIO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":7,"nombre":"FAJARDO TINIPUCLLA, ALIZ JHORYET"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":8,"nombre":"GARCIA ZEVALLOS, DAYRA NOEMI"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":9,"nombre":"GOMEZ GARIBAY, YANDIRY NICOLL"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":10,"nombre":"GOMEZ SALAS, BRISSA MARIANA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":11,"nombre":"GOMEZ ZEVALLOS, EDWAR JOSUE"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":12,"nombre":"GUERRA PISCONTE, JUAN CARLOS"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":13,"nombre":"GUILLEN VARGAS, JHOSTIN SMITH"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":14,"nombre":"GUIZADO PUMA, MIA GIANELLA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":15,"nombre":"JULCA JUAREZ, NAOMI NIKEYLA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":16,"nombre":"LABIOS JAYO, DIEGO ALEXANDER"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":17,"nombre":"MISAICO CURI, VANIA MIRANDA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":18,"nombre":"NESTAREZ PALOMINO, DANTHE MAELO JANDY"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":19,"nombre":"OCHOA CHAMBA, PARIS ROLANDO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":20,"nombre":"PEVES SANCHEZ, ESAID ARAMIS"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":21,"nombre":"PISCONTE GUERRA, DARWIN PAOLO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":22,"nombre":"PLATAS MIRANDA, JESUS ANTONIO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":23,"nombre":"SANCHEZ ALVAREZ, DANNA ANDREA ROSARIO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":24,"nombre":"SANCHEZ MENDOZA, DANNY ANDERSON JINTAO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":25,"nombre":"TOLEDO TOLEDO, FABIANO SMITH"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":26,"nombre":"TOMAYRO QUISPE, DAVID SEBASTIAN"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":27,"nombre":"URIBE VALENCIA, REYNA VERONICA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":28,"nombre":"VALENCIA CHAVEZ, LEONELLA JHORLEY DE LOS ANGELES"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":29,"nombre":"VALENCIA LABIOS, EDINSON ALESSANDRO DEL PIERO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":30,"nombre":"YAÑEZ CAJAMARCA, MERCEDES GUADALUPE"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":1,"nombre":"ALVAREZ IPANAQUE, IKER ADRIANO JESUS"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":2,"nombre":"CABRERA LEVANO, JESUS FABIANO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":3,"nombre":"CACERES QUISPE, GEORGE ANDY"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":4,"nombre":"CAHUA FAJARDO, JESÚS ALBERTO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":5,"nombre":"CORTEZ ZAPATA, ARIANA LUCERO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":6,"nombre":"CUPE BERNAOLA, IVANNA FRANCESCA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":7,"nombre":"ESPINO ASTORGA, SMITH ALONSO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":8,"nombre":"EVANGELISTA SOTO, ANGELIQUE ALISSON"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":9,"nombre":"HERNANDEZ MUNAYLLA, VICTOR DANIEL"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":10,"nombre":"HUAMAN CANELA, KIARA LUCIA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":11,"nombre":"IPANAQUE HERNANDEZ, GRETEL KAHORY"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":12,"nombre":"LEGUA ANDIA, YHORDAN JOSUE"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":13,"nombre":"MELGAR NIETO, ANDRES DAYIRO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":14,"nombre":"MORALES ROMERO, ARIANA DARLINE"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":15,"nombre":"NAVARRETE PISCONTE, JOSE LUIS"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":16,"nombre":"OCHOA QUISPE, JOHAN SMITH"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":17,"nombre":"OSORIO CHACALIAZA, NADIA XIMENA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":18,"nombre":"PACHECO HUAMAN, VALERY DE LOS ANGELES"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":19,"nombre":"PALOMINO QUISPE, SMITH JOSUE"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":20,"nombre":"PAREDES MARTINEZ, NAOMY SOFIA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":21,"nombre":"QUISPE CASTILLO, SEBASTIAN GREGORY"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":22,"nombre":"QUISPE CUSI, JOSE NEHEMIAS"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":23,"nombre":"RAYME MUÑOZ, OSCAR ANTONIO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":24,"nombre":"VELARDE INJANTE, WILLIAMS SMITH"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":25,"nombre":"VILCA HUARIPAUCAR, MERLY CRISTEL"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":1,"nombre":"CAHUA SUAREZ, JULIA CAMILA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":2,"nombre":"CARMONA CASTILLO, ALESSANDRA ESTEFANY"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":3,"nombre":"CHAPILLIQUEN OLIVA, ROMINA XIMENA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":4,"nombre":"CHOQUEHUANCA FUENTES, LUANA BELEN"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":5,"nombre":"COCCHE PALOMINO, JHOSTIN JESUS FROYLAN"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":6,"nombre":"CORDOVA HERNANDEZ, JEFFERSON ALEXANDER"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":7,"nombre":"CORVERA FAJARDO, ESPERANZA CRISTINA DEL ROSARIO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":8,"nombre":"CUADROS UCEDA, LEYSSI NATHANIEL"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":9,"nombre":"DONAYRE OSORIO, XIOMARA XIMENA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":10,"nombre":"ESPINO ARONI, LOURDES HELENA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":11,"nombre":"ESPINO GARCIA, PRISCILA DEL CARMEN"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":12,"nombre":"FLORES SANTARIA, KEDNY JOHAN"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":13,"nombre":"GAMARRA MARTINEZ, KELVIN DENILSON"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":14,"nombre":"GARCIA ZEVALLOS, KEYRA GERALDINE"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":15,"nombre":"HUAMAN JANAMPA, EDWAR STING"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":16,"nombre":"LICAS VALENCIA, DIEGO DAVID"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":17,"nombre":"LLOCLLA HERNANDEZ, FABIAN JESUS"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":18,"nombre":"LOPEZ CORDOVA, ANDREA RICARDINA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":19,"nombre":"MONTENEGRO ARUCANQUI, ANDRE FABIAN"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":20,"nombre":"MUÑOZ PEÑA, JUANA PAULA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":21,"nombre":"QUILCA ROMERO, PERLITA YADITZA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":22,"nombre":"QUISPE MUÑOZ, MATIAS NICOLAS"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":23,"nombre":"RAMOS MORENO, BRIZA GUADALUPE"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":24,"nombre":"RAMOS SALAZAR, ANA VALENTINA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":25,"nombre":"ROMAN HUARCAYA, YONAIRA YUDALY"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":26,"nombre":"SALAZAR MEZA, CARMEN JANINE"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":27,"nombre":"TATAJE TAME, FERNANDO JESUS"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":1,"nombre":"APARCANA AÑANCA, DAYIRO LEONARDO FARID"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":2,"nombre":"AURIS VILCA, AXEL JESUS"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":3,"nombre":"BELLIDO TELLO, JOSEMIR ALEJANDRO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":4,"nombre":"CAMPOS TUEROS, JHORDAN RAFAEL"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":5,"nombre":"CANELA MENDOZA, ALEXIS ADEMIR"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":6,"nombre":"CHAUCA ESPINOZA, BRISHA DAFNE"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":7,"nombre":"CHILLCCE PARIONA, JHERAMY ALEJANDRO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":8,"nombre":"ESPINO ASTORGA, WINNY BRIGGITH"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":9,"nombre":"FIGUEROA HERNANDEZ, CESAR ALEXANDRO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":10,"nombre":"FIGUEROA HERNANDEZ, CESAR DEL PIERO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":11,"nombre":"GAMBOA PARIONA, PIERINA YOMARA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":12,"nombre":"HERNANDEZ HUAMAN, DANNA YUSHARA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":13,"nombre":"HUACAC JANAMPA, LUCIANO FABRIZIO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":14,"nombre":"HUAMAN CHACALTANA, YSMAEL ANDRES"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":15,"nombre":"HUAMAN ORE, ANGELA FERNANDA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":16,"nombre":"HUARACC ARANGO, ISMAEL YORDAN"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":17,"nombre":"JANAMPA UNTIVEROS, IKER FIDEL"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":18,"nombre":"JAYO CARMONA, GREIS KELLY"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":19,"nombre":"LINAREZ QUISPE, JIMMY ANTHONY"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":20,"nombre":"MALQUI CHOQUE, FATIMA MILADY"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":21,"nombre":"PARIONA CANCHO, VALENTINA SOLANGE"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":22,"nombre":"PEÑA APARCANA, JHONNIER FERNANDO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":23,"nombre":"PEREZ HUARCAYA, ADRIEN OMAR"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":24,"nombre":"QUICHCA PAREDES, MAURY JOSSEPH"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":25,"nombre":"ROJAS JANAMPA, RUTH KIARA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":26,"nombre":"SAYRITUPAC SALCEDO, ROSARIO VALENTINA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":27,"nombre":"SIGUAS PEÑA, SOL DE MARIA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":28,"nombre":"URIBE OCAÑA, LUIGI FABRIZIO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":29,"nombre":"ZURITA TAPIA, SARAY DELFA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":41,"nombre":"ROJAS RAMIREZ, JOSE CARLOS MAGDALENO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":42,"nombre":"SEMINARIO DONAYRE, ROSARIO CRISTINA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":43,"nombre":"VALDIVIA RUIZ, PAULA RUTH"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":44,"nombre":"VELARDE LEÓN, ANDY JOSÉ ALDAIR"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":1,"nombre":"ALEGRIA RIVEROS, KIMBERLIN NAIYARA DAFNE"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":2,"nombre":"ANDIA RAMIREZ, JOSE CARLOS"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":3,"nombre":"APARCANA MARTINEZ, KIARA ALEXANDRA"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":4,"nombre":"AURIS CCAULLA, MARIA DE LOS ANGELES"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":5,"nombre":"BELLIDO TELLO, JOILSO ALONSO"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":6,"nombre":"CARHUAS CCAULLA, ESTRELLA ARUMY"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":7,"nombre":"CASAVALENTE GOMEZ, RAQUEL ALESSANDRA"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":8,"nombre":"CHACAYA ROJAS, JOSE GABRIEL"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":9,"nombre":"CHAPILLIQUEN CHACAYA, SEBASTIAN ALONSSO"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":10,"nombre":"COELLO JANAMPA, JAIRO DANIEL"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":11,"nombre":"CORTEZ ALVAREZ, FELIX GERARDO"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":12,"nombre":"DIAZ NAVARRETE, KIARA MASSIEL"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":13,"nombre":"ESPINOZA CARMONA, MATEO ENRIQUE"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":14,"nombre":"ESTRADA GARIBAY, WILLIAMS SHMUEL"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":15,"nombre":"FAJARDO GOMEZ, VALENY LUANA"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":16,"nombre":"FAJARDO MAYURI, MARIA JESUS DEL ROSARIO"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":17,"nombre":"GALINDO ALVAREZ, JEHAN LEYNCOLN HEISENBERG"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":18,"nombre":"GARCIA SOLDEVILLA, ANTONY ALEXANDER"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":19,"nombre":"HERNANDEZ AQUIJE, WILLIAM ALEXANDER"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":20,"nombre":"HUAUYA ESCALANTE, SERGIO PAUL"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":21,"nombre":"JUNES JANAMPA, RODRIGO DAVID"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":22,"nombre":"LOAYZA YARASCA, LISSETH MILAGROS"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":23,"nombre":"MAYAUTE APARCANA, MARIA FERNANDA"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":24,"nombre":"MAYURI AQUIJE, MERCEDES CECILIA"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":25,"nombre":"MENDOZA ESCATE, SAIR STHEFANO"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":26,"nombre":"NAVEROS QUISPE, JOSE ESTEBAN"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":27,"nombre":"PEÑA APARCANA, DAYAN JULIETH"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":28,"nombre":"PEREZ HUARCAYA, LUCIANA NICOLLE"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":29,"nombre":"PISCONTE ROJAS, MAXIMO JESUS"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":30,"nombre":"PURILLA PASACHE, DAMERZON VICENTE"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":31,"nombre":"QUINTANILLA MARTINEZ, GIAN FRANCO ALEXSANDER"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":32,"nombre":"ROJAS RAMIREZ, JOSE CARLOS MAGDALENO"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":33,"nombre":"SEMINARIO DONAYRE, ROSARIO CRISTINA"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":34,"nombre":"VALDIVIA RUIZ, PAULA RUTH"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":35,"nombre":"VELARDE LEÓN, ANDY JOSÉ ALDAIR"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":41,"nombre":"PASACHE CURI, NICOLLE FERNANDA"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":42,"nombre":"PEÑA AQUIJE, JUAN ANGEL"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":43,"nombre":"RAMIREZ LAGOS, STIVEN LEONARDO"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":44,"nombre":"TAYPE PUMA, CIELO VALENTINA"},{"nivel":"secundaria","grado":4,"seccion":"Única","orden":45,"nombre":"VELARDE YNJANTE, KAORY LUCIANA SANYÚ"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":1,"nombre":"ALEGRIA LINAREZ, CARLOS ALBERTO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":2,"nombre":"ANICAMA LEGUA, PEDRO EDUARDO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":3,"nombre":"ARANGO GAMBOA, RUTH MALENA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":4,"nombre":"ATIQUIPA ALLCCAHUAMAN, JHORDAN GONZALO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":5,"nombre":"CAJAMARCA SOTO, NADINE JULEYSI"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":6,"nombre":"CAZANI TINEO, LEONELA LUCERO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":7,"nombre":"CHACAYA PEÑA, MARIA PAZ"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":8,"nombre":"DE LA CRUZ CHATE, PIERO ALONSO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":9,"nombre":"DIESTRO ALLCCAHUAMAN, JHANT MARC"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":10,"nombre":"GOMEZ HUAUYA, ARIANA FERNANDA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":11,"nombre":"GRADOS ORE, NATHANIEL ALEJANDRA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":12,"nombre":"GUEVARA JUNCO, LUCIO ANTONIO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":13,"nombre":"HUAMAN JANAMPA, BRIZA YASSMIN"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":14,"nombre":"IPANAQUE CARMONA, XIANA XIMENA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":15,"nombre":"JANAMPA GUERRA, TATIANA ROSA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":16,"nombre":"JARA CHACON, CLARA LUCIA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":17,"nombre":"LEGUA ANDIA, CRISTIAN ALDAIR"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":18,"nombre":"LLOCLLA LLAMOCA, IMANUEL ALEX"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":19,"nombre":"MARTINEZ MUÑOZ, DAYRON JESUS"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":20,"nombre":"MEDINA FAJARDO, ANGHELITH OLENKA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":21,"nombre":"MELGAR UNTIVEROS, ANGIE NOEMI"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":22,"nombre":"MENDOZA CASANI, MARCO ANTONIO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":23,"nombre":"MORON PISCONTE, NICOL NOELIA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":24,"nombre":"MUÑOZ FLORES, DAMARIS CORAL"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":25,"nombre":"NARAZAS VENTURA, DAYANA NICOLLE"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":26,"nombre":"NAVARRETE RAMOS, CARLOS OSMAR"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":27,"nombre":"NAVARRO TOLEDO, CESAR SMITH"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":28,"nombre":"NIETO CHALLAPA, MIGUEL JESUS TOMAS"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":29,"nombre":"PALOMINO ASCAMA, JORGE JESUS"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":30,"nombre":"PALOMINO QUISPE, CARLOS FERNANDO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":31,"nombre":"PARIONA VELARDE, VALERIA CONSUELO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":32,"nombre":"PASACHE CURI, NICOLLE FERNANDA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":33,"nombre":"PEÑA AQUIJE, JUAN ANGEL"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":34,"nombre":"RAMIREZ LAGOS, STIVEN LEONARDO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":35,"nombre":"TAYPE PUMA, CIELO VALENTINA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":36,"nombre":"VELARDE YNJANTE, KAORY LUCIANA SANYÚ"}],"docentes":["Arias Saldaña, Pilar Guillermina","Benito Huamaní, Edgar Cirilo","Choque Aybar, Luis Javier","Galindo Alviar, Ninoska","Gomez Uribe, Humberto Santiago","Huarcaya Hostia, Ana Elizabeth","Maria del Pilar Alaluna Chipana","Parvina Gamonal, Filomena Lourdes","Quispe Galindo, Lucy","Rosado Espinoza, Patrick Albert Brian Hans","Slava Torres, Sandra Fátima","Zorrilla Nieto, Julio Ricardo"]}};
+
+const LS_KEY = 'ie22375_admin_bd_v1';
+const LS_PASS = 'ie22375_admin_pass';
+const LS_PER = 'ie22375_admin_periodos';
+const DEFAULT_PASS = 'admin22375';
+
+let estado = null;
+
+function loadEstado() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) { estado = JSON.parse(raw); return; }
+  } catch(e) {}
+  estado = JSON.parse(JSON.stringify(BD_EMPOTRADA));
+}
+
+function saveEstado() {
+  localStorage.setItem(LS_KEY, JSON.stringify(estado));
+  actualizarResumen();
+}
+
+function getPass() {
+  return localStorage.getItem(LS_PASS) || DEFAULT_PASS;
+}
+
+function doLogin() {
+  const v = document.getElementById('loginPass').value || '';
+  if (v === getPass()) {
+    document.getElementById('loginError').classList.add('hidden');
+    document.getElementById('screenLogin').classList.remove('active');
+    document.getElementById('screenApp').classList.add('active');
+    sessionStorage.setItem('ie22375_admin_ok', '1');
+    loadEstado();
+    initPeriodosUI();
+    actualizarResumen();
+    fillFiltros();
+    renderTabla();
+    showTab('menu');
+  } else {
+    document.getElementById('loginError').classList.remove('hidden');
+  }
+}
+
+function logout() {
+  sessionStorage.removeItem('ie22375_admin_ok');
+  document.getElementById('screenApp').classList.remove('active');
+  document.getElementById('screenLogin').classList.add('active');
+  document.getElementById('loginPass').value = '';
+}
+
+function showTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
+  const el = document.getElementById('tab-' + id);
+  if (el) el.classList.remove('hidden');
+  document.querySelectorAll('.navbtn').forEach(b => {
+    const on = b.getAttribute('data-tab') === id;
+    b.className = 'navbtn chip ' + (on ? 'chip-on' : 'chip-off');
+  });
+  if (id === 'bd') { fillFiltros(); renderTabla(); }
+  if (id === 'periodos') initPeriodosUI();
+  if (id === 'menu') actualizarResumen();
+}
+
+function estudiantesDe(nivel) {
+  return (estado[nivel] && estado[nivel].estudiantes) ? estado[nivel].estudiantes : [];
+}
+
+function fillFiltros() {
+  const nivel = document.getElementById('filtroNivel').value;
+  const list = estudiantesDe(nivel);
+  const grados = [...new Set(list.map(s => s.grado))].sort((a,b)=>a-b);
+  const secs = [...new Set(list.map(s => s.seccion))].sort();
+  const gSel = document.getElementById('filtroGrado');
+  const sSel = document.getElementById('filtroSeccion');
+  const gVal = gSel.value, sVal = sSel.value;
+  gSel.innerHTML = '<option value="">Todos</option>' + grados.map(g => `<option value="${g}">${g}°</option>`).join('');
+  sSel.innerHTML = '<option value="">Todas</option>' + secs.map(s => `<option value="${s}">${s}</option>`).join('');
+  if ([...gSel.options].some(o => o.value === gVal)) gSel.value = gVal;
+  if ([...sSel.options].some(o => o.value === sVal)) sSel.value = sVal;
+}
+
+function renderTabla() {
+  const nivel = document.getElementById('filtroNivel').value;
+  const g = document.getElementById('filtroGrado').value;
+  const s = document.getElementById('filtroSeccion').value;
+  const q = (document.getElementById('filtroBuscar').value || '').toLowerCase().trim();
+  let list = estudiantesDe(nivel);
+  if (g) list = list.filter(x => String(x.grado) === String(g));
+  if (s) list = list.filter(x => x.seccion === s);
+  if (q) list = list.filter(x => (x.nombre||'').toLowerCase().includes(q));
+  list = [...list].sort((a,b) => a.grado - b.grado || String(a.seccion).localeCompare(b.seccion) || (a.orden||0) - (b.orden||0));
+  document.getElementById('bdCount').textContent = list.length + ' alumno(s) mostrados';
+  const body = document.getElementById('bdBody');
+  body.innerHTML = list.map((al, idx) => {
+    const id = encodeURIComponent(al.nombre + '|' + al.grado + '|' + al.seccion);
+    return `<tr>
+      <td>${al.orden || idx+1}</td>
+      <td>${al.grado}°</td>
+      <td>${al.seccion}</td>
+      <td>${al.nombre}</td>
+      <td><button class="text-red-600 text-xs font-bold" onclick="eliminarAlumno('${nivel}','${id}')">Quitar</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="text-slate-400">Sin resultados</td></tr>';
+}
+
+function eliminarAlumno(nivel, idEnc) {
+  const id = decodeURIComponent(idEnc);
+  if (!confirm('¿Quitar este alumno de la BD oficial?')) return;
+  estado[nivel].estudiantes = estudiantesDe(nivel).filter(a => (a.nombre+'|'+a.grado+'|'+a.seccion) !== id);
+  saveEstado();
+  renderTabla();
+}
+
+function agregarAlumno() {
+  const nivel = document.getElementById('filtroNivel').value;
+  const nombre = prompt('Apellidos y nombres (APELLIDOS, NOMBRES):');
+  if (!nombre || !nombre.trim()) return;
+  const grado = parseInt(prompt('Grado (número):', document.getElementById('filtroGrado').value || '1'), 10);
+  if (!grado) return;
+  const seccion = prompt('Sección (Única, A, B…):', document.getElementById('filtroSeccion').value || (nivel==='primaria'?'Única':'A')) || 'Única';
+  const list = estudiantesDe(nivel);
+  const orden = list.filter(x => x.grado===grado && x.seccion===seccion).length + 1;
+  list.push({ nivel, grado, seccion, orden, nombre: nombre.trim().toUpperCase() });
+  estado[nivel].estudiantes = list;
+  saveEstado();
+  fillFiltros();
+  renderTabla();
+}
+
+function guardarBD() {
+  saveEstado();
+  alert('BD guardada en este dispositivo.');
+}
+
+function actualizarResumen() {
+  if (!estado) return;
+  const p = estudiantesDe('primaria').length;
+  const s = estudiantesDe('secundaria').length;
+  document.getElementById('statAlumnos').textContent = (p+s) + ' alumnos (' + p + ' prim. / ' + s + ' sec.)';
+  document.getElementById('hdrAnio').textContent = 'Año ' + (estado.anio || 2026);
+  const cp = {};
+  estudiantesDe('primaria').forEach(a => { const k=a.grado+'° '+a.seccion; cp[k]=(cp[k]||0)+1; });
+  const cs = {};
+  estudiantesDe('secundaria').forEach(a => { const k=a.grado+'° '+a.seccion; cs[k]=(cs[k]||0)+1; });
+  const fmt = (o) => Object.keys(o).sort().map(k => k + ': ' + o[k]).join(' · ') || '—';
+  document.getElementById('resumenRapido').innerHTML =
+    '<div><b>Primaria</b> ('+p+'): '+fmt(cp)+'</div>' +
+    '<div><b>Secundaria</b> ('+s+'): '+fmt(cs)+'</div>' +
+    '<div class="text-slate-500 mt-1">Docentes prim.: '+(estado.primaria.docentes||[]).length+' · sec.: '+(estado.secundaria.docentes||[]).length+'</div>';
+}
+
+function exportarJSON() {
+  const blob = new Blob([JSON.stringify(estado, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'bd_oficial_IE22375_' + (estado.anio||2026) + '.json';
+  a.click();
+}
+
+function exportarCSV() {
+  const nivel = document.getElementById('filtroNivel').value;
+  const list = estudiantesDe(nivel);
+  let csv = 'nivel,grado,seccion,orden,nombre\n';
+  list.forEach(a => {
+    csv += [nivel, a.grado, a.seccion, a.orden||'', '"'+String(a.nombre).replace(/"/g,'""')+'"'].join(',') + '\n';
+  });
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'estudiantes_' + nivel + '.csv';
+  a.click();
+}
+
+function restaurarEmpotrada() {
+  if (!confirm('¿Restaurar la BD extraída de los Excel REGISTROS 2026? Se reemplazará lo guardado en este dispositivo.')) return;
+  estado = JSON.parse(JSON.stringify(BD_EMPOTRADA));
+  saveEstado();
+  fillFiltros();
+  renderTabla();
+  alert('BD restaurada desde Excel 2026.');
+}
+
+function parseCSV(text) {
+  const lines = text.replace(/\r/g,'').split('\n').filter(l => l.trim());
+  if (!lines.length) return [];
+  const sep = lines[0].includes(';') && !lines[0].includes(',') ? ';' : ',';
+  const headers = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/"/g,''));
+  const out = [];
+  for (let i=1;i<lines.length;i++) {
+    const cols = lines[i].split(sep).map(c => c.trim().replace(/^"|"$/g,''));
+    const row = {};
+    headers.forEach((h,j) => row[h] = cols[j] || '');
+    const nombre = row.nombre || row.apellidos_nombres || row['apellidos y nombres'] || row.alumno || '';
+    if (!nombre) continue;
+    out.push({
+      nivel: (row.nivel || document.getElementById('importNivel').value || 'primaria').toLowerCase(),
+      grado: parseInt(row.grado || row.grado_num || '0', 10) || 0,
+      seccion: row.seccion || row.sec || 'Única',
+      orden: parseInt(row.orden || row.ord || row.n || '0', 10) || 0,
+      nombre: nombre.toUpperCase()
+    });
+  }
+  return out.filter(x => x.grado && x.nombre);
+}
+
+document.getElementById('importFile')?.addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const text = await f.text();
+  const prev = document.getElementById('importPreview');
+  prev.classList.remove('hidden');
+  if (f.name.endsWith('.json')) {
+    try {
+      const j = JSON.parse(text);
+      prev.textContent = 'JSON detectado. Claves: ' + Object.keys(j).join(', ');
+      window._importJSON = j;
+      window._importCSV = null;
+    } catch(err) {
+      prev.textContent = 'JSON inválido';
+    }
+  } else {
+    const rows = parseCSV(text);
+    window._importCSV = rows;
+    window._importJSON = null;
+    prev.textContent = rows.length + ' filas detectadas.\n' + rows.slice(0,5).map(r => r.grado+'° '+r.seccion+' · '+r.nombre).join('\n');
+  }
+});
+
+function procesarImport() {
+  const modo = document.getElementById('importModo').value;
+  const nivelSel = document.getElementById('importNivel').value;
+  if (window._importJSON) {
+    const j = window._importJSON;
+    if (j.primaria && j.secundaria) {
+      if (nivelSel === 'ambos' || nivelSel === 'primaria') {
+        if (modo === 'replace') estado.primaria = j.primaria;
+        else mergeNivel('primaria', j.primaria.estudiantes || []);
+      }
+      if (nivelSel === 'ambos' || nivelSel === 'secundaria') {
+        if (modo === 'replace') estado.secundaria = j.secundaria;
+        else mergeNivel('secundaria', j.secundaria.estudiantes || []);
+      }
+      if (j.anio) estado.anio = j.anio;
+    } else if (Array.isArray(j)) {
+      mergeOrReplace(nivelSel === 'ambos' ? 'primaria' : nivelSel, j, modo);
+    } else {
+      alert('JSON no reconocido');
+      return;
+    }
+  } else if (window._importCSV) {
+    const nivel = nivelSel === 'ambos' ? 'primaria' : nivelSel;
+    mergeOrReplace(nivel, window._importCSV, modo);
+  } else {
+    alert('Seleccione un archivo primero');
+    return;
+  }
+  saveEstado();
+  alert('Importación aplicada.');
+  showTab('bd');
+}
+
+function mergeOrReplace(nivel, rows, modo) {
+  const clean = rows.map(r => ({
+    nivel,
+    grado: +r.grado,
+    seccion: r.seccion || 'Única',
+    orden: +r.orden || 0,
+    nombre: String(r.nombre || '').toUpperCase()
+  })).filter(r => r.grado && r.nombre);
+  if (modo === 'replace') estado[nivel].estudiantes = clean;
+  else mergeNivel(nivel, clean);
+}
+
+function mergeNivel(nivel, rows) {
+  const cur = estudiantesDe(nivel);
+  const key = a => a.nombre + '|' + a.grado + '|' + a.seccion;
+  const have = new Set(cur.map(key));
+  rows.forEach(r => {
+    const k = key(r);
+    if (!have.has(k)) { cur.push(r); have.add(k); }
+  });
+  estado[nivel].estudiantes = cur;
+}
+
+function defaultPeriodos() {
+  return { anio: 2026, bimestres: { I: 'cerrado', II: 'abierto', III: 'bloqueado', IV: 'bloqueado' } };
+}
+
+function loadPeriodos() {
+  try {
+    const raw = localStorage.getItem(LS_PER);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return defaultPeriodos();
+}
+
+function initPeriodosUI() {
+  const per = loadPeriodos();
+  document.getElementById('cfgAnio').value = per.anio || 2026;
+  const box = document.getElementById('listaBimestres');
+  const labels = { abierto: 'Abierto', cerrado: 'Cerrado', bloqueado: 'Bloqueado' };
+  const colors = { abierto: 'chip-open', cerrado: 'chip-closed', bloqueado: 'chip-off' };
+  box.innerHTML = ['I','II','III','IV'].map(b => {
+    const st = per.bimestres[b] || 'bloqueado';
+    return `<div class="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-slate-50">
+      <div class="font-black">Bimestre ${b}</div>
+      <span class="chip ${colors[st]}">${labels[st]}</span>
+      <select data-bim="${b}" class="max-w-[140px] bim-sel">
+        <option value="abierto" ${st==='abierto'?'selected':''}>Abierto</option>
+        <option value="cerrado" ${st==='cerrado'?'selected':''}>Cerrado</option>
+        <option value="bloqueado" ${st==='bloqueado'?'selected':''}>Bloqueado</option>
+      </select>
+    </div>`;
+  }).join('');
+}
+
+function savePeriodos() {
+  const per = loadPeriodos();
+  per.anio = parseInt(document.getElementById('cfgAnio').value, 10) || 2026;
+  document.querySelectorAll('.bim-sel').forEach(sel => {
+    per.bimestres[sel.getAttribute('data-bim')] = sel.value;
+  });
+  localStorage.setItem(LS_PER, JSON.stringify(per));
+  if (estado) { estado.anio = per.anio; saveEstado(); }
+  alert('Periodos guardados.');
+  initPeriodosUI();
+}
+
+function cambiarClave() {
+  const n = document.getElementById('cfgPass').value;
+  if (!n || n.length < 4) { alert('La clave debe tener al menos 4 caracteres'); return; }
+  localStorage.setItem(LS_PASS, n);
+  document.getElementById('cfgPass').value = '';
+  alert('Clave actualizada.');
+}
+
+// Auto session
+loadEstado();
+if (sessionStorage.getItem('ie22375_admin_ok') === '1') {
+  document.getElementById('screenLogin').classList.remove('active');
+  document.getElementById('screenApp').classList.add('active');
+  initPeriodosUI();
+  actualizarResumen();
+  fillFiltros();
+  renderTabla();
+  showTab('menu');
+}
+document.getElementById('loginPass')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+</script>
+</body>
+</html>
