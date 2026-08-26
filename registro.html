@@ -39,6 +39,22 @@
   .cap-box { background:#f8fafc; border-radius:12px; padding:8px 10px; margin-top:8px; border:1px solid #e2e8f0; }
   .cap-row { padding:8px 0; border-bottom:1px dashed #e2e8f0; }
   .cap-row:last-child { border-bottom:0; }
+  .mode-toggle { display:flex; gap:6px; background:#e2e8f0; border-radius:12px; padding:4px; }
+  .mode-toggle button { flex:1; border:0; border-radius:10px; padding:.45rem .5rem; font-size:12px; font-weight:800; background:transparent; color:#64748b; cursor:pointer; }
+  .mode-toggle button.on { background:#fff; color:#0f172a; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .num-wrap { display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .num-wrap input[type=number] {
+    width:72px; min-height:40px; text-align:center; font-size:18px; font-weight:900;
+    border:2px solid #cbd5e1; border-radius:12px; padding:.35rem;
+  }
+  .num-wrap input[type=number]:focus { border-color:#0ea5e9; outline:2px solid #bae6fd; }
+  .eq-letter { font-size:12px; font-weight:900; padding:.25rem .55rem; border-radius:999px; }
+  .eq-c { background:#fee2e2; color:#b91c1c; }
+  .eq-b { background:#fef3c7; color:#a16207; }
+  .eq-a { background:#ecfccb; color:#4d7c0f; }
+  .eq-ad { background:#d1fae5; color:#047857; }
+  .eq-none { background:#f1f5f9; color:#94a3b8; }
+  .scale-hint { font-size:10px; color:#64748b; margin-top:4px; }
 </style>
 </head>
 <body class="min-h-screen text-slate-800">
@@ -125,12 +141,19 @@
     </div>
 
     <div class="card p-3">
-      <div class="flex items-center justify-between gap-2 mb-1">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div class="text-[10px] font-bold text-slate-500">EVALUAR</div>
-        <button type="button" id="btnToggleCap" class="text-xs font-bold text-sky-600" onclick="toggleModoCap()">Ver capacidades</button>
+        <div class="flex flex-wrap gap-2 items-center">
+          <div class="mode-toggle" id="modeToggle">
+            <button type="button" id="btnModoLetra" class="on" onclick="setModoCalif('letra')">Letras C·B·A·AD</button>
+            <button type="button" id="btnModoNum" onclick="setModoCalif('num')">Números 0–20</button>
+          </div>
+          <button type="button" id="btnToggleCap" class="text-xs font-bold text-sky-600" onclick="toggleModoCap()">Ver capacidades</button>
+        </div>
       </div>
-      <div class="text-sm font-bold text-slate-700 mb-2" id="lblCompCorta">—</div>
-      <p class="text-[11px] text-slate-500 mb-2" id="lblAyuda">Marca el nivel de logro de la <b>competencia</b>. Si usas capacidades, ábrelas y califica cada una; luego puedes sugerir la nota de la competencia.</p>
+      <div class="text-sm font-bold text-slate-700 mb-1" id="lblCompCorta">—</div>
+      <p class="text-[11px] text-slate-500 mb-1" id="lblAyuda">Marca el nivel de logro de la <b>competencia</b> (obligatorio para MINEDU/SIAGIE).</p>
+      <p class="scale-hint" id="lblEscala">Escala oficial: AD = destacado · A = logrado · B = proceso · C = inicio</p>
       <div id="stuList"></div>
     </div>
   </main>
@@ -185,9 +208,45 @@ let nivel = null;
 let areaActual = null;
 let compIdx = 0;
 let modoCap = false; // false = solo competencia; true = capacidades abiertas
-let notas = {}; // nombre -> { nivel, conclusion, caps: {0: 'B', 1:'A'} }
+let modoCalif = 'letra'; // 'letra' | 'num'
+let notas = {}; // nombre -> { nivel, nota20, conclusion, caps, caps20 }
 let modalCtx = null;
 let expandStu = {}; // nombre -> bool
+
+/* Conversión vigesimal ↔ letras (uso frecuente en secundaria PE)
+   18–20 → AD | 14–17 → A | 11–13 → B | 0–10 → C */
+function numToLetter(n) {
+  n = Number(n);
+  if (isNaN(n) || n < 0 || n > 20) return '';
+  if (n >= 18) return 'AD';
+  if (n >= 14) return 'A';
+  if (n >= 11) return 'B';
+  return 'C';
+}
+function letterToNum(L) {
+  return ({ AD:19, A:15, B:12, C:8 })[L] ?? '';
+}
+function eqClass(L) {
+  if (L==='C') return 'eq-c';
+  if (L==='B') return 'eq-b';
+  if (L==='A') return 'eq-a';
+  if (L==='AD') return 'eq-ad';
+  return 'eq-none';
+}
+function setModoCalif(m) {
+  modoCalif = m;
+  document.getElementById('btnModoLetra').classList.toggle('on', m==='letra');
+  document.getElementById('btnModoNum').classList.toggle('on', m==='num');
+  document.getElementById('lblAyuda').innerHTML = m==='num'
+    ? 'Ingresa nota <b>0 a 20</b>. Se convierte automáticamente a letra para MINEDU/SIAGIE (18–20 AD · 14–17 A · 11–13 B · 0–10 C).'
+    : (modoCap
+      ? 'Califica cada <b>capacidad</b>. Usa <b>Sugerir</b> para proponer la nota de la competencia.'
+      : 'Marca el nivel de logro de la <b>competencia</b> (obligatorio para MINEDU/SIAGIE).');
+  document.getElementById('lblEscala').textContent = m==='num'
+    ? 'Escala: 18–20 = AD · 14–17 = A · 11–13 = B · 0–10 = C  |  La letra se guarda para SIAGIE'
+    : 'Escala oficial: AD = destacado · A = logrado · B = proceso · C = inicio';
+  renderStudents();
+}
 
 function toast(msg) {
   const el = document.getElementById('toast');
@@ -350,7 +409,7 @@ function toggleModoCap() {
 }
 
 function setNivel(nombre, niv) {
-  if (!notas[nombre]) notas[nombre] = { nivel:'', conclusion:'', caps:{} };
+  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'', caps:{}, caps20:{} };
   if (niv === 'C') {
     modalCtx = { nombre, niv, tipo:'comp' };
     document.getElementById('modalStu').textContent = nombre + ' · Competencia';
@@ -359,6 +418,77 @@ function setNivel(nombre, niv) {
     return;
   }
   notas[nombre].nivel = niv;
+  // Si no hay nota numérica aún, sugerir punto medio de la banda
+  if (notas[nombre].nota20 === '' || notas[nombre].nota20 === undefined || notas[nombre].nota20 === null) {
+    notas[nombre].nota20 = letterToNum(niv);
+  }
+  guardarNotas();
+  renderStudents();
+}
+
+function setNota20(nombre, val) {
+  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'', caps:{}, caps20:{} };
+  let n = val === '' || val === null ? '' : Number(val);
+  if (n !== '' && (isNaN(n) || n < 0 || n > 20)) {
+    toast('Solo 0 a 20');
+    renderStudents();
+    return;
+  }
+  if (n === '') {
+    notas[nombre].nota20 = '';
+    // no borrar letra si ya existía
+    guardarNotas();
+    renderStudents();
+    return;
+  }
+  n = Math.round(n * 10) / 10;
+  notas[nombre].nota20 = n;
+  const L = numToLetter(n);
+  if (L === 'C') {
+    // pedir conclusión si pasa a C o ya es C
+    notas[nombre].nivel = 'C';
+    modalCtx = { nombre, niv:'C', tipo:'comp', fromNum:true };
+    document.getElementById('modalStu').textContent = nombre + ' · Nota ' + n + ' → C';
+    document.getElementById('modalText').value = notas[nombre].conclusion || '';
+    document.getElementById('modalConc').classList.remove('hidden');
+    guardarNotas();
+    return;
+  }
+  notas[nombre].nivel = L;
+  guardarNotas();
+  renderStudents();
+}
+
+function setCap20(nombre, capIdx, val) {
+  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'', caps:{}, caps20:{} };
+  if (!notas[nombre].caps20) notas[nombre].caps20 = {};
+  if (!notas[nombre].caps) notas[nombre].caps = {};
+  let n = val === '' || val === null ? '' : Number(val);
+  if (n !== '' && (isNaN(n) || n < 0 || n > 20)) {
+    toast('Solo 0 a 20');
+    renderStudents();
+    return;
+  }
+  if (n === '') {
+    delete notas[nombre].caps20[capIdx];
+    delete notas[nombre].caps[capIdx];
+    guardarNotas();
+    renderStudents();
+    return;
+  }
+  n = Math.round(n * 10) / 10;
+  notas[nombre].caps20[capIdx] = n;
+  const L = numToLetter(n);
+  if (L === 'C') {
+    notas[nombre].caps[capIdx] = 'C';
+    modalCtx = { nombre, niv:'C', tipo:'cap', capIdx, fromNum:true };
+    document.getElementById('modalStu').textContent = nombre + ' · Cap. ' + (capIdx+1) + ' · ' + n + ' → C';
+    document.getElementById('modalText').value = (notas[nombre].capConc && notas[nombre].capConc[capIdx]) || '';
+    document.getElementById('modalConc').classList.remove('hidden');
+    guardarNotas();
+    return;
+  }
+  notas[nombre].caps[capIdx] = L;
   guardarNotas();
   renderStudents();
 }
@@ -395,8 +525,9 @@ function sugerirCompetencia(nombre) {
     document.getElementById('modalConc').classList.remove('hidden');
   } else {
     n.nivel = sug;
+    n.nota20 = letterToNum(sug);
     guardarNotas();
-    toast('Competencia → ' + sug);
+    toast('Competencia → ' + sug + (modoCalif==='num' ? ' ('+n.nota20+'/20)' : ''));
     renderStudents();
   }
 }
@@ -415,6 +546,9 @@ function cerrarModal(ok) {
     } else {
       notas[nombre].nivel = 'C';
       notas[nombre].conclusion = text;
+      if (notas[nombre].nota20 === '' || notas[nombre].nota20 === undefined || notas[nombre].nota20 === null) {
+        notas[nombre].nota20 = letterToNum('C');
+      }
     }
     guardarNotas();
   }
@@ -441,14 +575,42 @@ function renderStudents() {
     return;
   }
   box.innerHTML = list.map((al, i) => {
-    const n = notas[al.nombre] || { nivel:'', conclusion:'', caps:{} };
+    const n = notas[al.nombre] || { nivel:'', nota20:'', conclusion:'', caps:{}, caps20:{} };
     const niv = n.nivel || '';
+    const n20 = (n.nota20 !== undefined && n.nota20 !== null && n.nota20 !== '') ? n.nota20 : '';
     const enc = encodeURIComponent(al.nombre);
+    let califHtml = '';
+    if (modoCalif === 'num') {
+      const eq = niv ? `<span class="eq-letter ${eqClass(niv)}">${niv}</span>` : `<span class="eq-letter eq-none">—</span>`;
+      califHtml = `<div class="num-wrap">
+        <input type="number" min="0" max="20" step="1" inputmode="numeric" placeholder="0-20"
+          value="${n20}" data-num-comp="${enc}">
+        ${eq}
+        <span class="text-[10px] text-slate-400">→ SIAGIE</span>
+      </div>`;
+    } else {
+      califHtml = `<div class="flex flex-wrap gap-1 mt-1" data-comp-set="${enc}">
+        ${['C','B','A','AD'].map(v => `<button type="button" class="chip nivel-${v.toLowerCase()} ${niv===v?'on':''}" data-comp-val="${v}">${v}</button>`).join('')}
+        ${n20 !== '' ? `<span class="text-[10px] text-slate-400 self-center ml-1">(${n20}/20)</span>` : ''}
+      </div>`;
+    }
     let capsHtml = '';
     if (modoCap) {
       capsHtml = `<div class="cap-box">
         ${caps.map((ct, ci) => {
           const cv = (n.caps && n.caps[ci]) || '';
+          const c20 = (n.caps20 && n.caps20[ci] !== undefined && n.caps20[ci] !== '') ? n.caps20[ci] : '';
+          if (modoCalif === 'num') {
+            const eq = cv ? `<span class="eq-letter ${eqClass(cv)}">${cv}</span>` : `<span class="eq-letter eq-none">—</span>`;
+            return `<div class="cap-row">
+              <div class="text-[11px] font-semibold text-slate-600 mb-1">${ci+1}. ${ct}</div>
+              <div class="num-wrap">
+                <input type="number" min="0" max="20" step="1" inputmode="numeric" placeholder="0-20"
+                  value="${c20}" data-num-cap="${enc}" data-cap-i="${ci}">
+                ${eq}
+              </div>
+            </div>`;
+          }
           return `<div class="cap-row">
             <div class="text-[11px] font-semibold text-slate-600 mb-1">${ci+1}. ${ct}</div>
             <div class="flex flex-wrap gap-1" data-cap="${ci}" data-stu="${enc}">
@@ -465,9 +627,7 @@ function renderStudents() {
         <div class="flex-1 min-w-0">
           <div class="font-bold text-sm leading-snug">${al.nombre}</div>
           <div class="text-[10px] font-bold text-slate-400 mt-1">COMPETENCIA</div>
-          <div class="flex flex-wrap gap-1 mt-1" data-comp-set="${enc}">
-            ${['C','B','A','AD'].map(v => `<button type="button" class="chip nivel-${v.toLowerCase()} ${niv===v?'on':''}" data-comp-val="${v}">${v}</button>`).join('')}
-          </div>
+          ${califHtml}
           ${niv==='C' ? `<div class="text-[11px] text-red-700 mt-1 bg-red-50 rounded-lg px-2 py-1">${(n.conclusion||'Sin conclusión').slice(0,140)}</div>` : ''}
           ${capsHtml}
         </div>
@@ -475,7 +635,6 @@ function renderStudents() {
     </div>`;
   }).join('');
 
-  // Event delegation (más fiable en móvil que onclick inline)
   box.onclick = function(ev) {
     const t = ev.target.closest('button');
     if (!t) return;
@@ -488,6 +647,25 @@ function renderStudents() {
       setCap(nombre, parseInt(wrap.dataset.cap,10), t.dataset.capSet);
     } else if (t.dataset.sug) {
       sugerirCompetencia(decodeURIComponent(t.dataset.sug));
+    }
+  };
+
+  box.onchange = function(ev) {
+    const el = ev.target;
+    if (el.matches('input[data-num-comp]')) {
+      setNota20(decodeURIComponent(el.dataset.numComp), el.value);
+    } else if (el.matches('input[data-num-cap]')) {
+      setCap20(decodeURIComponent(el.dataset.numCap), parseInt(el.dataset.capI,10), el.value);
+    }
+  };
+
+  // blur also saves on mobile keyboards
+  box.onfocusout = function(ev) {
+    const el = ev.target;
+    if (el.matches && el.matches('input[data-num-comp]')) {
+      setNota20(decodeURIComponent(el.dataset.numComp), el.value);
+    } else if (el.matches && el.matches('input[data-num-cap]')) {
+      setCap20(decodeURIComponent(el.dataset.numCap), parseInt(el.dataset.capI,10), el.value);
     }
   };
 
