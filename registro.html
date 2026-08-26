@@ -189,7 +189,7 @@
       </div>
       <div>
         <label class="text-[10px] font-bold text-slate-500">Competencia</label>
-        <select id="selComp" onchange="onSesionChange()"></select>
+        <select id="selComp" onchange="onCompChange()"></select>
       </div>
       <div>
         <label class="text-[10px] font-bold text-slate-500">Capacidad / evidencia a evaluar</label>
@@ -463,6 +463,36 @@ function fillComps() {
   document.getElementById('selComp').innerHTML = comps.map(c => `<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join('') || '<option value="">Sin competencias</option>';
 }
 
+function onCompChange() {
+  // Al cambiar competencia: limpiar capacidad y preguntar si guardar sesión actual
+  if (sesionActiva && hayNotasPendientes()) {
+    if (confirm('Hay notas en la sesión actual.\n¿Desea guardar antes de cambiar de competencia?')) {
+      guardarTodo();
+      toast('Guardado');
+    }
+  }
+  document.getElementById('inpCapacidad').value = '';
+  sesionActiva = null;
+  notas = {};
+  document.getElementById('lblSesionActiva').textContent = 'Define fecha, competencia y capacidad arriba';
+  renderSesiones();
+  renderStudents();
+}
+
+function hayNotasPendientes() {
+  return Object.keys(notas).some(k => {
+    const n = notas[k];
+    return n && (n.nivel || n.nota20 !== '' && n.nota20 != null);
+  });
+}
+
+function pad2(n) {
+  if (n === '' || n == null || isNaN(Number(n))) return '';
+  const x = Math.round(Number(n));
+  if (x < 0 || x > 20) return String(x);
+  return String(x).padStart(2, '0');
+}
+
 function onSesionChange() {
   // no-op until activar
 }
@@ -475,6 +505,17 @@ function activarSesion() {
   if (!fecha) { alert('Indica la fecha de la sesión'); return; }
   if (!comp) { alert('Elige la competencia'); return; }
   if (!capacidad) { alert('Escribe la capacidad o evidencia a evaluar'); return; }
+
+  // Si ya hay sesión distinta con notas, preguntar guardar
+  if (sesionActiva && hayNotasPendientes()) {
+    const misma = sesionActiva.fecha === fecha && sesionActiva.comp === comp && sesionActiva.capacidad === capacidad;
+    if (!misma) {
+      if (confirm('Hay notas en otra sesión.\n¿Desea guardar antes de cambiar de capacidad/competencia?')) {
+        guardarTodo();
+        toast('Guardado');
+      }
+    }
+  }
 
   sesionActiva = { fecha, unidad, comp, capacidad };
   // register session in store if new
@@ -536,11 +577,31 @@ function renderSesiones() {
     const id = sessionId(s);
     const on = sesionActiva && sessionId(sesionActiva) === id ? 'on' : '';
     const label = (s.fecha || '') + ' · ' + (s.capacidad || '').slice(0,28);
-    return `<button type="button" class="sess-chip ${on}" data-sid="${encodeURIComponent(id)}">${label}</button>`;
+    return `<span class="sess-chip ${on}" style="display:inline-flex;align-items:center;gap:4px">
+      <button type="button" data-sid="${encodeURIComponent(id)}" style="border:0;background:transparent;font:inherit;font-weight:700;cursor:pointer;padding:0;color:inherit">${label}</button>
+      <button type="button" title="Borrar esta sesión" data-del="${encodeURIComponent(id)}" style="border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0">×</button>
+    </span>`;
   }).join('');
   box.onclick = function(ev) {
+    const del = ev.target.closest('button[data-del]');
+    if (del) {
+      const id = decodeURIComponent(del.dataset.del);
+      borrarSesion(id);
+      return;
+    }
     const b = ev.target.closest('button[data-sid]');
     if (!b) return;
+    // preguntar guardar si hay otra sesión activa con notas
+    if (sesionActiva && hayNotasPendientes()) {
+      const curId = sessionId(sesionActiva);
+      const id = decodeURIComponent(b.dataset.sid);
+      if (curId !== id) {
+        if (confirm('Hay notas en la sesión actual.\n¿Desea guardar antes de cambiar?')) {
+          guardarTodo();
+          toast('Guardado');
+        }
+      }
+    }
     const id = decodeURIComponent(b.dataset.sid);
     const s = store.sessions.find(x => sessionId(x) === id);
     if (!s) return;
@@ -555,6 +616,33 @@ function renderSesiones() {
     document.getElementById('lblSesionActiva').textContent =
       s.fecha + ' · ' + s.capacidad + (s.unidad ? ' · U' + s.unidad : '');
   };
+}
+
+function borrarSesion(id) {
+  const s = store.sessions.find(x => sessionId(x) === id);
+  if (!s) return;
+  const ok = confirm(
+    '¿Borrar esta sesión y todas sus notas?\n\n' +
+    (s.fecha || '') + ' · ' + (s.comp || '') + '\n' +
+    (s.capacidad || '') +
+    '\n\nEsta acción no se puede deshacer.'
+  );
+  if (!ok) return;
+  // delete grades with this session prefix
+  const prefix = [s.nivel, s.bim, s.grado, s.seccion, s.area, s.comp, s.capacidad, s.fecha].join('||') + '||';
+  Object.keys(store.grades).forEach(k => {
+    if (k.startsWith(prefix)) delete store.grades[k];
+  });
+  store.sessions = store.sessions.filter(x => sessionId(x) !== id);
+  if (sesionActiva && sessionId(sesionActiva) === id) {
+    sesionActiva = null;
+    notas = {};
+    document.getElementById('lblSesionActiva').textContent = 'Define fecha, competencia y capacidad arriba';
+  }
+  saveStore();
+  renderSesiones();
+  renderStudents();
+  toast('Sesión borrada');
 }
 
 function setModoCalif(m) {
@@ -644,18 +732,18 @@ function renderStudents() {
     if (modoCalif === 'num') {
       const eq = niv ? `<span class="eq-letter ${eqClass(niv)}">${niv}</span>` : `<span class="eq-letter eq-none">—</span>`;
       calif = `<div class="num-wrap">
-        <input type="number" min="0" max="20" step="1" inputmode="numeric" placeholder="0-20" value="${n20}" data-num="${enc}">
+        <input type="number" min="0" max="20" step="1" inputmode="numeric" placeholder="0-20" value="${n20 !== '' ? pad2(n20) : ''}" data-num="${enc}">
         ${eq}
       </div>`;
     } else {
       calif = `<div class="flex flex-wrap gap-1 mt-1" data-comp-set="${enc}">
         ${['C','B','A','AD'].map(v => `<button type="button" class="chip nivel-${v.toLowerCase()} ${niv===v?'on':''}" data-val="${v}">${v}</button>`).join('')}
-        ${n20 !== '' ? `<span class="text-[10px] text-slate-400 self-center ml-1">(${n20})</span>` : ''}
+        ${n20 !== '' ? `<span class="text-[10px] text-slate-400 self-center ml-1">(${pad2(n20)})</span>` : ''}
       </div>`;
     }
     return `<div class="stu-row">
       <div class="flex gap-2 items-start">
-        <div class="text-xs font-bold text-slate-400 w-6 pt-1">${al.orden || i+1}</div>
+        <div class="text-xs font-bold text-slate-400 w-6 pt-1">${i+1}</div>
         <div class="flex-1 min-w-0">
           <div class="font-bold text-sm leading-snug">${al.nombre}</div>
           ${calif}
@@ -865,7 +953,7 @@ function prepararImpresion() {
         let show = '';
         if (g) {
           if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) {
-            show = String(g.nota20);
+            show = pad2(g.nota20);
             vals.push(Number(g.nota20));
           } else if (g.nivel) {
             show = g.nivel;
@@ -878,10 +966,10 @@ function prepararImpresion() {
       const prom = promedioNums(vals);
       const letra = prom != null ? numToLetter(prom) : '';
       html += `<tr>
-        <td style="text-align:center">${al.orden || i+1}</td>
+        <td style="text-align:center">${i+1}</td>
         <td style="text-align:left;font-size:8pt">${al.nombre}</td>
         ${cells}
-        <td style="text-align:center;font-weight:bold">${prom != null ? prom : ''}</td>
+        <td style="text-align:center;font-weight:bold">${prom != null ? pad2(prom) : ''}</td>
         <td style="text-align:center;font-weight:bold">${letra}</td>
       </tr>`;
     });
@@ -996,11 +1084,11 @@ function renderAvance() {
       .map(e => `<div class="av-ev">${e.fecha || '—'} · <b>${e.capacidad}</b>${e.unidad?' · U'+e.unidad:''}</div>`)
       .join('');
 
-    const detalle = stuRows.map(r => {
+    const detalle = stuRows.map((r, idx) => {
       const mark = r.letra
-        ? `<span class="eq-letter ${eqClass(r.letra)}">${r.letra}${r.prom!=null?' '+r.prom:''}</span>`
+        ? `<span class="eq-letter ${eqClass(r.letra)}">${r.letra}${r.prom!=null?' '+pad2(r.prom):''}</span>`
         : `<span class="eq-letter eq-none">—</span>`;
-      return `<div class="av-stu"><span class="truncate">${r.orden||''}. ${r.nombre}</span>${mark}</div>`;
+      return `<div class="av-stu"><span class="truncate">${idx+1}. ${r.nombre}</span>${mark}</div>`;
     }).join('');
 
     return `<div class="av-card">
