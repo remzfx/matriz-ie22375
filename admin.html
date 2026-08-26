@@ -294,7 +294,7 @@
       </div>
     </section>
 
-id="tab-config" class="tab hidden">
+    <section id="tab-config" class="tab hidden">
       <div class="card p-4 space-y-3">
         <h2 class="font-black text-lg">Configuración</h2>
         <div>
@@ -844,16 +844,29 @@ function cambiarClave() {
   alert('Clave actualizada.');
 }
 
-// Auto session
-loadEstado();
-if (sessionStorage.getItem('ie22375_admin_ok') === '1') {
+// Auto session: si ya entró por el login general como admin, NO pedir clave otra vez
+function sesionIndexAdmin() {
+  try {
+    const raw = sessionStorage.getItem('ie22375_session_v1') || localStorage.getItem('ie22375_session_v1');
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    return s && (s.user === 'admin' || s.role === 'admin' || s.nivel === 'admin');
+  } catch(e) { return false; }
+}
+function entrarAppAdmin() {
   document.getElementById('screenLogin').classList.remove('active');
+  document.getElementById('screenLogin').style.display = 'none';
   document.getElementById('screenApp').classList.add('active');
+  sessionStorage.setItem('ie22375_admin_ok', '1');
   initPeriodosUI();
   actualizarResumen();
   fillFiltros();
   renderTabla();
   showTab('menu');
+}
+loadEstado();
+if (sessionStorage.getItem('ie22375_admin_ok') === '1' || sesionIndexAdmin()) {
+  entrarAppAdmin();
 }
 document.getElementById('loginPass')?.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 </script>

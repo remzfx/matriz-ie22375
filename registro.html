@@ -465,6 +465,19 @@ function fixHdrHeight() {
   if (h) document.documentElement.style.setProperty('--hdr', h.offsetHeight + 'px');
 }
 
+function loadPeriodosAdmin() {
+  try {
+    const raw = localStorage.getItem('ie22375_admin_periodos');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { anio: 2026, bimestres: { I: 'abierto', II: 'abierto', III: 'abierto', IV: 'abierto' } };
+}
+function bimestreHabilitado(b) {
+  const per = loadPeriodosAdmin();
+  const st = (per.bimestres && per.bimestres[b]) || 'abierto';
+  // abierto = OK; cerrado / bloqueado = no
+  return st === 'abierto';
+}
 function getLoginSession() {
   try {
     var KEY = 'ie22375_session_v1';
@@ -538,6 +551,26 @@ function aplicarRestriccionNivel() {
   }
 }
 
+function aplicarDocenteSesion() {
+  const inp = document.getElementById('inpDocente');
+  if (!inp) return;
+  const s = getLoginSession();
+  if (s && s.role === 'docente' && s.label) {
+    inp.value = s.label;
+    inp.readOnly = true;
+    inp.style.background = '#f1f5f9';
+    inp.title = 'Definido por administración';
+  } else if (s && (s.role === 'nivel' || s.user === 'primaria' || s.user === 'secundaria')) {
+    // nivel general: editable
+    inp.readOnly = false;
+    inp.style.background = '#fff';
+    // no pisar si ya hay meta guardada
+  } else {
+    inp.readOnly = false;
+    inp.style.background = '#fff';
+  }
+}
+
 function entrarNivel(n) {
   // Bloquear cruce de nivel si la sesión no lo permite
   var perm = nivelPermitido();
@@ -554,7 +587,15 @@ function entrarNivel(n) {
   loadStore();
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
-  document.getElementById('selBim').innerHTML = ['I','II','III','IV'].map(b => `<option value="${b}">Bimestre ${b}</option>`).join('');
+  const sLogin = getLoginSession();
+  const esAdmin = sLogin && (sLogin.role === 'admin' || sLogin.user === 'admin');
+  document.getElementById('selBim').innerHTML = ['I','II','III','IV'].map(b => {
+    const ok = bimestreHabilitado(b);
+    const label = 'Bimestre ' + b + (ok ? '' : ' (cerrado)');
+    // Docentes no pueden elegir cerrados; admin sí ve todos
+    if (!ok && !esAdmin) return '';
+    return `<option value="${b}" ${ok?'':'disabled'}>${label}</option>`;
+  }).join('') || '<option value="">Sin bimestres abiertos</option>';
   const bd = loadBD();
   const list = (bd[n] && bd[n].estudiantes) || [];
   let grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
@@ -584,6 +625,15 @@ function entrarNivel(n) {
   updateHdr();
   renderSesiones();
   renderStudents();
+  aplicarDocenteSesion();
+  // Nueva entrada: fecha y capacidad vacías (el docente completa al evaluar)
+  document.getElementById('inpFecha').value = '';
+  document.getElementById('inpCapacidad').value = '';
+  document.getElementById('selUnidad').value = '';
+  sesionActiva = null;
+  notas = {};
+  markClean();
+  document.getElementById('lblSesionActiva').textContent = 'Define fecha, competencia y capacidad arriba';
   setTimeout(fixHdrHeight, 50);
 }
 
@@ -598,12 +648,21 @@ function onGrado() {
 }
 
 function onContexto() {
-  // restore docente meta
   const c = ctxBase();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
-  document.getElementById('inpDocente').value = (store.meta && store.meta[mk]) || '';
+  const s = getLoginSession();
+  if (s && s.role === 'docente' && s.label) {
+    document.getElementById('inpDocente').value = s.label;
+  } else {
+    document.getElementById('inpDocente').value = (store.meta && store.meta[mk]) || '';
+  }
+  aplicarDocenteSesion();
+  // Al cambiar contexto: limpiar capacidad (fecha la elige el docente)
+  document.getElementById('inpCapacidad').value = '';
   sesionActiva = null;
   notas = {};
+  markClean();
+  document.getElementById('lblSesionActiva').textContent = 'Define fecha, competencia y capacidad arriba';
   updateHdr();
   renderSesiones();
   renderStudents();
@@ -687,6 +746,13 @@ function onSesionChange() {
 }
 
 function activarSesion() {
+  const bim = document.getElementById('selBim').value;
+  const sLogin = getLoginSession();
+  const esAdmin = sLogin && (sLogin.role === 'admin' || sLogin.user === 'admin');
+  if (!bimestreHabilitado(bim) && !esAdmin) {
+    alert('Este bimestre está cerrado por administración. No se pueden registrar notas.');
+    return;
+  }
   const fecha = document.getElementById('inpFecha').value;
   const unidad = document.getElementById('selUnidad').value;
   const comp = document.getElementById('selComp').value;
@@ -849,6 +915,11 @@ function setModoCalif(m) {
 
 function setNivel(nombre, niv) {
   if (!sesionActiva) { toast('Activa una sesión primero'); return; }
+  const bimC = document.getElementById('selBim').value;
+  const sL = getLoginSession();
+  if (!bimestreHabilitado(bimC) && !(sL && (sL.role==='admin'||sL.user==='admin'))) {
+    alert('Bimestre cerrado por administración'); return;
+  }
   if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
   notas[nombre].nivel = niv;
   if (notas[nombre].nota20 === '' || notas[nombre].nota20 == null)
@@ -859,6 +930,11 @@ function setNivel(nombre, niv) {
 
 function setNota20(nombre, val) {
   if (!sesionActiva) { toast('Activa una sesión primero'); return; }
+  const bimC = document.getElementById('selBim').value;
+  const sL = getLoginSession();
+  if (!bimestreHabilitado(bimC) && !(sL && (sL.role==='admin'||sL.user==='admin'))) {
+    alert('Bimestre cerrado por administración'); return;
+  }
   if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
   let n = val === '' || val == null ? '' : Number(val);
   if (n !== '' && (isNaN(n) || n < 0 || n > 20)) {
