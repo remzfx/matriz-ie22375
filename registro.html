@@ -136,17 +136,18 @@
     <p class="text-sm text-slate-500 mt-1">Sesión · Competencia · Capacidad · 2026</p>
   </div>
   <div class="grid gap-3">
-    <button class="card p-5 text-left" onclick="entrarNivel('primaria')">
+    <button id="btnHomePri" class="card p-5 text-left" onclick="entrarNivel('primaria')">
       <div class="text-xs font-bold text-sky-600">NIVEL</div>
       <div class="text-xl font-black">Primaria</div>
       <div class="text-sm text-slate-500">1°–6° · Sección única · Todas las áreas</div>
     </button>
-    <button class="card p-5 text-left" onclick="entrarNivel('secundaria')">
+    <button id="btnHomeSec" class="card p-5 text-left" onclick="entrarNivel('secundaria')">
       <div class="text-xs font-bold text-emerald-600">NIVEL</div>
       <div class="text-xl font-black">Secundaria</div>
       <div class="text-sm text-slate-500">1°–5° · A/B o Única · Por área</div>
     </button>
   </div>
+  <p id="lblNivelBloqueo" class="hidden text-center text-sm text-slate-500 mt-3"></p>
   <div class="mt-6 text-center space-x-3 text-sm">
     <a href="index.html" class="text-slate-500">← Inicio</a>
     <a href="admin.html" class="text-slate-500">Admin BD</a>
@@ -453,7 +454,71 @@ function fixHdrHeight() {
   if (h) document.documentElement.style.setProperty('--hdr', h.offsetHeight + 'px');
 }
 
+function getLoginSession() {
+  try {
+    var KEY = 'ie22375_session_v1';
+    var raw = sessionStorage.getItem(KEY) || localStorage.getItem(KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+/** Nivel permitido según login: primaria | secundaria | admin | null */
+function nivelPermitido() {
+  var s = getLoginSession();
+  if (!s) return null;
+  if (s.user === 'admin' || s.nivel === 'admin') return 'admin';
+  if (s.user === 'primaria' || s.nivel === 'primaria') return 'primaria';
+  if (s.user === 'secundaria' || s.nivel === 'secundaria') return 'secundaria';
+  return null;
+}
+
+function aplicarRestriccionNivel() {
+  var perm = nivelPermitido();
+  var btnP = document.getElementById('btnHomePri');
+  var btnS = document.getElementById('btnHomeSec');
+  var lbl = document.getElementById('lblNivelBloqueo');
+  if (!btnP || !btnS) return;
+
+  if (perm === 'primaria') {
+    btnS.style.display = 'none';
+    btnP.style.display = 'block';
+    if (lbl) {
+      lbl.classList.remove('hidden');
+      lbl.textContent = 'Sesión Primaria · solo registro de primaria';
+    }
+    // Entrar directo a primaria (sin mostrar elección)
+    entrarNivel('primaria');
+  } else if (perm === 'secundaria') {
+    btnP.style.display = 'none';
+    btnS.style.display = 'block';
+    if (lbl) {
+      lbl.classList.remove('hidden');
+      lbl.textContent = 'Sesión Secundaria · solo registro de secundaria';
+    }
+    entrarNivel('secundaria');
+  } else {
+    // admin u otro: ambos visibles
+    btnP.style.display = 'block';
+    btnS.style.display = 'block';
+    if (lbl) {
+      lbl.classList.remove('hidden');
+      lbl.textContent = 'Administrador · puede entrar a ambos niveles';
+    }
+  }
+}
+
 function entrarNivel(n) {
+  // Bloquear cruce de nivel si la sesión no lo permite
+  var perm = nivelPermitido();
+  if (perm === 'primaria' && n !== 'primaria') {
+    alert('Su sesión es de Primaria. No puede ver el registro de Secundaria.');
+    n = 'primaria';
+  }
+  if (perm === 'secundaria' && n !== 'secundaria') {
+    alert('Su sesión es de Secundaria. No puede ver el registro de Primaria.');
+    n = 'secundaria';
+  }
+
   nivel = n;
   loadStore();
   document.getElementById('viewHome').classList.add('hidden');
@@ -1367,11 +1432,28 @@ function renderAvance() {
 
 function volverHome() {
   guardarTodo();
+  var perm = nivelPermitido();
+  // Si solo tiene un nivel, no mostrar menú de elección: salir al index
+  if (perm === 'primaria' || perm === 'secundaria') {
+    nivel = null;
+    location.href = 'index.html';
+    return;
+  }
   document.getElementById('viewApp').classList.add('hidden');
   document.getElementById('viewHome').classList.remove('hidden');
   nivel = null;
+  aplicarRestriccionNivel();
 }
 window.addEventListener('resize', fixHdrHeight);
+
+// Al cargar: separar primaria / secundaria según sesión de login
+document.addEventListener('DOMContentLoaded', function() {
+  aplicarRestriccionNivel();
+});
+// Por si el script corre después de DOMContentLoaded
+if (document.readyState !== 'loading') {
+  setTimeout(aplicarRestriccionNivel, 0);
+}
 </script>
 </body>
 </html>
