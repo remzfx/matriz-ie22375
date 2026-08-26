@@ -62,6 +62,23 @@
   .panel-cal.on { display:block; }
   .panel-cal { display:none; }
   #printArea { display:none; }
+  .panel-as { display:none; }
+  .panel-as.on { display:block; }
+  .asis-chip {
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:2rem; height:2rem; border-radius:8px; font-size:12px; font-weight:900;
+    border:2px solid #e2e8f0; background:#fff; cursor:pointer; margin:1px;
+  }
+  .asis-chip.P { background:#dcfce7; border-color:#86efac; color:#166534; }
+  .asis-chip.F { background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
+  .asis-chip.T { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
+  .asis-chip.J { background:#e0e7ff; border-color:#a5b4fc; color:#3730a3; }
+  .asis-date-btn {
+    font-size:11px; font-weight:800; padding:.35rem .55rem; border-radius:999px;
+    border:1px solid #e2e8f0; background:#f8fafc; cursor:pointer; margin:2px;
+  }
+  .asis-date-btn.on { background:#0ea5e9; color:#fff; border-color:#0ea5e9; }
+
   @media print {
     body * { visibility: hidden !important; }
     #printArea, #printArea * { visibility: visible !important; }
@@ -201,8 +218,39 @@
     <!-- Tabs Calificar / Avance -->
     <div class="flex gap-2 flex-wrap">
       <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
+      <button type="button" id="tabAs" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('as')">Asistencia</button>
       <button type="button" id="tabAv" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('av')">Ver avance</button>
       <button type="button" class="btn btn-ghost flex-1 text-sm" onclick="prepararImpresion()">🖨 Imprimir / PDF</button>
+    </div>
+
+    <!-- PANEL ASISTENCIA -->
+    <div class="panel-as" id="panelAsistencia">
+      <div class="card p-3 space-y-3">
+        <div>
+          <div class="text-[10px] font-bold text-slate-500">ASISTENCIA</div>
+          <div class="text-sm font-bold" id="lblAsisCtx">—</div>
+          <p class="text-[11px] text-slate-500 mt-1">Marca por fecha: <b>P</b> presente · <b>F</b> falta · <b>T</b> tardanza · <b>J</b> justificado. Toca el círculo para ciclar.</p>
+        </div>
+        <div class="flex flex-wrap gap-2 items-end">
+          <div class="flex-1 min-w-[140px]">
+            <label class="text-[10px] font-bold text-slate-500">Fecha</label>
+            <input type="date" id="inpAsisFecha">
+          </div>
+          <button type="button" class="btn btn-primary text-sm" onclick="agregarFechaAsis()">Agregar fecha</button>
+          <button type="button" class="btn btn-ghost text-sm" onclick="guardarAsistencia(); toast('Asistencia guardada')">Guardar</button>
+        </div>
+        <div>
+          <div class="text-[10px] font-bold text-slate-500 mb-1">FECHAS DEL BIMESTRE</div>
+          <div id="asisFechas" class="flex flex-wrap gap-1"></div>
+        </div>
+        <div class="flex flex-wrap gap-2 text-[11px] font-bold">
+          <span class="px-2 py-1 rounded-lg bg-green-50 text-green-800">P <span id="aP">0</span></span>
+          <span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">F <span id="aF">0</span></span>
+          <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">T <span id="aT">0</span></span>
+          <span class="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-800">J <span id="aJ">0</span></span>
+        </div>
+        <div id="asisLista"></div>
+      </div>
     </div>
 
     <!-- PANEL AVANCE -->
@@ -327,6 +375,8 @@ function loadStore() {
   if (!store.sessions) store.sessions = [];
   if (!store.grades) store.grades = {};
   if (!store.meta) store.meta = {};
+  if (!store.asistencia) store.asistencia = {}; // key ctx||fecha||nombre -> 'P'|'F'|'T'|'J'|''
+  if (!store.asisFechas) store.asisFechas = {}; // key ctx -> [fechas]
 }
 function saveStore() {
   store._ts = Date.now();
@@ -1013,20 +1063,180 @@ function prepararImpresion() {
 function showPanel(which) {
   const cal = document.getElementById('panelCalificar');
   const av = document.getElementById('panelAvance');
+  const as = document.getElementById('panelAsistencia');
   const tCal = document.getElementById('tabCal');
   const tAv = document.getElementById('tabAv');
+  const tAs = document.getElementById('tabAs');
+  // reset
+  cal.classList.remove('on');
+  av.classList.remove('on');
+  as.classList.remove('on');
+  tCal.className = 'btn btn-ghost flex-1 text-sm';
+  tAv.className = 'btn btn-ghost flex-1 text-sm';
+  tAs.className = 'btn btn-ghost flex-1 text-sm';
   if (which === 'av') {
-    cal.classList.remove('on');
     av.classList.add('on');
-    tCal.className = 'btn btn-ghost flex-1 text-sm';
     tAv.className = 'btn btn-primary flex-1 text-sm';
     renderAvance();
+  } else if (which === 'as') {
+    as.classList.add('on');
+    tAs.className = 'btn btn-primary flex-1 text-sm';
+    renderAsistencia();
   } else {
-    av.classList.remove('on');
     cal.classList.add('on');
-    tAv.className = 'btn btn-ghost flex-1 text-sm';
     tCal.className = 'btn btn-primary flex-1 text-sm';
   }
+}
+
+function asisCtxKey() {
+  const c = ctxBase();
+  return [c.nivel, c.bim, c.grado, c.seccion].join('||');
+}
+
+function asisMarkKey(fecha, nombre) {
+  return asisCtxKey() + '||' + fecha + '||' + nombre;
+}
+
+function getAsisFechas() {
+  const k = asisCtxKey();
+  if (!store.asisFechas[k]) store.asisFechas[k] = [];
+  return store.asisFechas[k];
+}
+
+let asisFechaActiva = null;
+
+function agregarFechaAsis() {
+  const f = document.getElementById('inpAsisFecha').value;
+  if (!f) { alert('Elige una fecha'); return; }
+  const arr = getAsisFechas();
+  if (!arr.includes(f)) {
+    arr.push(f);
+    arr.sort();
+    saveStore();
+  }
+  asisFechaActiva = f;
+  renderAsistencia();
+  toast('Fecha agregada');
+}
+
+function cicloAsis(nombre) {
+  if (!asisFechaActiva) { toast('Elige o agrega una fecha'); return; }
+  const k = asisMarkKey(asisFechaActiva, nombre);
+  const cur = store.asistencia[k] || '';
+  // ciclo: '' → P → F → T → J → ''
+  const orden = ['', 'P', 'F', 'T', 'J'];
+  const i = orden.indexOf(cur);
+  const next = orden[(i + 1) % orden.length];
+  if (next) store.asistencia[k] = next;
+  else delete store.asistencia[k];
+  saveStore();
+  renderAsistencia();
+}
+
+function setAsis(nombre, val) {
+  if (!asisFechaActiva) { toast('Elige o agrega una fecha'); return; }
+  const k = asisMarkKey(asisFechaActiva, nombre);
+  if (!val) delete store.asistencia[k];
+  else store.asistencia[k] = val;
+  saveStore();
+  renderAsistencia();
+}
+
+function guardarAsistencia() {
+  saveStore();
+}
+
+function borrarFechaAsis(fecha) {
+  if (!confirm('¿Quitar la fecha ' + fecha + ' y sus marcas de asistencia?')) return;
+  const arr = getAsisFechas().filter(x => x !== fecha);
+  store.asisFechas[asisCtxKey()] = arr;
+  const prefix = asisCtxKey() + '||' + fecha + '||';
+  Object.keys(store.asistencia).forEach(k => {
+    if (k.startsWith(prefix)) delete store.asistencia[k];
+  });
+  if (asisFechaActiva === fecha) asisFechaActiva = arr.length ? arr[arr.length-1] : null;
+  saveStore();
+  renderAsistencia();
+  toast('Fecha eliminada');
+}
+
+function renderAsistencia() {
+  loadStore();
+  const c = ctxBase();
+  document.getElementById('lblAsisCtx').textContent =
+    (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + ' · Bim ' + c.bim;
+
+  const inp = document.getElementById('inpAsisFecha');
+  if (inp && !inp.value) inp.value = hoyISO();
+
+  const fechas = getAsisFechas();
+  if (!asisFechaActiva && fechas.length) asisFechaActiva = fechas[fechas.length - 1];
+  if (asisFechaActiva && !fechas.includes(asisFechaActiva)) asisFechaActiva = fechas[fechas.length-1] || null;
+
+  const boxF = document.getElementById('asisFechas');
+  if (!fechas.length) {
+    boxF.innerHTML = '<span class="text-[11px] text-slate-400">Sin fechas. Agrega la del día de clase.</span>';
+  } else {
+    boxF.innerHTML = fechas.map(f => {
+      const on = f === asisFechaActiva ? 'on' : '';
+      return `<span style="display:inline-flex;align-items:center;gap:2px">
+        <button type="button" class="asis-date-btn ${on}" data-af="${f}">${f}</button>
+        <button type="button" title="Quitar fecha" data-adel="${f}" style="border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:18px;height:18px;font-weight:900;cursor:pointer;line-height:18px;padding:0">×</button>
+      </span>`;
+    }).join('');
+  }
+  boxF.onclick = function(ev) {
+    const del = ev.target.closest('button[data-adel]');
+    if (del) { borrarFechaAsis(del.dataset.adel); return; }
+    const b = ev.target.closest('button[data-af]');
+    if (b) { asisFechaActiva = b.dataset.af; renderAsistencia(); }
+  };
+
+  const alumnos = estudiantes();
+  const lista = document.getElementById('asisLista');
+  if (!asisFechaActiva) {
+    lista.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">Agrega una fecha para marcar asistencia.</p>';
+    ['aP','aF','aT','aJ'].forEach(id => document.getElementById(id).textContent = '0');
+    return;
+  }
+
+  let cP=0,cF=0,cT=0,cJ=0;
+  lista.innerHTML = `<div class="text-[11px] font-bold text-slate-500 mb-2">Marcando: ${asisFechaActiva}</div>` +
+    alumnos.map((al, i) => {
+      const k = asisMarkKey(asisFechaActiva, al.nombre);
+      const m = store.asistencia[k] || '';
+      if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++;
+      const enc = encodeURIComponent(al.nombre);
+      return `<div class="stu-row">
+        <div class="flex gap-2 items-center">
+          <div class="text-xs font-bold text-slate-400 w-6">${i+1}</div>
+          <div class="flex-1 min-w-0 font-bold text-sm truncate">${al.nombre}</div>
+          <div class="flex gap-1 shrink-0">
+            ${['P','F','T','J'].map(v =>
+              `<button type="button" class="asis-chip ${m===v?v:''}" data-an="${enc}" data-av="${v}">${v}</button>`
+            ).join('')}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+  document.getElementById('aP').textContent = cP;
+  document.getElementById('aF').textContent = cF;
+  document.getElementById('aT').textContent = cT;
+  document.getElementById('aJ').textContent = cJ;
+
+  lista.onclick = function(ev) {
+    const b = ev.target.closest('button[data-an]');
+    if (!b) return;
+    const nombre = decodeURIComponent(b.dataset.an);
+    const val = b.dataset.av;
+    const k = asisMarkKey(asisFechaActiva, nombre);
+    // toggle: if same mark, clear; else set
+    if (store.asistencia[k] === val) delete store.asistencia[k];
+    else store.asistencia[k] = val;
+    saveStore();
+    renderAsistencia();
+  };
 }
 
 function promedioNums(arr) {
