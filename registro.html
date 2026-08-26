@@ -264,6 +264,7 @@
           </div>
           <button type="button" class="btn btn-primary text-sm" onclick="agregarFechaAsis()">Agregar fecha</button>
           <button type="button" class="btn btn-ghost text-sm" onclick="guardarAsistencia(); toast('Asistencia guardada')">Guardar</button>
+          <button type="button" class="btn btn-ghost text-sm" onclick="compartirAsisWhatsApp()">WhatsApp</button>
         </div>
         <div>
           <div class="text-[10px] font-bold text-slate-500 mb-1">FECHAS DEL BIMESTRE</div>
@@ -1320,6 +1321,21 @@ function asisCtxKey() {
 function asisMarkKey(fecha, nombre) {
   return asisCtxKey() + '||' + fecha + '||' + nombre;
 }
+function horaAhora() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function asisGet(rec) {
+  // soporta formato viejo "P" y nuevo {marca, hora}
+  if (!rec) return { marca: '', hora: '' };
+  if (typeof rec === 'string') return { marca: rec, hora: '' };
+  return { marca: rec.marca || '', hora: rec.hora || '' };
+}
+function asisSet(nombre, marca) {
+  const k = asisMarkKey(asisFechaActiva, nombre);
+  if (!marca) delete store.asistencia[k];
+  else store.asistencia[k] = { marca: marca, hora: horaAhora() };
+}
 
 function getAsisFechas() {
   const k = asisCtxKey();
@@ -1346,28 +1362,50 @@ function agregarFechaAsis() {
 function cicloAsis(nombre) {
   if (!asisFechaActiva) { toast('Elige o agrega una fecha'); return; }
   const k = asisMarkKey(asisFechaActiva, nombre);
-  const cur = store.asistencia[k] || '';
-  // ciclo: '' → P → F → T → J → ''
+  const cur = asisGet(store.asistencia[k]).marca;
   const orden = ['', 'P', 'F', 'T', 'J'];
   const i = orden.indexOf(cur);
   const next = orden[(i + 1) % orden.length];
-  if (next) store.asistencia[k] = next;
-  else delete store.asistencia[k];
+  asisSet(nombre, next);
   saveStore();
   renderAsistencia();
 }
 
 function setAsis(nombre, val) {
   if (!asisFechaActiva) { toast('Elige o agrega una fecha'); return; }
-  const k = asisMarkKey(asisFechaActiva, nombre);
-  if (!val) delete store.asistencia[k];
-  else store.asistencia[k] = val;
+  asisSet(nombre, val);
   saveStore();
   renderAsistencia();
 }
 
 function guardarAsistencia() {
   saveStore();
+}
+
+function compartirAsisWhatsApp() {
+  if (!asisFechaActiva) { alert('Elige una fecha'); return; }
+  const c = ctxBase();
+  const alumnos = estudiantes();
+  const lineas = [];
+  let cP=0,cF=0,cT=0,cJ=0;
+  const faltas = [];
+  alumnos.forEach((al, i) => {
+    const rec = asisGet(store.asistencia[asisMarkKey(asisFechaActiva, al.nombre)]);
+    const m = rec.marca || '—';
+    if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++;
+    if (m==='F') faltas.push(al.nombre);
+    const hora = (m==='P' || m==='T' || m==='J') && rec.hora ? rec.hora : '';
+    lineas.push((i+1) + '. ' + al.nombre + '  ' + m + (hora ? '  ' + hora : ''));
+  });
+  const txt =
+    'IE 22375 · Asistencia ' + asisFechaActiva + '\n' +
+    (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + ' · Bim ' + c.bim + '\n' +
+    'P ' + cP + ' · F ' + cF + ' · T ' + cT + ' · J ' + cJ + '\n\n' +
+    lineas.join('\n') +
+    (faltas.length ? '\n\nFaltas:\n- ' + faltas.join('\n- ') : '') +
+    '\n\nP=Presente (con hora) · F=Falta · T=Tardanza · J=Justificado';
+  const url = 'https://wa.me/?text=' + encodeURIComponent(txt);
+  window.open(url, '_blank');
 }
 
 function borrarFechaAsis(fecha) {
@@ -1428,13 +1466,15 @@ function renderAsistencia() {
   lista.innerHTML = `<div class="text-[11px] font-bold text-slate-500 mb-2">Marcando: ${asisFechaActiva}</div>` +
     alumnos.map((al, i) => {
       const k = asisMarkKey(asisFechaActiva, al.nombre);
-      const m = store.asistencia[k] || '';
+      const rec = asisGet(store.asistencia[k]);
+      const m = rec.marca;
       if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++;
+      const horaTxt = rec.hora ? `<span class="text-[10px] text-slate-500 font-bold">${rec.hora}</span>` : '';
       const enc = encodeURIComponent(al.nombre);
       return `<div class="stu-row">
         <div class="flex gap-2 items-center">
           <div class="text-xs font-bold text-slate-400 w-6">${i+1}</div>
-          <div class="flex-1 min-w-0 font-bold text-sm truncate">${al.nombre}</div>
+          <div class="flex-1 min-w-0 font-bold text-sm truncate">${al.nombre} ${horaTxt}</div>
           <div class="flex gap-1 shrink-0">
             ${['P','F','T','J'].map(v =>
               `<button type="button" class="asis-chip ${m===v?v:''}" data-an="${enc}" data-av="${v}">${v}</button>`
@@ -1455,9 +1495,9 @@ function renderAsistencia() {
     const nombre = decodeURIComponent(b.dataset.an);
     const val = b.dataset.av;
     const k = asisMarkKey(asisFechaActiva, nombre);
-    // toggle: if same mark, clear; else set
-    if (store.asistencia[k] === val) delete store.asistencia[k];
-    else store.asistencia[k] = val;
+    const cur = asisGet(store.asistencia[k]).marca;
+    if (cur === val) asisSet(nombre, '');
+    else asisSet(nombre, val);
     saveStore();
     renderAsistencia();
   };
