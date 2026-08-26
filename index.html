@@ -76,9 +76,25 @@
 const ADMIN_PASS = 'admin22375';
 const SESSION_KEY = 'ie22375_session_v1';
 const DOCENTES_KEY = 'ie22375_docentes_v1';
-function loadDocentes() {
+function loadDocentesLocal() {
   try { const raw = localStorage.getItem(DOCENTES_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
   return [];
+}
+function loadDocentes() {
+  return loadDocentesLocal();
+}
+async function asegurarDocentesRemotos() {
+  // Si en esta máquina no hay docentes, intenta bajar docentes.json del sitio (GitHub Pages)
+  if (loadDocentesLocal().length) return;
+  try {
+    const r = await fetch('docentes.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const data = await r.json();
+    const list = Array.isArray(data) ? data : (data.docentes || []);
+    if (list.length) {
+      localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
+    }
+  } catch(e) {}
 }
 function getSession() {
   try {
@@ -98,9 +114,10 @@ function clearSession() {
 function onTipoChange() {
   document.getElementById('wrapDocente').classList.toggle('hidden', document.getElementById('inpTipo').value === 'admin');
 }
-function intentarLogin() {
+async function intentarLogin() {
   const err = document.getElementById('loginErr');
   err.classList.add('hidden');
+  await asegurarDocentesRemotos();
   const tipo = document.getElementById('inpTipo').value;
   const pass = document.getElementById('inpPass').value;
   if (tipo === 'admin') {
@@ -164,7 +181,9 @@ function mostrarHub() {
   }).join('');
 }
 onTipoChange();
-if (getSession()) mostrarHub();
+asegurarDocentesRemotos().then(function(){
+  if (getSession()) mostrarHub();
+});
 </script>
 </body>
 </html>

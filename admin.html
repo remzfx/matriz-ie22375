@@ -287,7 +287,20 @@
       </div>
 
       <div class="card p-4 mt-3">
-        <div class="font-bold text-sm mb-2">Usuarios registrados</div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div class="font-bold text-sm">Usuarios registrados</div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="btn btn-ghost text-xs" onclick="exportarDocentes()">Descargar docentes.json</button>
+            <label class="btn btn-ghost text-xs cursor-pointer">
+              Importar JSON
+              <input type="file" accept=".json,application/json" class="hidden" onchange="importarDocentes(event)">
+            </label>
+          </div>
+        </div>
+        <p class="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mb-2">
+          Los docentes se guardan en ESTE navegador. Para que funcionen en otra PC o celular:
+          descarga <b>docentes.json</b> y súbelo a GitHub (junto a index.html), o impórtalo en esa máquina.
+        </p>
         <div id="docLista" class="space-y-2 text-sm"></div>
       </div>
 
@@ -715,6 +728,34 @@ function loadDocentes() {
 }
 function saveDocentes(list) {
   localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
+}
+function exportarDocentes() {
+  const list = loadDocentes();
+  const blob = new Blob([JSON.stringify(list, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'docentes.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function importarDocentes(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = function() {
+    try {
+      const data = JSON.parse(reader.result);
+      const list = Array.isArray(data) ? data : (data.docentes || []);
+      if (!list.length) { alert('El JSON no tiene docentes.'); return; }
+      saveDocentes(list);
+      renderDocentes();
+      alert('Importados ' + list.length + ' docentes. Ya puedes iniciar sesión con ellos EN ESTA máquina.\n\nPara todas las máquinas: sube este mismo docentes.json a GitHub.');
+    } catch(e) {
+      alert('JSON inválido');
+    }
+  };
+  reader.readAsText(f);
 }
 
 function toggleDocFiltros() {
