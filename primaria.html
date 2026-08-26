@@ -881,12 +881,11 @@
     </style>
 </head>
 <body class="text-slate-800">
-<script>window.__IE_NEED_ROLES=['primaria','admin'];</script>
+<script>window.__IE_NEED_['primaria','admin']=['primaria','admin'];</script>
 <script>
-/* Gate de acceso básico IE 22375 */
 (function(){
   var KEY='ie22375_session_v1';
-  var need=window.__IE_NEED_ROLES||null; // null = cualquier sesión
+  var need=window.__IE_NEED_['primaria','admin']||null;
   function ses(){
     try{
       var r=sessionStorage.getItem(KEY)||localStorage.getItem(KEY);
@@ -896,11 +895,41 @@
   var s=ses();
   if(!s){ location.replace('index.html'); return; }
   if(need && need.length){
-    var ok=need.indexOf(s.user)>=0 || s.user==='admin';
-    if(!ok){ alert('No tiene permiso para este módulo.'); location.replace('index.html'); }
+    var ok = (s.user==='admin' || s.role==='admin');
+    if(!ok && s.role==='docente' && s.nivel && need.indexOf(s.nivel)>=0) ok = true;
+    if(!ok && s.nivel && need.indexOf(s.nivel)>=0) ok = true;
+    if(!ok && need.indexOf(s.user)>=0) ok = true;
+    if(!ok){ alert('No tiene permiso para este módulo.'); location.replace('index.html'); return; }
   }
 })();
 </script>
+
+<script>
+window.__IE_SES = (function(){
+  try {
+    var r = sessionStorage.getItem('ie22375_session_v1') || localStorage.getItem('ie22375_session_v1');
+    return r ? JSON.parse(r) : null;
+  } catch(e) { return null; }
+})();
+window.__IE_areasOK = function(nombreArea) {
+  var s = window.__IE_SES;
+  if (!s || s.role === 'admin' || s.user === 'admin') return true;
+  if (s.role !== 'docente') return true;
+  if (!s.areas || !s.areas.length) return true;
+  return s.areas.indexOf(nombreArea) >= 0;
+};
+window.__IE_gradoOK = function(gradoVal) {
+  var s = window.__IE_SES;
+  if (!s || s.role === 'admin' || s.user === 'admin') return true;
+  if (s.role !== 'docente') return true;
+  if (!s.grados || !s.grados.length) return true;
+  var map = {'PRIMERO':1,'SEGUNDO':2,'TERCERO':3,'CUARTO':4,'QUINTO':5,'SEXTO':6,'1°':1,'2°':2,'3°':3,'4°':4,'5°':5,'6°':6};
+  var n = map[String(gradoVal)] || parseInt(String(gradoVal),10);
+  return s.grados.map(Number).indexOf(n) >= 0;
+};
+</script>
+
+
 
     <!-- HEADER -->
     <header class="bg-gradient-to-r from-sky-700 via-sky-600 to-emerald-600 text-white shadow-xl no-print">
@@ -1574,7 +1603,7 @@
             const container = document.getElementById('areasContainer');
             container.innerHTML = '';
             
-            Object.keys(ESTRUCTURA_AREAS).forEach(nombreArea => {
+            Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return !window.__IE_areasOK || window.__IE_areasOK(nombreArea); }).forEach(nombreArea => {
                 const area = ESTRUCTURA_AREAS[nombreArea];
                 const progreso = calcularProgresoArea(nombreArea);
                 
@@ -1652,7 +1681,7 @@
             const cont = document.getElementById('navAreasExpoBtns');
             if (!cont) return;
             cont.innerHTML = '';
-            Object.keys(ESTRUCTURA_AREAS).forEach(nombreArea => {
+            Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return !window.__IE_areasOK || window.__IE_areasOK(nombreArea); }).forEach(nombreArea => {
                 const area = ESTRUCTURA_AREAS[nombreArea];
                 const btn = document.createElement('button');
                 btn.type = 'button';
@@ -1751,7 +1780,7 @@
             const cont = document.getElementById('presNavAreas');
             if (cont) {
                 cont.innerHTML = '';
-                Object.keys(ESTRUCTURA_AREAS).forEach(nombreArea => {
+                Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return !window.__IE_areasOK || window.__IE_areasOK(nombreArea); }).forEach(nombreArea => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
                     btn.textContent = typeof abrevArea === 'function' ? abrevArea(nombreArea) : nombreArea;
@@ -2803,7 +2832,7 @@
             const totalEst = getTotalEstudiantes();
             const pct = (n) => totalEst > 0 ? Math.round((n / totalEst) * 100) : 0;
             
-            Object.keys(ESTRUCTURA_AREAS).forEach(nombreArea => {
+            Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return !window.__IE_areasOK || window.__IE_areasOK(nombreArea); }).forEach(nombreArea => {
                 const area = ESTRUCTURA_AREAS[nombreArea];
                 
                 // Fila de área (header)
@@ -3334,5 +3363,22 @@
   }
 </script>
 
+
+<script>
+(function aplicarFiltroGradosSesion(){
+  function run(){
+    if (!window.__IE_gradoOK) return;
+    var nodes = document.querySelectorAll('#btnGrado button, [data-val="PRIMERO"], [data-val="SEGUNDO"], [data-val="TERCERO"], [data-val="CUARTO"], [data-val="QUINTO"], [data-val="SEXTO"]');
+    nodes.forEach(function(btn){
+      var v = btn.getAttribute('data-val') || '';
+      if (v && !window.__IE_gradoOK(v)) btn.style.display = 'none';
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+  else run();
+  setTimeout(run, 400);
+  setTimeout(run, 1200);
+})();
+</script>
 </body>
 </html>

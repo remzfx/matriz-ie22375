@@ -626,8 +626,8 @@ function entrarNivel(n) {
   renderSesiones();
   renderStudents();
   aplicarDocenteSesion();
-  // Nueva entrada: fecha y capacidad vacías (el docente completa al evaluar)
-  document.getElementById('inpFecha').value = '';
+  // Fecha de hoy por defecto; capacidad vacía
+  document.getElementById('inpFecha').value = hoyISO();
   document.getElementById('inpCapacidad').value = '';
   document.getElementById('selUnidad').value = '';
   sesionActiva = null;
