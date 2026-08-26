@@ -989,6 +989,27 @@
     </style>
 </head>
 <body class="text-slate-800">
+<script>window.__IE_NEED_ROLES=['secundaria','admin'];</script>
+<script>
+/* Gate de acceso básico IE 22375 */
+(function(){
+  var KEY='ie22375_session_v1';
+  var need=window.__IE_NEED_ROLES||null; // null = cualquier sesión
+  function ses(){
+    try{
+      var r=sessionStorage.getItem(KEY)||localStorage.getItem(KEY);
+      return r?JSON.parse(r):null;
+    }catch(e){return null;}
+  }
+  var s=ses();
+  if(!s){ location.replace('index.html'); return; }
+  if(need && need.length){
+    var ok=need.indexOf(s.user)>=0 || s.user==='admin';
+    if(!ok){ alert('No tiene permiso para este módulo.'); location.replace('index.html'); }
+  }
+})();
+</script>
+
     <!-- HEADER -->
     <header class="bg-gradient-to-r from-sky-700 via-sky-600 to-emerald-600 text-white shadow-xl no-print">
         <div class="max-w-7xl mx-auto px-4 py-4">
