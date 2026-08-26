@@ -511,6 +511,19 @@ function areasPermitidas() {
   if (s.nivel === 'secundaria' && s.areas && s.areas.length) return s.areas;
   return null;
 }
+/** Aulas permitidas secundaria: ["1|A","3|B","5|ÚNICA"] o null = todas */
+function aulasPermitidas() {
+  var s = getLoginSession();
+  if (!s || s.role !== 'docente') return null;
+  if (s.nivel === 'secundaria' && s.aulas && s.aulas.length) return s.aulas;
+  return null;
+}
+function aulaKey(grado, seccion) {
+  var g = String(grado).replace('°','');
+  var s = String(seccion || '');
+  if (s === 'UNICA' || s === 'Única') s = 'ÚNICA';
+  return g + '|' + s;
+}
 
 function aplicarRestriccionNivel() {
   var perm = nivelPermitido();
@@ -601,9 +614,14 @@ function entrarNivel(n) {
   let grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
   const gp = gradosPermitidos();
   if (gp && gp.length) grados = grados.filter(g => gp.includes(g));
+  const apAulas = aulasPermitidas();
+  if (apAulas && apAulas.length) {
+    const gs = new Set(apAulas.map(a => parseInt(String(a).split('|')[0],10)));
+    grados = grados.filter(g => gs.has(Number(g)));
+  }
   document.getElementById('selGrado').innerHTML = grados.map(g => `<option value="${g}">${g}°</option>`).join('');
   if (!grados.length) {
-    alert('No hay grados asignados a su usuario. Contacte al administrador.');
+    alert('No hay grados/secciones asignados a su usuario. Contacte al administrador.');
   }
   document.getElementById('inpFecha').value = hoyISO();
   onGrado();
@@ -641,7 +659,15 @@ function onGrado() {
   const bd = loadBD();
   const g = parseInt(document.getElementById('selGrado').value, 10);
   const list = ((bd[nivel] && bd[nivel].estudiantes) || []).filter(a => a.grado === g);
-  const secs = [...new Set(list.map(a => a.seccion))].sort();
+  let secs = [...new Set(list.map(a => a.seccion))].sort();
+  const apAulas = aulasPermitidas();
+  if (apAulas && apAulas.length) {
+    const allowed = new Set(apAulas.filter(a => parseInt(String(a).split('|')[0],10) === g).map(a => a.split('|')[1]));
+    secs = secs.filter(s => {
+      const norm = (s === 'UNICA' || s === 'Única') ? 'ÚNICA' : s;
+      return allowed.has(s) || allowed.has(norm) || allowed.has('ÚNICA') && (s === 'UNICA' || s === 'Única' || s === 'ÚNICA');
+    });
+  }
   document.getElementById('selSeccion').innerHTML = secs.map(s => `<option value="${s}">${s}</option>`).join('');
   document.getElementById('wrapSeccion').style.display = (secs.length <= 1 && nivel==='primaria') ? 'none' : 'block';
   onContexto();

@@ -1607,13 +1607,30 @@ window.__IE_gradoOK = function(gradoVal) {
             const cont = document.getElementById('btnGradoSeccion');
             if (!cont) return;
             // 1°–4°: solo A y B · 5° este año: solo ÚNICA
-            const grados = [
+            let grados = [
                 { g: '1°', secciones: ['A', 'B'] },
                 { g: '2°', secciones: ['A', 'B'] },
                 { g: '3°', secciones: ['A', 'B'] },
                 { g: '4°', secciones: ['A', 'B'] },
                 { g: '5°', secciones: ['ÚNICA'] }
             ];
+            // Filtrar aulas si el docente tiene asignación
+            (function(){
+              var s = window.__IE_SES;
+              if (!s || s.role !== 'docente' || !s.aulas || !s.aulas.length) return;
+              var allow = {};
+              s.aulas.forEach(function(k){
+                var p = String(k).split('|');
+                var g = p[0] + '°';
+                var sec = p[1];
+                if (!allow[g]) allow[g] = [];
+                allow[g].push(sec);
+              });
+              grados = grados.map(function(item){
+                if (!allow[item.g]) return null;
+                return { g: item.g, secciones: item.secciones.filter(function(sec){ return allow[item.g].indexOf(sec) >= 0; }) };
+              }).filter(function(item){ return item && item.secciones.length; });
+            })();
             cont.innerHTML = grados.map(({ g, secciones }) => {
                 const isThis = estado.grado === g;
                 return `

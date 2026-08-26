@@ -127,6 +127,7 @@ function intentarLogin() {
     user: d.user, label: d.nombre || d.user, nivel: d.nivel, role: 'docente',
     grados: d.nivel === 'primaria' ? (d.grados || []) : null,
     areas: d.nivel === 'secundaria' ? (d.areas || []) : null,
+    aulas: d.nivel === 'secundaria' ? (d.aulas || []) : null,
     mods: d.nivel === 'primaria' ? ['matriz_pri','registro'] : ['matriz_sec','registro'],
     ts: Date.now()
   });
@@ -148,6 +149,7 @@ function mostrarHub() {
   if (s.role === 'docente') {
     if (s.grados && s.grados.length) sub += ' · Grado ' + s.grados.map(g => g + '°').join(', ');
     if (s.areas && s.areas.length) sub += ' · ' + s.areas.join(', ');
+    if (s.aulas && s.aulas.length) sub += ' · ' + s.aulas.map(a => a.replace('|','° ')).join(', ');
   }
   document.getElementById('hubSub').textContent = sub;
   const catalog = {

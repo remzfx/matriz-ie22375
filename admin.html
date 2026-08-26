@@ -272,8 +272,11 @@
         </div>
 
         <div id="docAreasWrap" class="hidden">
-          <label class="text-[11px] font-bold text-slate-500">Áreas que puede ver (secundaria)</label>
+          <label class="text-[11px] font-bold text-slate-500">Áreas que enseña (secundaria)</label>
           <div class="flex flex-wrap gap-2 mt-1" id="docAreasBox"></div>
+          <label class="text-[11px] font-bold text-slate-500 mt-3 block">Grados y secciones que enseña</label>
+          <p class="text-[11px] text-slate-400 mb-1">Marca solo las aulas reales del docente (ej. 1° A y 3° B).</p>
+          <div class="flex flex-wrap gap-2" id="docAulasBox"></div>
         </div>
 
         <input type="hidden" id="docEditId" value="">
@@ -729,6 +732,18 @@ function initDocentesUI() {
       '</label>'
     ).join(' ');
   }
+  const aulasBox = document.getElementById('docAulasBox');
+  if (aulasBox && !aulasBox.children.length) {
+    const aulas = [];
+    [1,2,3,4].forEach(g => { aulas.push(g + '|A'); aulas.push(g + '|B'); });
+    aulas.push('5|ÚNICA');
+    aulasBox.innerHTML = aulas.map(v => {
+      const [g,s] = v.split('|');
+      const label = g + '° ' + s;
+      return '<label class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">' +
+        '<input type="checkbox" class="doc-aula" value="' + v + '"> ' + label + '</label>';
+    }).join(' ');
+  }
   renderDocentes();
   toggleDocFiltros();
 }
@@ -741,6 +756,7 @@ function limpiarFormDocente() {
   document.getElementById('docNivel').value = 'primaria';
   document.querySelectorAll('.doc-grado').forEach(c => c.checked = false);
   document.querySelectorAll('.doc-area').forEach(c => c.checked = false);
+  document.querySelectorAll('.doc-aula').forEach(c => c.checked = false);
   toggleDocFiltros();
 }
 
@@ -757,20 +773,22 @@ function guardarDocente() {
   }
   const grados = [...document.querySelectorAll('.doc-grado:checked')].map(c => parseInt(c.value,10));
   const areas = [...document.querySelectorAll('.doc-area:checked')].map(c => c.value);
+  const aulas = [...document.querySelectorAll('.doc-aula:checked')].map(c => c.value);
   if (nivel === 'primaria' && !grados.length) { alert('Marca al menos un grado'); return; }
   if (nivel === 'secundaria' && !areas.length) { alert('Marca al menos un área'); return; }
+  if (nivel === 'secundaria' && !aulas.length) { alert('Marca al menos un grado y sección (aula)'); return; }
 
   const list = loadDocentes();
   if (id) {
     const i = list.findIndex(d => d.id === id);
     if (i >= 0) {
-      list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas };
+      list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas, aulas };
     }
   } else {
     if (list.some(d => d.user === user)) { alert('Ese usuario ya existe'); return; }
     list.push({
       id: 'd' + Date.now(),
-      user, pass, nombre, nivel, grados, areas,
+      user, pass, nombre, nivel, grados, areas, aulas,
       ts: Date.now()
     });
   }
@@ -795,6 +813,9 @@ function editarDocente(id) {
   document.querySelectorAll('.doc-area').forEach(c => {
     c.checked = (d.areas || []).includes(c.value);
   });
+  document.querySelectorAll('.doc-aula').forEach(c => {
+    c.checked = (d.aulas || []).includes(c.value);
+  });
   showTab('docentes');
   window.scrollTo(0,0);
 }
@@ -816,7 +837,8 @@ function renderDocentes() {
   box.innerHTML = list.map(d => {
     const filtro = d.nivel === 'primaria'
       ? ('Grados: ' + (d.grados||[]).map(g=>g+'°').join(', '))
-      : ('Áreas: ' + (d.areas||[]).join(' · '));
+      : ('Áreas: ' + (d.areas||[]).join(' · ') +
+         ((d.aulas&&d.aulas.length) ? (' · Aulas: ' + d.aulas.map(a=>a.replace('|','° ')).join(', ')) : ''));
     return '<div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2" data-doc-id="'+d.id+'">' +
       '<div><div class="font-bold">' + (d.nombre||d.user) + ' <span class="text-slate-400 font-normal">(@'+d.user+')</span></div>' +
       '<div class="text-xs text-slate-500">' + d.nivel + ' · ' + filtro + '</div>' +
