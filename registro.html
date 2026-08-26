@@ -236,11 +236,11 @@
           <div class="text-sm font-bold text-slate-800" id="lblSesionActiva">Define fecha, competencia y capacidad arriba</div>
         </div>
         <div class="mode-toggle" style="min-width:200px">
-          <button type="button" id="btnModoLetra" class="on" onclick="setModoCalif('letra')">Letras</button>
-          <button type="button" id="btnModoNum" onclick="setModoCalif('num')">0–20</button>
+          <button type="button" id="btnModoLetra" onclick="setModoCalif('letra')">Letras</button>
+          <button type="button" id="btnModoNum" class="on" onclick="setModoCalif('num')">0–20</button>
         </div>
       </div>
-      <p class="scale-hint" id="lblEscala">Escala: AD destacado · A logrado · B proceso · C inicio</p>
+      <p class="scale-hint" id="lblEscala">0–20 → letra: 18–20 AD · 14–17 A · 11–13 B · 0–10 C</p>
       <div id="stuList" class="mt-2"></div>
     </div>
     </div><!-- /panelCalificar -->
@@ -285,7 +285,8 @@ const EST_SEC = {"Desarrollo Personal, Ciudadanía y Cívica":{"competencias":["
 
 let nivel = null;
 let areaActual = null;
-let modoCalif = 'letra';
+let modoCalif = 'num'; // predeterminado: números 0–20
+let dirty = false; // hay cambios sin guardar
 let sesionActiva = null; // { fecha, unidad, comp, capacidad }
 let notas = {}; // key alumno -> { nivel, nota20, conclusion }
 let modalCtx = null;
@@ -398,6 +399,16 @@ function entrarNivel(n) {
   fillComps();
   sesionActiva = null;
   notas = {};
+  dirty = false;
+  modoCalif = 'num';
+  const bL = document.getElementById('btnModoLetra');
+  const bN = document.getElementById('btnModoNum');
+  if (bL && bN) {
+    bL.classList.remove('on');
+    bN.classList.add('on');
+  }
+  const esc = document.getElementById('lblEscala');
+  if (esc) esc.textContent = '0–20 → letra: 18–20 AD · 14–17 A · 11–13 B · 0–10 C';
   updateHdr();
   renderSesiones();
   renderStudents();
@@ -480,10 +491,16 @@ function onCompChange() {
 }
 
 function hayNotasPendientes() {
-  return Object.keys(notas).some(k => {
-    const n = notas[k];
-    return n && (n.nivel || n.nota20 !== '' && n.nota20 != null);
-  });
+  // Solo alerta si hay cambios REALES sin guardar
+  return dirty === true;
+}
+
+function markDirty() {
+  dirty = true;
+}
+
+function markClean() {
+  dirty = false;
 }
 
 function pad2(n) {
@@ -543,19 +560,21 @@ function loadNotasSesion() {
   if (!sesionActiva) return;
   estudiantes().forEach(al => {
     const k = gradeKey(al.nombre);
-    if (k && store.grades[k]) notas[al.nombre] = store.grades[k];
+    if (k && store.grades[k]) notas[al.nombre] = JSON.parse(JSON.stringify(store.grades[k]));
   });
+  markClean();
 }
 
 function guardarTodo() {
   if (sesionActiva) {
     Object.keys(notas).forEach(nombre => {
       const k = gradeKey(nombre);
-      if (k) store.grades[k] = notas[nombre];
+      if (k) store.grades[k] = JSON.parse(JSON.stringify(notas[nombre]));
     });
   }
   guardarMeta();
   saveStore();
+  markClean();
 }
 
 function renderSesiones() {
@@ -640,6 +659,7 @@ function borrarSesion(id) {
     document.getElementById('lblSesionActiva').textContent = 'Define fecha, competencia y capacidad arriba';
   }
   saveStore();
+  markClean();
   renderSesiones();
   renderStudents();
   toast('Sesión borrada');
@@ -661,9 +681,7 @@ function setNivel(nombre, niv) {
   notas[nombre].nivel = niv;
   if (notas[nombre].nota20 === '' || notas[nombre].nota20 == null)
     notas[nombre].nota20 = letterToNum(niv);
-  // Conclusión descriptiva ya NO es obligatoria al calificar día a día.
-  // Solo se exige al validar/procesar al registro oficial (promedio C, y en primaria también B).
-  guardarTodo();
+  markDirty();
   renderStudents();
 }
 
@@ -678,14 +696,14 @@ function setNota20(nombre, val) {
   }
   if (n === '') {
     notas[nombre].nota20 = '';
-    guardarTodo();
+    markDirty();
     renderStudents();
     return;
   }
   n = Math.round(n);
   notas[nombre].nota20 = n;
   notas[nombre].nivel = numToLetter(n);
-  guardarTodo();
+  markDirty();
   renderStudents();
 }
 
@@ -703,7 +721,7 @@ function cerrarModal(ok) {
     const nombre = modalCtx.nombre;
     if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
     notas[nombre].conclusion = text;
-    guardarTodo();
+    markDirty();
   }
   modalCtx = null;
   document.getElementById('modalConc').classList.add('hidden');
