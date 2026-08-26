@@ -7,12 +7,12 @@
 <title>Registro auxiliar · IE 22375</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  :root { --hdr: 56px; --ctx: auto; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
   .card { background:#fff; border-radius:16px; box-shadow:0 6px 24px rgba(15,23,42,.08); }
   .btn { border-radius:12px; font-weight:700; padding:.55rem 1rem; transition:.15s; border:0; cursor:pointer; }
   .btn-primary { background:#0284c7; color:#fff; }
   .btn-ghost { background:#e2e8f0; color:#0f172a; }
+  .btn-danger { background:#fee2e2; color:#b91c1c; }
   .chip { display:inline-flex; align-items:center; justify-content:center; min-width:2.4rem; padding:.4rem .65rem; border-radius:999px; font-size:13px; font-weight:800; border:2px solid transparent; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .nivel-c { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
   .nivel-c.on { background:#dc2626; color:#fff; border-color:#dc2626; }
@@ -26,19 +26,13 @@
   .stu-row:last-child { border-bottom:0; }
   select, input, textarea {
     border:1.5px solid #cbd5e1; border-radius:12px; padding:.65rem .75rem;
-    width:100%; font-size:16px; background:#fff; color:#0f172a;
-    min-height:44px; /* iOS touch */
+    width:100%; font-size:16px; background:#fff; color:#0f172a; min-height:44px;
   }
   select { appearance:auto; -webkit-appearance:menulist; }
   .area-btn { font-size:12px; padding:.45rem .7rem; border-radius:10px; font-weight:800; background:#f1f5f9; color:#475569; border:0; cursor:pointer; }
   .area-btn.on { background:#0ea5e9; color:#fff; }
-  .comp-btn { text-align:left; width:100%; padding:.7rem .85rem; border-radius:12px; border:2px solid #e2e8f0; background:#fff; font-size:13px; font-weight:600; color:#334155; cursor:pointer; }
-  .comp-btn.on { border-color:#0ea5e9; background:#f0f9ff; color:#0c4a6e; }
   .sticky-top { position:sticky; top:0; z-index:40; }
-  .ctx-bar { position:sticky; top:var(--hdr); z-index:35; background:#f1f5f9; padding:8px 0; border-bottom:1px solid #e2e8f0; }
-  .cap-box { background:#f8fafc; border-radius:12px; padding:8px 10px; margin-top:8px; border:1px solid #e2e8f0; }
-  .cap-row { padding:8px 0; border-bottom:1px dashed #e2e8f0; }
-  .cap-row:last-child { border-bottom:0; }
+  .ctx-bar { position:sticky; top:var(--hdr,56px); z-index:35; background:#f1f5f9; padding:8px 0; border-bottom:1px solid #e2e8f0; }
   .mode-toggle { display:flex; gap:6px; background:#e2e8f0; border-radius:12px; padding:4px; }
   .mode-toggle button { flex:1; border:0; border-radius:10px; padding:.45rem .5rem; font-size:12px; font-weight:800; background:transparent; color:#64748b; cursor:pointer; }
   .mode-toggle button.on { background:#fff; color:#0f172a; box-shadow:0 1px 3px rgba(0,0,0,.08); }
@@ -47,13 +41,14 @@
     width:72px; min-height:40px; text-align:center; font-size:18px; font-weight:900;
     border:2px solid #cbd5e1; border-radius:12px; padding:.35rem;
   }
-  .num-wrap input[type=number]:focus { border-color:#0ea5e9; outline:2px solid #bae6fd; }
   .eq-letter { font-size:12px; font-weight:900; padding:.25rem .55rem; border-radius:999px; }
   .eq-c { background:#fee2e2; color:#b91c1c; }
   .eq-b { background:#fef3c7; color:#a16207; }
   .eq-a { background:#ecfccb; color:#4d7c0f; }
   .eq-ad { background:#d1fae5; color:#047857; }
   .eq-none { background:#f1f5f9; color:#94a3b8; }
+  .sess-chip { display:inline-block; font-size:11px; font-weight:700; padding:.35rem .65rem; border-radius:999px; background:#f1f5f9; color:#334155; margin:2px; border:1px solid #e2e8f0; cursor:pointer; }
+  .sess-chip.on { background:#e0f2fe; color:#0369a1; border-color:#7dd3fc; }
   .scale-hint { font-size:10px; color:#64748b; margin-top:4px; }
 </style>
 </head>
@@ -63,7 +58,7 @@
   <div class="text-center mb-6">
     <div class="text-xs font-bold tracking-widest text-sky-600">IE 22375 SANTA ROSA DE LOS MOLINOS</div>
     <h1 class="text-2xl font-black mt-1">Registro auxiliar</h1>
-    <p class="text-sm text-slate-500 mt-1">Competencias y capacidades · 2026</p>
+    <p class="text-sm text-slate-500 mt-1">Sesión · Competencia · Capacidad · 2026</p>
   </div>
   <div class="grid gap-3">
     <button class="card p-5 text-left" onclick="entrarNivel('primaria')">
@@ -93,13 +88,12 @@
         <div class="text-xs text-sky-100/90 truncate" id="hdrSub">—</div>
       </div>
       <div class="flex gap-2 shrink-0">
-        <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="guardarNotas(); toast('Guardado')">💾</button>
+        <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="guardarTodo(); toast('Guardado')">💾</button>
         <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="volverHome()">Salir</button>
       </div>
     </div>
   </header>
 
-  <!-- Barra de contexto SIEMPRE visible en móvil -->
   <div class="ctx-bar">
     <div class="max-w-3xl mx-auto px-3">
       <div class="card p-3">
@@ -123,38 +117,71 @@
         </div>
         <div class="mt-2">
           <label class="text-[10px] font-bold text-slate-500">Docente responsable</label>
-          <input id="inpDocente" placeholder="Apellidos y nombres del docente" onchange="guardarNotas()">
+          <input id="inpDocente" placeholder="Apellidos y nombres del docente" onchange="guardarMeta()">
         </div>
       </div>
     </div>
   </div>
 
-  <main class="max-w-3xl mx-auto px-3 py-3 space-y-3" style="padding-bottom:100px">
+  <main class="max-w-3xl mx-auto px-3 py-3 space-y-3" style="padding-bottom:110px">
+    <!-- Área -->
     <div class="card p-3">
       <div class="text-[10px] font-bold text-slate-500 mb-2">ÁREA</div>
       <div id="areaBtns" class="flex flex-wrap gap-1.5"></div>
     </div>
 
-    <div class="card p-3">
-      <div class="text-[10px] font-bold text-slate-500 mb-2">COMPETENCIA</div>
-      <div id="compList" class="space-y-1.5"></div>
-    </div>
-
-    <div class="card p-3">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div class="text-[10px] font-bold text-slate-500">EVALUAR</div>
-        <div class="flex flex-wrap gap-2 items-center">
-          <div class="mode-toggle" id="modeToggle">
-            <button type="button" id="btnModoLetra" class="on" onclick="setModoCalif('letra')">Letras C·B·A·AD</button>
-            <button type="button" id="btnModoNum" onclick="setModoCalif('num')">Números 0–20</button>
-          </div>
-          <button type="button" id="btnToggleCap" class="text-xs font-bold text-sky-600" onclick="toggleModoCap()">Ver capacidades</button>
+    <!-- Sesión: fecha + competencia + capacidad manual -->
+    <div class="card p-3 space-y-2">
+      <div class="text-[10px] font-bold text-slate-500">SESIÓN DE EVALUACIÓN</div>
+      <p class="text-[11px] text-slate-500">Indica la fecha, la competencia del día y escribe la capacidad o evidencia que vas a evaluar.</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div>
+          <label class="text-[10px] font-bold text-slate-500">Fecha</label>
+          <input type="date" id="inpFecha" onchange="onSesionChange()">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500">Unidad (opc.)</label>
+          <select id="selUnidad" onchange="onSesionChange()">
+            <option value="">—</option>
+            <option value="1">1ª unidad</option>
+            <option value="2">2ª unidad</option>
+            <option value="3">3ª unidad</option>
+            <option value="4">4ª unidad</option>
+          </select>
         </div>
       </div>
-      <div class="text-sm font-bold text-slate-700 mb-1" id="lblCompCorta">—</div>
-      <p class="text-[11px] text-slate-500 mb-1" id="lblAyuda">Marca el nivel de logro de la <b>competencia</b> (obligatorio para MINEDU/SIAGIE).</p>
-      <p class="scale-hint" id="lblEscala">Escala oficial: AD = destacado · A = logrado · B = proceso · C = inicio</p>
-      <div id="stuList"></div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Competencia</label>
+        <select id="selComp" onchange="onSesionChange()"></select>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Capacidad / evidencia a evaluar</label>
+        <input type="text" id="inpCapacidad" placeholder="Ej: Exp. La Celestina · El discurso · Teoría…" onchange="onSesionChange()" onblur="onSesionChange()">
+      </div>
+      <button type="button" class="btn btn-primary w-full text-sm" onclick="activarSesion()">Listo · Calificar esta capacidad</button>
+    </div>
+
+    <!-- Sesiones previas del contexto -->
+    <div class="card p-3" id="wrapSesiones">
+      <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS (este bimestre / área)</div>
+      <div id="listaSesiones" class="flex flex-wrap gap-1"></div>
+      <p class="text-[11px] text-slate-400 mt-1" id="lblSinSesiones">Aún no hay sesiones guardadas.</p>
+    </div>
+
+    <!-- Calificar -->
+    <div class="card p-3" id="wrapCalificar">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div>
+          <div class="text-[10px] font-bold text-slate-500">CALIFICAR</div>
+          <div class="text-sm font-bold text-slate-800" id="lblSesionActiva">Define fecha, competencia y capacidad arriba</div>
+        </div>
+        <div class="mode-toggle" style="min-width:200px">
+          <button type="button" id="btnModoLetra" class="on" onclick="setModoCalif('letra')">Letras</button>
+          <button type="button" id="btnModoNum" onclick="setModoCalif('num')">0–20</button>
+        </div>
+      </div>
+      <p class="scale-hint" id="lblEscala">Escala: AD destacado · A logrado · B proceso · C inicio</p>
+      <div id="stuList" class="mt-2"></div>
     </div>
   </main>
 
@@ -166,7 +193,7 @@
         <span class="px-2 py-1 rounded-lg bg-lime-50 text-lime-700">A <span id="cA">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
-      <button type="button" class="btn btn-primary text-xs !py-2" onclick="guardarNotas(); toast('Guardado')">Guardar</button>
+      <button type="button" class="btn btn-primary text-xs !py-2" onclick="guardarTodo(); toast('Guardado')">Guardar</button>
     </div>
   </div>
 </div>
@@ -188,33 +215,26 @@
 
 <script>
 const BD_ADMIN_KEY = 'ie22375_admin_bd_v1';
-const NOTAS_KEY = 'ie22375_registro_notas_v1';
+const NOTAS_KEY = 'ie22375_registro_notas_v2';
 const BD_EMP = {"anio":2026,"ie":"IE 22375 Santa Rosa de los Molinos","primaria":{"estudiantes":[{"nivel":"primaria","grado":1,"seccion":"Única","orden":1,"nombre":"ALEJOS GALLIQUE, GAEL ALEXANDER"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":2,"nombre":"ARONI ROJO, GABRIEL JESÚS"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":3,"nombre":"ARROYO MARTINEZ, JHAROL LUCIANO"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":4,"nombre":"CARMONA PALOMINO, FLAVIA KALESSI"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":5,"nombre":"CRUZ PISCONTE, LUHANA THAISA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":6,"nombre":"GOMEZ LOPEZ, GAEL ALEXANDER"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":7,"nombre":"GOMEZ NIETO, KAMILA VALENTINA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":8,"nombre":"HUAMAN LICAS, JHADIEL ADRIANO"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":9,"nombre":"HUARCAYA SALCEDO, ARIANNE XIMENA"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":10,"nombre":"HUYHUA CHAMPION, JHEREMI"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":11,"nombre":"IPANAQUE BURGOS, AYTZA LUCERO"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":12,"nombre":"MEDINA GRADOS, KHALED VALENTINO"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":13,"nombre":"MELGAR RAMOS, LYANNO JESUS NORIEL"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":14,"nombre":"MOLINA ORTEGA, ANALUCIA BELEN"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":15,"nombre":"OCAÑA QUICHUA, YERIK BRUNEY"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":17,"nombre":"PASACHE HUAUYA, BASTHIAN ESTEFAN"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":18,"nombre":"QUICHUA TACAS, KHALED LEONEL"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":19,"nombre":"QUISPE DIESTRO, ALEXANDRA SOLANSH"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":20,"nombre":"QUISPE GARCIA, AROHON YOUT"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":21,"nombre":"TOLEDO TOLEDO, EMYEL KHALESSY"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":22,"nombre":"URIBE BERNALES, SOFIA NICOLE"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":23,"nombre":"VALENCIA OCHOA, DAYLIN MILAGROS"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":24,"nombre":"VALENCIA OCHOA, KEYLINE MILAGROS"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":25,"nombre":"VARGAS POMA, DYLAN SERGIO"},{"nivel":"primaria","grado":1,"seccion":"Única","orden":26,"nombre":"VILLAGARAY HUARIPAUCAR, ARELY MILAGROS"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":28,"nombre":"CANCHO HUAMAN, LUIS SANDRO"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":29,"nombre":"CORTEZ PEÑA, ILLARI VALEZKA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":30,"nombre":"CURI LOPEZ, KEVIN DAVID"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":31,"nombre":"GOMEZ LABIOS, ALEXANDRA MARIA YOLANDA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":32,"nombre":"GOMEZ NIETO, LIAM JESÚS"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":33,"nombre":"HUARCAYA CONTRERAS, KHALEY MARÍA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":34,"nombre":"INJANTE TOLEDO, DALESKA ORIANA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":35,"nombre":"JIMENEZ CHACALIAZA, BRIANA VALERIA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":36,"nombre":"LEON CASTILLO, DALEXA ALEXANDRA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":37,"nombre":"MATTA GRADOS, LUCAS ARIAM"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":38,"nombre":"MENDOZA PAUCAR, JHEREMY GHALED"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":39,"nombre":"MEZA SIGUAS, ALICE ABRIL"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":40,"nombre":"PARIONA CANCHO, GAEL VALENTINO"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":41,"nombre":"PERALTA PINEDA, IRIANA ISABELLA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":42,"nombre":"PEVES SANCHEZ, AMIT EIAL"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":43,"nombre":"ROJAS MARTINEZ, IVANA ANTONELLA"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":44,"nombre":"TAME BELLIDO, JHONATAN BENJAMÍN"},{"nivel":"primaria","grado":2,"seccion":"Única","orden":45,"nombre":"TINEO GALINDO, SOLANGE AMIRA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":46,"nombre":"ACOSTA ASCAMA, DANIELLA MIRTHA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":47,"nombre":"ANICAMA PEVES, SOLANGE ISABELLA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":48,"nombre":"BELLIDO TELLO, ARELLYS LUNA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":49,"nombre":"CHAUCA ESPINOZA, ASHLY DARIA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":50,"nombre":"CORTEZ ZAPATA, EYDAN ALEXÁNDER"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":51,"nombre":"ESPINO NAVARRETE, OSCAR EMILIANO"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":52,"nombre":"ESPINO VELARDE, FABRICIO MATEO"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":53,"nombre":"ESPINO VELARDE, MOISES EMILIO"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":54,"nombre":"JANAMPA GUERRA, ASHLEY THAYSA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":55,"nombre":"LABIOS JAYO, AXEL MATEO"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":56,"nombre":"MARTEL CONDORI, DAYANA THAIZA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":57,"nombre":"MERE VILCA, FLAVIA ITZEL"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":58,"nombre":"NAVARRO TOLEDO, BRIANA CAMILA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":59,"nombre":"PARIONA VELARDE, ZOE SHAMIRA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":60,"nombre":"QUICHUA CHIRA, LUZ DANIELA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":61,"nombre":"QUILCA ROMERO, IHAN GAEL JOSE"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":62,"nombre":"QUISPE ALVAREZ, YORYELI DALESKA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":63,"nombre":"QUISPE GARCIA, RONALD STEVEN"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":64,"nombre":"SILVA VELARDE, ESTEFANO ANDRE"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":65,"nombre":"SUAREZ PISCONTE, IVANNA YARÉLI"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":66,"nombre":"TOLEDO GARCIA, DYLAN DAVID ROGGER"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":67,"nombre":"TORRES RAMIREZ, AITANA VALENTINA"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":68,"nombre":"TUEROS HUAYTA, ELAN GAEL"},{"nivel":"primaria","grado":3,"seccion":"Única","orden":69,"nombre":"VALENCIA HUAMAN, ASHLEY AYLEN"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":70,"nombre":"BARZOLA HUAMAN, BRUNELLA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":71,"nombre":"BERNAOLA FERNANDEZ, DARIANA SAORI"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":72,"nombre":"CANELA PEÑA, ADIEL ALEXANDRO"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":73,"nombre":"CARMONA HUAYAMARES, BRIANA RAPHAELA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":74,"nombre":"CORTEZ PEÑA, SOHE SALOME"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":75,"nombre":"DE LA CRUZ QUICHCA, BRIANA ALONDRA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":76,"nombre":"EVANGELISTA SOTO, DILAN WILBER"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":77,"nombre":"FAJARDO VELARDE, IKER ANDRÉ"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":78,"nombre":"FIGUEROA CURI, LENNER NICOLAS"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":79,"nombre":"GOMEZ LOPEZ, KHALESSI VALENTINA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":80,"nombre":"GUTIERREZ ANDIA, PABLO BENJAMÍN"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":81,"nombre":"HERNANDEZ RAMOS, STEFANO ANTONIO"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":82,"nombre":"HUAMANCOLI MARTINEZ, ESTRELLA DE LOS ANGELES"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":83,"nombre":"HUARCAYA JAYO, OSTIN LIAN"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":84,"nombre":"LEVANO DONAYRE, ASHLEY LUCIANA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":85,"nombre":"MARTINEZ MIRANDA, ZHOE VALENTINA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":86,"nombre":"MUÑOZ URIBE, LIA KALESSY"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":87,"nombre":"PACO ALLCCAHUAMAN, KIARA ALLISON"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":88,"nombre":"PAUCAR QUISPE, SAHORI MAGDIEL"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":89,"nombre":"PEVE APARICIO, DAYANA VALENTINA"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":90,"nombre":"RIVERA GARIBAY, ROUSSE MARGARETH"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":91,"nombre":"SOTELO CUSI, JOSHSUA YMANOLL"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":92,"nombre":"URIBE BERNALES, HEDINZON ALEJANDRO"},{"nivel":"primaria","grado":4,"seccion":"Única","orden":93,"nombre":"VALENCIA LABIOS, LIAM SEBASTIAN"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":94,"nombre":"ANDIA ARAPA, FLOR DE MARÍA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":95,"nombre":"ANICAMA HERNANDEZ, ITALO FRANCISCO ABILIO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":96,"nombre":"ANICAMA PEVES, JHOSUA DANIEL"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":97,"nombre":"ARONI QUISPE, YOSHUA LEONARDO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":98,"nombre":"BAUTISTA ZAPATA, LUZ MARIA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":99,"nombre":"CARMONA PALOMINO, XIMENA GUADALUPE"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":100,"nombre":"CARPIO BARRETO, JORDY ALEJANDRO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":101,"nombre":"FRANCO DONAYRE, PAOLO VALENTINO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":102,"nombre":"GARCIA GOMEZ, VANIA MASIEL"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":103,"nombre":"IPANAQUE CARMONA, BRAD MILAN JOSE"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":104,"nombre":"JIMENEZ CHACALIAZA, SHANTALL LUCIANA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":105,"nombre":"LLANOS RAMOS, DANIEL ALEXANDER"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":106,"nombre":"MELGAR UNTIVEROS, MARYORIE MILAGROS"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":107,"nombre":"MEZA SIGUAS, ALESSA LORELI"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":108,"nombre":"MORALES TUEROS, MISHELL XIMENA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":109,"nombre":"MORAN HUARACHI, MILAN GIOVANI"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":110,"nombre":"MUÑOZ URIBE, JEYCO MANUELL"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":111,"nombre":"NAVARRO TOLEDO, YADIR ANGELO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":112,"nombre":"PANUERA HUAMAN, HANDSEL ALID NAZARIT"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":113,"nombre":"QUISPE CUSI, NYCOL SOLEDAD"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":114,"nombre":"RAMIREZ MIRANDA, MARIA DEL PILAR"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":115,"nombre":"RAVELLO SAYRITUPAC, PATRICIO VALENTINO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":116,"nombre":"RUIZ TAME, ALANIS VALENTINA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":117,"nombre":"RUIZ TAME, JUAN ALAIN"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":118,"nombre":"SALAZAR MEZA, GIA KIMBERLY"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":119,"nombre":"SANCHEZ ALVAREZ, DANIELA YAMILET"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":120,"nombre":"SOTO MENDOZA, LIAM LEONARDO"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":121,"nombre":"TAYPE PUMA, CAMILA VALESKA"},{"nivel":"primaria","grado":5,"seccion":"Única","orden":122,"nombre":"VILLAGARAY ZARATE, ELINA GUADALUPE DEL PILAR"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":123,"nombre":"ALLCCAHUAMAN JANAMPA, CORAL MARIAPAZ"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":124,"nombre":"ASTORGA ARANGO, FERNANDA CLAUDIA"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":125,"nombre":"ASTORGA QUINTANILLA, REBECA VALENTINA"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":126,"nombre":"ATIQUIPA ALLCCAHUAMAN, JHANDI CELESTE"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":127,"nombre":"CANELA PEVES, YVANA MARIA"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":128,"nombre":"CARMONA CASTRO, MOIRA MILET"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":129,"nombre":"CONDE ASCAMA, JHANDY JASSURY"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":130,"nombre":"ESPINO NAVARRETE, ARIAPNA GUADALUPE"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":131,"nombre":"GARCIA ESPINO, XAVI GERARD"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":132,"nombre":"GOMEZ LABIOS, JESÚS BENJAMÍN OBDULIO"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":133,"nombre":"HUARCAYA SALCEDO, ALIX DARLIN"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":134,"nombre":"JAYO DONAYRE, JESUS SEBASTIAN"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":135,"nombre":"MARTEL CONDORI, ANDRES SEBASTIAN"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":136,"nombre":"MARTINEZ SANTIAGO, ALESSANDER MANUEL"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":137,"nombre":"MENDOZA CANCHO, LUZ ANAINA"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":138,"nombre":"MUÑOZ FLORES, REBECA ALEXANDRA"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":139,"nombre":"OSORIO CHACALIAZA, LEANDRO JOSÉ"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":140,"nombre":"PARIONA VELARDE, GIA ALESSANDRA"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":141,"nombre":"PARIONA VELARDE, MAGGI ALEJANDRA"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":142,"nombre":"PASACHE SIVERUERO, DAMARIS JASEL"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":143,"nombre":"PINEDA MUÑOZ, IKER KARLETH"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":144,"nombre":"PURILLA PASACHE, IHAN JHOAO"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":145,"nombre":"SALAZAR ORTEGA, LIAM ARMANDO"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":146,"nombre":"TOLEDO TOLEDO, LIAM NICOLAZ"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":147,"nombre":"URIBE SANCHEZ, LEONARD ITZAE"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":148,"nombre":"VELARDE CONDORI, CLAUDIA MILET"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":149,"nombre":"VILLA BENDEZ, DILAN KEFREE"},{"nivel":"primaria","grado":6,"seccion":"Única","orden":150,"nombre":"VIVANCO AÑANCA, DOMENICA KAORI"}],"docentes":["Cabrera Rios, Gonzalo Celestino","Carhuayo Gutierrez, Eudelia Madeleine","Chacaliaza Condorí, Luisa Victoria","Diaz Saavedra, Robert Jhonny","Ferreyra Guillen, Alejandra irma","Servellón Otiniano, César Augusto","Villamares Hernandez, Ana Fiorella"],"fuente":"SIAGIE CSV 2026-08-14","trasladados_excluidos":2},"secundaria":{"estudiantes":[{"nivel":"secundaria","grado":1,"seccion":"A","orden":1,"nombre":"AGUIRRE CHIRA, LUIS"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":2,"nombre":"ALARCON PURILLA, LUANA ISABEL"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":3,"nombre":"CAMPOS ALVAREZ, SASHYRA"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":4,"nombre":"CAMPOS GALINDO, MILAN YOSUE"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":5,"nombre":"CARHUAS CCAULLA, BREYNER THIAGO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":6,"nombre":"CHOQUEHUANCA FUENTES, FRANK LINCOLN"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":7,"nombre":"CORTEZ ALVAREZ, MIGUEL ANGEL"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":8,"nombre":"CORTEZ PISCONTE, DAYRO FABIAN"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":9,"nombre":"CURI LOPEZ, CAMILA LISET"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":10,"nombre":"ESPINO PISCONTE, DOMINICK JESÚS"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":11,"nombre":"FERNANDEZ ZARATE, DIEGO ALESSANDRO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":12,"nombre":"HUAMANCOLI MARTINEZ, CARLOS ANDRES"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":13,"nombre":"JAYO LICAS, DAYRON DAYIRO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":14,"nombre":"LLOCLLA TAIPE, ARELY JESÚS GUADALUPE"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":15,"nombre":"LOPEZ GARIBAY, MATIAS ALESSANDRO"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":16,"nombre":"MAYAUTE APARCANA, MILETH KAHORI"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":17,"nombre":"MOLINA ORTEGA, JEREMY LEONNEL"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":18,"nombre":"MUÑOZ DONAYRE, ARIACNE GEORGETTE"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":19,"nombre":"OCAÑA LABIOS, DAYRON JESUS"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":20,"nombre":"PARIONA ESPINO, DAYRON JHOSYMAR"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":21,"nombre":"RAMOS MORENO, JUAN MARTÍN SEBASTHIÁN"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":22,"nombre":"RAYME MUÑOZ, DAYRO ESMITH"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":23,"nombre":"ROJAS JANAMPA, ANGEL DAVID"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":24,"nombre":"SANCHEZ HUAMAN, MICHELLE VALENTINA"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":25,"nombre":"SAYRITUPAC SALCEDO, STEPHANO JESÚS"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":26,"nombre":"SIGUAS MARTINEZ, JADIEL KEYNER"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":27,"nombre":"SILVA GONZALES, BORIS IVAN"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":28,"nombre":"UNTIVEROS ZALASAR, LESLIE TAMARA"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":29,"nombre":"VEGA MENDOZA, HANEDT XIOMARA"},{"nivel":"secundaria","grado":1,"seccion":"A","orden":30,"nombre":"ZEVALLOS CONTRERAS, YARUMI MISSELA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":31,"nombre":"ANCHANTE FAJARDO, ADRIANO YOSUETH"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":32,"nombre":"ARCE ESPINO, YEIMI KAORI"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":33,"nombre":"ASCAMA ARANGO, PAULA ZAIS"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":34,"nombre":"ATAUCUSI AÑANCA, LUIS FRANCO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":35,"nombre":"CARMONA TAYPECCAHUANA, YOJHAN ANTONY"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":36,"nombre":"COLLADO HUARIPAUCAR, JOSE MIGUEL"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":37,"nombre":"CURI HUANCARE, CAMILA YAMILET"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":39,"nombre":"DONAYRE MUÑOZ, THIAGO ANDREUS"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":40,"nombre":"GARCIA TORRES, ADRIANO IMANOL"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":41,"nombre":"GOMEZ GARIBAY, THIAGO ELIAS"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":42,"nombre":"GRADOS ORE, DENZEL MATEO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":43,"nombre":"HUAMANI CHUMBE, BONIFACIA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":44,"nombre":"HUARCAYA CUETO, NICOLAS LUCIANO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":45,"nombre":"HUARCAYA HUAMANCAYO, CHRISTOFER KIBA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":46,"nombre":"JAYO PISCONTE, VALERY HEIDY"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":47,"nombre":"LABIOS MEDINA, JHEREMY SAÚL"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":48,"nombre":"LOAYZA YARASCA, GRACE JAZMIN"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":49,"nombre":"MEZA SIGUAS, YESURY JOEL"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":50,"nombre":"PEVES NIETO, JESUS ESTEFANO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":51,"nombre":"QUICHCA SANTANA, MILLET JANYURI"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":52,"nombre":"QUICHUA TACAS, DANIEL OSWALDO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":53,"nombre":"QUISPE GARCIA, BRAYAN OCONER"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":54,"nombre":"QUISPE MARTINEZ, FABIANO AMIR ALBERTO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":55,"nombre":"RAMOS SOLDEVILLA, MARIA JOSE"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":56,"nombre":"REYES LEIVA, JUAN ALBERTO"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":57,"nombre":"URIBE BERNALES, JULIO SALVADOR"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":58,"nombre":"VENTURA GARCIA, ROMINA TAMARA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":59,"nombre":"VILCA HUARCAYA, ANYALI SORAYA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":60,"nombre":"ZAPATA LINAREZ, VALENTINA ALONDRA"},{"nivel":"secundaria","grado":1,"seccion":"B","orden":61,"nombre":"ZEVALLOS PAREDES, LEONEL MESSI"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":62,"nombre":"ANICAMA HERNANDEZ, WENCESLAO GADIEL"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":63,"nombre":"ANICAMA HERNANDEZ, YORDY JULIO CESAR"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":64,"nombre":"ARANGO GAMBOA, ADRIANA ISABELA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":65,"nombre":"BALBUENA NIETO, ANDREY VALENTINO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":66,"nombre":"BERNALES HUAMANI, MAKEYLA DEL PILAR"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":67,"nombre":"CANALES HUAMAN, JHOSUHAN YOVI"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":68,"nombre":"CANCHO HUAMAN, JESUS JHAIR"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":69,"nombre":"CASIANO ANTACAYO, JESUS GABRIEL"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":70,"nombre":"CHOQUEHUANCA CRUZADO, KIMBERLI LUCERO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":71,"nombre":"GALINDO CAMPOS, ANGEL DAYIRO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":72,"nombre":"GOMEZ SALCEDO, LUIS ALFONSO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":73,"nombre":"GOMEZ TAIPE, JHAIRO JOSUE"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":74,"nombre":"HERNANDEZ GARCIA, THIAGO JESUS"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":75,"nombre":"JANAMPA GUERRA, JASURY CIELO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":76,"nombre":"JANAMPA HUAYLLA, YELSID MELANIA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":77,"nombre":"MORAN HUARACHI, DAMILETH CAMILA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":78,"nombre":"MUÑOZ MARCELO, CAMILA JAZMIN"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":79,"nombre":"NUÑEZ RAMOS, ARIANA VICTORIA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":80,"nombre":"PAREDES PEÑA, STEFANNY CRISTEL"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":81,"nombre":"PIZANGO BANEO, KARIN JULIS"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":82,"nombre":"QUISPE ALVAREZ, DAMARIS ARELY"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":83,"nombre":"QUISPE PISCONTE, ELEONOR KAORI"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":84,"nombre":"RAVELLO JAYO, ALEX MARIANO"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":85,"nombre":"RAVELLO SAYRITUPAC, HILDA CAMILA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":86,"nombre":"SANTIAGO CARMONA, EMILY LUANA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":87,"nombre":"SUAREZ MARTINEZ, ALEXANDRA DAYLINE"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":88,"nombre":"URIBE VALENCIA, REYNA VERONICA"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":89,"nombre":"VALDIVIA RUIZ, ARON"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":90,"nombre":"VELARDE CONDORI, ALEXANDER SNAYDER"},{"nivel":"secundaria","grado":2,"seccion":"A","orden":91,"nombre":"ZURITA TAPIA, CIELO ALEJANDRA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":92,"nombre":"ALEGRIA LINAREZ, JHADIRA MARISOL"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":93,"nombre":"BARRERA DE LA CRUZ, ANGELLO EDUARDO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":94,"nombre":"CACSIRE DONAYRE, VANIA VALERIA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":95,"nombre":"CAHUA FAJARDO, JESÚS ALBERTO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":96,"nombre":"CASTRO YARASCA, THIAGO YAEL"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":97,"nombre":"CHACCERE LINAREZ, ANA MILAGROS"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":98,"nombre":"LIMA CANELA, FLAVIA NICOLLE"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":99,"nombre":"MALQUI CHOQUE, DIEGO ALEXANDER"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":100,"nombre":"MILACHAY MORON, GUADALUPE LUHANA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":101,"nombre":"MUÑOZ SIGUAS, FELIX TOMAS"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":102,"nombre":"PACO ALLCCAHUAMAN, ANTHONY GERMAN"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":103,"nombre":"PARIONA CURI, GUIORDANO JOSUE"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":104,"nombre":"PARIONA VELARDE, JESUS ADRIAN"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":105,"nombre":"PASACHE CALDERON, DANNA LUCERO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":106,"nombre":"PAUCAR QUISPE, YURIKO MILENA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":107,"nombre":"PECHO HUAMANCAYO, KAORI LUHANA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":108,"nombre":"PERALTA BERNAOLA, EDELAY NAIARA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":109,"nombre":"PEVE ROMANO, JUAN JOSE JUNIOR"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":110,"nombre":"PISCONTE RAMOS, DAFANI YASMIN"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":111,"nombre":"QUICHUA MENDEZ, JOSUE DAVID"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":112,"nombre":"QUINTANILLA MARTINEZ, LUCIANA RAFAELA"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":113,"nombre":"QUISPE CURI, WILLY NADIR"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":114,"nombre":"QUISPE MARTINEZ, JESUS MATEO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":115,"nombre":"ROJAS LAGOS, ADRIANO YOAO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":116,"nombre":"TAME HUARANCCA, ANGIE LUCERO"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":117,"nombre":"TATAJE TAME, JAMES JOICE"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":118,"nombre":"UGARTE GUTIERREZ, VICTORIA GUADALUPE"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":119,"nombre":"UZCATEGUI CARAGUICHE, JHONKLEITHS JOSUE"},{"nivel":"secundaria","grado":2,"seccion":"B","orden":120,"nombre":"VILCA SANCHES, ADRIANO DEL PIERO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":121,"nombre":"APARCANA BAUTISTA, JESUS ALEXANDER"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":122,"nombre":"CARHUAS OLIVARES, GIANELLA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":123,"nombre":"CARMONA GARCIA, HRISTO KALET"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":124,"nombre":"CHAPILLIQUEN CHACAYA, RODRIGO FERNANDO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":125,"nombre":"CORVERA FAJARDO, ESPERANZA CRISTINA DEL ROSARIO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":126,"nombre":"DE LA CRUZ QUICHCA, CARMEN FERNANDA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":127,"nombre":"ELIAS ROMERO, GUADALUPE DEL ROSARIO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":128,"nombre":"FAJARDO TINIPUCLLA, ALIZ JHORYET"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":129,"nombre":"GARCIA ZEVALLOS, DAYRA NOEMI"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":130,"nombre":"GOMEZ GARIBAY, YANDIRY NICOLL"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":131,"nombre":"GOMEZ SALAS, BRISSA MARIANA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":132,"nombre":"GOMEZ ZEVALLOS, EDWAR JOSUE"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":133,"nombre":"GUERRA PISCONTE, JUAN CARLOS"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":134,"nombre":"GUILLEN VARGAS, JHOSTIN SMITH"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":135,"nombre":"GUIZADO PUMA, MIA GIANELLA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":136,"nombre":"JULCA JUAREZ, NAOMI NIKEYLA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":137,"nombre":"LABIOS JAYO, DIEGO ALEXANDER"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":138,"nombre":"MISAICO CURI, VANIA MIRANDA"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":139,"nombre":"NESTAREZ PALOMINO, DANTHE MAELO JANDY"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":140,"nombre":"OCHOA CHAMBA, PARIS ROLANDO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":141,"nombre":"PEVES SANCHEZ, ESAID ARAMIS"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":142,"nombre":"PISCONTE GUERRA, DARWIN PAOLO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":143,"nombre":"PLATAS MIRANDA, JESUS ANTONIO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":144,"nombre":"SANCHEZ ALVAREZ, DANNA ANDREA ROSARIO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":145,"nombre":"SANCHEZ MENDOZA, DANNY ANDERSON JINTAO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":146,"nombre":"TOLEDO TOLEDO, FABIANO SMITH"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":147,"nombre":"TOMAYRO QUISPE, DAVID SEBASTIAN"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":148,"nombre":"VALENCIA CHAVEZ, LEONELLA JHORLEY DE LOS ANGELES"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":149,"nombre":"VALENCIA LABIOS, EDINSON ALESSANDRO DEL PIERO"},{"nivel":"secundaria","grado":3,"seccion":"A","orden":150,"nombre":"YAÑEZ CAJAMARCA, MERCEDES GUADALUPE"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":151,"nombre":"ALVAREZ IPANAQUE, IKER ADRIANO JESUS"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":152,"nombre":"AURIS VILCA, AXEL JESUS"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":153,"nombre":"CACERES QUISPE, GEORGE ANDY"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":154,"nombre":"CAMPOS TUEROS, JHORDAN RAFAEL"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":155,"nombre":"CORTEZ ZAPATA, ARIANA LUCERO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":156,"nombre":"CUPE BERNAOLA, IVANNA FRANCESCA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":157,"nombre":"ESPINO ASTORGA, SMITH ALONSO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":158,"nombre":"EVANGELISTA SOTO, ANGELIQUE ALISSON"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":159,"nombre":"FIGUEROA HERNANDEZ, CESAR DEL PIERO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":160,"nombre":"HERNANDEZ MUNAYLLA, VICTOR DANIEL"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":161,"nombre":"HUAMAN CANELA, KIARA LUCIA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":162,"nombre":"IPANAQUE HERNANDEZ, GRETEL KAHORY"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":163,"nombre":"LEGUA ANDIA, YHORDAN JOSUE"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":164,"nombre":"MELGAR NIETO, ANDRES DAYIRO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":165,"nombre":"MORALES ROMERO, ARIANA DARLINE"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":166,"nombre":"NAVARRETE PISCONTE, JOSE LUIS"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":167,"nombre":"OCHOA QUISPE, JOHAN SMITH"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":168,"nombre":"OJANAMA OLIVEIRA, DEVORA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":169,"nombre":"OSORIO CHACALIAZA, NADIA XIMENA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":170,"nombre":"PACHECO HUAMAN, VALERY DE LOS ANGELES"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":171,"nombre":"PALOMINO QUISPE, SMITH JOSUE"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":172,"nombre":"PAREDES MARTINEZ, NAOMY SOFIA"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":173,"nombre":"QUISPE CASTILLO, SEBASTIAN GREGORY"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":174,"nombre":"QUISPE CUSI, JOSE NEHEMIAS"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":175,"nombre":"RAYME MUÑOZ, OSCAR ANTONIO"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":176,"nombre":"VELARDE INJANTE, WILLIAMS SMITH"},{"nivel":"secundaria","grado":3,"seccion":"B","orden":178,"nombre":"VILCA HUARIPAUCAR, MERLY CRISTEL"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":179,"nombre":"BARRERA DE LA CRUZ, ASHLEY DANIELLA"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":180,"nombre":"CAHUA SUAREZ, JULIA CAMILA"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":181,"nombre":"CARMONA CASTILLO, ALESSANDRA ESTEFANY"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":182,"nombre":"CHAPILLIQUEN OLIVA, ROMINA XIMENA"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":183,"nombre":"CHOQUEHUANCA FUENTES, LUANA BELEN"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":184,"nombre":"COCCHE PALOMINO, JHOSTIN JESUS FROYLAN"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":185,"nombre":"CORDOVA HERNANDEZ, JEFFERSON ALEXANDER"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":186,"nombre":"CUADROS UCEDA, LEYSSI NATHANIEL"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":187,"nombre":"DONAYRE OSORIO, XIOMARA XIMENA"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":188,"nombre":"ESPINO ARONI, LOURDES HELENA"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":189,"nombre":"FLORES SANTARIA, KEDNY JOHAN"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":190,"nombre":"GARCIA ZEVALLOS, KEYRA GERALDINE"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":191,"nombre":"HUAMAN JANAMPA, EDWAR STING"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":192,"nombre":"LICAS VALENCIA, DIEGO DAVID"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":193,"nombre":"LINAREZ QUISPE, JIMMY ANTHONY"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":194,"nombre":"LLOCLLA HERNANDEZ, FABIAN JESUS"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":195,"nombre":"LOPEZ CORDOVA, ANDREA RICARDINA"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":196,"nombre":"MONTENEGRO ARUCANQUI, ANDRE FABIAN"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":197,"nombre":"MUÑOZ PEÑA, JUANA PAULA"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":198,"nombre":"OJANAMA OLIVEIRA, MAGVIS LEYLI"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":199,"nombre":"QUILCA ROMERO, PERLITA YADITZA"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":200,"nombre":"QUISPE MUÑOZ, MATIAS NICOLAS"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":201,"nombre":"RAMOS MORENO, BRIZA GUADALUPE"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":202,"nombre":"RAMOS SALAZAR, ANA VALENTINA"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":203,"nombre":"ROMAN HUARCAYA, YONAIRA YUDALY"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":204,"nombre":"SALAZAR MEZA, CARMEN JANINE"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":205,"nombre":"TATAJE TAME, FERNANDO JESUS"},{"nivel":"secundaria","grado":4,"seccion":"A","orden":206,"nombre":"VALENCIA OCHOA, MILAGROS JESUS YARAVI"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":207,"nombre":"APARCANA AÑANCA, DAYIRO LEONARDO FARID"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":208,"nombre":"APARCANA MUÑOZ, ASHLY ROMINA"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":209,"nombre":"BELLIDO TELLO, JOSEMIR ALEJANDRO"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":210,"nombre":"CANELA MENDOZA, ALEXIS ADEMIR"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":211,"nombre":"CHAUCA ESPINOZA, BRISHA DAFNE"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":212,"nombre":"CHILLCCE PARIONA, JHERAMY ALEJANDRO"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":213,"nombre":"CURICHIMBA OJANAMA, CORI PAULET"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":214,"nombre":"ESPINO ASTORGA, WINNY BRIGGITH"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":215,"nombre":"FAJARDO MAYURI, MARIA JESUS DEL ROSARIO"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":216,"nombre":"FIGUEROA HERNANDEZ, CESAR ALEXANDRO"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":217,"nombre":"GAMARRA MARTINEZ, KELVIN DENILSON"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":218,"nombre":"GAMBOA PARIONA, PIERINA YOMARA"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":219,"nombre":"HERNANDEZ HUAMAN, DANNA YUSHARA"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":220,"nombre":"HUAMAN CHACALTANA, YSMAEL ANDRES"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":221,"nombre":"HUAMAN ORE, ANGELA FERNANDA"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":222,"nombre":"HUARACC ARANGO, ISMAEL YORDAN"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":223,"nombre":"JANAMPA UNTIVEROS, IKER FIDEL"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":224,"nombre":"JAYO CARMONA, GREIS KELLY"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":226,"nombre":"MALQUI CHOQUE, FATIMA MILADY"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":227,"nombre":"PARIONA CANCHO, VALENTINA SOLANGE"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":228,"nombre":"PEÑA APARCANA, JHONNIER FERNANDO"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":229,"nombre":"PEREZ HUARCAYA, ADRIEN OMAR"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":230,"nombre":"QUICHCA PAREDES, MAURY JOSSEPH"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":231,"nombre":"ROJAS JANAMPA, RUTH KIARA"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":232,"nombre":"SAYRITUPAC SALCEDO, ROSARIO VALENTINA"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":233,"nombre":"SIGUAS PEÑA, SOL DE MARIA"},{"nivel":"secundaria","grado":4,"seccion":"B","orden":234,"nombre":"ZURITA TAPIA, SARAY DELFA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":236,"nombre":"ANDIA RAMIREZ, JOSE CARLOS"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":237,"nombre":"APARCANA MARTINEZ, KIARA ALEXANDRA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":238,"nombre":"AURIS CCAULLA, MARIA DE LOS ANGELES"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":239,"nombre":"BELLIDO TELLO, JOILSO ALONSO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":240,"nombre":"CARHUAS CCAULLA, ESTRELLA ARUMY"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":241,"nombre":"CASAVALENTE GOMEZ, RAQUEL ALESSANDRA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":242,"nombre":"CHACAYA ROJAS, JOSE GABRIEL"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":243,"nombre":"CHAPILLIQUEN CHACAYA, SEBASTIAN ALONSSO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":245,"nombre":"COELLO JANAMPA, JAIRO DANIEL"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":246,"nombre":"ESPINOZA CARMONA, MATEO ENRIQUE"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":247,"nombre":"FAJARDO GOMEZ, VALENY LUANA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":248,"nombre":"GALINDO ALVAREZ, JEHAN LEYNCOLN HEISENBERG"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":249,"nombre":"GARCIA SOLDEVILLA, ANTONY ALEXANDER"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":250,"nombre":"HERNANDEZ AQUIJE, WILLIAM ALEXANDER"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":251,"nombre":"HUAUYA ESCALANTE, SERGIO PAUL"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":252,"nombre":"JUNES JANAMPA, RODRIGO DAVID"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":253,"nombre":"MAYAUTE APARCANA, MARIA FERNANDA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":254,"nombre":"MAYURI AQUIJE, MERCEDES CECILIA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":255,"nombre":"MENDOZA ESCATE, SAIR STHEFANO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":256,"nombre":"NAVEROS QUISPE, JOSE ESTEBAN"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":257,"nombre":"PEÑA APARCANA, DAYAN JULIETH"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":258,"nombre":"PEREZ HUARCAYA, LUCIANA NICOLLE"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":259,"nombre":"PISCONTE ROJAS, MAXIMO JESUS"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":260,"nombre":"PURILLA PASACHE, DAMERZON VICENTE"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":261,"nombre":"QUINTANILLA MARTINEZ, GIAN FRANCO ALEXSANDER"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":262,"nombre":"ROJAS RAMIREZ, JOSE CARLOS MAGDALENO"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":263,"nombre":"SEMINARIO DONAYRE, ROSARIO CRISTINA"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":264,"nombre":"VALDIVIA RUIZ, PAULA RUTH"},{"nivel":"secundaria","grado":5,"seccion":"Única","orden":265,"nombre":"VELARDE LEÓN, ANDY JOSÉ ALDAIR"}],"docentes":["Arias Saldaña, Pilar Guillermina","Benito Huamaní, Edgar Cirilo","Choque Aybar, Luis Javier","Galindo Alviar, Ninoska","Gomez Uribe, Humberto Santiago","Huarcaya Hostia, Ana Elizabeth","Maria del Pilar Alaluna Chipana","Parvina Gamonal, Filomena Lourdes","Quispe Galindo, Lucy","Rosado Espinoza, Patrick Albert Brian Hans","Slava Torres, Sandra Fátima","Zorrilla Nieto, Julio Ricardo"],"fuente":"SIAGIE CSV 2026-08-14","trasladados_excluidos":5},"actualizado":"2026-08-14"};
 const EST_PRIM = {"Personal Social":{"competencias":["Construye su Identidad","Convive y participa democráticamente","Construye interpretaciones históricas","Gestiona responsablemente el espacio y el ambiente","Gestiona responsablemente los recursos económicos"]},"Educación Física":{"competencias":["Se desenvuelve de manera autónoma a través de su motricidad","Asume una vida saludable","Interactúa a través de sus habilidades sociomotrices"]},"Comunicación":{"competencias":["Se comunica oralmente en su lengua materna","Lee diversos tipos de textos escritos en su lengua materna","Escribe diversos tipos de textos en su lengua materna"]},"Arte y Cultura":{"competencias":["Aprecia de manera crítica manifestaciones artístico-culturales","Crea proyectos artísticos desde los lenguajes artísticos"]},"Matemática":{"competencias":["Resuelve problemas de cantidad","Resuelve problemas de regularidad, equivalencia y cambio","Resuelve problemas de forma, movimiento y localización","Resuelve problemas de gestión de datos e incertidumbre"]},"Ciencia y Tecnología":{"competencias":["Indaga mediante métodos científicos para construir sus conocimientos","Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo","Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"]},"Educación Religiosa":{"competencias":["Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas","Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"]},"Competencias Transversales":{"competencias":["Se desenvuelven en entornos virtuales generados por las TIC","Gestiona su aprendizaje de manera autónoma"]}};
 const EST_SEC = {"Desarrollo Personal, Ciudadanía y Cívica":{"competencias":["Construye su identidad","Convive y participa democráticamente en la búsqueda del bien común"]},"Ciencias Sociales":{"competencias":["Construye interpretaciones históricas","Gestiona responsablemente el espacio y el ambiente","Gestiona responsablemente los recursos económicos"]},"Educación para el Trabajo (EPT)":{"competencias":["Gestiona proyectos de emprendimiento económico o social"]},"Educación Física":{"competencias":["Se desenvuelve de manera autónoma a través de su motricidad","Asume una vida saludable","Interactúa a través de sus habilidades sociomotrices"]},"Comunicación":{"competencias":["Se comunica oralmente en su lengua materna","Lee diversos tipos de textos escritos en su lengua materna","Escribe diversos tipos de textos en su lengua materna"]},"Arte y Cultura":{"competencias":["Aprecia de manera crítica manifestaciones artístico-culturales","Crea proyectos artísticos desde los lenguajes artísticos"]},"Inglés":{"competencias":["Se comunica oralmente en inglés como lengua extranjera","Lee diversos tipos de texto en inglés como lengua extranjera","Escribe diversos tipos de textos en inglés como lengua extranjera"]},"Matemática":{"competencias":["Resuelve problemas de cantidad","Resuelve problemas de regularidad, equivalencia y cambio","Resuelve problemas de forma, movimiento y localización","Resuelve problemas de gestión de datos e incertidumbre"]},"Ciencia y Tecnología":{"competencias":["Indaga mediante métodos científicos para construir sus conocimientos","Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo","Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"]},"Educación Religiosa":{"competencias":["Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas","Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"]},"Competencias Transversales":{"competencias":["Se desenvuelven en entornos virtuales generados por las TIC","Gestiona su aprendizaje de manera autónoma"]}};
 
-/* Capacidades genéricas por índice de competencia (v1).
-   Luego se pueden reemplazar por el desglose oficial CNEB por área. */
-function capacidadesDe(compNombre) {
-  // Si el nombre sugiere, usamos textos cortos genéricos numerados
-  return [
-    'Capacidad 1 · Observa / obtiene información',
-    'Capacidad 2 · Procesa / interpreta',
-    'Capacidad 3 · Comunica / aplica'
-  ];
-}
-
 let nivel = null;
 let areaActual = null;
-let compIdx = 0;
-let modoCap = false; // false = solo competencia; true = capacidades abiertas
-let modoCalif = 'letra'; // 'letra' | 'num'
-let notas = {}; // nombre -> { nivel, nota20, conclusion, caps, caps20 }
+let modoCalif = 'letra';
+let sesionActiva = null; // { fecha, unidad, comp, capacidad }
+let notas = {}; // key alumno -> { nivel, nota20, conclusion }
 let modalCtx = null;
-let expandStu = {}; // nombre -> bool
+let store = { sessions: [], grades: {}, meta: {} };
 
-/* Conversión vigesimal ↔ letras (uso frecuente en secundaria PE)
-   18–20 → AD | 14–17 → A | 11–13 → B | 0–10 → C */
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 1600);
+}
+
 function numToLetter(n) {
   n = Number(n);
   if (isNaN(n) || n < 0 || n > 20) return '';
@@ -223,36 +243,9 @@ function numToLetter(n) {
   if (n >= 11) return 'B';
   return 'C';
 }
-function letterToNum(L) {
-  return ({ AD:19, A:15, B:12, C:8 })[L] ?? '';
-}
+function letterToNum(L) { return ({ AD:19, A:15, B:12, C:8 })[L] ?? ''; }
 function eqClass(L) {
-  if (L==='C') return 'eq-c';
-  if (L==='B') return 'eq-b';
-  if (L==='A') return 'eq-a';
-  if (L==='AD') return 'eq-ad';
-  return 'eq-none';
-}
-function setModoCalif(m) {
-  modoCalif = m;
-  document.getElementById('btnModoLetra').classList.toggle('on', m==='letra');
-  document.getElementById('btnModoNum').classList.toggle('on', m==='num');
-  document.getElementById('lblAyuda').innerHTML = m==='num'
-    ? 'Ingresa nota <b>0 a 20</b>. Se convierte automáticamente a letra para MINEDU/SIAGIE (18–20 AD · 14–17 A · 11–13 B · 0–10 C).'
-    : (modoCap
-      ? 'Califica cada <b>capacidad</b>. Usa <b>Sugerir</b> para proponer la nota de la competencia.'
-      : 'Marca el nivel de logro de la <b>competencia</b> (obligatorio para MINEDU/SIAGIE).');
-  document.getElementById('lblEscala').textContent = m==='num'
-    ? 'Escala: 18–20 = AD · 14–17 = A · 11–13 = B · 0–10 = C  |  La letra se guarda para SIAGIE'
-    : 'Escala oficial: AD = destacado · A = logrado · B = proceso · C = inicio';
-  renderStudents();
-}
-
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 1600);
+  return ({ C:'eq-c', B:'eq-b', A:'eq-a', AD:'eq-ad' })[L] || 'eq-none';
 }
 
 function loadBD() {
@@ -262,17 +255,26 @@ function loadBD() {
   } catch(e) {}
   return JSON.parse(JSON.stringify(BD_EMP));
 }
-function loadNotasStore() {
+function loadStore() {
   try {
     const raw = localStorage.getItem(NOTAS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) store = JSON.parse(raw);
   } catch(e) {}
-  return {};
+  if (!store.sessions) store.sessions = [];
+  if (!store.grades) store.grades = {};
+  if (!store.meta) store.meta = {};
 }
-function saveNotasStore(all) {
-  localStorage.setItem(NOTAS_KEY, JSON.stringify(all));
+function saveStore() {
+  store._ts = Date.now();
+  localStorage.setItem(NOTAS_KEY, JSON.stringify(store));
 }
 
+function estructura() { return nivel === 'primaria' ? EST_PRIM : EST_SEC; }
+function areas() { return Object.keys(estructura()); }
+function competencias() {
+  const e = estructura()[areaActual];
+  return (e && e.competencias) ? e.competencias : [];
+}
 function estudiantes() {
   const bd = loadBD();
   const g = parseInt(document.getElementById('selGrado').value, 10);
@@ -282,11 +284,33 @@ function estudiantes() {
   list.sort((a,b) => (a.orden||0)-(b.orden||0) || a.nombre.localeCompare(b.nombre));
   return list;
 }
-function estructura() { return nivel === 'primaria' ? EST_PRIM : EST_SEC; }
-function areas() { return Object.keys(estructura()); }
-function competencias() {
-  const e = estructura()[areaActual];
-  return (e && e.competencias) ? e.competencias : [];
+
+function ctxBase() {
+  return {
+    nivel,
+    bim: document.getElementById('selBim').value,
+    grado: parseInt(document.getElementById('selGrado').value, 10),
+    seccion: document.getElementById('selSeccion').value,
+    area: areaActual
+  };
+}
+
+function gradeKey(nombre) {
+  if (!sesionActiva) return null;
+  const c = ctxBase();
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area, sesionActiva.comp, sesionActiva.capacidad, sesionActiva.fecha, nombre].join('||');
+}
+
+function sessionId(s) {
+  const c = ctxBase();
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area, s.comp, s.capacidad, s.fecha].join('||');
+}
+
+function hoyISO() {
+  const d = new Date();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return d.getFullYear() + '-' + m + '-' + day;
 }
 
 function fixHdrHeight() {
@@ -296,21 +320,24 @@ function fixHdrHeight() {
 
 function entrarNivel(n) {
   nivel = n;
+  loadStore();
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
-  const sb = document.getElementById('selBim');
-  sb.innerHTML = ['I','II','III','IV'].map(b => `<option value="${b}">Bimestre ${b}</option>`).join('');
+  document.getElementById('selBim').innerHTML = ['I','II','III','IV'].map(b => `<option value="${b}">Bimestre ${b}</option>`).join('');
   const bd = loadBD();
   const list = (bd[n] && bd[n].estudiantes) || [];
   const grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
   document.getElementById('selGrado').innerHTML = grados.map(g => `<option value="${g}">${g}°</option>`).join('');
+  document.getElementById('inpFecha').value = hoyISO();
   onGrado();
   areaActual = areas()[0];
   renderAreas();
-  renderComps();
-  cargarNotasMemoria();
-  renderStudents();
+  fillComps();
+  sesionActiva = null;
+  notas = {};
   updateHdr();
+  renderSesiones();
+  renderStudents();
   setTimeout(fixHdrHeight, 50);
 }
 
@@ -319,16 +346,30 @@ function onGrado() {
   const g = parseInt(document.getElementById('selGrado').value, 10);
   const list = ((bd[nivel] && bd[nivel].estudiantes) || []).filter(a => a.grado === g);
   const secs = [...new Set(list.map(a => a.seccion))].sort();
-  const ss = document.getElementById('selSeccion');
-  ss.innerHTML = secs.map(s => `<option value="${s}">${s}</option>`).join('');
+  document.getElementById('selSeccion').innerHTML = secs.map(s => `<option value="${s}">${s}</option>`).join('');
   document.getElementById('wrapSeccion').style.display = (secs.length <= 1 && nivel==='primaria') ? 'none' : 'block';
   onContexto();
 }
+
 function onContexto() {
-  cargarNotasMemoria();
-  renderStudents();
+  // restore docente meta
+  const c = ctxBase();
+  const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
+  document.getElementById('inpDocente').value = (store.meta && store.meta[mk]) || '';
+  sesionActiva = null;
+  notas = {};
   updateHdr();
+  renderSesiones();
+  renderStudents();
 }
+
+function guardarMeta() {
+  const c = ctxBase();
+  const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
+  store.meta[mk] = document.getElementById('inpDocente').value.trim();
+  saveStore();
+}
+
 function updateHdr() {
   const g = document.getElementById('selGrado').value;
   const s = document.getElementById('selSeccion').value;
@@ -338,6 +379,7 @@ function updateHdr() {
   document.getElementById('lblN').textContent = estudiantes().length;
   fixHdrHeight();
 }
+
 function renderAreas() {
   document.getElementById('areaBtns').innerHTML = areas().map(a => {
     const on = a === areaActual ? 'on' : '';
@@ -345,90 +387,144 @@ function renderAreas() {
     return `<button type="button" class="area-btn ${on}" data-a="${encodeURIComponent(a)}" onclick="setArea(decodeURIComponent(this.dataset.a))">${short}</button>`;
   }).join('');
 }
+
 function setArea(a) {
-  areaActual = a; compIdx = 0;
-  renderAreas(); renderComps(); cargarNotasMemoria(); renderStudents(); updateHdr();
-}
-function renderComps() {
-  const comps = competencias();
-  document.getElementById('compList').innerHTML = comps.map((c,i) => {
-    const on = i === compIdx ? 'on' : '';
-    return `<button type="button" class="comp-btn ${on}" onclick="setComp(${i})"><span class="text-sky-600 font-black mr-1">${i+1}.</span>${c}</button>`;
-  }).join('') || '<p class="text-sm text-slate-400">Sin competencias</p>';
-  document.getElementById('lblCompCorta').textContent = comps[compIdx] ? ((compIdx+1)+'. '+comps[compIdx]) : '—';
-}
-function setComp(i) {
-  compIdx = i; renderComps(); cargarNotasMemoria(); renderStudents();
+  areaActual = a;
+  renderAreas();
+  fillComps();
+  onContexto();
 }
 
-function ctxParts() {
-  return {
-    bim: document.getElementById('selBim').value,
-    grado: parseInt(document.getElementById('selGrado').value, 10),
-    seccion: document.getElementById('selSeccion').value,
-    area: areaActual,
-    comp: competencias()[compIdx] || ''
+function fillComps() {
+  const comps = competencias();
+  document.getElementById('selComp').innerHTML = comps.map(c => `<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join('') || '<option value="">Sin competencias</option>';
+}
+
+function onSesionChange() {
+  // no-op until activar
+}
+
+function activarSesion() {
+  const fecha = document.getElementById('inpFecha').value;
+  const unidad = document.getElementById('selUnidad').value;
+  const comp = document.getElementById('selComp').value;
+  const capacidad = document.getElementById('inpCapacidad').value.trim();
+  if (!fecha) { alert('Indica la fecha de la sesión'); return; }
+  if (!comp) { alert('Elige la competencia'); return; }
+  if (!capacidad) { alert('Escribe la capacidad o evidencia a evaluar'); return; }
+
+  sesionActiva = { fecha, unidad, comp, capacidad };
+  // register session in store if new
+  const id = sessionId(sesionActiva);
+  if (!store.sessions.find(s => sessionId(s) === id)) {
+    store.sessions.push({
+      ...ctxBase(),
+      ...sesionActiva,
+      docente: document.getElementById('inpDocente').value.trim(),
+      ts: Date.now()
+    });
+    saveStore();
+  }
+  loadNotasSesion();
+  renderSesiones();
+  renderStudents();
+  document.getElementById('lblSesionActiva').textContent =
+    fecha + ' · ' + capacidad + (unidad ? ' · U' + unidad : '');
+  toast('Sesión lista');
+  document.getElementById('wrapCalificar').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function loadNotasSesion() {
+  notas = {};
+  if (!sesionActiva) return;
+  estudiantes().forEach(al => {
+    const k = gradeKey(al.nombre);
+    if (k && store.grades[k]) notas[al.nombre] = store.grades[k];
+  });
+}
+
+function guardarTodo() {
+  if (sesionActiva) {
+    Object.keys(notas).forEach(nombre => {
+      const k = gradeKey(nombre);
+      if (k) store.grades[k] = notas[nombre];
+    });
+  }
+  guardarMeta();
+  saveStore();
+}
+
+function renderSesiones() {
+  const c = ctxBase();
+  const list = (store.sessions || []).filter(s =>
+    s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
+    s.seccion === c.seccion && s.area === c.area
+  ).sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'') || (b.ts||0)-(a.ts||0));
+
+  const box = document.getElementById('listaSesiones');
+  const empty = document.getElementById('lblSinSesiones');
+  if (!list.length) {
+    box.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  box.innerHTML = list.map(s => {
+    const id = sessionId(s);
+    const on = sesionActiva && sessionId(sesionActiva) === id ? 'on' : '';
+    const label = (s.fecha || '') + ' · ' + (s.capacidad || '').slice(0,28);
+    return `<button type="button" class="sess-chip ${on}" data-sid="${encodeURIComponent(id)}">${label}</button>`;
+  }).join('');
+  box.onclick = function(ev) {
+    const b = ev.target.closest('button[data-sid]');
+    if (!b) return;
+    const id = decodeURIComponent(b.dataset.sid);
+    const s = store.sessions.find(x => sessionId(x) === id);
+    if (!s) return;
+    document.getElementById('inpFecha').value = s.fecha || hoyISO();
+    document.getElementById('selUnidad').value = s.unidad || '';
+    document.getElementById('selComp').value = s.comp || '';
+    document.getElementById('inpCapacidad').value = s.capacidad || '';
+    sesionActiva = { fecha: s.fecha, unidad: s.unidad || '', comp: s.comp, capacidad: s.capacidad };
+    loadNotasSesion();
+    renderSesiones();
+    renderStudents();
+    document.getElementById('lblSesionActiva').textContent =
+      s.fecha + ' · ' + s.capacidad + (s.unidad ? ' · U' + s.unidad : '');
   };
 }
 
-function cargarNotasMemoria() {
-  const all = loadNotasStore();
-  const {bim, grado, seccion, area, comp} = ctxParts();
-  const prefix = [nivel, bim, grado, seccion, area, comp].join('||') + '||';
-  notas = {};
-  Object.keys(all).forEach(k => {
-    if (k.startsWith(prefix) && !k.includes('||cap||')) {
-      const nombre = k.slice(prefix.length);
-      if (nombre && !nombre.startsWith('doc')) notas[nombre] = all[k];
-    }
-  });
-  const dk = ['doc', nivel, bim, grado, seccion, area].join('||');
-  document.getElementById('inpDocente').value = all[dk] || '';
-}
-
-function guardarNotas() {
-  const all = loadNotasStore();
-  const {bim, grado, seccion, area, comp} = ctxParts();
-  const prefix = [nivel, bim, grado, seccion, area, comp].join('||') + '||';
-  Object.keys(all).forEach(k => { if (k.startsWith(prefix)) delete all[k]; });
-  Object.keys(notas).forEach(nombre => { all[prefix + nombre] = notas[nombre]; });
-  const dk = ['doc', nivel, bim, grado, seccion, area].join('||');
-  all[dk] = document.getElementById('inpDocente').value.trim();
-  all._ts = Date.now();
-  saveNotasStore(all);
-  actualizarContadores();
-}
-
-function toggleModoCap() {
-  modoCap = !modoCap;
-  document.getElementById('btnToggleCap').textContent = modoCap ? 'Ocultar capacidades' : 'Ver capacidades';
-  document.getElementById('lblAyuda').innerHTML = modoCap
-    ? 'Califica cada <b>capacidad</b>. Usa <b>Sugerir</b> para proponer la nota de la competencia (el docente confirma).'
-    : 'Marca el nivel de logro de la <b>competencia</b>. Si usas capacidades, ábrelas y califica cada una.';
+function setModoCalif(m) {
+  modoCalif = m;
+  document.getElementById('btnModoLetra').classList.toggle('on', m==='letra');
+  document.getElementById('btnModoNum').classList.toggle('on', m==='num');
+  document.getElementById('lblEscala').textContent = m==='num'
+    ? '0–20 → letra: 18–20 AD · 14–17 A · 11–13 B · 0–10 C'
+    : 'Escala: AD destacado · A logrado · B proceso · C inicio';
   renderStudents();
 }
 
 function setNivel(nombre, niv) {
-  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'', caps:{}, caps20:{} };
+  if (!sesionActiva) { toast('Activa una sesión primero'); return; }
+  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
   if (niv === 'C') {
-    modalCtx = { nombre, niv, tipo:'comp' };
-    document.getElementById('modalStu').textContent = nombre + ' · Competencia';
+    modalCtx = { nombre };
+    document.getElementById('modalStu').textContent = nombre;
     document.getElementById('modalText').value = notas[nombre].conclusion || '';
     document.getElementById('modalConc').classList.remove('hidden');
     return;
   }
   notas[nombre].nivel = niv;
-  // Si no hay nota numérica aún, sugerir punto medio de la banda
-  if (notas[nombre].nota20 === '' || notas[nombre].nota20 === undefined || notas[nombre].nota20 === null) {
+  if (notas[nombre].nota20 === '' || notas[nombre].nota20 == null)
     notas[nombre].nota20 = letterToNum(niv);
-  }
-  guardarNotas();
+  guardarTodo();
   renderStudents();
 }
 
 function setNota20(nombre, val) {
-  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'', caps:{}, caps20:{} };
-  let n = val === '' || val === null ? '' : Number(val);
+  if (!sesionActiva) { toast('Activa una sesión primero'); return; }
+  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
+  let n = val === '' || val == null ? '' : Number(val);
   if (n !== '' && (isNaN(n) || n < 0 || n > 20)) {
     toast('Solo 0 a 20');
     renderStudents();
@@ -436,100 +532,25 @@ function setNota20(nombre, val) {
   }
   if (n === '') {
     notas[nombre].nota20 = '';
-    // no borrar letra si ya existía
-    guardarNotas();
+    guardarTodo();
     renderStudents();
     return;
   }
-  n = Math.round(n * 10) / 10;
+  n = Math.round(n);
   notas[nombre].nota20 = n;
   const L = numToLetter(n);
   if (L === 'C') {
-    // pedir conclusión si pasa a C o ya es C
     notas[nombre].nivel = 'C';
-    modalCtx = { nombre, niv:'C', tipo:'comp', fromNum:true };
-    document.getElementById('modalStu').textContent = nombre + ' · Nota ' + n + ' → C';
+    modalCtx = { nombre };
+    document.getElementById('modalStu').textContent = nombre + ' · ' + n + ' → C';
     document.getElementById('modalText').value = notas[nombre].conclusion || '';
     document.getElementById('modalConc').classList.remove('hidden');
-    guardarNotas();
+    guardarTodo();
     return;
   }
   notas[nombre].nivel = L;
-  guardarNotas();
+  guardarTodo();
   renderStudents();
-}
-
-function setCap20(nombre, capIdx, val) {
-  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'', caps:{}, caps20:{} };
-  if (!notas[nombre].caps20) notas[nombre].caps20 = {};
-  if (!notas[nombre].caps) notas[nombre].caps = {};
-  let n = val === '' || val === null ? '' : Number(val);
-  if (n !== '' && (isNaN(n) || n < 0 || n > 20)) {
-    toast('Solo 0 a 20');
-    renderStudents();
-    return;
-  }
-  if (n === '') {
-    delete notas[nombre].caps20[capIdx];
-    delete notas[nombre].caps[capIdx];
-    guardarNotas();
-    renderStudents();
-    return;
-  }
-  n = Math.round(n * 10) / 10;
-  notas[nombre].caps20[capIdx] = n;
-  const L = numToLetter(n);
-  if (L === 'C') {
-    notas[nombre].caps[capIdx] = 'C';
-    modalCtx = { nombre, niv:'C', tipo:'cap', capIdx, fromNum:true };
-    document.getElementById('modalStu').textContent = nombre + ' · Cap. ' + (capIdx+1) + ' · ' + n + ' → C';
-    document.getElementById('modalText').value = (notas[nombre].capConc && notas[nombre].capConc[capIdx]) || '';
-    document.getElementById('modalConc').classList.remove('hidden');
-    guardarNotas();
-    return;
-  }
-  notas[nombre].caps[capIdx] = L;
-  guardarNotas();
-  renderStudents();
-}
-
-function setCap(nombre, capIdx, niv) {
-  if (!notas[nombre]) notas[nombre] = { nivel:'', conclusion:'', caps:{} };
-  if (!notas[nombre].caps) notas[nombre].caps = {};
-  if (niv === 'C') {
-    modalCtx = { nombre, niv, tipo:'cap', capIdx };
-    document.getElementById('modalStu').textContent = nombre + ' · Capacidad ' + (capIdx+1);
-    document.getElementById('modalText').value = (notas[nombre].capConc && notas[nombre].capConc[capIdx]) || '';
-    document.getElementById('modalConc').classList.remove('hidden');
-    return;
-  }
-  notas[nombre].caps[capIdx] = niv;
-  guardarNotas();
-  renderStudents();
-}
-
-function sugerirCompetencia(nombre) {
-  const n = notas[nombre];
-  if (!n || !n.caps) return;
-  const vals = Object.values(n.caps).filter(Boolean);
-  if (!vals.length) { toast('Sin capacidades calificadas'); return; }
-  // Regla simple ordinal: C=0,B=1,A=2,AD=3 → promedio redondeado
-  const map = {C:0,B:1,A:2,AD:3};
-  const inv = ['C','B','A','AD'];
-  const avg = vals.reduce((s,v)=>s+(map[v]??1),0) / vals.length;
-  const sug = inv[Math.round(avg)];
-  if (sug === 'C') {
-    modalCtx = { nombre, niv:'C', tipo:'comp', sugerido:true };
-    document.getElementById('modalStu').textContent = nombre + ' · Sugerido: C';
-    document.getElementById('modalText').value = n.conclusion || '';
-    document.getElementById('modalConc').classList.remove('hidden');
-  } else {
-    n.nivel = sug;
-    n.nota20 = letterToNum(sug);
-    guardarNotas();
-    toast('Competencia → ' + sug + (modoCalif==='num' ? ' ('+n.nota20+'/20)' : ''));
-    renderStudents();
-  }
 }
 
 function cerrarModal(ok) {
@@ -537,138 +558,79 @@ function cerrarModal(ok) {
     const text = document.getElementById('modalText').value.trim();
     if (!text) { alert('La conclusión descriptiva es obligatoria para nivel C'); return; }
     const nombre = modalCtx.nombre;
-    if (!notas[nombre]) notas[nombre] = { nivel:'', conclusion:'', caps:{}, capConc:{} };
-    if (modalCtx.tipo === 'cap') {
-      notas[nombre].caps = notas[nombre].caps || {};
-      notas[nombre].caps[modalCtx.capIdx] = 'C';
-      notas[nombre].capConc = notas[nombre].capConc || {};
-      notas[nombre].capConc[modalCtx.capIdx] = text;
-    } else {
-      notas[nombre].nivel = 'C';
-      notas[nombre].conclusion = text;
-      if (notas[nombre].nota20 === '' || notas[nombre].nota20 === undefined || notas[nombre].nota20 === null) {
-        notas[nombre].nota20 = letterToNum('C');
-      }
-    }
-    guardarNotas();
+    if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
+    notas[nombre].nivel = 'C';
+    notas[nombre].conclusion = text;
+    if (notas[nombre].nota20 === '' || notas[nombre].nota20 == null)
+      notas[nombre].nota20 = letterToNum('C');
+    guardarTodo();
   }
   modalCtx = null;
   document.getElementById('modalConc').classList.add('hidden');
   renderStudents();
 }
 
-function chipRow(nombre, actual, setterPrefix) {
-  // setterPrefix unused - we use inline
-  return ['C','B','A','AD'].map(n => {
-    const cls = 'nivel-' + n.toLowerCase() + (actual===n?' on':'');
-    return `<button type="button" class="chip ${cls}" data-n="${encodeURIComponent(nombre)}" data-v="${n}">${n}</button>`;
-  }).join('');
-}
-
 function renderStudents() {
   const list = estudiantes();
   const box = document.getElementById('stuList');
-  const caps = capacidadesDe(competencias()[compIdx] || '');
+  if (!sesionActiva) {
+    box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Completa <b>fecha</b>, <b>competencia</b> y <b>capacidad</b>, luego toca <b>Listo · Calificar</b>.</p>';
+    actualizarContadores();
+    return;
+  }
   if (!list.length) {
-    box.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">No hay estudiantes. Revisa la BD en Admin.</p>';
+    box.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">No hay estudiantes. Revisa Admin BD.</p>';
     actualizarContadores();
     return;
   }
   box.innerHTML = list.map((al, i) => {
-    const n = notas[al.nombre] || { nivel:'', nota20:'', conclusion:'', caps:{}, caps20:{} };
+    const n = notas[al.nombre] || { nivel:'', nota20:'', conclusion:'' };
     const niv = n.nivel || '';
-    const n20 = (n.nota20 !== undefined && n.nota20 !== null && n.nota20 !== '') ? n.nota20 : '';
+    const n20 = (n.nota20 !== '' && n.nota20 != null) ? n.nota20 : '';
     const enc = encodeURIComponent(al.nombre);
-    let califHtml = '';
+    let calif = '';
     if (modoCalif === 'num') {
       const eq = niv ? `<span class="eq-letter ${eqClass(niv)}">${niv}</span>` : `<span class="eq-letter eq-none">—</span>`;
-      califHtml = `<div class="num-wrap">
-        <input type="number" min="0" max="20" step="1" inputmode="numeric" placeholder="0-20"
-          value="${n20}" data-num-comp="${enc}">
+      calif = `<div class="num-wrap">
+        <input type="number" min="0" max="20" step="1" inputmode="numeric" placeholder="0-20" value="${n20}" data-num="${enc}">
         ${eq}
-        <span class="text-[10px] text-slate-400">→ SIAGIE</span>
       </div>`;
     } else {
-      califHtml = `<div class="flex flex-wrap gap-1 mt-1" data-comp-set="${enc}">
-        ${['C','B','A','AD'].map(v => `<button type="button" class="chip nivel-${v.toLowerCase()} ${niv===v?'on':''}" data-comp-val="${v}">${v}</button>`).join('')}
-        ${n20 !== '' ? `<span class="text-[10px] text-slate-400 self-center ml-1">(${n20}/20)</span>` : ''}
+      calif = `<div class="flex flex-wrap gap-1 mt-1" data-comp-set="${enc}">
+        ${['C','B','A','AD'].map(v => `<button type="button" class="chip nivel-${v.toLowerCase()} ${niv===v?'on':''}" data-val="${v}">${v}</button>`).join('')}
+        ${n20 !== '' ? `<span class="text-[10px] text-slate-400 self-center ml-1">(${n20})</span>` : ''}
       </div>`;
     }
-    let capsHtml = '';
-    if (modoCap) {
-      capsHtml = `<div class="cap-box">
-        ${caps.map((ct, ci) => {
-          const cv = (n.caps && n.caps[ci]) || '';
-          const c20 = (n.caps20 && n.caps20[ci] !== undefined && n.caps20[ci] !== '') ? n.caps20[ci] : '';
-          if (modoCalif === 'num') {
-            const eq = cv ? `<span class="eq-letter ${eqClass(cv)}">${cv}</span>` : `<span class="eq-letter eq-none">—</span>`;
-            return `<div class="cap-row">
-              <div class="text-[11px] font-semibold text-slate-600 mb-1">${ci+1}. ${ct}</div>
-              <div class="num-wrap">
-                <input type="number" min="0" max="20" step="1" inputmode="numeric" placeholder="0-20"
-                  value="${c20}" data-num-cap="${enc}" data-cap-i="${ci}">
-                ${eq}
-              </div>
-            </div>`;
-          }
-          return `<div class="cap-row">
-            <div class="text-[11px] font-semibold text-slate-600 mb-1">${ci+1}. ${ct}</div>
-            <div class="flex flex-wrap gap-1" data-cap="${ci}" data-stu="${enc}">
-              ${['C','B','A','AD'].map(v => `<button type="button" class="chip nivel-${v.toLowerCase()} ${cv===v?'on':''}" data-cap-set="${v}">${v}</button>`).join('')}
-            </div>
-          </div>`;
-        }).join('')}
-        <button type="button" class="btn btn-ghost text-xs mt-2 w-full" data-sug="${enc}">Sugerir nota de competencia</button>
-      </div>`;
-    }
-    return `<div class="stu-row" data-stu-row="${enc}">
+    return `<div class="stu-row">
       <div class="flex gap-2 items-start">
         <div class="text-xs font-bold text-slate-400 w-6 pt-1">${al.orden || i+1}</div>
         <div class="flex-1 min-w-0">
           <div class="font-bold text-sm leading-snug">${al.nombre}</div>
-          <div class="text-[10px] font-bold text-slate-400 mt-1">COMPETENCIA</div>
-          ${califHtml}
+          ${calif}
           ${niv==='C' ? `<div class="text-[11px] text-red-700 mt-1 bg-red-50 rounded-lg px-2 py-1">${(n.conclusion||'Sin conclusión').slice(0,140)}</div>` : ''}
-          ${capsHtml}
         </div>
       </div>
     </div>`;
   }).join('');
 
   box.onclick = function(ev) {
-    const t = ev.target.closest('button');
+    const t = ev.target.closest('button[data-val]');
     if (!t) return;
-    if (t.dataset.compVal) {
-      const nombre = decodeURIComponent(t.closest('[data-comp-set]').dataset.compSet);
-      setNivel(nombre, t.dataset.compVal);
-    } else if (t.dataset.capSet) {
-      const wrap = t.closest('[data-cap]');
-      const nombre = decodeURIComponent(wrap.dataset.stu);
-      setCap(nombre, parseInt(wrap.dataset.cap,10), t.dataset.capSet);
-    } else if (t.dataset.sug) {
-      sugerirCompetencia(decodeURIComponent(t.dataset.sug));
-    }
+    const nombre = decodeURIComponent(t.closest('[data-comp-set]').dataset.compSet);
+    setNivel(nombre, t.dataset.val);
   };
-
   box.onchange = function(ev) {
     const el = ev.target;
-    if (el.matches('input[data-num-comp]')) {
-      setNota20(decodeURIComponent(el.dataset.numComp), el.value);
-    } else if (el.matches('input[data-num-cap]')) {
-      setCap20(decodeURIComponent(el.dataset.numCap), parseInt(el.dataset.capI,10), el.value);
+    if (el.matches && el.matches('input[data-num]')) {
+      setNota20(decodeURIComponent(el.dataset.num), el.value);
     }
   };
-
-  // blur also saves on mobile keyboards
   box.onfocusout = function(ev) {
     const el = ev.target;
-    if (el.matches && el.matches('input[data-num-comp]')) {
-      setNota20(decodeURIComponent(el.dataset.numComp), el.value);
-    } else if (el.matches && el.matches('input[data-num-cap]')) {
-      setCap20(decodeURIComponent(el.dataset.numCap), parseInt(el.dataset.capI,10), el.value);
+    if (el.matches && el.matches('input[data-num]')) {
+      setNota20(decodeURIComponent(el.dataset.num), el.value);
     }
   };
-
   actualizarContadores();
 }
 
@@ -685,12 +647,11 @@ function actualizarContadores() {
 }
 
 function volverHome() {
-  guardarNotas();
+  guardarTodo();
   document.getElementById('viewApp').classList.add('hidden');
   document.getElementById('viewHome').classList.remove('hidden');
   nivel = null;
 }
-
 window.addEventListener('resize', fixHdrHeight);
 </script>
 </body>
