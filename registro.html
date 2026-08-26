@@ -112,7 +112,7 @@
 /* Gate de acceso básico IE 22375 */
 (function(){
   var KEY='ie22375_session_v1';
-  var need=window.__IE_NEED_ROLES||null; // null = cualquier sesión
+  var need=window.__IE_NEED_ROLES||null;
   function ses(){
     try{
       var r=sessionStorage.getItem(KEY)||localStorage.getItem(KEY);
@@ -122,7 +122,11 @@
   var s=ses();
   if(!s){ location.replace('index.html'); return; }
   if(need && need.length){
-    var ok=need.indexOf(s.user)>=0 || s.user==='admin';
+    var ok = need.indexOf(s.user)>=0 || s.user==='admin' || s.role==='admin';
+    // Docente: permitido si su nivel está en need
+    if(!ok && s.role==='docente' && s.nivel && need.indexOf(s.nivel)>=0) ok = true;
+    // Sesión nivel primaria/secundaria
+    if(!ok && s.nivel && need.indexOf(s.nivel)>=0) ok = true;
     if(!ok){ alert('No tiene permiso para este módulo.'); location.replace('index.html'); }
   }
 })();
@@ -406,7 +410,14 @@ function saveStore() {
 }
 
 function estructura() { return nivel === 'primaria' ? EST_PRIM : EST_SEC; }
-function areas() { return Object.keys(estructura()); }
+function areas() {
+  let all = Object.keys(estructura());
+  const ap = areasPermitidas();
+  if (ap && ap.length) {
+    all = all.filter(a => ap.includes(a));
+  }
+  return all;
+}
 function competencias() {
   const e = estructura()[areaActual];
   return (e && e.competencias) ? e.competencias : [];
@@ -462,13 +473,29 @@ function getLoginSession() {
   } catch (e) { return null; }
 }
 
-/** Nivel permitido según login: primaria | secundaria | admin | null */
+/** Nivel permitido: primaria | secundaria | admin | null */
 function nivelPermitido() {
   var s = getLoginSession();
   if (!s) return null;
-  if (s.user === 'admin' || s.nivel === 'admin') return 'admin';
-  if (s.user === 'primaria' || s.nivel === 'primaria') return 'primaria';
-  if (s.user === 'secundaria' || s.nivel === 'secundaria') return 'secundaria';
+  if (s.user === 'admin' || s.nivel === 'admin' || s.role === 'admin') return 'admin';
+  if (s.nivel === 'primaria') return 'primaria';
+  if (s.nivel === 'secundaria') return 'secundaria';
+  return null;
+}
+
+/** Grados permitidos (primaria docente) o null = todos */
+function gradosPermitidos() {
+  var s = getLoginSession();
+  if (!s || s.role !== 'docente') return null;
+  if (s.nivel === 'primaria' && s.grados && s.grados.length) return s.grados.map(Number);
+  return null;
+}
+
+/** Áreas permitidas (secundaria docente) o null = todas */
+function areasPermitidas() {
+  var s = getLoginSession();
+  if (!s || s.role !== 'docente') return null;
+  if (s.nivel === 'secundaria' && s.areas && s.areas.length) return s.areas;
   return null;
 }
 
@@ -478,31 +505,35 @@ function aplicarRestriccionNivel() {
   var btnS = document.getElementById('btnHomeSec');
   var lbl = document.getElementById('lblNivelBloqueo');
   if (!btnP || !btnS) return;
+  var s = getLoginSession();
+  var extra = '';
+  if (s && s.role === 'docente') {
+    if (s.grados && s.grados.length) extra = ' · Grado ' + s.grados.map(function(g){return g+'°';}).join(', ');
+    if (s.areas && s.areas.length) extra = ' · ' + s.areas.join(', ');
+  }
 
   if (perm === 'primaria') {
     btnS.style.display = 'none';
     btnP.style.display = 'block';
     if (lbl) {
       lbl.classList.remove('hidden');
-      lbl.textContent = 'Sesión Primaria · solo registro de primaria';
+      lbl.textContent = 'Sesión Primaria' + extra;
     }
-    // Entrar directo a primaria (sin mostrar elección)
     entrarNivel('primaria');
   } else if (perm === 'secundaria') {
     btnP.style.display = 'none';
     btnS.style.display = 'block';
     if (lbl) {
       lbl.classList.remove('hidden');
-      lbl.textContent = 'Sesión Secundaria · solo registro de secundaria';
+      lbl.textContent = 'Sesión Secundaria' + extra;
     }
     entrarNivel('secundaria');
   } else {
-    // admin u otro: ambos visibles
     btnP.style.display = 'block';
     btnS.style.display = 'block';
     if (lbl) {
       lbl.classList.remove('hidden');
-      lbl.textContent = 'Administrador · puede entrar a ambos niveles';
+      lbl.textContent = 'Administrador · ambos niveles';
     }
   }
 }
@@ -526,8 +557,13 @@ function entrarNivel(n) {
   document.getElementById('selBim').innerHTML = ['I','II','III','IV'].map(b => `<option value="${b}">Bimestre ${b}</option>`).join('');
   const bd = loadBD();
   const list = (bd[n] && bd[n].estudiantes) || [];
-  const grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
+  let grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
+  const gp = gradosPermitidos();
+  if (gp && gp.length) grados = grados.filter(g => gp.includes(g));
   document.getElementById('selGrado').innerHTML = grados.map(g => `<option value="${g}">${g}°</option>`).join('');
+  if (!grados.length) {
+    alert('No hay grados asignados a su usuario. Contacte al administrador.');
+  }
   document.getElementById('inpFecha').value = hoyISO();
   onGrado();
   areaActual = areas()[0];

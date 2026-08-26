@@ -44,7 +44,7 @@
 /* Gate de acceso básico IE 22375 */
 (function(){
   var KEY='ie22375_session_v1';
-  var need=window.__IE_NEED_ROLES||null; // null = cualquier sesión
+  var need=window.__IE_NEED_ROLES||null;
   function ses(){
     try{
       var r=sessionStorage.getItem(KEY)||localStorage.getItem(KEY);
@@ -54,7 +54,11 @@
   var s=ses();
   if(!s){ location.replace('index.html'); return; }
   if(need && need.length){
-    var ok=need.indexOf(s.user)>=0 || s.user==='admin';
+    var ok = need.indexOf(s.user)>=0 || s.user==='admin' || s.role==='admin';
+    // Docente: permitido si su nivel está en need
+    if(!ok && s.role==='docente' && s.nivel && need.indexOf(s.nivel)>=0) ok = true;
+    // Sesión nivel primaria/secundaria
+    if(!ok && s.nivel && need.indexOf(s.nivel)>=0) ok = true;
     if(!ok){ alert('No tiene permiso para este módulo.'); location.replace('index.html'); }
   }
 })();
@@ -96,6 +100,7 @@
       <button class="navbtn chip chip-off" data-tab="bd" onclick="showTab('bd')">Estudiantes</button>
       <button class="navbtn chip chip-off" data-tab="periodos" onclick="showTab('periodos')">Bimestres</button>
       <button class="navbtn chip chip-off" data-tab="import" onclick="showTab('import')">Importar</button>
+      <button class="navbtn chip chip-off" data-tab="docentes" onclick="showTab('docentes')">Docentes</button>
       <button class="navbtn chip chip-off" data-tab="config" onclick="showTab('config')">Config</button>
     </nav>
   </header>
@@ -120,6 +125,11 @@
           <div class="text-2xl mb-1">📅</div>
           <div class="font-black">Año y bimestres</div>
           <div class="text-sm text-slate-500">Abrir o cerrar periodos de carga</div>
+        </button>
+        <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('docentes')">
+          <div class="text-2xl mb-1">🔐</div>
+          <div class="font-black">Docentes y accesos</div>
+          <div class="text-sm text-slate-500">Usuario, clave, grado (pri) o área (sec)</div>
         </button>
         <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('config')">
           <div class="text-2xl mb-1">⚙️</div>
@@ -220,7 +230,71 @@
     </section>
 
     <!-- CONFIG -->
-    <section id="tab-config" class="tab hidden">
+    <section 
+    <!-- DOCENTES / ACCESOS -->
+    <section id="tab-docentes" class="tab hidden">
+      <div class="card p-4 space-y-3">
+        <h2 class="font-black text-lg">Docentes y accesos</h2>
+        <p class="text-sm text-slate-500">Define usuarios para que en <b>primaria</b> solo vean su grado y en <b>secundaria</b> solo su(s) área(s).</p>
+
+        <div class="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Usuario (login)</label>
+            <input id="docUser" placeholder="ej. jperez" autocomplete="off">
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Contraseña</label>
+            <input id="docPass" type="text" placeholder="clave simple" autocomplete="off">
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Nombre del docente</label>
+            <input id="docNombre" placeholder="Apellidos, Nombres">
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Nivel</label>
+            <select id="docNivel" onchange="toggleDocFiltros()">
+              <option value="primaria">Primaria</option>
+              <option value="secundaria">Secundaria</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="docGradosWrap">
+          <label class="text-[11px] font-bold text-slate-500">Grados que puede ver (primaria)</label>
+          <div class="flex flex-wrap gap-2 mt-1" id="docGradosBox">
+            <label class="text-sm"><input type="checkbox" value="1" class="doc-grado"> 1°</label>
+            <label class="text-sm"><input type="checkbox" value="2" class="doc-grado"> 2°</label>
+            <label class="text-sm"><input type="checkbox" value="3" class="doc-grado"> 3°</label>
+            <label class="text-sm"><input type="checkbox" value="4" class="doc-grado"> 4°</label>
+            <label class="text-sm"><input type="checkbox" value="5" class="doc-grado"> 5°</label>
+            <label class="text-sm"><input type="checkbox" value="6" class="doc-grado"> 6°</label>
+          </div>
+        </div>
+
+        <div id="docAreasWrap" class="hidden">
+          <label class="text-[11px] font-bold text-slate-500">Áreas que puede ver (secundaria)</label>
+          <div class="flex flex-wrap gap-2 mt-1" id="docAreasBox"></div>
+        </div>
+
+        <input type="hidden" id="docEditId" value="">
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-primary text-sm" onclick="guardarDocente()">Guardar docente</button>
+          <button class="btn btn-ghost text-sm" onclick="limpiarFormDocente()">Limpiar</button>
+        </div>
+      </div>
+
+      <div class="card p-4 mt-3">
+        <div class="font-bold text-sm mb-2">Usuarios registrados</div>
+        <div id="docLista" class="space-y-2 text-sm"></div>
+      </div>
+
+      <div class="card p-3 mt-3 text-[11px] text-slate-500">
+        <b>Usuarios generales (fijos):</b> primaria / prim22375 · secundaria / sec22375 · admin / admin22375<br>
+        Los docentes creados aquí se suman al login del inicio. No uses esos nombres de usuario fijos.
+      </div>
+    </section>
+
+id="tab-config" class="tab hidden">
       <div class="card p-4 space-y-3">
         <h2 class="font-black text-lg">Configuración</h2>
         <div>
@@ -309,6 +383,7 @@ function showTab(id) {
     const on = b.getAttribute('data-tab') === id;
     b.className = 'navbtn chip ' + (on ? 'chip-on' : 'chip-off');
   });
+  if (id === 'docentes') { initDocentesUI(); }
   if (id === 'bd') { fillFiltros(); renderTabla(); }
   if (id === 'periodos') initPeriodosUI();
   if (id === 'menu') actualizarResumen();
@@ -623,6 +698,143 @@ function savePeriodos() {
   alert('Periodos guardados.');
   initPeriodosUI();
 }
+
+
+const DOCENTES_KEY = 'ie22375_docentes_v1';
+const AREAS_SEC_LIST = ["Desarrollo Personal, Ciudadanía y Cívica", "Ciencias Sociales", "Educación para el Trabajo (EPT)", "Educación Física", "Comunicación", "Arte y Cultura", "Inglés", "Matemática", "Ciencia y Tecnología", "Educación Religiosa", "Competencias Transversales"];
+
+function loadDocentes() {
+  try {
+    const raw = localStorage.getItem(DOCENTES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return [];
+}
+function saveDocentes(list) {
+  localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
+}
+
+function toggleDocFiltros() {
+  const n = document.getElementById('docNivel').value;
+  document.getElementById('docGradosWrap').classList.toggle('hidden', n !== 'primaria');
+  document.getElementById('docAreasWrap').classList.toggle('hidden', n !== 'secundaria');
+}
+
+function initDocentesUI() {
+  const box = document.getElementById('docAreasBox');
+  if (box && !box.children.length) {
+    box.innerHTML = AREAS_SEC_LIST.map(a =>
+      '<label class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">' +
+      '<input type="checkbox" class="doc-area" value="' + a.replace(/"/g,'&quot;') + '"> ' + a +
+      '</label>'
+    ).join(' ');
+  }
+  renderDocentes();
+  toggleDocFiltros();
+}
+
+function limpiarFormDocente() {
+  document.getElementById('docEditId').value = '';
+  document.getElementById('docUser').value = '';
+  document.getElementById('docPass').value = '';
+  document.getElementById('docNombre').value = '';
+  document.getElementById('docNivel').value = 'primaria';
+  document.querySelectorAll('.doc-grado').forEach(c => c.checked = false);
+  document.querySelectorAll('.doc-area').forEach(c => c.checked = false);
+  toggleDocFiltros();
+}
+
+function guardarDocente() {
+  const id = document.getElementById('docEditId').value;
+  let user = document.getElementById('docUser').value.trim().toLowerCase().replace(/\s+/g,'');
+  const pass = document.getElementById('docPass').value.trim();
+  const nombre = document.getElementById('docNombre').value.trim();
+  const nivel = document.getElementById('docNivel').value;
+  if (!user || !pass) { alert('Usuario y contraseña son obligatorios'); return; }
+  if (['admin','primaria','secundaria'].includes(user)) {
+    alert('Ese nombre de usuario está reservado (admin / primaria / secundaria)');
+    return;
+  }
+  const grados = [...document.querySelectorAll('.doc-grado:checked')].map(c => parseInt(c.value,10));
+  const areas = [...document.querySelectorAll('.doc-area:checked')].map(c => c.value);
+  if (nivel === 'primaria' && !grados.length) { alert('Marca al menos un grado'); return; }
+  if (nivel === 'secundaria' && !areas.length) { alert('Marca al menos un área'); return; }
+
+  const list = loadDocentes();
+  if (id) {
+    const i = list.findIndex(d => d.id === id);
+    if (i >= 0) {
+      list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas };
+    }
+  } else {
+    if (list.some(d => d.user === user)) { alert('Ese usuario ya existe'); return; }
+    list.push({
+      id: 'd' + Date.now(),
+      user, pass, nombre, nivel, grados, areas,
+      ts: Date.now()
+    });
+  }
+  saveDocentes(list);
+  limpiarFormDocente();
+  renderDocentes();
+  alert('Docente guardado. Ya puede ingresar en el login del inicio.');
+}
+
+function editarDocente(id) {
+  const d = loadDocentes().find(x => x.id === id);
+  if (!d) return;
+  document.getElementById('docEditId').value = d.id;
+  document.getElementById('docUser').value = d.user;
+  document.getElementById('docPass').value = d.pass;
+  document.getElementById('docNombre').value = d.nombre || '';
+  document.getElementById('docNivel').value = d.nivel;
+  toggleDocFiltros();
+  document.querySelectorAll('.doc-grado').forEach(c => {
+    c.checked = (d.grados || []).includes(parseInt(c.value,10));
+  });
+  document.querySelectorAll('.doc-area').forEach(c => {
+    c.checked = (d.areas || []).includes(c.value);
+  });
+  showTab('docentes');
+  window.scrollTo(0,0);
+}
+
+function eliminarDocente(id) {
+  if (!confirm('¿Eliminar este acceso de docente?')) return;
+  saveDocentes(loadDocentes().filter(d => d.id !== id));
+  renderDocentes();
+}
+
+function renderDocentes() {
+  const list = loadDocentes();
+  const box = document.getElementById('docLista');
+  if (!box) return;
+  if (!list.length) {
+    box.innerHTML = '<p class="text-slate-400">Aún no hay docentes registrados.</p>';
+    return;
+  }
+  box.innerHTML = list.map(d => {
+    const filtro = d.nivel === 'primaria'
+      ? ('Grados: ' + (d.grados||[]).map(g=>g+'°').join(', '))
+      : ('Áreas: ' + (d.areas||[]).join(' · '));
+    return '<div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2" data-doc-id="'+d.id+'">' +
+      '<div><div class="font-bold">' + (d.nombre||d.user) + ' <span class="text-slate-400 font-normal">(@'+d.user+')</span></div>' +
+      '<div class="text-xs text-slate-500">' + d.nivel + ' · ' + filtro + '</div>' +
+      '<div class="text-xs text-slate-400">Clave: ' + d.pass + '</div></div>' +
+      '<div class="flex gap-1">' +
+      '<button type="button" class="btn btn-ghost text-xs !py-1 btn-doc-edit">Editar</button>' +
+      '<button type="button" class="btn btn-ghost text-xs !py-1 text-red-600 btn-doc-del">Eliminar</button>' +
+      '</div></div>';
+  }).join('');
+  box.onclick = function(ev) {
+    const row = ev.target.closest('[data-doc-id]');
+    if (!row) return;
+    const id = row.getAttribute('data-doc-id');
+    if (ev.target.closest('.btn-doc-edit')) editarDocente(id);
+    if (ev.target.closest('.btn-doc-del')) eliminarDocente(id);
+  };
+}
+
 
 function cambiarClave() {
   const n = document.getElementById('cfgPass').value;
