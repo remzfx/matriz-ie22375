@@ -263,7 +263,7 @@
   <div class="card w-full max-w-md p-4">
     <div class="font-black mb-1">Conclusión descriptiva</div>
     <div class="text-xs text-slate-500 mb-2" id="modalStu">—</div>
-    <p class="text-[11px] text-amber-700 bg-amber-50 rounded-lg p-2 mb-2">Obligatoria cuando el nivel es <b>C (Inicio)</b>.</p>
+    <p class="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2 mb-2">Opcional al calificar el día a día. Será <b>obligatoria al procesar al registro oficial</b> si el promedio es <b>C</b> (en primaria también si es <b>B</b>).</p>
     <textarea id="modalText" rows="4" placeholder="Describe el logro del estudiante…"></textarea>
     <div class="flex gap-2 mt-3">
       <button type="button" class="btn btn-ghost flex-1" onclick="cerrarModal(false)">Cancelar</button>
@@ -570,16 +570,11 @@ function setModoCalif(m) {
 function setNivel(nombre, niv) {
   if (!sesionActiva) { toast('Activa una sesión primero'); return; }
   if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
-  if (niv === 'C') {
-    modalCtx = { nombre };
-    document.getElementById('modalStu').textContent = nombre;
-    document.getElementById('modalText').value = notas[nombre].conclusion || '';
-    document.getElementById('modalConc').classList.remove('hidden');
-    return;
-  }
   notas[nombre].nivel = niv;
   if (notas[nombre].nota20 === '' || notas[nombre].nota20 == null)
     notas[nombre].nota20 = letterToNum(niv);
+  // Conclusión descriptiva ya NO es obligatoria al calificar día a día.
+  // Solo se exige al validar/procesar al registro oficial (promedio C, y en primaria también B).
   guardarTodo();
   renderStudents();
 }
@@ -601,31 +596,25 @@ function setNota20(nombre, val) {
   }
   n = Math.round(n);
   notas[nombre].nota20 = n;
-  const L = numToLetter(n);
-  if (L === 'C') {
-    notas[nombre].nivel = 'C';
-    modalCtx = { nombre };
-    document.getElementById('modalStu').textContent = nombre + ' · ' + n + ' → C';
-    document.getElementById('modalText').value = notas[nombre].conclusion || '';
-    document.getElementById('modalConc').classList.remove('hidden');
-    guardarTodo();
-    return;
-  }
-  notas[nombre].nivel = L;
+  notas[nombre].nivel = numToLetter(n);
   guardarTodo();
   renderStudents();
+}
+
+function abrirConclusion(nombre) {
+  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
+  modalCtx = { nombre };
+  document.getElementById('modalStu').textContent = nombre + (notas[nombre].nivel ? ' · ' + notas[nombre].nivel : '');
+  document.getElementById('modalText').value = notas[nombre].conclusion || '';
+  document.getElementById('modalConc').classList.remove('hidden');
 }
 
 function cerrarModal(ok) {
   if (ok && modalCtx) {
     const text = document.getElementById('modalText').value.trim();
-    if (!text) { alert('La conclusión descriptiva es obligatoria para nivel C'); return; }
     const nombre = modalCtx.nombre;
     if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
-    notas[nombre].nivel = 'C';
     notas[nombre].conclusion = text;
-    if (notas[nombre].nota20 === '' || notas[nombre].nota20 == null)
-      notas[nombre].nota20 = letterToNum('C');
     guardarTodo();
   }
   modalCtx = null;
@@ -670,16 +659,26 @@ function renderStudents() {
         <div class="flex-1 min-w-0">
           <div class="font-bold text-sm leading-snug">${al.nombre}</div>
           ${calif}
-          ${niv==='C' ? `<div class="text-[11px] text-red-700 mt-1 bg-red-50 rounded-lg px-2 py-1">${(n.conclusion||'Sin conclusión').slice(0,140)}</div>` : ''}
+          <div class="mt-1 flex flex-wrap items-center gap-2">
+            <button type="button" class="text-[11px] font-bold text-sky-600 underline" data-conc="${enc}">Conclusión</button>
+            ${n.conclusion ? `<span class="text-[11px] text-slate-600 bg-slate-50 rounded-lg px-2 py-0.5">${n.conclusion.slice(0,100)}${n.conclusion.length>100?'…':''}</span>` : `<span class="text-[10px] text-slate-400">opcional</span>`}
+          </div>
         </div>
       </div>
     </div>`;
   }).join('');
 
   box.onclick = function(ev) {
+    const btnConc = ev.target.closest('button[data-conc]');
+    if (btnConc) {
+      abrirConclusion(decodeURIComponent(btnConc.dataset.conc));
+      return;
+    }
     const t = ev.target.closest('button[data-val]');
     if (!t) return;
-    const nombre = decodeURIComponent(t.closest('[data-comp-set]').dataset.compSet);
+    const wrap = t.closest('[data-comp-set]');
+    if (!wrap) return;
+    const nombre = decodeURIComponent(wrap.dataset.compSet);
     setNivel(nombre, t.dataset.val);
   };
   box.onchange = function(ev) {
@@ -709,6 +708,47 @@ function actualizarContadores() {
   document.getElementById('cAD').textContent = ad;
 }
 
+function validarConclusionesOficial(c, alumnos, sess) {
+  /* Devuelve lista de strings "Alumno · Competencia · Letra" sin conclusión
+     cuando el promedio de evidencias exige conclusión:
+     - Siempre si letra = C
+     - En primaria también si letra = B
+  */
+  const byComp = {};
+  sess.forEach(s => {
+    if (!byComp[s.comp]) byComp[s.comp] = [];
+    byComp[s.comp].push(s);
+  });
+  const faltan = [];
+  Object.keys(byComp).forEach(comp => {
+    const evidencias = byComp[comp];
+    alumnos.forEach(al => {
+      const nums = [];
+      let conclusion = '';
+      evidencias.forEach(s => {
+        const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,al.nombre].join('||');
+        const g = store.grades[k];
+        if (!g) return;
+        if (g.conclusion && g.conclusion.trim()) conclusion = g.conclusion.trim();
+        if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
+        else if (g.nivel) {
+          const m = letterToNum(g.nivel);
+          if (m !== '') nums.push(Number(m));
+        }
+      });
+      if (!nums.length) return;
+      const prom = promedioNums(nums);
+      if (prom == null) return;
+      const letra = numToLetter(prom);
+      const exige = (letra === 'C') || (c.nivel === 'primaria' && letra === 'B');
+      if (exige && !conclusion) {
+        faltan.push(al.nombre + ' · ' + comp.slice(0, 40) + ' · ' + letra + ' (' + prom + ')');
+      }
+    });
+  });
+  return faltan;
+}
+
 function prepararImpresion() {
   loadStore();
   const c = ctxBase();
@@ -722,6 +762,23 @@ function prepararImpresion() {
   if (!sess.length) {
     alert('No hay evaluaciones guardadas en este bimestre/área para imprimir.');
     return;
+  }
+
+  // Validación registro oficial: conclusión obligatoria si PROMEDIO es C
+  // (en primaria también si el promedio es B). Solo alerta aquí (imprimir / enviar oficial).
+  const faltanConc = validarConclusionesOficial(c, alumnos, sess);
+  if (faltanConc.length) {
+    const lista = faltanConc.slice(0, 12).map(x => '• ' + x).join('\n');
+    const extra = faltanConc.length > 12 ? '\n… y ' + (faltanConc.length-12) + ' más' : '';
+    const ok = confirm(
+      'AVISO — Registro oficial (SIAGIE)\n\n' +
+      'Falta conclusión descriptiva en promedios que la requieren:\n\n' +
+      lista + extra +
+      '\n\nRegla: promedio C (Inicio) siempre; en PRIMARIA también promedio B.\n' +
+      'En el día a día no es obligatoria; sí al procesar/imprimir el registro oficial.\n\n' +
+      '¿Desea imprimir de todas formas?'
+    );
+    if (!ok) return;
   }
 
   // group by competencia
