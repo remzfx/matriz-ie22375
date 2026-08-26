@@ -50,6 +50,17 @@
   .sess-chip { display:inline-block; font-size:11px; font-weight:700; padding:.35rem .65rem; border-radius:999px; background:#f1f5f9; color:#334155; margin:2px; border:1px solid #e2e8f0; cursor:pointer; }
   .sess-chip.on { background:#e0f2fe; color:#0369a1; border-color:#7dd3fc; }
   .scale-hint { font-size:10px; color:#64748b; margin-top:4px; }
+  .av-card { border:1px solid #e2e8f0; border-radius:14px; padding:12px; margin-bottom:10px; background:#fff; }
+  .av-comp { font-weight:900; font-size:14px; color:#0f172a; }
+  .av-meta { font-size:11px; color:#64748b; margin-top:2px; }
+  .av-badge { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:900; padding:.3rem .65rem; border-radius:999px; }
+  .av-ev { font-size:11px; color:#475569; background:#f8fafc; border-radius:8px; padding:6px 8px; margin-top:6px; }
+  .av-stu { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f1f5f9; font-size:12px; }
+  .av-stu:last-child { border-bottom:0; }
+  .panel-av { display:none; }
+  .panel-av.on { display:block; }
+  .panel-cal.on { display:block; }
+  .panel-cal { display:none; }
 </style>
 </head>
 <body class="min-h-screen text-slate-800">
@@ -161,7 +172,29 @@
       <button type="button" class="btn btn-primary w-full text-sm" onclick="activarSesion()">Listo · Calificar esta capacidad</button>
     </div>
 
+    <!-- Tabs Calificar / Avance -->
+    <div class="flex gap-2">
+      <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
+      <button type="button" id="tabAv" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('av')">Ver avance</button>
+    </div>
+
+    <!-- PANEL AVANCE -->
+    <div class="panel-av" id="panelAvance">
+      <div class="card p-3">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <div>
+            <div class="text-[10px] font-bold text-slate-500">AVANCE DEL BIMESTRE</div>
+            <div class="text-sm font-bold" id="lblAvanceCtx">—</div>
+          </div>
+          <button type="button" class="btn btn-ghost text-xs !py-1.5" onclick="renderAvance()">Actualizar</button>
+        </div>
+        <p class="text-[11px] text-slate-500 mb-2">Promedio de evidencias por competencia → letra sugerida para SIAGIE.</p>
+        <div id="avanceBox"></div>
+      </div>
+    </div>
+
     <!-- Sesiones previas del contexto -->
+    <div class="panel-cal on" id="panelCalificar">
     <div class="card p-3" id="wrapSesiones">
       <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS (este bimestre / área)</div>
       <div id="listaSesiones" class="flex flex-wrap gap-1"></div>
@@ -183,6 +216,7 @@
       <p class="scale-hint" id="lblEscala">Escala: AD destacado · A logrado · B proceso · C inicio</p>
       <div id="stuList" class="mt-2"></div>
     </div>
+    </div><!-- /panelCalificar -->
   </main>
 
   <div class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
@@ -644,6 +678,130 @@ function actualizarContadores() {
   document.getElementById('cB').textContent = b;
   document.getElementById('cA').textContent = a;
   document.getElementById('cAD').textContent = ad;
+}
+
+function showPanel(which) {
+  const cal = document.getElementById('panelCalificar');
+  const av = document.getElementById('panelAvance');
+  const tCal = document.getElementById('tabCal');
+  const tAv = document.getElementById('tabAv');
+  if (which === 'av') {
+    cal.classList.remove('on');
+    av.classList.add('on');
+    tCal.className = 'btn btn-ghost flex-1 text-sm';
+    tAv.className = 'btn btn-primary flex-1 text-sm';
+    renderAvance();
+  } else {
+    av.classList.remove('on');
+    cal.classList.add('on');
+    tAv.className = 'btn btn-ghost flex-1 text-sm';
+    tCal.className = 'btn btn-primary flex-1 text-sm';
+  }
+}
+
+function promedioNums(arr) {
+  const v = arr.filter(x => x !== '' && x != null && !isNaN(Number(x))).map(Number);
+  if (!v.length) return null;
+  return Math.round((v.reduce((a,b)=>a+b,0) / v.length) * 10) / 10;
+}
+
+function renderAvance() {
+  const box = document.getElementById('avanceBox');
+  const c = ctxBase();
+  document.getElementById('lblAvanceCtx').textContent =
+    (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + ' · Bim ' + c.bim + ' · ' + (c.area||'');
+
+  const comps = competencias();
+  const alumnos = estudiantes();
+  // sessions for this context
+  const sess = (store.sessions || []).filter(s =>
+    s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
+    s.seccion === c.seccion && s.area === c.area
+  );
+
+  if (!sess.length) {
+    box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Aún no hay evaluaciones guardadas en este bimestre/área.</p>';
+    return;
+  }
+
+  // group sessions by competencia
+  const byComp = {};
+  sess.forEach(s => {
+    if (!byComp[s.comp]) byComp[s.comp] = [];
+    byComp[s.comp].push(s);
+  });
+
+  // also include comps with no data at end
+  const order = comps.filter(x => byComp[x]).concat(Object.keys(byComp).filter(x => !comps.includes(x)));
+
+  box.innerHTML = order.map(comp => {
+    const evidencias = byComp[comp] || [];
+    // unique capacidad labels
+    const caps = [...new Set(evidencias.map(e => e.capacidad))];
+
+    // per student: collect all numeric grades for this comp across evidencias
+    const stuRows = alumnos.map(al => {
+      const nums = [];
+      const letters = [];
+      evidencias.forEach(s => {
+        const k = [c.nivel, c.bim, c.grado, c.seccion, c.area, s.comp, s.capacidad, s.fecha, al.nombre].join('||');
+        const g = store.grades[k];
+        if (!g) return;
+        if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
+        else if (g.nivel) {
+          const mid = letterToNum(g.nivel);
+          if (mid !== '') nums.push(Number(mid));
+          letters.push(g.nivel);
+        }
+      });
+      const prom = promedioNums(nums);
+      const letra = prom != null ? numToLetter(prom) : (letters.length ? letters[letters.length-1] : '');
+      return { nombre: al.nombre, orden: al.orden, prom, letra, nEvid: nums.length };
+    });
+
+    // class average
+    const classProm = promedioNums(stuRows.map(r => r.prom).filter(x => x != null));
+    const classLetra = classProm != null ? numToLetter(classProm) : '';
+
+    const badge = classLetra
+      ? `<span class="av-badge eq-letter ${eqClass(classLetra)}">${classLetra}${classProm!=null?' · '+classProm:''}</span>`
+      : `<span class="av-badge eq-letter eq-none">Sin promedio</span>`;
+
+    const evList = evidencias
+      .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''))
+      .map(e => `<div class="av-ev">${e.fecha || '—'} · <b>${e.capacidad}</b>${e.unidad?' · U'+e.unidad:''}</div>`)
+      .join('');
+
+    const detalle = stuRows.map(r => {
+      const mark = r.letra
+        ? `<span class="eq-letter ${eqClass(r.letra)}">${r.letra}${r.prom!=null?' '+r.prom:''}</span>`
+        : `<span class="eq-letter eq-none">—</span>`;
+      return `<div class="av-stu"><span class="truncate">${r.orden||''}. ${r.nombre}</span>${mark}</div>`;
+    }).join('');
+
+    return `<div class="av-card">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <div class="av-comp">${comp}</div>
+          <div class="av-meta">${caps.length} evidencia(s) · ${stuRows.filter(r=>r.letra).length}/${alumnos.length} con nota</div>
+        </div>
+        ${badge}
+      </div>
+      ${evList}
+      <button type="button" class="btn btn-ghost text-xs mt-2 w-full btn-det">Ver detalle por alumno</button>
+      <div class="hidden mt-2 det-alumnos">${detalle}</div>
+    </div>`;
+  }).join('');
+
+  box.onclick = function(ev) {
+    const b = ev.target.closest('button.btn-det');
+    if (!b) return;
+    const card = b.closest('.av-card');
+    const el = card && card.querySelector('.det-alumnos');
+    if (!el) return;
+    el.classList.toggle('hidden');
+    b.textContent = el.classList.contains('hidden') ? 'Ver detalle por alumno' : 'Ocultar detalle';
+  };
 }
 
 function volverHome() {
