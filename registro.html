@@ -61,6 +61,32 @@
   .panel-av.on { display:block; }
   .panel-cal.on { display:block; }
   .panel-cal { display:none; }
+  #printArea { display:none; }
+  @media print {
+    body * { visibility: hidden !important; }
+    #printArea, #printArea * { visibility: visible !important; }
+    #printArea {
+      display: block !important;
+      position: absolute; left: 0; top: 0; width: 100%;
+      padding: 12mm; color: #000; background: #fff;
+      font-size: 10pt; font-family: Arial, Helvetica, sans-serif;
+    }
+    .no-print { display: none !important; }
+    .print-break { page-break-before: always; }
+    table.print-tbl { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    table.print-tbl th, table.print-tbl td {
+      border: 1px solid #333; padding: 3px 4px; font-size: 8.5pt; vertical-align: middle;
+    }
+    table.print-tbl th { background: #e5e7eb; font-weight: bold; text-align: center; }
+    .print-hdr { text-align: center; margin-bottom: 8px; }
+    .print-hdr h1 { font-size: 13pt; margin: 2px 0; }
+    .print-hdr h2 { font-size: 11pt; margin: 2px 0; font-weight: normal; }
+    .print-meta { font-size: 9pt; margin: 6px 0 10px; }
+    .print-meta td { border: none !important; padding: 1px 6px 1px 0; text-align: left; }
+    .print-foot { margin-top: 18px; font-size: 9pt; }
+    .print-sign { display: flex; justify-content: space-between; margin-top: 28px; }
+    .print-sign div { width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 4px; }
+  }
 </style>
 </head>
 <body class="min-h-screen text-slate-800">
@@ -173,9 +199,10 @@
     </div>
 
     <!-- Tabs Calificar / Avance -->
-    <div class="flex gap-2">
+    <div class="flex gap-2 flex-wrap">
       <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
       <button type="button" id="tabAv" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('av')">Ver avance</button>
+      <button type="button" class="btn btn-ghost flex-1 text-sm" onclick="prepararImpresion()">🖨 Imprimir / PDF</button>
     </div>
 
     <!-- PANEL AVANCE -->
@@ -246,6 +273,8 @@
 </div>
 
 <div id="toast" class="hidden fixed left-1/2 -translate-x-1/2 bottom-24 z-50 bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg"></div>
+
+<div id="printArea"></div>
 
 <script>
 const BD_ADMIN_KEY = 'ie22375_admin_bd_v1';
@@ -678,6 +707,144 @@ function actualizarContadores() {
   document.getElementById('cB').textContent = b;
   document.getElementById('cA').textContent = a;
   document.getElementById('cAD').textContent = ad;
+}
+
+function prepararImpresion() {
+  loadStore();
+  const c = ctxBase();
+  const alumnos = estudiantes();
+  const docente = document.getElementById('inpDocente').value.trim() || '________________';
+  const sess = (store.sessions || []).filter(s =>
+    s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
+    s.seccion === c.seccion && s.area === c.area
+  ).sort((a,b) => (a.fecha||'').localeCompare(b.fecha||'') || (a.comp||'').localeCompare(b.comp||''));
+
+  if (!sess.length) {
+    alert('No hay evaluaciones guardadas en este bimestre/área para imprimir.');
+    return;
+  }
+
+  // group by competencia
+  const byComp = {};
+  sess.forEach(s => {
+    if (!byComp[s.comp]) byComp[s.comp] = [];
+    byComp[s.comp].push(s);
+  });
+  const comps = Object.keys(byComp);
+
+  const nivelTxt = c.nivel === 'primaria' ? 'PRIMARIA' : 'SECUNDARIA';
+  let html = '';
+
+  // Cover / header page summary
+  html += `<div class="print-hdr">
+    <div style="font-size:9pt">IE 22375 SANTA ROSA DE LOS MOLINOS</div>
+    <h1>REGISTRO AUXILIAR DE EVALUACIÓN</h1>
+    <h2>${(c.area||'').toUpperCase()} · BIMESTRE ${c.bim} · ${nivelTxt}</h2>
+  </div>
+  <table class="print-meta"><tr>
+    <td><b>Grado / Sección:</b> ${c.grado}° ${c.seccion}</td>
+    <td><b>Año:</b> 2026</td>
+  </tr><tr>
+    <td><b>Docente:</b> ${docente}</td>
+    <td><b>Fecha de impresión:</b> ${new Date().toLocaleDateString('es-PE')}</td>
+  </tr></table>`;
+
+  // Resumen de avance
+  html += `<h2 style="font-size:11pt;margin:12px 0 6px">1. Resumen de avance por competencia</h2>
+  <table class="print-tbl"><thead><tr>
+    <th>Competencia</th><th>Evidencias</th><th>Prom. aula</th><th>Letra</th>
+  </tr></thead><tbody>`;
+
+  comps.forEach(comp => {
+    const evidencias = byComp[comp];
+    const nums = [];
+    alumnos.forEach(al => {
+      const ns = [];
+      evidencias.forEach(s => {
+        const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,al.nombre].join('||');
+        const g = store.grades[k];
+        if (!g) return;
+        if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) ns.push(Number(g.nota20));
+        else if (g.nivel) { const m = letterToNum(g.nivel); if (m!=='') ns.push(Number(m)); }
+      });
+      const p = promedioNums(ns);
+      if (p != null) nums.push(p);
+    });
+    const prom = promedioNums(nums);
+    const letra = prom != null ? numToLetter(prom) : '—';
+    const evTxt = evidencias.map(e => (e.fecha||'') + ' ' + e.capacidad).join(' · ');
+    html += `<tr>
+      <td style="text-align:left">${comp}</td>
+      <td style="text-align:left;font-size:8pt">${evTxt}</td>
+      <td>${prom != null ? prom : '—'}</td>
+      <td><b>${letra}</b></td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+
+  // Detail per competencia
+  comps.forEach((comp, idx) => {
+    const evidencias = byComp[comp].slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+    html += `<div class="${idx===0?'':'print-break'}"></div>`;
+    html += `<div class="print-hdr" style="margin-top:10px">
+      <h2 style="font-size:11pt;font-weight:bold">Competencia: ${comp}</h2>
+    </div>`;
+
+    // header row: # | Alumno | ev1 | ev2 | ... | PROM | LETRA
+    html += `<table class="print-tbl"><thead><tr>
+      <th style="width:28px">N°</th>
+      <th style="text-align:left">Estudiante</th>`;
+    evidencias.forEach(e => {
+      html += `<th style="font-size:7.5pt;max-width:70px">${(e.fecha||'').slice(5)}<br>${(e.capacidad||'').slice(0,18)}</th>`;
+    });
+    html += `<th>PROM</th><th>NL</th></tr></thead><tbody>`;
+
+    alumnos.forEach((al, i) => {
+      const vals = [];
+      let cells = '';
+      evidencias.forEach(s => {
+        const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,al.nombre].join('||');
+        const g = store.grades[k];
+        let show = '';
+        if (g) {
+          if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) {
+            show = String(g.nota20);
+            vals.push(Number(g.nota20));
+          } else if (g.nivel) {
+            show = g.nivel;
+            const m = letterToNum(g.nivel);
+            if (m !== '') vals.push(Number(m));
+          }
+        }
+        cells += `<td style="text-align:center">${show}</td>`;
+      });
+      const prom = promedioNums(vals);
+      const letra = prom != null ? numToLetter(prom) : '';
+      html += `<tr>
+        <td style="text-align:center">${al.orden || i+1}</td>
+        <td style="text-align:left;font-size:8pt">${al.nombre}</td>
+        ${cells}
+        <td style="text-align:center;font-weight:bold">${prom != null ? prom : ''}</td>
+        <td style="text-align:center;font-weight:bold">${letra}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+    html += `<div class="print-meta" style="margin-top:6px;font-size:8pt">NL = Nivel de logro (AD / A / B / C) · PROM = promedio de evidencias · Escala: 18–20 AD · 14–17 A · 11–13 B · 0–10 C</div>`;
+  });
+
+  html += `<div class="print-sign">
+    <div>Docente responsable<br><span style="font-size:8pt">${docente}</span></div>
+    <div>V° B° Dirección / Coordinación</div>
+  </div>
+  <div class="print-foot">IE 22375 Santa Rosa de los Molinos · Registro auxiliar digital · Uso supervisiones UGEL / DRE · Generado para impresión</div>`;
+
+  const pa = document.getElementById('printArea');
+  pa.innerHTML = html;
+  pa.style.display = 'block';
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => { pa.style.display = 'none'; }, 500);
+  }, 200);
 }
 
 function showPanel(which) {
