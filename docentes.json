@@ -1,14 +1,188 @@
 [
   {
-    "id": "d1787722039266",
-    "user": "21469494",
-    "pass": "21469494",
-    "nombre": "Huarcaya Hostia, Ana Elizabeth",
+    "id": "d1787778211169",
+    "user": "21535992",
+    "pass": "21535992",
+    "nombre": "CABRERA RIOS, GONZALO CELESTINO",
+    "nivel": "primaria",
+    "grados": [
+      3
+    ],
+    "areas": [],
+    "aulas": [],
+    "ts": 1787778211169
+  },
+  {
+    "id": "d1787778261793",
+    "user": "21463028",
+    "pass": "21463028",
+    "nombre": "CARHUAYO GUTIERREZ, EUDELIA MADELEINE",
+    "nivel": "primaria",
+    "grados": [
+      2
+    ],
+    "areas": [],
+    "aulas": [],
+    "ts": 1787778261793
+  },
+  {
+    "id": "d1787778394488",
+    "user": "21533436",
+    "pass": "21533436",
+    "nombre": "CHACALIAZA CONDORI, Luisa Victoria",
+    "nivel": "primaria",
+    "grados": [
+      1
+    ],
+    "areas": [],
+    "aulas": [],
+    "ts": 1787778394488
+  },
+  {
+    "id": "d1787778453337",
+    "user": "44953164",
+    "pass": "44953164",
+    "nombre": "MORENO QUISPE, KATHERINE LISSET",
+    "nivel": "primaria",
+    "grados": [
+      5
+    ],
+    "areas": [],
+    "aulas": [],
+    "ts": 1787778453337
+  },
+  {
+    "id": "d1787778510225",
+    "user": "22316115",
+    "pass": "22316115",
+    "nombre": "SANTA CRUZ PACHECO, JOEL ALVARO",
+    "nivel": "primaria",
+    "grados": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "areas": [],
+    "aulas": [],
+    "ts": 1787778510225
+  },
+  {
+    "id": "d1787778570904",
+    "user": "21573011",
+    "pass": "21573011",
+    "nombre": "SERVELLON OTINIANO, CESAR AUGUSTO",
+    "nivel": "primaria",
+    "grados": [
+      4
+    ],
+    "areas": [],
+    "aulas": [],
+    "ts": 1787778570904
+  },
+  {
+    "id": "d1787778604617",
+    "user": "46406649",
+    "pass": "46406649",
+    "nombre": "VILLAMARES HERNANDEZ, ANA FIORELLA",
+    "nivel": "primaria",
+    "grados": [
+      6
+    ],
+    "areas": [],
+    "aulas": [],
+    "ts": 1787778604617
+  },
+  {
+    "id": "d1787778861273",
+    "user": "40505215",
+    "pass": "40505215",
+    "nombre": "ALALUNA CHIPANA, MARIA DEL PILAR",
     "nivel": "secundaria",
     "grados": [],
     "areas": [
-      "Comunicación"
+      "Arte y Cultura"
     ],
-    "ts": 1787722039266
+    "aulas": [
+      "1|A",
+      "1|B",
+      "2|A",
+      "2|B",
+      "3|A",
+      "3|B",
+      "4|A",
+      "4|B",
+      "5|ÚNICA"
+    ],
+    "ts": 1787778861273
+  },
+  {
+    "id": "d1787778909562",
+    "user": "21864735",
+    "pass": "21864735",
+    "nombre": "ARIAS SALDAÑA, PILAR GUILLERMINA",
+    "nivel": "secundaria",
+    "grados": [],
+    "areas": [
+      "Ciencia y Tecnología"
+    ],
+    "aulas": [
+      "2|A",
+      "2|B",
+      "3|A",
+      "3|B",
+      "4|A",
+      "4|B"
+    ],
+    "ts": 1787778909562
+  },
+  {
+    "id": "d1787778979538",
+    "user": "44549320",
+    "pass": "44549320",
+    "nombre": "BAUTISTA HUISA, CARMEN ROSA",
+    "nivel": "secundaria",
+    "grados": [],
+    "areas": [
+      "Educación para el Trabajo (EPT)",
+      "Ciencia y Tecnología"
+    ],
+    "aulas": [
+      "1|A",
+      "1|B",
+      "2|A",
+      "2|B",
+      "3|A",
+      "3|B",
+      "4|A",
+      "4|B",
+      "5|ÚNICA"
+    ],
+    "ts": 1787778979538
+  },
+  {
+    "id": "d1787779039929",
+    "user": "21573390",
+    "pass": "21573390",
+    "nombre": "BENITO HUAMANI, EDGAR CIRILO",
+    "nivel": "secundaria",
+    "grados": [],
+    "areas": [
+      "Ciencias Sociales"
+    ],
+    "aulas": [
+      "1|A",
+      "1|B",
+      "2|A",
+      "2|B",
+      "3|A",
+      "3|B",
+      "4|A",
+      "4|B",
+      "5|ÚNICA"
+    ],
+    "ts": 1787779039929
   }
 ]
