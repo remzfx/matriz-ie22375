@@ -20,7 +20,17 @@
     .btn-primary { background:#0284c7; color:#fff; }
     .btn-ghost { background:#e2e8f0; color:#0f172a; }
     input, select { width:100%; border:1.5px solid #cbd5e1; border-radius:12px; padding:.75rem .9rem; font-size:16px; min-height:48px; background:#fff; }
-    .mod-card { display:block; text-decoration:none; color:inherit; border-radius:16px; padding:1rem 1.1rem; background:#fff; border:1.5px solid #e2e8f0; }
+    .hidden { display: none !important; }
+    #viewHub { position: relative; z-index: 2; }
+    #viewLogin { position: relative; z-index: 1; }
+    .mod-card {
+      display: block; text-decoration: none; color: inherit;
+      border-radius: 16px; padding: 1.1rem 1.15rem; background: #fff;
+      border: 1.5px solid #e2e8f0; min-height: 72px;
+      -webkit-tap-highlight-color: rgba(2,132,199,.18);
+      touch-action: manipulation; cursor: pointer;
+    }
+    .mod-card:active { background: #e0f2fe; }
   </style>
 </head>
 <body class="text-slate-800">
@@ -169,6 +179,17 @@ function cerrarSesion() {
   document.getElementById('viewLogin').classList.remove('hidden');
   document.getElementById('inpPass').value = '';
 }
+function modsDe(s) {
+  if (s.mods && s.mods.length) return s.mods;
+  if (s.role === 'admin' || s.user === 'admin') return ['matriz_pri','matriz_sec','registro','admin_bd','auxiliar'];
+  if (s.role === 'auxiliar' || s.user === 'auxiliar') return ['auxiliar'];
+  if (s.nivel === 'primaria') return ['matriz_pri','registro'];
+  if (s.nivel === 'secundaria') return ['matriz_sec','registro'];
+  return ['registro'];
+}
+function irModulo(href) {
+  window.location.href = href;
+}
 function mostrarHub() {
   const s = getSession();
   if (!s) { document.getElementById('viewLogin').classList.remove('hidden'); document.getElementById('viewHub').classList.add('hidden'); return; }
@@ -189,10 +210,14 @@ function mostrarHub() {
     admin_bd: { href:'admin.html', title:'Administración', desc:'BD, docentes y bimestres', badge:'ADMIN' },
     auxiliar: { href:'auxiliar.html', title:'Asistencia de ingreso', desc:'Puerta · QR · lista del aula para WhatsApp', badge:'AUXILIAR' }
   };
-  document.getElementById('modulos').innerHTML = (s.mods||[]).filter(m => catalog[m]).map(key => {
+  const keys = modsDe(s).filter(m => catalog[m]);
+  document.getElementById('modulos').innerHTML = keys.map(key => {
     const m = catalog[key];
-    return '<a class="mod-card" href="'+m.href+'"><div class="text-[10px] font-bold tracking-widest text-slate-400">'+m.badge+'</div><div class="font-black text-base mt-0.5">'+m.title+'</div><div class="text-sm text-slate-500 mt-0.5">'+m.desc+'</div></a>';
-  }).join('');
+    return '<a class="mod-card" href="'+m.href+'" onclick="irModulo(\''+m.href+'\');return false;">' +
+      '<div class="text-[10px] font-bold tracking-widest text-slate-400">'+m.badge+'</div>' +
+      '<div class="font-black text-base mt-0.5">'+m.title+'</div>' +
+      '<div class="text-sm text-slate-500 mt-0.5">'+m.desc+'</div></a>';
+  }).join('') || '<p class="text-sm text-slate-500">No hay módulos para este usuario.</p>';
 }
 onTipoChange();
 asegurarDocentesRemotos().then(function(){
