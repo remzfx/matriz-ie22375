@@ -177,7 +177,7 @@ let BD = null;
 async function ensureBD() {
   BD = loadBD();
   if (BD && BD.primaria && BD.primaria.estudiantes && BD.primaria.estudiantes.length) return;
-  const files = ['bd_oficial_2026.json', 'bd_oficial_IE22375_2026.json'];
+  const files = ['bd_oficial_2026.json'];
   for (let i = 0; i < files.length; i++) {
     try {
       const r = await fetch(files[i] + '?t=' + Date.now(), { cache: 'no-store' });

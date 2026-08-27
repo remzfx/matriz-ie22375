@@ -516,7 +516,7 @@ function exportarJSON() {
   const blob = new Blob([JSON.stringify(estado, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'bd_oficial_IE22375_' + (estado.anio||2026) + '.json';
+  a.download = 'bd_oficial_2026.json';
   a.click();
 }
 
