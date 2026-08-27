@@ -14,13 +14,21 @@
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#f1f5f9; color:#0f172a; }
     .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); }
-    .btn { border:0; border-radius:12px; font-weight:800; padding:.65rem 1rem; cursor:pointer; font-size:14px; }
+    .btn { border:0; border-radius:12px; font-weight:800; padding:.7rem 1rem; cursor:pointer; font-size:14px; touch-action:manipulation; }
     .btn-primary { background:#0284c7; color:#fff; }
     .btn-ghost { background:#e2e8f0; color:#0f172a; }
     .btn-danger { background:#fee2e2; color:#991b1b; }
     select, input[type=date], input[type=search] {
-      width:100%; border:1.5px solid #cbd5e1; border-radius:12px; padding:.6rem .75rem; font-size:16px; min-height:46px; background:#fff;
+      width:100%; border:1.5px solid #cbd5e1; border-radius:12px; padding:.65rem .75rem; font-size:16px; min-height:48px; background:#fff;
+      max-width:100%; box-sizing:border-box;
     }
+    .app-header { padding-top: calc(12px + env(safe-area-inset-top, 28px)); }
+    .app-header .btn-inicio {
+      min-height: 44px; min-width: 72px; display:inline-flex; align-items:center; justify-content:center;
+      text-decoration:none; z-index:30; position:relative;
+    }
+    .actions { display:flex; flex-direction:column; gap:8px; }
+    .actions .btn { width:100%; }
     .chip { display:inline-flex; align-items:center; justify-content:center; min-width:2.1rem; height:2.1rem;
       border-radius:8px; font-size:12px; font-weight:900; border:2px solid #e2e8f0; background:#fff; cursor:pointer; }
     .chip.P { background:#dcfce7; border-color:#86efac; color:#166534; }
@@ -55,33 +63,31 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
 })();
 </script>
 
-<header class="bg-gradient-to-r from-slate-900 to-teal-800 text-white sticky top-0 z-20">
-  <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-2">
-    <div class="min-w-0">
+<header class="app-header bg-gradient-to-r from-slate-900 to-teal-800 text-white sticky top-0 z-30">
+  <div class="max-w-lg mx-auto px-4 pb-3 flex items-start justify-between gap-3">
+    <div class="min-w-0 flex-1 pr-2">
       <div class="text-[10px] font-bold tracking-widest text-teal-200">IE 22375 · AUXILIAR</div>
-      <div class="font-black truncate">Asistencia de ingreso</div>
-      <div class="text-xs text-teal-100/80">Puerta / photocheck · lector v2 (iPhone + Android)</div>
+      <div class="font-black leading-tight">Asistencia de ingreso</div>
+      <div class="text-[11px] text-teal-100/80 leading-tight">Lector QR · iPhone y Android</div>
     </div>
-    <div class="flex gap-1 shrink-0">
-      <a href="index.html" class="btn btn-ghost text-xs" style="width:auto;padding:.4rem .7rem;text-decoration:none">Inicio</a>
-    </div>
+    <a href="index.html" class="btn btn-ghost btn-inicio text-sm shrink-0">Inicio</a>
   </div>
 </header>
 
 <main class="max-w-lg mx-auto px-4 py-4 space-y-3">
-  <div class="card p-3 space-y-2">
+  <div class="card p-3 space-y-3">
+    <div>
+      <label class="text-[10px] font-bold text-slate-500">Fecha</label>
+      <input type="date" id="inpFecha" onchange="renderLista()">
+    </div>
+    <div>
+      <label class="text-[10px] font-bold text-slate-500">Nivel</label>
+      <select id="selNivel" onchange="onNivel()">
+        <option value="primaria">Primaria</option>
+        <option value="secundaria">Secundaria</option>
+      </select>
+    </div>
     <div class="grid grid-cols-2 gap-2">
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Fecha</label>
-        <input type="date" id="inpFecha" onchange="renderLista()">
-      </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Nivel</label>
-        <select id="selNivel" onchange="onNivel()">
-          <option value="primaria">Primaria</option>
-          <option value="secundaria">Secundaria</option>
-        </select>
-      </div>
       <div>
         <label class="text-[10px] font-bold text-slate-500">Grado</label>
         <select id="selGrado" onchange="onGrado()"></select>
@@ -92,10 +98,10 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       </div>
     </div>
     <input type="search" id="inpBuscar" placeholder="Buscar alumno…" oninput="renderLista()">
-    <div class="flex flex-wrap gap-2">
-      <button type="button" class="btn btn-primary text-sm" onclick="toggleScan()">📷 Escanear QR</button>
-      <button type="button" class="btn btn-ghost text-sm" onclick="marcarTodos('P')">Todos P</button>
-      <button type="button" class="btn btn-ghost text-sm" onclick="compartirWhatsApp()">WhatsApp</button>
+    <div class="actions">
+      <button type="button" class="btn btn-primary" onclick="toggleScan()">📷 Escanear QR</button>
+      <button type="button" class="btn btn-ghost" onclick="marcarTodos('P')">Todos presente</button>
+      <button type="button" class="btn btn-ghost" onclick="compartirWhatsApp()">WhatsApp</button>
     </div>
     <div id="scanBox" class="space-y-2">
       <div id="reader" style="width:100%;border-radius:12px;overflow:hidden"></div>

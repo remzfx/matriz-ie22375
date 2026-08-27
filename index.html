@@ -31,6 +31,8 @@
       touch-action: manipulation; cursor: pointer;
     }
     .mod-card:active { background: #e0f2fe; }
+    .hub-header { padding-top: calc(12px + env(safe-area-inset-top, 28px)); }
+    .hub-header .btn { width: auto; min-height: 44px; min-width: 72px; touch-action: manipulation; }
   </style>
 </head>
 <body class="text-slate-800">
@@ -68,8 +70,8 @@
     </div>
   </div>
   <div id="viewHub" class="hidden min-h-screen">
-    <header class="bg-gradient-to-r from-slate-900 to-sky-900 text-white">
-      <div class="max-w-lg mx-auto px-4 py-4 flex items-center justify-between gap-3">
+    <header class="hub-header bg-gradient-to-r from-slate-900 to-sky-900 text-white">
+      <div class="max-w-lg mx-auto px-4 pb-4 flex items-center justify-between gap-3">
         <div class="min-w-0">
           <div class="text-[10px] font-bold tracking-widest text-sky-200">IE 22375</div>
           <div class="font-black truncate" id="hubTitulo">Panel</div>
