@@ -60,7 +60,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     <div class="min-w-0">
       <div class="text-[10px] font-bold tracking-widest text-teal-200">IE 22375 · AUXILIAR</div>
       <div class="font-black truncate">Asistencia de ingreso</div>
-      <div class="text-xs text-teal-100/80">Puerta / photocheck · no es el registro del docente</div>
+      <div class="text-xs text-teal-100/80">Puerta / photocheck · lector v2 (iPhone + Android)</div>
     </div>
     <div class="flex gap-1 shrink-0">
       <a href="index.html" class="btn btn-ghost text-xs" style="width:auto;padding:.4rem .7rem;text-decoration:none">Inicio</a>
@@ -166,8 +166,8 @@ function ctx() {
   };
 }
 function asisKey(al) {
-  const c = ctx();
-  return [c.fecha, c.nivel, c.grado, c.seccion, al.nombre].join('||');
+  const fecha = (document.getElementById('inpFecha').value || hoyISO());
+  return [fecha, al.nivel, al.grado, al.seccion, al.nombre].join('||');
 }
 function qrPayload(al) {
   return 'IE22375|' + al.nivel + '|' + al.grado + '|' + al.seccion + '|' + al.nombre;
@@ -176,10 +176,16 @@ function qrPayload(al) {
 let BD = null;
 async function ensureBD() {
   BD = loadBD();
-  if (BD && BD.primaria) return;
+  if (BD && BD.primaria && BD.primaria.estudiantes && BD.primaria.estudiantes.length) return;
   try {
     const r = await fetch('bd_oficial_2026.json?t=' + Date.now(), { cache:'no-store' });
-    if (r.ok) BD = await r.json();
+    if (r.ok) {
+      const j = await r.json();
+      if (j && j.primaria) {
+        BD = j;
+        try { localStorage.setItem(BD_KEY, JSON.stringify(j)); } catch(e) {}
+      }
+    }
   } catch(e) {}
   if (!BD) BD = { primaria:{estudiantes:[]}, secundaria:{estudiantes:[]} };
 }
@@ -195,7 +201,12 @@ function onNivel() {
   const nivel = document.getElementById('selNivel').value;
   const list = ((BD[nivel] || {}).estudiantes) || [];
   const grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
-  document.getElementById('selGrado').innerHTML = grados.map(g => '<option value="'+g+'">'+g+'°</option>').join('');
+  document.getElementById('selGrado').innerHTML = grados.length
+    ? grados.map(g => '<option value="'+g+'">'+g+'°</option>').join('')
+    : '<option value="">—</option>';
+  if (!list.length) {
+    document.getElementById('lblAula').textContent = 'Sin lista de alumnos. Sube bd_oficial_2026.json a GitHub o carga la BD en Admin en ESTE celular.';
+  }
   onGrado();
 }
 function onGrado() {
@@ -307,6 +318,70 @@ let html5Qr = null;
 let lastScanAt = 0;
 let lastScanText = '';
 
+function todosAlumnos() {
+  const out = [];
+  ['primaria','secundaria'].forEach(n => {
+    (((BD[n] || {}).estudiantes) || []).forEach(a => out.push(a));
+  });
+  return out;
+}
+function norm(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toUpperCase();
+}
+function parseQR(text) {
+  const raw = String(text || '').trim();
+  const parts = raw.split('|');
+  if (parts.length >= 5 && /IE22375/i.test(parts[0])) {
+    let nivel = String(parts[1] || '').toLowerCase();
+    if (nivel.indexOf('sec') >= 0) nivel = 'secundaria';
+    else nivel = 'primaria';
+    return {
+      nivel: nivel,
+      grado: String(parts[2] || '').replace('°',''),
+      seccion: parts[3],
+      nombre: parts.slice(4).join('|')
+    };
+  }
+  return { nombre: raw };
+}
+function hallarAlumno(p) {
+  const list = todosAlumnos();
+  if (!list.length) return null;
+  const nom = norm(p.nombre);
+  let cand = list.filter(a => norm(a.nombre) === nom);
+  if (!cand.length) {
+    cand = list.filter(a => norm(a.nombre).indexOf(nom) >= 0 || nom.indexOf(norm(a.nombre)) >= 0);
+  }
+  if (p.nivel) {
+    const n2 = cand.filter(a => a.nivel === p.nivel);
+    if (n2.length) cand = n2;
+  }
+  if (p.grado && cand.length > 1) {
+    const g = parseInt(p.grado, 10);
+    const g2 = cand.filter(a => Number(a.grado) === g);
+    if (g2.length) cand = g2;
+  }
+  return cand[0] || null;
+}
+function marcarPorQR(text) {
+  const p = parseQR(text);
+  const al = hallarAlumno(p);
+  if (!al) {
+    toast('QR leído, pero no está en la lista: ' + (p.nombre || text).slice(0,40));
+    document.getElementById('scanMsg').textContent = 'Leído: ' + String(text).slice(0,80) + ' · ¿subiste bd_oficial_2026.json?';
+    return;
+  }
+  document.getElementById('selNivel').value = al.nivel;
+  onNivel();
+  document.getElementById('selGrado').value = String(al.grado);
+  onGrado();
+  document.getElementById('selSeccion').value = al.seccion;
+  setRec(al, 'P', 'qr');
+  renderLista();
+  try { if (navigator.vibrate) navigator.vibrate(80); } catch(e) {}
+  toast('✓ ' + al.nombre.split(',')[0] + ' · ' + horaAhora());
+}
+
 async function toggleScan() {
   const box = document.getElementById('scanBox');
   if (box.classList.contains('on')) { stopScan(); return; }
@@ -319,25 +394,30 @@ async function toggleScan() {
   try {
     html5Qr = new Html5Qrcode('reader');
     const cameras = await Html5Qrcode.getCameras();
-    let camId = cameras && cameras.length ? cameras[cameras.length - 1].id : { facingMode: 'environment' };
-    // Prefer back camera
-    const back = (cameras || []).find(c => /back|rear|environment|trasera/i.test(c.label || ''));
-    if (back) camId = back.id;
+    let camId = { facingMode: 'environment' };
+    if (cameras && cameras.length) {
+      const back = cameras.find(c => /back|rear|environment|trasera/i.test(c.label || ''));
+      camId = back ? back.id : cameras[cameras.length - 1].id;
+    }
     await html5Qr.start(
-      typeof camId === 'string' ? camId : camId,
-      { fps: 8, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+      camId,
+      { fps: 12, qrbox: function(vw, vh) {
+          const s = Math.min(vw, vh) * 0.72;
+          return { width: s, height: s };
+        }
+      },
       function onSuccess(text) {
         const now = Date.now();
-        if (text === lastScanText && now - lastScanAt < 2500) return;
+        if (text === lastScanText && now - lastScanAt < 1800) return;
         lastScanText = text;
         lastScanAt = now;
         marcarPorQR(text);
       },
       function onFail() {}
     );
-    msg.textContent = 'Cámara lista. Enfoca el QR del photocheck.';
+    msg.textContent = 'Cámara lista. Acerca el QR hasta que entre en el recuadro.';
   } catch (e) {
-    msg.textContent = 'iPhone: Settings → Safari → Cámara = Permitir. Abre la web en Safari (no en app embebida). ' + (e && e.message ? e.message : '');
+    msg.textContent = 'Permite la cámara en Ajustes. Safari o Chrome. ' + (e && e.message ? e.message : '');
   }
 }
 
