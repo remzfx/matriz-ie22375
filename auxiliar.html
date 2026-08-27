@@ -10,6 +10,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <title>Auxiliar · Asistencia de ingreso · IE 22375</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#f1f5f9; color:#0f172a; }
     .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); }
@@ -97,8 +98,8 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <button type="button" class="btn btn-ghost text-sm" onclick="compartirWhatsApp()">WhatsApp</button>
     </div>
     <div id="scanBox" class="space-y-2">
-      <video id="scanVideo" playsinline></video>
-      <p class="text-[11px] text-slate-500" id="scanMsg">Apunta al photocheck. Si el celular no lee QR, usa Chrome o Edge.</p>
+      <div id="reader" style="width:100%;border-radius:12px;overflow:hidden"></div>
+      <p class="text-[11px] text-slate-500" id="scanMsg">Apunta al photocheck. En iPhone acepta el permiso de cámara.</p>
       <button type="button" class="btn btn-danger text-sm w-full" onclick="stopScan()">Cerrar cámara</button>
     </div>
   </div>
@@ -301,75 +302,49 @@ function compartirWhatsApp() {
   window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
 }
 
-/* ===== QR ===== */
-let scanTimer = null;
-let scanStream = null;
-
-function parseQR(text) {
-  // Formato: IE22375|primaria|1|Única|NOMBRE
-  const raw = String(text || '').trim();
-  const parts = raw.split('|');
-  if (parts.length >= 5 && parts[0] === 'IE22375') {
-    return { nivel: parts[1], grado: parts[2], seccion: parts[3], nombre: parts.slice(4).join('|') };
-  }
-  // búsqueda por nombre exacto en el aula actual
-  const al = alumnosAula().find(a => a.nombre === raw || a.nombre.toLowerCase() === raw.toLowerCase());
-  if (al) return { nivel: al.nivel, grado: al.grado, seccion: al.seccion, nombre: al.nombre };
-  return null;
-}
-
-function marcarPorQR(text) {
-  const p = parseQR(text);
-  if (!p) { toast('QR no reconocido'); return; }
-  // cambiar de aula si el QR es de otra
-  document.getElementById('selNivel').value = p.nivel === 'secundaria' ? 'secundaria' : 'primaria';
-  onNivel();
-  document.getElementById('selGrado').value = String(p.grado);
-  onGrado();
-  document.getElementById('selSeccion').value = p.seccion;
-  const list = alumnosAula();
-  const al = list.find(a => a.nombre === p.nombre);
-  if (!al) { toast('Alumno no está en la BD'); return; }
-  setRec(al, 'P', 'qr');
-  renderLista();
-  toast(al.nombre.split(',')[0] + ' · ' + horaAhora());
-}
+/* ===== QR (iPhone + Android) ===== */
+let html5Qr = null;
+let lastScanAt = 0;
+let lastScanText = '';
 
 async function toggleScan() {
   const box = document.getElementById('scanBox');
   if (box.classList.contains('on')) { stopScan(); return; }
   box.classList.add('on');
-  const video = document.getElementById('scanVideo');
   const msg = document.getElementById('scanMsg');
+  if (typeof Html5Qrcode === 'undefined') {
+    msg.textContent = 'No se cargó el lector. Revisa internet y recarga.';
+    return;
+  }
   try {
-    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    video.srcObject = scanStream;
-    await video.play();
-  } catch(e) {
-    msg.textContent = 'No se pudo abrir la cámara. Permite el acceso o usa HTTPS.';
-    return;
+    html5Qr = new Html5Qrcode('reader');
+    const cameras = await Html5Qrcode.getCameras();
+    let camId = cameras && cameras.length ? cameras[cameras.length - 1].id : { facingMode: 'environment' };
+    // Prefer back camera
+    const back = (cameras || []).find(c => /back|rear|environment|trasera/i.test(c.label || ''));
+    if (back) camId = back.id;
+    await html5Qr.start(
+      typeof camId === 'string' ? camId : camId,
+      { fps: 8, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+      function onSuccess(text) {
+        const now = Date.now();
+        if (text === lastScanText && now - lastScanAt < 2500) return;
+        lastScanText = text;
+        lastScanAt = now;
+        marcarPorQR(text);
+      },
+      function onFail() {}
+    );
+    msg.textContent = 'Cámara lista. Enfoca el QR del photocheck.';
+  } catch (e) {
+    msg.textContent = 'iPhone: Settings → Safari → Cámara = Permitir. Abre la web en Safari (no en app embebida). ' + (e && e.message ? e.message : '');
   }
-  if (!('BarcodeDetector' in window)) {
-    msg.textContent = 'Este navegador no lee QR con cámara. Usa Chrome en Android o marca manual.';
-    return;
-  }
-  const det = new BarcodeDetector({ formats: ['qr_code'] });
-  msg.textContent = 'Apunta al photocheck…';
-  scanTimer = setInterval(async () => {
-    try {
-      const codes = await det.detect(video);
-      if (codes && codes[0] && codes[0].rawValue) {
-        marcarPorQR(codes[0].rawValue);
-      }
-    } catch(e) {}
-  }, 500);
 }
+
 function stopScan() {
   document.getElementById('scanBox').classList.remove('on');
-  if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
-  if (scanStream) {
-    scanStream.getTracks().forEach(t => t.stop());
-    scanStream = null;
+  if (html5Qr) {
+    html5Qr.stop().then(() => { try { html5Qr.clear(); } catch(e) {} html5Qr = null; }).catch(() => { html5Qr = null; });
   }
 }
 
