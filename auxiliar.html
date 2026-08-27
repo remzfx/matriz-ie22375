@@ -102,6 +102,8 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <button type="button" class="btn btn-primary" onclick="toggleScan()">📷 Escanear QR</button>
       <button type="button" class="btn btn-ghost" onclick="marcarTodos('P')">Todos presente</button>
       <button type="button" class="btn btn-ghost" onclick="compartirWhatsApp()">WhatsApp</button>
+      <button type="button" class="btn btn-ghost" onclick="bajarNube()">Bajar asistencia de la nube</button>
+      <button type="button" class="btn btn-ghost" onclick="subirTodoNube()">Subir asistencia a la nube</button>
     </div>
     <div id="scanBox" class="space-y-2">
       <div id="reader" style="width:100%;border-radius:12px;overflow:hidden"></div>
@@ -131,6 +133,30 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
 <script>
 const BD_KEY = 'ie22375_admin_bd_v1';
 const ASIS_KEY = 'ie22375_asistencia_colegio_v1';
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
+let audioCtx = null;
+function prepararAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch(e) {}
+}
+function pitido() {
+  try {
+    prepararAudio();
+    if (!audioCtx) return;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.value = 920;
+    g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.2, audioCtx.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.18);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    o.stop(audioCtx.currentTime + 0.2);
+  } catch(e) {}
+}
 
 function hoyISO() {
   const d = new Date();
@@ -237,8 +263,63 @@ function setRec(al, marca, via) {
   const all = loadAsis();
   const k = asisKey(al);
   if (!marca) delete all[k];
-  else all[k] = { marca, hora: horaAhora(), via: via || 'manual' };
+  else all[k] = { marca, hora: horaAhora(), via: via || 'manual', ts: Date.now() };
   saveAsis(all);
+}
+
+function recToItem(clave, rec) {
+  const p = String(clave).split('||');
+  return {
+    clave: clave,
+    fecha: p[0], nivel: p[1], grado: p[2], seccion: p[3], nombre: p.slice(4).join('||'),
+    marca: rec.marca || '', hora: rec.hora || '', via: rec.via || '', ts: rec.ts || Date.now()
+  };
+}
+async function subirUnoNube(al) {
+  try {
+    const k = asisKey(al);
+    const rec = loadAsis()[k];
+    if (!rec) return;
+    await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'saveasis', items: [recToItem(k, rec)] })
+    });
+  } catch(e) {}
+}
+async function subirTodoNube() {
+  const all = loadAsis();
+  const items = Object.keys(all).map(k => recToItem(k, all[k]));
+  if (!items.length) { toast('No hay marcas para subir'); return; }
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'saveasis', items: items })
+    });
+    const data = JSON.parse(await res.text());
+    toast(data.ok ? ('Subido: ' + (data.guardados || items.length)) : (data.error || 'Error nube'));
+  } catch(e) { toast('No se pudo subir. Actualiza el Apps Script.'); }
+}
+async function bajarNube() {
+  const fecha = document.getElementById('inpFecha').value || hoyISO();
+  try {
+    const res = await fetch(CLOUD_API_URL + '?action=loadasis&fecha=' + encodeURIComponent(fecha), { cache: 'no-store' });
+    const data = JSON.parse(await res.text());
+    if (!data.ok) throw new Error(data.error || 'Error');
+    const all = loadAsis();
+    (data.items || []).forEach(it => {
+      const k = it.clave || [it.fecha, it.nivel, it.grado, it.seccion, it.nombre].join('||');
+      const prev = all[k];
+      const ts = Number(it.ts) || 0;
+      if (!prev || ts >= (prev.ts || 0)) {
+        all[k] = { marca: it.marca, hora: it.hora, via: it.via || 'nube', ts: ts };
+      }
+    });
+    saveAsis(all);
+    renderLista();
+    toast('Nube: ' + (data.items || []).length + ' marcas del ' + fecha);
+  } catch(e) { toast('No se pudo bajar. Actualiza el Apps Script.'); }
 }
 
 function renderLista() {
@@ -353,31 +434,40 @@ function parseQR(text) {
   }
   return { nombre: raw };
 }
+function secEq(a, b) {
+  const x = norm(a).replace('UNICO','UNICA').replace('ÚNICA','UNICA');
+  const y = norm(b).replace('UNICO','UNICA').replace('ÚNICA','UNICA');
+  return x === y;
+}
 function hallarAlumno(p) {
   const list = todosAlumnos();
   if (!list.length) return { error: 'vacio' };
   const nom = norm(p.nombre);
   if (!nom) return { error: 'sin-nombre' };
-  let cand = list.filter(a => norm(a.nombre) === nom);
-  if (!cand.length) {
-    cand = list.filter(a => {
+  let cand = list.slice();
+  // 1) nivel del QR manda
+  if (p.nivel) {
+    const n2 = cand.filter(a => a.nivel === p.nivel);
+    if (n2.length) cand = n2;
+  }
+  // 2) nombre
+  let porNom = cand.filter(a => norm(a.nombre) === nom);
+  if (!porNom.length) {
+    porNom = cand.filter(a => {
       const an = norm(a.nombre);
       return an.indexOf(nom) >= 0 || nom.indexOf(an) >= 0;
     });
   }
-  if (!cand.length) {
-    const ape = nom.split(',')[0].split(' ')[0];
-    if (ape && ape.length >= 4) {
-      cand = list.filter(a => norm(a.nombre).indexOf(ape) === 0);
-    }
-  }
+  if (porNom.length) cand = porNom;
+  else cand = [];
+  // 3) grado / sección del QR
   if (cand.length > 1 && p.grado) {
     const g = parseInt(p.grado, 10);
     const g2 = cand.filter(a => Number(a.grado) === g);
     if (g2.length) cand = g2;
   }
   if (cand.length > 1 && p.seccion) {
-    const s2 = cand.filter(a => norm(a.seccion) === norm(p.seccion));
+    const s2 = cand.filter(a => secEq(a.seccion, p.seccion));
     if (s2.length) cand = s2;
   }
   if (cand.length === 1) return { al: cand[0] };
@@ -405,8 +495,10 @@ function marcarPorQR(text) {
   document.getElementById('selSeccion').value = al.seccion;
   setRec(al, 'P', 'qr');
   renderLista();
-  try { if (navigator.vibrate) navigator.vibrate(80); } catch(e) {}
-  toast('✓ ' + al.nombre.split(',')[0] + ' · ' + horaAhora());
+  pitido();
+  try { if (navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch(e) {}
+  toast('✓ ' + (al.nivel==='secundaria'?'SEC':'PRI') + ' ' + al.grado + '° ' + al.seccion + ' · ' + al.nombre.split(',')[0] + ' · ' + horaAhora());
+  subirUnoNube(al);
 }
 
 async function toggleScan() {
@@ -419,6 +511,7 @@ async function toggleScan() {
     return;
   }
   try {
+    prepararAudio();
     html5Qr = new Html5Qrcode('reader');
     const cameras = await Html5Qrcode.getCameras();
     let camId = { facingMode: 'environment' };
@@ -458,6 +551,7 @@ function stopScan() {
 ensureBD().then(() => {
   document.getElementById('inpFecha').value = hoyISO();
   onNivel();
+  bajarNube();
 });
 </script>
 </body>
