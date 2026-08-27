@@ -253,7 +253,13 @@ function onGrado() {
   const nivel = document.getElementById('selNivel').value;
   const g = parseInt(document.getElementById('selGrado').value, 10);
   const list = ((BD[nivel] || {}).estudiantes) || [];
-  const secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
+  let secs;
+  if (nivel === 'secundaria') {
+    secs = (g === 5) ? ['Única'] : ['A', 'B'];
+  } else {
+    secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
+    if (!secs.length) secs = ['Única'];
+  }
   document.getElementById('selSeccion').innerHTML = secs.map(s => '<option value="'+s+'">'+s+'</option>').join('');
   renderLista();
 }

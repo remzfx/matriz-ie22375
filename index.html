@@ -142,7 +142,7 @@ async function intentarLogin() {
       return;
     }
     setSession({ user:'admin', label:'Administrador', nivel:'admin', role:'admin', grados:null, areas:null,
-      mods:['matriz_pri','matriz_sec','registro','admin_bd','auxiliar'], ts:Date.now() });
+      mods:['admin_bd','registro','auxiliar','matriz_pri','matriz_sec'], ts:Date.now() });
     mostrarHub();
     return;
   }
@@ -182,8 +182,8 @@ function cerrarSesion() {
   document.getElementById('inpPass').value = '';
 }
 function modsDe(s) {
+  if (s.role === 'admin' || s.user === 'admin') return ['admin_bd','registro','auxiliar','matriz_pri','matriz_sec'];
   if (s.mods && s.mods.length) return s.mods;
-  if (s.role === 'admin' || s.user === 'admin') return ['matriz_pri','matriz_sec','registro','admin_bd','auxiliar'];
   if (s.role === 'auxiliar' || s.user === 'auxiliar') return ['auxiliar'];
   if (s.nivel === 'primaria') return ['matriz_pri','registro'];
   if (s.nivel === 'secundaria') return ['matriz_sec','registro'];

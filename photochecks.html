@@ -82,6 +82,7 @@
       <button type="button" class="btn btn-primary" onclick="window.print()">🖨 Imprimir</button>
     </div>
     <p class="text-[11px] text-slate-400" id="lblN">—</p>
+    <p class="text-[11px] text-slate-500" id="lblBD">Cargando lista oficial…</p>
   </div>
   <div id="sheet" class="sheet"></div>
 </main>
@@ -134,9 +135,12 @@ function onGrado() {
   const nivel = document.getElementById('selNivel').value;
   const g = parseInt(document.getElementById('selGrado').value,10);
   const list = ((BD[nivel]||{}).estudiantes)||[];
-  let secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
-  if (!secs.length) {
-    secs = (nivel === 'secundaria' && g === 5) ? ['Única'] : (nivel === 'secundaria' ? ['A','B'] : ['Única']);
+  let secs;
+  if (nivel === 'secundaria') {
+    secs = (g === 5) ? ['Única'] : ['A', 'B'];
+  } else {
+    secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
+    if (!secs.length) secs = ['Única'];
   }
   document.getElementById('selSeccion').innerHTML = secs.map(s => '<option value="'+s+'">'+s+'</option>').join('');
 }
@@ -180,7 +184,13 @@ function generarNivel() {
   if (!list.length) { alert('No hay alumnos.'); return; }
   pintar(list);
 }
-ensureBD().then(onNivel);
+ensureBD().then(function(){
+  const np = ((BD.primaria||{}).estudiantes||[]).length;
+  const ns = ((BD.secundaria||{}).estudiantes||[]).length;
+  const el = document.getElementById('lblBD');
+  if (el) el.textContent = 'Lista oficial: Primaria ' + np + ' · Secundaria ' + ns + ' (sec. 1°–4° = A/B · 5° = Única)';
+  onNivel();
+});
 </script>
 </body>
 </html>
