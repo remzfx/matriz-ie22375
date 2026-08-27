@@ -64,6 +64,8 @@
   #printArea { display:none; }
   .panel-as { display:none; }
   .panel-as.on { display:block; }
+  .panel-fin { display:none; }
+  .panel-fin.on { display:block; }
   .asis-chip {
     display:inline-flex; align-items:center; justify-content:center;
     min-width:2rem; height:2rem; border-radius:8px; font-size:12px; font-weight:900;
@@ -244,9 +246,31 @@
     <!-- Tabs Calificar / Avance -->
     <div class="flex gap-2 flex-wrap">
       <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
+      <button type="button" id="tabFin" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('fin')">Promedios</button>
       <button type="button" id="tabAs" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('as')">Asistencia</button>
       <button type="button" id="tabAv" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('av')">Ver avance</button>
       <button type="button" class="btn btn-ghost flex-1 text-sm" onclick="prepararImpresion()">🖨 Imprimir / PDF</button>
+    </div>
+
+    <!-- PANEL PROMEDIOS DIRECTOS -->
+    <div class="panel-fin" id="panelFinales">
+      <div class="card p-3 space-y-3">
+        <div>
+          <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
+          <div class="text-sm font-bold" id="lblFinCtx">—</div>
+          <p class="text-[11px] text-slate-500 mt-1">
+            Para docentes que cierran el bimestre <b>sin evidencias</b>.
+            Si ya hay sesiones calificadas en una competencia, el promedio de esas evidencias <b>manda</b> (aquí se muestra solo lectura).
+          </p>
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500">Competencia</label>
+          <select id="selFinComp" onchange="renderFinales()"></select>
+        </div>
+        <div class="flex flex-wrap gap-2 text-[11px] font-bold" id="finResumen"></div>
+        <div id="finLista"></div>
+        <button type="button" class="btn btn-primary w-full text-sm" onclick="guardarFinales(); toast('Promedios guardados')">Guardar promedios</button>
+      </div>
     </div>
 
     <!-- PANEL ASISTENCIA -->
@@ -404,6 +428,7 @@ function loadStore() {
   if (!store.meta) store.meta = {};
   if (!store.asistencia) store.asistencia = {}; // key ctx||fecha||nombre -> 'P'|'F'|'T'|'J'|''
   if (!store.asisFechas) store.asisFechas = {}; // key ctx -> [fechas]
+  if (!store.finales) store.finales = {}; // key nivel||bim||grado||seccion||area||comp||nombre -> {nota20,nivel,conclusion,ts}
 }
 function saveStore() {
   store._ts = Date.now();
@@ -1289,16 +1314,19 @@ function showPanel(which) {
   const cal = document.getElementById('panelCalificar');
   const av = document.getElementById('panelAvance');
   const as = document.getElementById('panelAsistencia');
+  const fin = document.getElementById('panelFinales');
   const tCal = document.getElementById('tabCal');
   const tAv = document.getElementById('tabAv');
   const tAs = document.getElementById('tabAs');
-  // reset
+  const tFin = document.getElementById('tabFin');
   cal.classList.remove('on');
   av.classList.remove('on');
   as.classList.remove('on');
+  if (fin) fin.classList.remove('on');
   tCal.className = 'btn btn-ghost flex-1 text-sm';
   tAv.className = 'btn btn-ghost flex-1 text-sm';
   tAs.className = 'btn btn-ghost flex-1 text-sm';
+  if (tFin) tFin.className = 'btn btn-ghost flex-1 text-sm';
   if (which === 'av') {
     av.classList.add('on');
     tAv.className = 'btn btn-primary flex-1 text-sm';
@@ -1307,10 +1335,158 @@ function showPanel(which) {
     as.classList.add('on');
     tAs.className = 'btn btn-primary flex-1 text-sm';
     renderAsistencia();
+  } else if (which === 'fin') {
+    if (fin) fin.classList.add('on');
+    if (tFin) tFin.className = 'btn btn-primary flex-1 text-sm';
+    renderFinales();
   } else {
     cal.classList.add('on');
     tCal.className = 'btn btn-primary flex-1 text-sm';
   }
+}
+
+function finalKey(comp, nombre) {
+  const c = ctxBase();
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, nombre].join('||');
+}
+
+function compTieneSesiones(comp) {
+  const c = ctxBase();
+  return (store.sessions || []).some(s =>
+    s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
+    s.seccion === c.seccion && s.area === c.area && s.comp === comp
+  );
+}
+
+function bimCerradoDocente() {
+  const bim = document.getElementById('selBim').value;
+  const sL = getLoginSession();
+  const esAdmin = sL && (sL.role === 'admin' || sL.user === 'admin');
+  return !bimestreHabilitado(bim) && !esAdmin;
+}
+
+function renderFinales() {
+  loadStore();
+  const c = ctxBase();
+  document.getElementById('lblFinCtx').textContent =
+    (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + ' · Bim ' + c.bim + ' · ' + (c.area||'');
+
+  const comps = competencias();
+  const sel = document.getElementById('selFinComp');
+  const prev = sel.value;
+  sel.innerHTML = comps.map(x => '<option value="'+x.replace(/"/g,'&quot;')+'">'+x+'</option>').join('') || '<option value="">Sin competencias</option>';
+  if (prev && comps.includes(prev)) sel.value = prev;
+  const comp = sel.value;
+  const box = document.getElementById('finLista');
+  const res = document.getElementById('finResumen');
+  if (!comp) { box.innerHTML = ''; res.innerHTML = ''; return; }
+
+  const bloqueado = bimCerradoDocente();
+  const desdeSesiones = compTieneSesiones(comp);
+  const alumnos = estudiantes();
+
+  if (desdeSesiones) {
+    res.innerHTML = '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">Esta competencia ya tiene evidencias. El promedio se calcula en Calificar / Ver avance (aquí no se edita).</span>';
+  } else if (bloqueado) {
+    res.innerHTML = '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>';
+  } else {
+    res.innerHTML = '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">Edición directa · 0–20 (18–20 AD · 14–17 A · 11–13 B · 0–10 C)</span>';
+  }
+
+  let cAD=0,cA=0,cB=0,cC=0,cV=0;
+  box.innerHTML = alumnos.map((al, i) => {
+    const k = finalKey(comp, al.nombre);
+    let nota = '', letra = '', conc = '';
+    if (desdeSesiones) {
+      // mostrar promedio calculado
+      const sess = (store.sessions||[]).filter(s =>
+        s.nivel===c.nivel && s.bim===c.bim && s.grado===c.grado &&
+        s.seccion===c.seccion && s.area===c.area && s.comp===comp
+      );
+      const nums = [];
+      sess.forEach(s => {
+        const gk = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,al.nombre].join('||');
+        const g = store.grades[gk];
+        if (!g) return;
+        if (g.nota20!=='' && g.nota20!=null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
+        else if (g.nivel) { const m = letterToNum(g.nivel); if (m!=='') nums.push(Number(m)); }
+      });
+      const prom = promedioNums(nums);
+      if (prom != null) { nota = prom; letra = numToLetter(prom); }
+    } else {
+      const f = store.finales[k];
+      if (f) {
+        nota = (f.nota20!=='' && f.nota20!=null) ? f.nota20 : '';
+        letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
+        conc = f.conclusion || '';
+      }
+    }
+    if (letra==='AD') cAD++; else if (letra==='A') cA++; else if (letra==='B') cB++; else if (letra==='C') cC++;
+    if (letra) cV++;
+    const enc = encodeURIComponent(al.nombre);
+    const ro = (bloqueado || desdeSesiones) ? 'readonly' : '';
+    const dis = (bloqueado || desdeSesiones) ? 'disabled' : '';
+    return '<div class="stu-row" data-fin="'+enc+'">' +
+      '<div class="flex gap-2 items-center flex-wrap">' +
+      '<div class="text-xs font-bold text-slate-400 w-6">'+(i+1)+'</div>' +
+      '<div class="flex-1 min-w-0 font-bold text-sm truncate">'+al.nombre+'</div>' +
+      '<input type="number" min="0" max="20" step="1" class="num-input fin-nota" '+ro+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—" style="width:4.2rem">' +
+      '<span class="eq-letter '+(letra?eqClass(letra):'eq-none')+'">'+(letra||'—')+'</span>' +
+      '</div>' +
+      (desdeSesiones ? '' : '<input type="text" class="fin-conc mt-1" '+dis+' placeholder="Conclusión (opcional; obligatoria al procesar si C)" value="'+(conc||'').replace(/"/g,'&quot;')+'">') +
+      '</div>';
+  }).join('');
+
+  res.innerHTML += '<div class="w-full flex flex-wrap gap-2 mt-1">' +
+    '<span class="px-2 py-1 rounded-lg bg-slate-50">Con nota '+cV+'/'+alumnos.length+'</span>' +
+    '<span class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800">AD '+cAD+'</span>' +
+    '<span class="px-2 py-1 rounded-lg bg-green-50 text-green-800">A '+cA+'</span>' +
+    '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">B '+cB+'</span>' +
+    '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">C '+cC+'</span></div>';
+
+  box.querySelectorAll('.fin-nota').forEach(inp => {
+    inp.addEventListener('change', function() {
+      if (bloqueado || desdeSesiones) return;
+      const row = inp.closest('[data-fin]');
+      const nombre = decodeURIComponent(row.dataset.fin);
+      let n = inp.value === '' ? '' : Number(inp.value);
+      if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); inp.value = ''; n = ''; }
+      if (n !== '') n = Math.round(n);
+      const letra = n === '' ? '' : numToLetter(n);
+      const badge = row.querySelector('.eq-letter');
+      if (badge) {
+        badge.textContent = letra || '—';
+        badge.className = 'eq-letter ' + (letra ? eqClass(letra) : 'eq-none');
+      }
+      if (n !== '') inp.value = pad2(n);
+      const conc = (row.querySelector('.fin-conc') || {}).value || '';
+      const k = finalKey(comp, nombre);
+      if (n === '') delete store.finales[k];
+      else store.finales[k] = { nota20: n, nivel: letra, conclusion: conc.trim(), ts: Date.now() };
+      saveStore();
+    });
+  });
+}
+
+function guardarFinales() {
+  if (bimCerradoDocente()) { alert('Bimestre cerrado por administración'); return; }
+  const comp = document.getElementById('selFinComp').value;
+  if (!comp || compTieneSesiones(comp)) { saveStore(); return; }
+  document.querySelectorAll('#finLista [data-fin]').forEach(row => {
+    const nombre = decodeURIComponent(row.dataset.fin);
+    const inp = row.querySelector('.fin-nota');
+    const concEl = row.querySelector('.fin-conc');
+    const nraw = inp && inp.value !== '' ? Number(inp.value) : '';
+    const conc = concEl ? concEl.value.trim() : '';
+    const k = finalKey(comp, nombre);
+    if (nraw === '' || isNaN(nraw)) {
+      if (!conc) delete store.finales[k];
+      return;
+    }
+    const n = Math.round(nraw);
+    store.finales[k] = { nota20: n, nivel: numToLetter(n), conclusion: conc, ts: Date.now() };
+  });
+  saveStore();
 }
 
 function asisCtxKey() {
@@ -1523,8 +1699,12 @@ function renderAvance() {
     s.seccion === c.seccion && s.area === c.area
   );
 
-  if (!sess.length) {
-    box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Aún no hay evaluaciones guardadas en este bimestre/área.</p>';
+  const hayFinales = Object.keys(store.finales||{}).some(k => {
+    const parts = k.split('||');
+    return parts[0]===c.nivel && parts[1]===c.bim && String(parts[2])===String(c.grado) && parts[3]===c.seccion && parts[4]===c.area;
+  });
+  if (!sess.length && !hayFinales) {
+    box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Aún no hay evaluaciones ni promedios en este bimestre/área.</p>';
     return;
   }
 
@@ -1536,7 +1716,12 @@ function renderAvance() {
   });
 
   // also include comps with no data at end
-  const order = comps.filter(x => byComp[x]).concat(Object.keys(byComp).filter(x => !comps.includes(x)));
+  comps.forEach(comp => {
+    if (!byComp[comp] && alumnos.some(al => store.finales[finalKey(comp, al.nombre)])) {
+      byComp[comp] = []; // sin evidencias; se usarán finales
+    }
+  });
+  const order = comps.filter(x => byComp[x] !== undefined).concat(Object.keys(byComp).filter(x => !comps.includes(x)));
 
   box.innerHTML = order.map(comp => {
     const evidencias = byComp[comp] || [];
@@ -1558,8 +1743,21 @@ function renderAvance() {
           letters.push(g.nivel);
         }
       });
-      const prom = promedioNums(nums);
-      const letra = prom != null ? numToLetter(prom) : (letters.length ? letters[letters.length-1] : '');
+      let prom = promedioNums(nums);
+      let letra = prom != null ? numToLetter(prom) : (letters.length ? letters[letters.length-1] : '');
+      if (prom == null && !letra) {
+        const f = store.finales[finalKey(comp, al.nombre)];
+        if (f) {
+          if (f.nota20!=='' && f.nota20!=null && !isNaN(Number(f.nota20))) {
+            prom = Number(f.nota20);
+            letra = f.nivel || numToLetter(prom);
+          } else if (f.nivel) {
+            letra = f.nivel;
+            const mid = letterToNum(f.nivel);
+            if (mid!=='') prom = Number(mid);
+          }
+        }
+      }
       return { nombre: al.nombre, orden: al.orden, prom, letra, nEvid: nums.length };
     });
 
@@ -1587,7 +1785,7 @@ function renderAvance() {
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
           <div class="av-comp">${comp}</div>
-          <div class="av-meta">${caps.length} evidencia(s) · ${stuRows.filter(r=>r.letra).length}/${alumnos.length} con nota</div>
+          <div class="av-meta">${caps.length ? (caps.length+' evidencia(s)') : 'Promedio directo'} · ${stuRows.filter(r=>r.letra).length}/${alumnos.length} con nota</div>
         </div>
         ${badge}
       </div>
