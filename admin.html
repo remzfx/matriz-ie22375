@@ -582,12 +582,18 @@ function parseCSV(text) {
     const estado = (row.estadomatricula || '').toUpperCase();
     if (estado === 'TRASLADADO') continue; // no activos
     let grado = parseInt(row.grado || row.grado_num || '0', 10) || 0;
-    if (!grado) grado = mapGradoSiagie(row.grado1 || row.grado || '');
-    let seccion = row.seccion || row.sec || row.seccion1 || '';
+    if (!grado) grado = mapGradoSiagie(row.grado1 || row.grado || row.descgrado || '');
+    if (!grado) {
+      const m = String(row.grado || row.grado1 || row.descgrado || '').match(/(\d+)/);
+      if (m) grado = parseInt(m[1], 10);
+    }
+    let seccion = row.seccion || row.sec || row.seccion1 || row.descseccion || '';
     seccion = mapSecSiagie(seccion);
-    const orden = parseInt(row.orden || row.ord || row.n || row.numerodeorden || '0', 10) || 0;
+    const orden = parseInt(row.orden || row.ord || row.n || row.numerodeorden || row.item || '0', 10) || 0;
+    const nivelRaw = (row.nivel || row.descnivel || document.getElementById('importNivel').value || 'primaria').toLowerCase();
+    const nivel = nivelRaw.includes('sec') ? 'secundaria' : 'primaria';
     out.push({
-      nivel: (row.nivel || document.getElementById('importNivel').value || 'primaria').toLowerCase().includes('sec') ? 'secundaria' : (document.getElementById('importNivel').value || 'primaria'),
+      nivel,
       grado,
       seccion,
       orden,
@@ -621,46 +627,79 @@ document.getElementById('importFile')?.addEventListener('change', async (e) => {
 });
 
 function procesarImport() {
+  if (!estado) loadEstado();
+  if (!estado.primaria) estado.primaria = { estudiantes: [], docentes: [] };
+  if (!estado.secundaria) estado.secundaria = { estudiantes: [], docentes: [] };
   const modo = document.getElementById('importModo').value;
   const nivelSel = document.getElementById('importNivel').value;
+  let nPri = 0, nSec = 0;
   if (window._importJSON) {
     const j = window._importJSON;
     if (j.primaria && j.secundaria) {
       if (nivelSel === 'ambos' || nivelSel === 'primaria') {
-        if (modo === 'replace') estado.primaria = j.primaria;
+        if (modo === 'replace') estado.primaria = Object.assign({ estudiantes: [], docentes: [] }, j.primaria);
         else mergeNivel('primaria', j.primaria.estudiantes || []);
       }
       if (nivelSel === 'ambos' || nivelSel === 'secundaria') {
-        if (modo === 'replace') estado.secundaria = j.secundaria;
+        if (modo === 'replace') estado.secundaria = Object.assign({ estudiantes: [], docentes: [] }, j.secundaria);
         else mergeNivel('secundaria', j.secundaria.estudiantes || []);
       }
       if (j.anio) estado.anio = j.anio;
     } else if (Array.isArray(j)) {
-      mergeOrReplace(nivelSel === 'ambos' ? 'primaria' : nivelSel, j, modo);
+      const nivel = nivelSel === 'ambos' ? 'primaria' : nivelSel;
+      mergeOrReplace(nivel, j, modo);
+    } else if (j.estudiantes) {
+      const nivel = nivelSel === 'ambos' ? 'primaria' : nivelSel;
+      mergeOrReplace(nivel, j.estudiantes, modo);
     } else {
       alert('JSON no reconocido');
       return;
     }
   } else if (window._importCSV) {
-    const nivel = nivelSel === 'ambos' ? 'primaria' : nivelSel;
-    mergeOrReplace(nivel, window._importCSV, modo);
+    const rows = window._importCSV;
+    if (!rows.length) {
+      alert('El CSV no trajo filas válidas. Revisa que tenga columnas de nombre y grado (formato SIAGIE).');
+      return;
+    }
+    if (nivelSel === 'ambos') {
+      const pri = rows.filter(r => (r.nivel || '').toLowerCase().indexOf('sec') < 0);
+      const sec = rows.filter(r => (r.nivel || '').toLowerCase().indexOf('sec') >= 0);
+      if (pri.length) mergeOrReplace('primaria', pri, modo);
+      if (sec.length) mergeOrReplace('secundaria', sec, modo);
+      if (!pri.length && !sec.length) {
+        // un solo archivo sin columna nivel: preguntar no; usar primaria por defecto
+        mergeOrReplace('primaria', rows, modo);
+      }
+    } else {
+      mergeOrReplace(nivelSel, rows, modo);
+    }
   } else {
-    alert('Seleccione un archivo primero');
+    alert('Seleccione un archivo primero y espere la vista previa');
     return;
   }
+  nPri = estudiantesDe('primaria').length;
+  nSec = estudiantesDe('secundaria').length;
   saveEstado();
-  alert('Importación aplicada.');
-  showTab('bd');
+  actualizarResumen();
+  fillFiltros();
+  renderTabla();
+  alert('Importación aplicada.\n\nPrimaria: ' + nPri + ' alumnos\nSecundaria: ' + nSec + ' alumnos\n\nSi el número no coincide, importa de nuevo el CSV del otro nivel (elige Primaria o Secundaria en el selector).');
+  showTab('menu');
 }
 
 function mergeOrReplace(nivel, rows, modo) {
+  if (!estado[nivel]) estado[nivel] = { estudiantes: [], docentes: [] };
   const clean = rows.map(r => ({
     nivel,
-    grado: +r.grado,
+    grado: +r.grado || 0,
     seccion: r.seccion || 'Única',
     orden: +r.orden || 0,
     nombre: String(r.nombre || '').toUpperCase()
   })).filter(r => r.grado && r.nombre);
+  if (!clean.length) {
+    alert('No se pudo leer alumnos para ' + nivel + ' (grado o nombre vacíos).');
+    return;
+  }
   if (modo === 'replace') estado[nivel].estudiantes = clean;
   else mergeNivel(nivel, clean);
 }
