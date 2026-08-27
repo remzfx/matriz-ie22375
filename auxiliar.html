@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Auxiliar IE 22375" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <title>Auxiliar · Asistencia de ingreso · IE 22375</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#f1f5f9; color:#0f172a; }
+    .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); }
+    .btn { border:0; border-radius:12px; font-weight:800; padding:.65rem 1rem; cursor:pointer; font-size:14px; }
+    .btn-primary { background:#0284c7; color:#fff; }
+    .btn-ghost { background:#e2e8f0; color:#0f172a; }
+    .btn-danger { background:#fee2e2; color:#991b1b; }
+    select, input[type=date], input[type=search] {
+      width:100%; border:1.5px solid #cbd5e1; border-radius:12px; padding:.6rem .75rem; font-size:16px; min-height:46px; background:#fff;
+    }
+    .chip { display:inline-flex; align-items:center; justify-content:center; min-width:2.1rem; height:2.1rem;
+      border-radius:8px; font-size:12px; font-weight:900; border:2px solid #e2e8f0; background:#fff; cursor:pointer; }
+    .chip.P { background:#dcfce7; border-color:#86efac; color:#166534; }
+    .chip.F { background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
+    .chip.T { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
+    .chip.J { background:#e0e7ff; border-color:#a5b4fc; color:#3730a3; }
+    .row { padding:.55rem 0; border-bottom:1px solid #f1f5f9; }
+    #scanBox { display:none; }
+    #scanBox.on { display:block; }
+    #scanVideo { width:100%; max-height:240px; background:#000; border-radius:12px; object-fit:cover; }
+    .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#0f172a; color:#fff;
+      font-weight:800; font-size:13px; padding:.5rem 1rem; border-radius:999px; z-index:50; }
+  </style>
+</head>
+<body>
+<script>
+window.__IE_NEED_ROLES=['admin','auxiliar'];
+</script>
+<script>
+(function(){
+  var KEY='ie22375_session_v1';
+  function ses(){
+    try{
+      var r=sessionStorage.getItem(KEY)||localStorage.getItem(KEY);
+      return r?JSON.parse(r):null;
+    }catch(e){return null;}
+  }
+  var s=ses();
+  if(!s){ location.replace('index.html'); return; }
+  var ok = s.user==='admin' || s.role==='admin' || s.user==='auxiliar' || s.role==='auxiliar';
+  if(!ok){ alert('Este módulo es del auxiliar del colegio / administración.'); location.replace('index.html'); }
+})();
+</script>
+
+<header class="bg-gradient-to-r from-slate-900 to-teal-800 text-white sticky top-0 z-20">
+  <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-2">
+    <div class="min-w-0">
+      <div class="text-[10px] font-bold tracking-widest text-teal-200">IE 22375 · AUXILIAR</div>
+      <div class="font-black truncate">Asistencia de ingreso</div>
+      <div class="text-xs text-teal-100/80">Puerta / photocheck · no es el registro del docente</div>
+    </div>
+    <div class="flex gap-1 shrink-0">
+      <a href="index.html" class="btn btn-ghost text-xs" style="width:auto;padding:.4rem .7rem;text-decoration:none">Inicio</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-lg mx-auto px-4 py-4 space-y-3">
+  <div class="card p-3 space-y-2">
+    <div class="grid grid-cols-2 gap-2">
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Fecha</label>
+        <input type="date" id="inpFecha" onchange="renderLista()">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Nivel</label>
+        <select id="selNivel" onchange="onNivel()">
+          <option value="primaria">Primaria</option>
+          <option value="secundaria">Secundaria</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Grado</label>
+        <select id="selGrado" onchange="onGrado()"></select>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Sección</label>
+        <select id="selSeccion" onchange="renderLista()"></select>
+      </div>
+    </div>
+    <input type="search" id="inpBuscar" placeholder="Buscar alumno…" oninput="renderLista()">
+    <div class="flex flex-wrap gap-2">
+      <button type="button" class="btn btn-primary text-sm" onclick="toggleScan()">📷 Escanear QR</button>
+      <button type="button" class="btn btn-ghost text-sm" onclick="marcarTodos('P')">Todos P</button>
+      <button type="button" class="btn btn-ghost text-sm" onclick="compartirWhatsApp()">WhatsApp</button>
+    </div>
+    <div id="scanBox" class="space-y-2">
+      <video id="scanVideo" playsinline></video>
+      <p class="text-[11px] text-slate-500" id="scanMsg">Apunta al photocheck. Si el celular no lee QR, usa Chrome o Edge.</p>
+      <button type="button" class="btn btn-danger text-sm w-full" onclick="stopScan()">Cerrar cámara</button>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-2 text-[11px] font-bold">
+    <span class="px-2 py-1 rounded-lg bg-green-50 text-green-800">P <span id="nP">0</span></span>
+    <span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">F <span id="nF">0</span></span>
+    <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">T <span id="nT">0</span></span>
+    <span class="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-800">J <span id="nJ">0</span></span>
+    <span class="px-2 py-1 rounded-lg bg-slate-100 text-slate-600">Sin marca <span id="nS">0</span></span>
+  </div>
+
+  <div class="card p-3">
+    <div class="text-[10px] font-bold text-slate-500 mb-1" id="lblAula">—</div>
+    <div id="lista"></div>
+  </div>
+  <p class="text-[11px] text-center text-slate-400 pb-6">
+    Asistencia de ingreso al local. El docente sigue pasando lista en su registro de aula.
+  </p>
+</main>
+<div id="toast" class="toast hidden"></div>
+
+<script>
+const BD_KEY = 'ie22375_admin_bd_v1';
+const ASIS_KEY = 'ie22375_asistencia_colegio_v1';
+
+function hoyISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function horaAhora() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function toast(m) {
+  const el = document.getElementById('toast');
+  el.textContent = m;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 2200);
+}
+
+function loadBD() {
+  try {
+    const raw = localStorage.getItem(BD_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return null;
+}
+function loadAsis() {
+  try {
+    const raw = localStorage.getItem(ASIS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return {};
+}
+function saveAsis(obj) { localStorage.setItem(ASIS_KEY, JSON.stringify(obj)); }
+
+function ctx() {
+  return {
+    fecha: document.getElementById('inpFecha').value || hoyISO(),
+    nivel: document.getElementById('selNivel').value,
+    grado: document.getElementById('selGrado').value,
+    seccion: document.getElementById('selSeccion').value
+  };
+}
+function asisKey(al) {
+  const c = ctx();
+  return [c.fecha, c.nivel, c.grado, c.seccion, al.nombre].join('||');
+}
+function qrPayload(al) {
+  return 'IE22375|' + al.nivel + '|' + al.grado + '|' + al.seccion + '|' + al.nombre;
+}
+
+let BD = null;
+async function ensureBD() {
+  BD = loadBD();
+  if (BD && BD.primaria) return;
+  try {
+    const r = await fetch('bd_oficial_2026.json?t=' + Date.now(), { cache:'no-store' });
+    if (r.ok) BD = await r.json();
+  } catch(e) {}
+  if (!BD) BD = { primaria:{estudiantes:[]}, secundaria:{estudiantes:[]} };
+}
+
+function alumnosAula() {
+  const c = ctx();
+  const list = ((BD[c.nivel] || {}).estudiantes) || [];
+  const g = parseInt(c.grado, 10);
+  return list.filter(a => Number(a.grado) === g && String(a.seccion) === String(c.seccion));
+}
+
+function onNivel() {
+  const nivel = document.getElementById('selNivel').value;
+  const list = ((BD[nivel] || {}).estudiantes) || [];
+  const grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
+  document.getElementById('selGrado').innerHTML = grados.map(g => '<option value="'+g+'">'+g+'°</option>').join('');
+  onGrado();
+}
+function onGrado() {
+  const nivel = document.getElementById('selNivel').value;
+  const g = parseInt(document.getElementById('selGrado').value, 10);
+  const list = ((BD[nivel] || {}).estudiantes) || [];
+  const secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
+  document.getElementById('selSeccion').innerHTML = secs.map(s => '<option value="'+s+'">'+s+'</option>').join('');
+  renderLista();
+}
+
+function getRec(al) {
+  const rec = loadAsis()[asisKey(al)];
+  if (!rec) return { marca:'', hora:'' };
+  if (typeof rec === 'string') return { marca: rec, hora:'' };
+  return { marca: rec.marca || '', hora: rec.hora || '' };
+}
+function setRec(al, marca, via) {
+  const all = loadAsis();
+  const k = asisKey(al);
+  if (!marca) delete all[k];
+  else all[k] = { marca, hora: horaAhora(), via: via || 'manual' };
+  saveAsis(all);
+}
+
+function renderLista() {
+  const c = ctx();
+  const q = (document.getElementById('inpBuscar').value || '').trim().toLowerCase();
+  let list = alumnosAula();
+  if (q) list = list.filter(a => a.nombre.toLowerCase().includes(q));
+  document.getElementById('lblAula').textContent =
+    (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + ' · ' + c.fecha + ' · ' + alumnosAula().length + ' alumnos';
+
+  let cP=0,cF=0,cT=0,cJ=0,cS=0;
+  const box = document.getElementById('lista');
+  if (!list.length) {
+    box.innerHTML = '<p class="text-sm text-slate-400 py-4 text-center">Sin alumnos en esta aula (¿ya cargó la BD en Admin?).</p>';
+  } else {
+    box.innerHTML = list.map((al, i) => {
+      const rec = getRec(al);
+      const m = rec.marca;
+      if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++; else cS++;
+      const hora = rec.hora ? '<span class="text-[10px] text-slate-500 font-bold">'+rec.hora+'</span>' : '';
+      const enc = encodeURIComponent(al.nombre);
+      return '<div class="row flex gap-2 items-center">' +
+        '<div class="text-xs font-bold text-slate-400 w-6">'+(i+1)+'</div>' +
+        '<div class="flex-1 min-w-0 font-bold text-sm truncate">'+al.nombre+' '+hora+'</div>' +
+        '<div class="flex gap-1">' +
+        ['P','F','T','J'].map(v => '<button type="button" class="chip '+(m===v?v:'')+'" data-n="'+enc+'" data-v="'+v+'">'+v+'</button>').join('') +
+        '</div></div>';
+    }).join('');
+  }
+  // recount all aula not just filtered
+  cP=cF=cT=cJ=cS=0;
+  alumnosAula().forEach(al => {
+    const m = getRec(al).marca;
+    if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++; else cS++;
+  });
+  document.getElementById('nP').textContent = cP;
+  document.getElementById('nF').textContent = cF;
+  document.getElementById('nT').textContent = cT;
+  document.getElementById('nJ').textContent = cJ;
+  document.getElementById('nS').textContent = cS;
+
+  box.onclick = function(ev) {
+    const b = ev.target.closest('button[data-n]');
+    if (!b) return;
+    const nombre = decodeURIComponent(b.dataset.n);
+    const al = alumnosAula().find(x => x.nombre === nombre);
+    if (!al) return;
+    const cur = getRec(al).marca;
+    setRec(al, cur === b.dataset.v ? '' : b.dataset.v, 'manual');
+    renderLista();
+  };
+}
+
+function marcarTodos(marca) {
+  if (!confirm('¿Marcar a todo el aula como ' + marca + '?')) return;
+  alumnosAula().forEach(al => setRec(al, marca, 'manual'));
+  renderLista();
+}
+
+function compartirWhatsApp() {
+  const c = ctx();
+  const list = alumnosAula();
+  if (!list.length) { alert('No hay alumnos'); return; }
+  let cP=0,cF=0,cT=0,cJ=0;
+  const lineas = [];
+  const faltas = [];
+  list.forEach((al, i) => {
+    const rec = getRec(al);
+    const m = rec.marca || '—';
+    if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++;
+    if (m==='F' || !rec.marca) faltas.push(al.nombre + (!rec.marca ? ' (sin marca)' : ''));
+    const hora = (m==='P'||m==='T'||m==='J') && rec.hora ? '  ' + rec.hora : '';
+    lineas.push((i+1)+'. '+al.nombre+'  '+m+hora);
+  });
+  const txt =
+    'IE 22375 · Ingreso ' + c.fecha + '\n' +
+    (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + '\n' +
+    'P '+cP+' · F '+cF+' · T '+cT+' · J '+cJ + '\n\n' +
+    lineas.join('\n') +
+    (faltas.length ? '\n\nSin ingreso / faltas:\n- ' + faltas.join('\n- ') : '');
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+}
+
+/* ===== QR ===== */
+let scanTimer = null;
+let scanStream = null;
+
+function parseQR(text) {
+  // Formato: IE22375|primaria|1|Única|NOMBRE
+  const raw = String(text || '').trim();
+  const parts = raw.split('|');
+  if (parts.length >= 5 && parts[0] === 'IE22375') {
+    return { nivel: parts[1], grado: parts[2], seccion: parts[3], nombre: parts.slice(4).join('|') };
+  }
+  // búsqueda por nombre exacto en el aula actual
+  const al = alumnosAula().find(a => a.nombre === raw || a.nombre.toLowerCase() === raw.toLowerCase());
+  if (al) return { nivel: al.nivel, grado: al.grado, seccion: al.seccion, nombre: al.nombre };
+  return null;
+}
+
+function marcarPorQR(text) {
+  const p = parseQR(text);
+  if (!p) { toast('QR no reconocido'); return; }
+  // cambiar de aula si el QR es de otra
+  document.getElementById('selNivel').value = p.nivel === 'secundaria' ? 'secundaria' : 'primaria';
+  onNivel();
+  document.getElementById('selGrado').value = String(p.grado);
+  onGrado();
+  document.getElementById('selSeccion').value = p.seccion;
+  const list = alumnosAula();
+  const al = list.find(a => a.nombre === p.nombre);
+  if (!al) { toast('Alumno no está en la BD'); return; }
+  setRec(al, 'P', 'qr');
+  renderLista();
+  toast(al.nombre.split(',')[0] + ' · ' + horaAhora());
+}
+
+async function toggleScan() {
+  const box = document.getElementById('scanBox');
+  if (box.classList.contains('on')) { stopScan(); return; }
+  box.classList.add('on');
+  const video = document.getElementById('scanVideo');
+  const msg = document.getElementById('scanMsg');
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = scanStream;
+    await video.play();
+  } catch(e) {
+    msg.textContent = 'No se pudo abrir la cámara. Permite el acceso o usa HTTPS.';
+    return;
+  }
+  if (!('BarcodeDetector' in window)) {
+    msg.textContent = 'Este navegador no lee QR con cámara. Usa Chrome en Android o marca manual.';
+    return;
+  }
+  const det = new BarcodeDetector({ formats: ['qr_code'] });
+  msg.textContent = 'Apunta al photocheck…';
+  scanTimer = setInterval(async () => {
+    try {
+      const codes = await det.detect(video);
+      if (codes && codes[0] && codes[0].rawValue) {
+        marcarPorQR(codes[0].rawValue);
+      }
+    } catch(e) {}
+  }, 500);
+}
+function stopScan() {
+  document.getElementById('scanBox').classList.remove('on');
+  if (scanTimer) { clearInterval(scanTimer); scanTimer = null; }
+  if (scanStream) {
+    scanStream.getTracks().forEach(t => t.stop());
+    scanStream = null;
+  }
+}
+
+ensureBD().then(() => {
+  document.getElementById('inpFecha').value = hoyISO();
+  onNivel();
+});
+</script>
+</body>
+</html>

@@ -38,6 +38,7 @@
           <select id="inpTipo" onchange="onTipoChange()">
             <option value="docente">Docente</option>
             <option value="admin">Administrador</option>
+            <option value="auxiliar">Auxiliar del colegio</option>
           </select>
         </div>
         <div id="wrapDocente">
@@ -51,7 +52,7 @@
         </div>
         <p id="loginErr" class="hidden text-sm text-red-600 font-semibold bg-red-50 rounded-lg px-3 py-2"></p>
         <button type="button" class="btn btn-primary" onclick="intentarLogin()">Ingresar</button>
-        <p class="text-[11px] text-slate-400 text-center">Docentes: solo su grado o área · Admin: acceso total</p>
+        <p class="text-[11px] text-slate-400 text-center">Docente · Admin · Auxiliar del colegio (ingreso / puerta)</p>
       </div>
       <p class="text-[10px] text-center text-slate-400 mt-8">Desarrollo · Diseño e integración Mag. Efrain Ceopa Paredes</p>
     </div>
@@ -112,7 +113,8 @@ function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 function onTipoChange() {
-  document.getElementById('wrapDocente').classList.toggle('hidden', document.getElementById('inpTipo').value === 'admin');
+  const t = document.getElementById('inpTipo').value;
+  document.getElementById('wrapDocente').classList.toggle('hidden', t !== 'docente');
 }
 async function intentarLogin() {
   const err = document.getElementById('loginErr');
@@ -128,7 +130,18 @@ async function intentarLogin() {
       return;
     }
     setSession({ user:'admin', label:'Administrador', nivel:'admin', role:'admin', grados:null, areas:null,
-      mods:['matriz_pri','matriz_sec','registro','admin_bd'], ts:Date.now() });
+      mods:['matriz_pri','matriz_sec','registro','admin_bd','auxiliar'], ts:Date.now() });
+    mostrarHub();
+    return;
+  }
+  if (tipo === 'auxiliar') {
+    if (pass !== 'aux22375') {
+      err.textContent = 'Contraseña de auxiliar incorrecta.';
+      err.classList.remove('hidden');
+      return;
+    }
+    setSession({ user:'auxiliar', label:'Auxiliar del colegio', nivel:'colegio', role:'auxiliar',
+      grados:null, areas:null, mods:['auxiliar'], ts:Date.now() });
     mostrarHub();
     return;
   }
@@ -173,7 +186,8 @@ function mostrarHub() {
     matriz_pri: { href:'primaria.html', title:'Matriz consolidado · Primaria', desc:'Áreas y gráficos de avance', badge:'PRIMARIA' },
     matriz_sec: { href:'secundaria.html', title:'Matriz consolidado · Secundaria', desc:'Áreas y gráficos de avance', badge:'SECUNDARIA' },
     registro: { href:'registro.html', title:'Registro auxiliar', desc:'Notas, asistencia e impresión', badge:'REGISTRO' },
-    admin_bd: { href:'admin.html', title:'Administración', desc:'BD, docentes y bimestres', badge:'ADMIN' }
+    admin_bd: { href:'admin.html', title:'Administración', desc:'BD, docentes y bimestres', badge:'ADMIN' },
+    auxiliar: { href:'auxiliar.html', title:'Asistencia de ingreso', desc:'Puerta · QR · lista del aula para WhatsApp', badge:'AUXILIAR' }
   };
   document.getElementById('modulos').innerHTML = (s.mods||[]).filter(m => catalog[m]).map(key => {
     const m = catalog[key];
