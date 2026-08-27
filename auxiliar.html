@@ -38,7 +38,10 @@
     .row { padding:.55rem 0; border-bottom:1px solid #f1f5f9; }
     #scanBox { display:none; }
     #scanBox.on { display:block; }
-    #scanVideo { width:100%; max-height:240px; background:#000; border-radius:12px; object-fit:cover; }
+    #reader { width:100%; min-height:260px; background:#000; border-radius:12px; overflow:hidden; }
+    #reader video, #reader canvas, #reader img {
+      width:100% !important; height:260px !important; object-fit:cover !important; border-radius:12px;
+    }
     .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#0f172a; color:#fff;
       font-weight:800; font-size:13px; padding:.5rem 1rem; border-radius:999px; z-index:50; }
   </style>
@@ -76,6 +79,11 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
 
 <main class="max-w-lg mx-auto px-4 py-4 space-y-3">
   <div class="card p-3 space-y-3">
+    <div id="scanBox" class="space-y-2">
+      <div id="reader"></div>
+      <p class="text-[11px] text-slate-500" id="scanMsg">Apunta al photocheck.</p>
+      <button type="button" class="btn btn-danger w-full" onclick="stopScan()">Cerrar cámara</button>
+    </div>
     <div>
       <label class="text-[10px] font-bold text-slate-500">Fecha</label>
       <input type="date" id="inpFecha" onchange="renderLista()">
@@ -104,11 +112,6 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <button type="button" class="btn btn-ghost" onclick="compartirWhatsApp()">WhatsApp</button>
       <button type="button" class="btn btn-ghost" onclick="bajarNube()">Bajar asistencia de la nube</button>
       <button type="button" class="btn btn-ghost" onclick="subirTodoNube()">Subir asistencia a la nube</button>
-    </div>
-    <div id="scanBox" class="space-y-2">
-      <div id="reader" style="width:100%;border-radius:12px;overflow:hidden"></div>
-      <p class="text-[11px] text-slate-500" id="scanMsg">Apunta al photocheck. En iPhone acepta el permiso de cámara.</p>
-      <button type="button" class="btn btn-danger text-sm w-full" onclick="stopScan()">Cerrar cámara</button>
     </div>
   </div>
 
@@ -505,6 +508,7 @@ async function toggleScan() {
   const box = document.getElementById('scanBox');
   if (box.classList.contains('on')) { stopScan(); return; }
   box.classList.add('on');
+  try { box.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
   const msg = document.getElementById('scanMsg');
   if (typeof Html5Qrcode === 'undefined') {
     msg.textContent = 'No se cargó el lector. Revisa internet y recarga.';
