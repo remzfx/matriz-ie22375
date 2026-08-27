@@ -19,7 +19,7 @@
       background:#fff; break-inside:avoid; page-break-inside:avoid;
       display:flex; gap:10px; align-items:center;
     }
-    .badge .qr { width:96px; height:96px; flex-shrink:0; }
+    .badge .qr { width:96px; height:96px; flex-shrink:0; background:#fff; border:1px solid #e2e8f0; }
     .badge .qr img, .badge .qr canvas { width:96px !important; height:96px !important; }
     @media print {
       .no-print { display:none !important; }
@@ -119,11 +119,15 @@ function onGrado() {
   const secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
   document.getElementById('selSeccion').innerHTML = secs.map(s => '<option value="'+s+'">'+s+'</option>').join('');
 }
+function qrImgUrl(text) {
+  return 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&ecc=M&data=' + encodeURIComponent(text);
+}
 function cardHtml(al, i) {
   const id = 'qr-' + i;
+  const data = payload(al);
   const niv = al.nivel === 'secundaria' ? 'SECUNDARIA' : 'PRIMARIA';
   return '<div class="badge">' +
-    '<div class="qr" id="'+id+'"></div>' +
+    '<div class="qr" id="'+id+'"><img alt="QR" src="'+qrImgUrl(data)+'" width="96" height="96" style="width:96px;height:96px;display:block"></div>' +
     '<div class="min-w-0">' +
       '<div style="font-size:9px;font-weight:800;letter-spacing:.08em;color:#0369a1">IE 22375 SANTA ROSA DE LOS MOLINOS</div>' +
       '<div style="font-size:12px;font-weight:900;line-height:1.2;margin-top:2px">'+al.nombre+'</div>' +
@@ -134,13 +138,7 @@ function cardHtml(al, i) {
 function pintar(list) {
   const sheet = document.getElementById('sheet');
   sheet.innerHTML = list.map((al,i) => cardHtml(al,i)).join('');
-  list.forEach((al,i) => {
-    const el = document.getElementById('qr-'+i);
-    if (!el) return;
-    el.innerHTML = '';
-    new QRCode(el, { text: payload(al), width:96, height:96, correctLevel: QRCode.CorrectLevel.M });
-  });
-  document.getElementById('lblN').textContent = list.length + ' photochecks';
+  document.getElementById('lblN').textContent = list.length + ' photochecks · debe verse el cuadrado QR a la izquierda';
 }
 function generar() {
   const nivel = document.getElementById('selNivel').value;
