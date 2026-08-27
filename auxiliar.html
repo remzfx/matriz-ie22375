@@ -82,6 +82,10 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     <div id="scanBox" class="space-y-2">
       <div id="reader"></div>
       <p class="text-[11px] text-slate-500" id="scanMsg">Apunta al photocheck.</p>
+      <label class="btn btn-ghost w-full" style="display:block;text-align:center">
+        Leer QR desde foto
+        <input id="inpFotoQR" type="file" accept="image/*" capture="environment" hidden onchange="leerFotoQR(this)">
+      </label>
       <button type="button" class="btn btn-danger w-full" onclick="stopScan()">Cerrar cámara</button>
     </div>
     <div>
@@ -528,12 +532,8 @@ async function toggleScan() {
       camId = back ? back.id : cameras[cameras.length - 1].id;
     }
     await html5Qr.start(
-      camId,
-      { fps: 12, qrbox: function(vw, vh) {
-          const s = Math.min(vw, vh) * 0.72;
-          return { width: s, height: s };
-        }
-      },
+      { facingMode: 'environment' },
+      { fps: 15, disableFlip: false },
       function onSuccess(text) {
         const now = Date.now();
         if (text === lastScanText && now - lastScanAt < 1800) return;
@@ -543,7 +543,7 @@ async function toggleScan() {
       },
       function onFail() {}
     );
-    msg.textContent = 'Cámara lista. Acerca el QR hasta que entre en el recuadro.';
+    msg.textContent = 'Cámara lista. Acerca el QR (sin recuadro). Si no lee, usa “Leer QR desde foto”.';
   } catch (e) {
     msg.textContent = 'Permite la cámara en Ajustes. Safari o Chrome. ' + (e && e.message ? e.message : '');
   }
@@ -556,10 +556,24 @@ function stopScan() {
   }
 }
 
+async function leerFotoQR(input) {
+  const f = input.files && input.files[0];
+  input.value = '';
+  if (!f) return;
+  if (typeof Html5Qrcode === 'undefined') { toast('Lector no cargó'); return; }
+  try {
+    const tmp = new Html5Qrcode('reader');
+    const text = await tmp.scanFile(f, true);
+    try { await tmp.clear(); } catch(e) {}
+    marcarPorQR(text);
+  } catch (e) {
+    toast('No se leyó el QR de la foto. Toma otra más de cerca y sin sombra.');
+  }
+}
+
 ensureBD().then(() => {
   document.getElementById('inpFecha').value = hoyISO();
   onNivel();
-  bajarNube();
 });
 </script>
 </body>
