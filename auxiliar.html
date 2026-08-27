@@ -507,6 +507,12 @@ function marcarPorQR(text) {
   document.getElementById('selGrado').value = String(al.grado);
   onGrado();
   document.getElementById('selSeccion').value = al.seccion;
+  const ya = getRec(al);
+  if (ya.marca) {
+    renderLista();
+    toast(al.nombre.split(',')[0] + ' ya registrado hoy a las ' + (ya.hora || '—') + '. Borre la marca manual si desea volver a registrar.');
+    return;
+  }
   setRec(al, 'P', 'qr');
   renderLista();
   pitido();
