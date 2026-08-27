@@ -177,17 +177,20 @@ let BD = null;
 async function ensureBD() {
   BD = loadBD();
   if (BD && BD.primaria && BD.primaria.estudiantes && BD.primaria.estudiantes.length) return;
-  try {
-    const r = await fetch('bd_oficial_2026.json?t=' + Date.now(), { cache:'no-store' });
-    if (r.ok) {
+  const files = ['bd_oficial_2026.json', 'bd_oficial_IE22375_2026.json'];
+  for (let i = 0; i < files.length; i++) {
+    try {
+      const r = await fetch(files[i] + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) continue;
       const j = await r.json();
       if (j && j.primaria) {
         BD = j;
-        try { localStorage.setItem(BD_KEY, JSON.stringify(j)); } catch(e) {}
+        try { localStorage.setItem(BD_KEY, JSON.stringify(j)); } catch (e) {}
+        return;
       }
-    }
-  } catch(e) {}
-  if (!BD) BD = { primaria:{estudiantes:[]}, secundaria:{estudiantes:[]} };
+    } catch (e) {}
+  }
+  if (!BD) BD = { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
 }
 
 function alumnosAula() {
@@ -337,38 +340,56 @@ function parseQR(text) {
     else nivel = 'primaria';
     return {
       nivel: nivel,
-      grado: String(parts[2] || '').replace('°',''),
-      seccion: parts[3],
-      nombre: parts.slice(4).join('|')
+      grado: String(parts[2] || '').replace('°','').trim(),
+      seccion: String(parts[3] || '').replace(/\s+/g,' ').trim(),
+      nombre: parts.slice(4).join('|').replace(/\s+/g,' ').trim()
     };
   }
   return { nombre: raw };
 }
 function hallarAlumno(p) {
   const list = todosAlumnos();
-  if (!list.length) return null;
+  if (!list.length) return { error: 'vacio' };
   const nom = norm(p.nombre);
+  if (!nom) return { error: 'sin-nombre' };
   let cand = list.filter(a => norm(a.nombre) === nom);
   if (!cand.length) {
-    cand = list.filter(a => norm(a.nombre).indexOf(nom) >= 0 || nom.indexOf(norm(a.nombre)) >= 0);
+    cand = list.filter(a => {
+      const an = norm(a.nombre);
+      return an.indexOf(nom) >= 0 || nom.indexOf(an) >= 0;
+    });
   }
-  if (p.nivel) {
-    const n2 = cand.filter(a => a.nivel === p.nivel);
-    if (n2.length) cand = n2;
+  if (!cand.length) {
+    const ape = nom.split(',')[0].split(' ')[0];
+    if (ape && ape.length >= 4) {
+      cand = list.filter(a => norm(a.nombre).indexOf(ape) === 0);
+    }
   }
-  if (p.grado && cand.length > 1) {
+  if (cand.length > 1 && p.grado) {
     const g = parseInt(p.grado, 10);
     const g2 = cand.filter(a => Number(a.grado) === g);
     if (g2.length) cand = g2;
   }
-  return cand[0] || null;
+  if (cand.length > 1 && p.seccion) {
+    const s2 = cand.filter(a => norm(a.seccion) === norm(p.seccion));
+    if (s2.length) cand = s2;
+  }
+  if (cand.length === 1) return { al: cand[0] };
+  if (cand.length > 1) return { al: cand[0], varios: cand.length };
+  return { error: 'no-encontrado', nombre: p.nombre };
 }
 function marcarPorQR(text) {
+  const nAl = todosAlumnos().length;
   const p = parseQR(text);
-  const al = hallarAlumno(p);
+  document.getElementById('scanMsg').textContent = 'Leído: ' + String(text).slice(0, 90);
+  if (!nAl) {
+    toast('No hay lista de alumnos en este celular. Sube bd_oficial_2026.json a GitHub.');
+    return;
+  }
+  const hit = hallarAlumno(p);
+  const al = hit.al;
   if (!al) {
-    toast('QR leído, pero no está en la lista: ' + (p.nombre || text).slice(0,40));
-    document.getElementById('scanMsg').textContent = 'Leído: ' + String(text).slice(0,80) + ' · ¿subiste bd_oficial_2026.json?';
+    toast('QR leído, no está en la lista: ' + (p.nombre || text).slice(0, 42));
     return;
   }
   document.getElementById('selNivel').value = al.nivel;
