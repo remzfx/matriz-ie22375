@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Photochecks QR · IE 22375</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#f1f5f9; color:#0f172a; }
+    .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); }
+    .btn { border:0; border-radius:12px; font-weight:800; padding:.65rem 1rem; cursor:pointer; font-size:14px; }
+    .btn-primary { background:#0284c7; color:#fff; }
+    .btn-ghost { background:#e2e8f0; color:#0f172a; }
+    select { border:1.5px solid #cbd5e1; border-radius:12px; padding:.55rem .7rem; font-size:16px; min-height:44px; background:#fff; }
+    .sheet { display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
+    .badge {
+      border:2px solid #0f172a; border-radius:12px; padding:10px 10px 8px;
+      background:#fff; break-inside:avoid; page-break-inside:avoid;
+      display:flex; gap:10px; align-items:center;
+    }
+    .badge .qr { width:96px; height:96px; flex-shrink:0; }
+    .badge .qr img, .badge .qr canvas { width:96px !important; height:96px !important; }
+    @media print {
+      .no-print { display:none !important; }
+      body { background:#fff; }
+      .sheet { gap:8px; }
+      .badge { box-shadow:none; }
+    }
+    @page { size: A4; margin: 10mm; }
+  </style>
+</head>
+<body>
+<script>
+(function(){
+  var KEY='ie22375_session_v1';
+  try {
+    var r=sessionStorage.getItem(KEY)||localStorage.getItem(KEY);
+    var s=r?JSON.parse(r):null;
+    if(!s || !(s.user==='admin'||s.role==='admin')) {
+      alert('Solo administración puede imprimir photochecks.');
+      location.replace('index.html');
+    }
+  } catch(e) { location.replace('index.html'); }
+})();
+</script>
+
+<header class="no-print bg-slate-900 text-white">
+  <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+    <div>
+      <div class="text-[10px] font-bold tracking-widest text-sky-300">ADMIN · IE 22375</div>
+      <div class="font-black">Photochecks QR</div>
+    </div>
+    <div class="flex gap-2">
+      <a href="admin.html" class="btn btn-ghost text-xs" style="text-decoration:none">Admin</a>
+      <a href="index.html" class="btn btn-ghost text-xs" style="text-decoration:none">Inicio</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-4 py-4">
+  <div class="no-print card p-3 mb-4 space-y-2">
+    <p class="text-sm text-slate-600">Genera credenciales con QR para la tablet de la puerta. Imprime en A4 (2 por fila) y recorta.</p>
+    <div class="flex flex-wrap gap-2 items-end">
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Nivel</label><br>
+        <select id="selNivel" onchange="onNivel()">
+          <option value="primaria">Primaria</option>
+          <option value="secundaria">Secundaria</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Grado</label><br>
+        <select id="selGrado" onchange="onGrado()"></select>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Sección</label><br>
+        <select id="selSeccion"></select>
+      </div>
+      <button type="button" class="btn btn-primary" onclick="generar()">Generar aula</button>
+      <button type="button" class="btn btn-ghost" onclick="generarNivel()">Generar todo el nivel</button>
+      <button type="button" class="btn btn-primary" onclick="window.print()">🖨 Imprimir</button>
+    </div>
+    <p class="text-[11px] text-slate-400" id="lblN">—</p>
+  </div>
+  <div id="sheet" class="sheet"></div>
+</main>
+
+<script>
+const BD_KEY = 'ie22375_admin_bd_v1';
+function loadBD() {
+  try { const raw = localStorage.getItem(BD_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
+  return null;
+}
+let BD = null;
+async function ensureBD() {
+  BD = loadBD();
+  if (BD && BD.primaria) return;
+  try {
+    const r = await fetch('bd_oficial_2026.json?t=' + Date.now(), {cache:'no-store'});
+    if (r.ok) BD = await r.json();
+  } catch(e) {}
+  if (!BD) BD = { primaria:{estudiantes:[]}, secundaria:{estudiantes:[]} };
+}
+function payload(al) {
+  return 'IE22375|' + al.nivel + '|' + al.grado + '|' + al.seccion + '|' + al.nombre;
+}
+function onNivel() {
+  const nivel = document.getElementById('selNivel').value;
+  const list = ((BD[nivel]||{}).estudiantes)||[];
+  const grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
+  document.getElementById('selGrado').innerHTML = grados.map(g => '<option value="'+g+'">'+g+'°</option>').join('');
+  onGrado();
+}
+function onGrado() {
+  const nivel = document.getElementById('selNivel').value;
+  const g = parseInt(document.getElementById('selGrado').value,10);
+  const list = ((BD[nivel]||{}).estudiantes)||[];
+  const secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
+  document.getElementById('selSeccion').innerHTML = secs.map(s => '<option value="'+s+'">'+s+'</option>').join('');
+}
+function cardHtml(al, i) {
+  const id = 'qr-' + i;
+  const niv = al.nivel === 'secundaria' ? 'SECUNDARIA' : 'PRIMARIA';
+  return '<div class="badge">' +
+    '<div class="qr" id="'+id+'"></div>' +
+    '<div class="min-w-0">' +
+      '<div style="font-size:9px;font-weight:800;letter-spacing:.08em;color:#0369a1">IE 22375 SANTA ROSA DE LOS MOLINOS</div>' +
+      '<div style="font-size:12px;font-weight:900;line-height:1.2;margin-top:2px">'+al.nombre+'</div>' +
+      '<div style="font-size:11px;font-weight:800;margin-top:4px">'+niv+' · '+al.grado+'° '+al.seccion+'</div>' +
+      '<div style="font-size:9px;color:#64748b;margin-top:2px">2026 · Photocheck de ingreso</div>' +
+    '</div></div>';
+}
+function pintar(list) {
+  const sheet = document.getElementById('sheet');
+  sheet.innerHTML = list.map((al,i) => cardHtml(al,i)).join('');
+  list.forEach((al,i) => {
+    const el = document.getElementById('qr-'+i);
+    if (!el) return;
+    el.innerHTML = '';
+    new QRCode(el, { text: payload(al), width:96, height:96, correctLevel: QRCode.CorrectLevel.M });
+  });
+  document.getElementById('lblN').textContent = list.length + ' photochecks';
+}
+function generar() {
+  const nivel = document.getElementById('selNivel').value;
+  const g = parseInt(document.getElementById('selGrado').value,10);
+  const sec = document.getElementById('selSeccion').value;
+  const list = (((BD[nivel]||{}).estudiantes)||[])
+    .filter(a => Number(a.grado)===g && String(a.seccion)===String(sec))
+    .slice()
+    .sort((a,b)=>(a.orden||0)-(b.orden||0) || a.nombre.localeCompare(b.nombre,'es'));
+  if (!list.length) { alert('No hay alumnos en esa aula.'); return; }
+  pintar(list);
+}
+function generarNivel() {
+  const nivel = document.getElementById('selNivel').value;
+  const list = (((BD[nivel]||{}).estudiantes)||[]).slice()
+    .sort((a,b)=>a.grado-b.grado || String(a.seccion).localeCompare(String(b.seccion),'es') || a.nombre.localeCompare(b.nombre,'es'));
+  if (!list.length) { alert('No hay alumnos.'); return; }
+  pintar(list);
+}
+ensureBD().then(onNivel);
+</script>
+</body>
+</html>
