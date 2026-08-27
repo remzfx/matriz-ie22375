@@ -39,12 +39,10 @@
     .row { padding:.55rem 0; border-bottom:1px solid #f1f5f9; }
     #scanBox { display:none; }
     #scanBox.on { display:block; }
-    #reader { width:100%; min-height:260px; background:#000; border-radius:12px; overflow:hidden; position:relative; }
-    #reader video, #reader canvas, #reader img, #iosVideo {
-      width:100% !important; height:260px !important; object-fit:cover !important; border-radius:12px;
-      background:#000;
+    #reader { width:100%; min-height:240px; background:#000; border-radius:12px; overflow:hidden; }
+    #reader video, #reader canvas, #reader img {
+      width:100% !important; max-height:280px !important; object-fit:cover !important;
     }
-    #iosVideo { display:block; }
     .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#0f172a; color:#fff;
       font-weight:800; font-size:13px; padding:.5rem 1rem; border-radius:999px; z-index:50; }
   </style>
@@ -83,7 +81,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
 <main class="max-w-lg mx-auto px-4 py-4 space-y-3">
   <div class="card p-3 space-y-3">
     <div id="scanBox" class="space-y-2">
-      <div id="reader"><video id="iosVideo" playsinline webkit-playsinline muted autoplay></video></div>
+      <div id="reader"></div>
       <p class="text-[11px] text-slate-500" id="scanMsg">Apunta al photocheck.</p>
       <label class="btn btn-ghost w-full" style="display:block;text-align:center">
         Leer QR desde foto
@@ -521,15 +519,6 @@ function marcarPorQR(text) {
   subirUnoNube(al);
 }
 
-function esIOS() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
-
-let iosStream = null;
-let iosLoop = false;
-let iosCanvas = null;
-
 function onDecoded(text) {
   const now = Date.now();
   if (text === lastScanText && now - lastScanAt < 1800) return;
@@ -545,77 +534,40 @@ async function toggleScan() {
   try { box.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
   const msg = document.getElementById('scanMsg');
   prepararAudio();
-  if (esIOS()) {
-    await startIosScan(msg);
-    return;
-  }
   if (typeof Html5Qrcode === 'undefined') {
     msg.textContent = 'No se cargó el lector. Revisa internet y recarga.';
     return;
   }
   try {
     html5Qr = new Html5Qrcode('reader');
+    let camId = { facingMode: 'environment' };
+    try {
+      const cameras = await Html5Qrcode.getCameras();
+      if (cameras && cameras.length) {
+        const back = cameras.find(c => /back|rear|environment|trasera/i.test(c.label || ''));
+        camId = back ? back.id : cameras[cameras.length - 1].id;
+      }
+    } catch (e) {}
     await html5Qr.start(
-      { facingMode: 'environment' },
-      { fps: 15, disableFlip: false },
+      camId,
+      {
+        fps: 10,
+        qrbox: function(vw, vh) {
+          const s = Math.max(160, Math.min(vw, vh) * 0.7);
+          return { width: s, height: s };
+        }
+      },
       onDecoded,
       function onFail() {}
     );
-    msg.textContent = 'Cámara lista. Acerca el QR.';
+    msg.textContent = 'Cámara lista. Centra el QR en el recuadro.';
   } catch (e) {
-    msg.textContent = 'Permite la cámara. ' + (e && e.message ? e.message : '');
+    msg.textContent = 'Permite la cámara en Ajustes → Safari. ' + (e && e.message ? e.message : '');
   }
-}
-
-async function startIosScan(msg) {
-  const video = document.getElementById('iosVideo');
-  if (!video) { msg.textContent = 'No hay visor de cámara.'; return; }
-  video.setAttribute('playsinline', 'true');
-  video.setAttribute('webkit-playsinline', 'true');
-  video.muted = true;
-  video.autoplay = true;
-  try {
-    iosStream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { facingMode: { ideal: 'environment' } }
-    });
-    video.srcObject = iosStream;
-    await video.play();
-    iosCanvas = document.createElement('canvas');
-    iosLoop = true;
-    msg.textContent = 'iPhone: acerca el QR. Si no pita, usa “Leer QR desde foto”.';
-    loopIos();
-  } catch (e) {
-    msg.textContent = 'iPhone: Ajustes → Safari → Cámara = Permitir. Abre en Safari. ' + (e && e.message ? e.message : '');
-  }
-}
-
-function loopIos() {
-  if (!iosLoop) return;
-  const video = document.getElementById('iosVideo');
-  if (video && video.readyState >= 2 && typeof jsQR === 'function') {
-    const w = video.videoWidth || 640;
-    const h = video.videoHeight || 480;
-    iosCanvas.width = w;
-    iosCanvas.height = h;
-    const ctx = iosCanvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(video, 0, 0, w, h);
-    const img = ctx.getImageData(0, 0, w, h);
-    const code = jsQR(img.data, w, h, { inversionAttempts: 'attemptBoth' });
-    if (code && code.data) onDecoded(code.data);
-  }
-  requestAnimationFrame(loopIos);
 }
 
 function stopScan() {
   document.getElementById('scanBox').classList.remove('on');
-  iosLoop = false;
-  if (iosStream) {
-    iosStream.getTracks().forEach(t => t.stop());
-    iosStream = null;
-  }
-  const video = document.getElementById('iosVideo');
-  if (video) video.srcObject = null;
   if (html5Qr) {
     html5Qr.stop().then(() => { try { html5Qr.clear(); } catch(e) {} html5Qr = null; }).catch(() => { html5Qr = null; });
   }
