@@ -93,22 +93,40 @@ function loadBD() {
   return null;
 }
 let BD = null;
+function corregirNiveles(j) {
+  if (!j) return j;
+  const p0 = ((j.primaria && j.primaria.estudiantes) || [])[0];
+  const s0 = ((j.secundaria && j.secundaria.estudiantes) || [])[0];
+  if (p0 && /AGUIRRE/.test(p0.nombre || '') && s0 && /ALEJOS/.test(s0.nombre || '')) {
+    const tmp = j.primaria; j.primaria = j.secundaria; j.secundaria = tmp;
+  }
+  ((j.primaria && j.primaria.estudiantes) || []).forEach(a => { a.nivel = 'primaria'; });
+  ((j.secundaria && j.secundaria.estudiantes) || []).forEach(a => { a.nivel = 'secundaria'; });
+  return j;
+}
 async function ensureBD() {
-  BD = loadBD();
-  if (BD && BD.primaria) return;
   try {
-    const r = await fetch('bd_oficial_2026.json?t=' + Date.now(), {cache:'no-store'});
-    if (r.ok) BD = await r.json();
-  } catch(e) {}
-  if (!BD) BD = { primaria:{estudiantes:[]}, secundaria:{estudiantes:[]} };
+    const r = await fetch('bd_oficial_2026.json?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) {
+      const j = corregirNiveles(await r.json());
+      if (j && j.primaria) {
+        BD = j;
+        try { localStorage.setItem(BD_KEY, JSON.stringify(j)); } catch (e) {}
+        return;
+      }
+    }
+  } catch (e) {}
+  BD = corregirNiveles(loadBD()) || { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
 }
 function payload(al) {
-  return 'IE22375|' + al.nivel + '|' + al.grado + '|' + al.seccion + '|' + al.nombre;
+  const nivel = al.nivel === 'secundaria' ? 'secundaria' : 'primaria';
+  return 'IE22375|' + nivel + '|' + al.grado + '|' + al.seccion + '|' + al.nombre;
 }
 function onNivel() {
   const nivel = document.getElementById('selNivel').value;
   const list = ((BD[nivel]||{}).estudiantes)||[];
-  const grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
+  let grados = [...new Set(list.map(a => Number(a.grado)))].filter(Boolean).sort((a,b)=>a-b);
+  if (!grados.length) grados = nivel === 'secundaria' ? [1,2,3,4,5] : [1,2,3,4,5,6];
   document.getElementById('selGrado').innerHTML = grados.map(g => '<option value="'+g+'">'+g+'°</option>').join('');
   onGrado();
 }
@@ -116,7 +134,10 @@ function onGrado() {
   const nivel = document.getElementById('selNivel').value;
   const g = parseInt(document.getElementById('selGrado').value,10);
   const list = ((BD[nivel]||{}).estudiantes)||[];
-  const secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
+  let secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
+  if (!secs.length) {
+    secs = (nivel === 'secundaria' && g === 5) ? ['Única'] : (nivel === 'secundaria' ? ['A','B'] : ['Única']);
+  }
   document.getElementById('selSeccion').innerHTML = secs.map(s => '<option value="'+s+'">'+s+'</option>').join('');
 }
 function qrImgUrl(text) {
@@ -146,14 +167,15 @@ function generar() {
   const sec = document.getElementById('selSeccion').value;
   const list = (((BD[nivel]||{}).estudiantes)||[])
     .filter(a => Number(a.grado)===g && String(a.seccion)===String(sec))
-    .slice()
+    .map(a => Object.assign({}, a, { nivel: nivel }))
     .sort((a,b)=>(a.orden||0)-(b.orden||0) || a.nombre.localeCompare(b.nombre,'es'));
-  if (!list.length) { alert('No hay alumnos en esa aula.'); return; }
+  if (!list.length) { alert('No hay alumnos en esa aula. ¿Ya subiste bd_oficial_2026.json?'); return; }
   pintar(list);
 }
 function generarNivel() {
   const nivel = document.getElementById('selNivel').value;
   const list = (((BD[nivel]||{}).estudiantes)||[]).slice()
+    .map(a => Object.assign({}, a, { nivel: nivel }))
     .sort((a,b)=>a.grado-b.grado || String(a.seccion).localeCompare(String(b.seccion),'es') || a.nombre.localeCompare(b.nombre,'es'));
   if (!list.length) { alert('No hay alumnos.'); return; }
   pintar(list);
