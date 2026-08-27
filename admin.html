@@ -145,6 +145,9 @@
       <div class="card p-4 mt-3">
         <div class="font-bold text-sm text-slate-600 mb-2">Resumen rápido</div>
         <div id="resumenRapido" class="text-sm text-slate-700 space-y-1"></div>
+        <p class="text-[11px] text-slate-500 mt-2 leading-snug">
+          Nota: solo se cuentan alumnos con matrícula <b>DEFINITIVA</b>. Los <b>TRASLADADOS</b> del SIAGIE se omiten (por eso el total puede ser menor al del reporte oficial).
+        </p>
       </div>
     </section>
 
@@ -172,7 +175,8 @@
             <input id="filtroBuscar" placeholder="Apellido o nombre" oninput="renderTabla()">
           </div>
         </div>
-        <div class="text-xs text-slate-500 mb-2" id="bdCount"></div>
+        <div class="text-xs text-slate-500 mb-1" id="bdCount"></div>
+        <p class="text-[11px] text-slate-400 mb-2">Solo matrícula DEFINITIVA · los TRASLADADOS del SIAGIE no aparecen aquí.</p>
         <div class="overflow-auto max-h-[60vh] border border-slate-100 rounded-xl">
           <table class="data">
             <thead><tr><th>Nº</th><th>Grado</th><th>Sección</th><th>Apellidos y nombres</th><th></th></tr></thead>
@@ -192,6 +196,9 @@
       <div class="card p-4 space-y-3">
         <h2 class="font-black text-lg">Importar base oficial</h2>
         <p class="text-sm text-slate-600">Acepta CSV del <b>SIAGIE</b> (listado de estudiantes) o JSON. Columnas sugeridas: <code class="bg-slate-100 px-1 rounded">nivel,grado,seccion,orden,nombre</code></p>
+        <p class="text-[11px] text-amber-800 bg-amber-50 rounded-lg px-2 py-1.5 leading-snug">
+          Al importar del SIAGIE se excluyen alumnos con estado <b>TRASLADADO</b>. Solo ingresan matrículas <b>DEFINITIVA</b> (ej. 150 en el CSV → 148 activos).
+        </p>
         <div>
           <label class="text-[11px] font-bold text-slate-500">Nivel destino</label>
           <select id="importNivel">
@@ -437,13 +444,16 @@ function renderTabla() {
   if (g) list = list.filter(x => String(x.grado) === String(g));
   if (s) list = list.filter(x => x.seccion === s);
   if (q) list = list.filter(x => (x.nombre||'').toLowerCase().includes(q));
-  list = [...list].sort((a,b) => a.grado - b.grado || String(a.seccion).localeCompare(b.seccion) || (a.orden||0) - (b.orden||0));
-  document.getElementById('bdCount').textContent = list.length + ' alumno(s) mostrados';
+  list = [...list].sort((a,b) => a.grado - b.grado || String(a.seccion).localeCompare(b.seccion,'es') || (a.orden||0) - (b.orden||0) || String(a.nombre).localeCompare(b.nombre,'es'));
+  const totalNivel = estudiantesDe(nivel).length;
+  document.getElementById('bdCount').textContent =
+    list.length + ' alumno(s) mostrados' +
+    (list.length !== totalNivel ? ' · Total en ' + nivel + ': ' + totalNivel : ' (total del nivel)');
   const body = document.getElementById('bdBody');
   body.innerHTML = list.map((al, idx) => {
     const id = encodeURIComponent(al.nombre + '|' + al.grado + '|' + al.seccion);
     return `<tr>
-      <td>${al.orden || idx+1}</td>
+      <td>${idx+1}</td>
       <td>${al.grado}°</td>
       <td>${al.seccion}</td>
       <td>${al.nombre}</td>
@@ -477,8 +487,12 @@ function agregarAlumno() {
 }
 
 function guardarBD() {
+  if (!estado) loadEstado();
   saveEstado();
-  alert('BD guardada en este dispositivo.');
+  actualizarResumen();
+  const p = estudiantesDe('primaria').length;
+  const s = estudiantesDe('secundaria').length;
+  alert('✓ BD guardada en este dispositivo.\n\nPrimaria: ' + p + ' alumnos\nSecundaria: ' + s + ' alumnos\nTotal: ' + (p+s));
 }
 
 function actualizarResumen() {
