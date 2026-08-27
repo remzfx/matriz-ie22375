@@ -174,21 +174,70 @@ function horaAhora() {
   const d = new Date();
   return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
 }
-const HORARIO = {
-  primaria:   { desde: 7 * 60 + 30,  hasta: 8 * 60 + 15 },
-  secundaria: { desde: 12 * 60 + 30, hasta: 13 * 60 + 15 }
-};
+const HORARIO_KEY = 'ie22375_horario_ingreso_v1';
+function horarioDefecto() {
+  return {
+    defaults: {
+      primaria: { desde: '07:30', hasta: '08:15' },
+      secundaria: { desde: '12:30', hasta: '13:15' }
+    },
+    extras: []
+  };
+}
+function loadHorarioLocal() {
+  try {
+    const raw = localStorage.getItem(HORARIO_KEY);
+    if (raw) return Object.assign(horarioDefecto(), JSON.parse(raw));
+  } catch (e) {}
+  return horarioDefecto();
+}
+let HORARIO_CFG = loadHorarioLocal();
+async function ensureHorario() {
+  try {
+    const r = await fetch('horario_ingreso.json?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) {
+      const j = await r.json();
+      if (j && j.defaults) {
+        HORARIO_CFG = Object.assign(horarioDefecto(), j);
+        try { localStorage.setItem(HORARIO_KEY, JSON.stringify(HORARIO_CFG)); } catch (e) {}
+      }
+    }
+  } catch (e) {}
+}
+function hmAMin(hhmm) {
+  const p = String(hhmm || '00:00').split(':');
+  return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
+}
 function minutosAhora() {
   const d = new Date();
   return d.getHours() * 60 + d.getMinutes();
 }
-function marcaPorHora(nivel) {
-  const h = HORARIO[nivel] || HORARIO.primaria;
-  return minutosAhora() <= h.hasta ? 'P' : 'T';
+function ventanasDe(al) {
+  const out = [];
+  const def = (HORARIO_CFG.defaults || {})[al.nivel];
+  if (def) out.push(def);
+  (HORARIO_CFG.extras || []).forEach(function(r) {
+    if (r.nivel && r.nivel !== al.nivel) return;
+    if (r.grado && Number(r.grado) !== Number(al.grado)) return;
+    if (r.seccion && String(r.seccion).toLowerCase() !== String(al.seccion).toLowerCase()) return;
+    out.push(r);
+  });
+  return out;
 }
-function jornadaCerrada(nivel) {
-  const h = HORARIO[nivel] || HORARIO.primaria;
-  return minutosAhora() > h.hasta;
+function marcaPorHora(al) {
+  const now = minutosAhora();
+  const vents = ventanasDe(al);
+  if (!vents.length) return 'P';
+  if (vents.some(function(v) { return now >= hmAMin(v.desde) && now <= hmAMin(v.hasta); })) return 'P';
+  const minDesde = Math.min.apply(null, vents.map(function(v) { return hmAMin(v.desde); }));
+  if (now < minDesde) return 'P';
+  return 'T';
+}
+function jornadaCerrada(al) {
+  const vents = ventanasDe(al);
+  if (!vents.length) return false;
+  const maxHasta = Math.max.apply(null, vents.map(function(v) { return hmAMin(v.hasta); }));
+  return minutosAhora() > maxHasta;
 }
 function toast(m) {
   const el = document.getElementById('toast');
@@ -325,7 +374,7 @@ function completarFaltasAlSubir() {
   const all = loadAsis();
   let n = 0;
   todosAlumnos().forEach(al => {
-    if (!jornadaCerrada(al.nivel)) return;
+    if (!jornadaCerrada(al)) return;
     const k = asisKey(al);
     if (all[k] && all[k].marca) return;
     all[k] = { marca: 'F', hora: horaAhora(), via: 'auto-falta', ts: Date.now() };
@@ -546,7 +595,7 @@ function marcarPorQR(text) {
     toast(al.nombre.split(',')[0] + ' ya registrado hoy a las ' + (ya.hora || '—') + '. Borre la marca manual si desea volver a registrar.');
     return;
   }
-  const marca = marcaPorHora(al.nivel);
+  const marca = marcaPorHora(al);
   setRec(al, marca, 'qr');
   renderLista();
   pitido();
@@ -634,7 +683,7 @@ async function leerFotoQR(input) {
   }
 }
 
-ensureBD().then(() => {
+Promise.all([ensureBD(), ensureHorario()]).then(() => {
   document.getElementById('inpFecha').value = hoyISO();
   onNivel();
 });

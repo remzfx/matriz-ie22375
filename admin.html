@@ -99,6 +99,7 @@
       <button class="navbtn chip chip-on" data-tab="menu" onclick="showTab('menu')">Menú</button>
       <button class="navbtn chip chip-off" data-tab="bd" onclick="showTab('bd')">Estudiantes</button>
       <button class="navbtn chip chip-off" data-tab="periodos" onclick="showTab('periodos')">Bimestres</button>
+      <button class="navbtn chip chip-off" data-tab="horario" onclick="showTab('horario')">Horario ingreso</button>
       <button class="navbtn chip chip-off" data-tab="import" onclick="showTab('import')">Importar</button>
       <button class="navbtn chip chip-off" data-tab="docentes" onclick="showTab('docentes')">Docentes</button>
       <button class="navbtn chip chip-off" data-tab="config" onclick="showTab('config')">Config</button>
@@ -125,6 +126,11 @@
           <div class="text-2xl mb-1">📅</div>
           <div class="font-black">Año y bimestres</div>
           <div class="text-sm text-slate-500">Abrir o cerrar periodos de carga</div>
+        </button>
+        <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('horario')">
+          <div class="text-2xl mb-1">⏰</div>
+          <div class="font-black">Horario de ingreso</div>
+          <div class="text-sm text-slate-500">Presente / tardanza por nivel o sección</div>
         </button>
         <a class="card p-4 text-left hover:ring-2 hover:ring-sky-300 block" href="photochecks.html">
           <div class="text-2xl mb-1">🪪</div>
@@ -238,6 +244,62 @@
         <div class="space-y-2" id="listaBimestres"></div>
         <p class="text-xs text-slate-500 mt-3">Al <b>cerrar</b> un bimestre, los docentes no deberían editar notas de ese periodo (se aplicará en el registro auxiliar).</p>
         <button class="btn btn-primary text-sm mt-3" onclick="savePeriodos()">Guardar periodos</button>
+      </div>
+    </section>
+
+    <section id="tab-horario" class="tab hidden">
+      <div class="card p-4 space-y-4">
+        <h2 class="font-black text-lg">Horario de ingreso (asistencia de puerta)</h2>
+        <p class="text-sm text-slate-600">Dentro del rango = <b>Presente</b>. Después del cierre = <b>Tardanza</b>. La justificación (J) la pone el auxiliar a mano. Si un aula de secundaria viene en la mañana, agregue una regla extra.</p>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <div class="border border-slate-200 rounded-xl p-3">
+            <div class="font-black text-sm mb-2">Primaria (por defecto)</div>
+            <label class="text-[11px] font-bold text-slate-500">Presente desde</label>
+            <input type="time" id="horPriDesde">
+            <label class="text-[11px] font-bold text-slate-500 mt-2">Presente hasta</label>
+            <input type="time" id="horPriHasta">
+          </div>
+          <div class="border border-slate-200 rounded-xl p-3">
+            <div class="font-black text-sm mb-2">Secundaria (por defecto)</div>
+            <label class="text-[11px] font-bold text-slate-500">Presente desde</label>
+            <input type="time" id="horSecDesde">
+            <label class="text-[11px] font-bold text-slate-500 mt-2">Presente hasta</label>
+            <input type="time" id="horSecHasta">
+          </div>
+        </div>
+        <div>
+          <div class="font-black text-sm mb-2">Reglas extra (citación / otra hora)</div>
+          <div class="grid sm:grid-cols-5 gap-2 items-end">
+            <div>
+              <label class="text-[11px] font-bold text-slate-500">Nivel</label>
+              <select id="exNivel"><option value="secundaria">Secundaria</option><option value="primaria">Primaria</option></select>
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-500">Grado (vacío = todos)</label>
+              <input id="exGrado" placeholder="ej. 2">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-500">Sección (vacío = todas)</label>
+              <input id="exSec" placeholder="A, B o Única">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-500">Desde</label>
+              <input type="time" id="exDesde" value="07:30">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-500">Hasta</label>
+              <input type="time" id="exHasta" value="08:15">
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost text-sm mt-2" onclick="agregarReglaHorario()">+ Agregar regla</button>
+          <div id="listaReglasHorario" class="mt-2 space-y-1 text-sm"></div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-primary text-sm" onclick="guardarHorario()">Guardar horario</button>
+          <button class="btn btn-ghost text-sm" onclick="exportarHorario()">Descargar horario_ingreso.json</button>
+          <label class="btn btn-ghost text-sm">Importar JSON<input type="file" accept=".json" hidden onchange="importarHorario(this)"></label>
+        </div>
+        <p class="text-[11px] text-slate-500">Para que el auxiliar en otro equipo use el mismo horario: descargue el JSON y súbalo a GitHub como <b>horario_ingreso.json</b>.</p>
       </div>
     </section>
 
@@ -414,6 +476,7 @@ function showTab(id) {
   if (id === 'docentes') { initDocentesUI(); }
   if (id === 'bd') { fillFiltros(); renderTabla(); }
   if (id === 'periodos') initPeriodosUI();
+  if (id === 'horario') initHorarioUI();
   if (id === 'menu') actualizarResumen();
 }
 
@@ -956,6 +1019,100 @@ function renderDocentes() {
   };
 }
 
+
+const HORARIO_KEY = 'ie22375_horario_ingreso_v1';
+function horarioDefecto() {
+  return {
+    defaults: {
+      primaria: { desde: '07:30', hasta: '08:15' },
+      secundaria: { desde: '12:30', hasta: '13:15' }
+    },
+    extras: []
+  };
+}
+function loadHorario() {
+  try {
+    const raw = localStorage.getItem(HORARIO_KEY);
+    if (raw) return Object.assign(horarioDefecto(), JSON.parse(raw));
+  } catch (e) {}
+  return horarioDefecto();
+}
+function saveHorarioObj(h) {
+  localStorage.setItem(HORARIO_KEY, JSON.stringify(h));
+}
+function initHorarioUI() {
+  const h = loadHorario();
+  document.getElementById('horPriDesde').value = h.defaults.primaria.desde;
+  document.getElementById('horPriHasta').value = h.defaults.primaria.hasta;
+  document.getElementById('horSecDesde').value = h.defaults.secundaria.desde;
+  document.getElementById('horSecHasta').value = h.defaults.secundaria.hasta;
+  renderReglasHorario();
+}
+function renderReglasHorario() {
+  const extras = loadHorario().extras || [];
+  const box = document.getElementById('listaReglasHorario');
+  if (!box) return;
+  if (!extras.length) { box.innerHTML = '<p class="text-slate-400 text-xs">Sin reglas extra.</p>'; return; }
+  box.innerHTML = extras.map((r, i) =>
+    '<div class="flex justify-between gap-2 bg-slate-50 rounded-lg px-3 py-2">' +
+      '<span>' + (r.nivel==='secundaria'?'Sec.':'Pri.') +
+      (r.grado ? (' ' + r.grado + '°') : '') +
+      (r.seccion ? (' ' + r.seccion) : ' (todas)') +
+      ' · ' + r.desde + '–' + r.hasta + '</span>' +
+      '<button class="text-red-600 font-bold" onclick="borrarReglaHorario('+i+')">Quitar</button></div>'
+  ).join('');
+}
+function agregarReglaHorario() {
+  const h = loadHorario();
+  h.extras.push({
+    nivel: document.getElementById('exNivel').value,
+    grado: document.getElementById('exGrado').value.trim(),
+    seccion: document.getElementById('exSec').value.trim(),
+    desde: document.getElementById('exDesde').value || '07:30',
+    hasta: document.getElementById('exHasta').value || '08:15'
+  });
+  saveHorarioObj(h);
+  renderReglasHorario();
+}
+function borrarReglaHorario(i) {
+  const h = loadHorario();
+  h.extras.splice(i, 1);
+  saveHorarioObj(h);
+  renderReglasHorario();
+}
+function guardarHorario() {
+  const h = loadHorario();
+  h.defaults.primaria.desde = document.getElementById('horPriDesde').value || '07:30';
+  h.defaults.primaria.hasta = document.getElementById('horPriHasta').value || '08:15';
+  h.defaults.secundaria.desde = document.getElementById('horSecDesde').value || '12:30';
+  h.defaults.secundaria.hasta = document.getElementById('horSecHasta').value || '13:15';
+  saveHorarioObj(h);
+  alert('Horario guardado en este navegador.\nSi el auxiliar usa otro equipo, descargue horario_ingreso.json y súbalo a GitHub.');
+}
+function exportarHorario() {
+  guardarHorario();
+  const blob = new Blob([JSON.stringify(loadHorario(), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'horario_ingreso.json';
+  a.click();
+}
+function importarHorario(inp) {
+  const f = inp.files && inp.files[0];
+  inp.value = '';
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = function() {
+    try {
+      const j = JSON.parse(r.result);
+      if (!j.defaults) throw new Error('JSON inválido');
+      saveHorarioObj(Object.assign(horarioDefecto(), j));
+      initHorarioUI();
+      alert('Horario importado.');
+    } catch (e) { alert('No se pudo leer el archivo.'); }
+  };
+  r.readAsText(f);
+}
 
 function cambiarClave() {
   const n = document.getElementById('cfgPass').value;

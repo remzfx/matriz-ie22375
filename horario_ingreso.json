@@ -1,0 +1,7 @@
+{
+  "defaults": {
+    "primaria": { "desde": "07:30", "hasta": "08:15" },
+    "secundaria": { "desde": "12:30", "hasta": "13:15" }
+  },
+  "extras": []
+}
