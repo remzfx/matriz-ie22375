@@ -184,5 +184,179 @@
       "5|ÚNICA"
     ],
     "ts": 1787779039929
+  },
+  {
+    "id": "d1787947545759",
+    "user": "40297749",
+    "pass": "40297749",
+    "nombre": "CHOQUE AYBAR, LUIS JAVIER",
+    "nivel": "secundaria",
+    "grados": [],
+    "areas": [
+      "Matemática"
+    ],
+    "aulas": [
+      "3|A",
+      "3|B",
+      "4|A",
+      "4|B",
+      "5|ÚNICA"
+    ],
+    "ts": 1787947545759
+  },
+  {
+    "id": "d1787947737935",
+    "user": "28854774",
+    "pass": "28854774",
+    "nombre": "GALINDO ALVIAR, Ninoska",
+    "nivel": "secundaria",
+    "grados": [],
+    "areas": [
+      "Comunicación"
+    ],
+    "aulas": [
+      "1|A",
+      "1|B",
+      "3|A",
+      "3|B",
+      "5|ÚNICA"
+    ],
+    "ts": 1787947737935
+  },
+  {
+    "id": "d1787947838542",
+    "user": "21469494",
+    "pass": "21469494",
+    "nombre": "HUARCAYA HOSTIA, ANA ELIZABETH",
+    "nivel": "secundaria",
+    "grados": [],
+    "areas": [
+      "Comunicación"
+    ],
+    "aulas": [
+      "2|A",
+      "2|B",
+      "4|A",
+      "4|B"
+    ],
+    "ts": 1787947838543
+  },
+  {
+    "id": "d1787947997583",
+    "user": "21549890",
+    "pass": "21549890",
+    "nombre": "HUARCAYA SERVELLON, NILDA EVANGELINA",
+    "nivel": "secundaria",
+    "grados": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "areas": [
+      "Desarrollo Personal, Ciudadanía y Cívica"
+    ],
+    "aulas": [
+      "1|A",
+      "1|B",
+      "2|A",
+      "2|B",
+      "3|A",
+      "3|B",
+      "4|A",
+      "4|B"
+    ],
+    "ts": 1787947997583
+  },
+  {
+    "id": "d1787948148135",
+    "user": "23522944",
+    "pass": "23522944",
+    "nombre": "MARTINEZ ÑAÑEZ, IVAN GENARO",
+    "nivel": "secundaria",
+    "grados": [],
+    "areas": [
+      "Matemática",
+      "Ciencia y Tecnología"
+    ],
+    "aulas": [
+      "1|A",
+      "1|B",
+      "2|A",
+      "2|B",
+      "5|ÚNICA"
+    ],
+    "ts": 1787948148135
+  },
+  {
+    "id": "d1787948288855",
+    "user": "21539372",
+    "pass": "21539372",
+    "nombre": "PACHECO HUAROTTO, NANCY SOLEDAD",
+    "nivel": "secundaria",
+    "grados": [],
+    "areas": [
+      "Inglés"
+    ],
+    "aulas": [
+      "1|A",
+      "1|B",
+      "2|A",
+      "2|B",
+      "3|A",
+      "3|B",
+      "4|A",
+      "4|B",
+      "5|ÚNICA"
+    ],
+    "ts": 1787948288855
+  },
+  {
+    "id": "d1787948400143",
+    "user": "40977340",
+    "pass": "40977340",
+    "nombre": "SANCHEZ HUAYTA, LAURA GUISELLA",
+    "nivel": "secundaria",
+    "grados": [],
+    "areas": [
+      "Educación Religiosa"
+    ],
+    "aulas": [
+      "1|A",
+      "1|B",
+      "2|A",
+      "2|B",
+      "3|A",
+      "3|B",
+      "4|A",
+      "4|B",
+      "5|ÚNICA"
+    ],
+    "ts": 1787948400143
+  },
+  {
+    "id": "d1787948491327",
+    "user": "21466751",
+    "pass": "21466751",
+    "nombre": "ZORRILLA NIETO, JULIO RICARDO",
+    "nivel": "secundaria",
+    "grados": [],
+    "areas": [
+      "Educación Física"
+    ],
+    "aulas": [
+      "1|A",
+      "1|B",
+      "2|A",
+      "2|B",
+      "3|A",
+      "3|B",
+      "4|A",
+      "4|B",
+      "5|ÚNICA"
+    ],
+    "ts": 1787948491327
   }
 ]
