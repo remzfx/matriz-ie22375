@@ -142,7 +142,7 @@ async function intentarLogin() {
       return;
     }
     setSession({ user:'admin', label:'Administrador', nivel:'admin', role:'admin', grados:null, areas:null,
-      mods:['admin_bd','registro','auxiliar','matriz_pri','matriz_sec'], ts:Date.now() });
+      mods:['admin_bd','registro','auxiliar','matriz_pri','matriz_sec','aip'], ts:Date.now() });
     mostrarHub();
     return;
   }
@@ -182,7 +182,7 @@ function cerrarSesion() {
   document.getElementById('inpPass').value = '';
 }
 function modsDe(s) {
-  if (s.role === 'admin' || s.user === 'admin') return ['admin_bd','registro','auxiliar','matriz_pri','matriz_sec'];
+  if (s.role === 'admin' || s.user === 'admin') return ['admin_bd','registro','auxiliar','matriz_pri','matriz_sec','aip'];
   if (s.mods && s.mods.length) return s.mods;
   if (s.role === 'auxiliar' || s.user === 'auxiliar') return ['auxiliar'];
   if (s.nivel === 'primaria') return ['matriz_pri','registro'];
@@ -210,7 +210,8 @@ function mostrarHub() {
     matriz_sec: { href:'secundaria.html', title:'Matriz consolidado · Secundaria', desc:'Áreas y gráficos de avance', badge:'SECUNDARIA' },
     registro: { href:'registro.html', title:'Registro auxiliar', desc:'Notas, asistencia e impresión', badge:'REGISTRO' },
     admin_bd: { href:'admin.html', title:'Administración', desc:'BD, docentes y bimestres', badge:'ADMIN' },
-    auxiliar: { href:'auxiliar.html', title:'Asistencia de ingreso', desc:'Puerta · QR · lista del aula para WhatsApp', badge:'AUXILIAR' }
+    auxiliar: { href:'auxiliar.html', title:'Asistencia de ingreso', desc:'Puerta · QR · lista del aula para WhatsApp', badge:'AUXILIAR' },
+    aip: { href:'aula_innovacion.html', title:'Aula de innovación (AIP)', desc:'Horario mensual · competencia 28', badge:'PIP' }
   };
   const keys = modsDe(s).filter(m => catalog[m]);
   document.getElementById('modulos').innerHTML = keys.map(key => {
