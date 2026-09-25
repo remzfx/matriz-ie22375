@@ -1,6 +1,7 @@
 const KEY = 'ie22375_aip_plan_v1';
 const CFG_KEY = 'ie22375_aip_cfg_v1';
-const FERIADOS = { '2026-10-08': 'Combate de Angamos' };
+const FERIADOS_DEF = { '2026-10-08': 'Combate de Angamos' };
+let feriados = Object.assign({}, FERIADOS_DEF);
 const DOW = ['LUN','MAR','MIE','JUE','VIE'];
 const PIP_PRI = { 4:[1,3], 5:[1,3], 6:[1,3] };
 const PIP_SEC = { 1:[0,1,3], 2:[0,1,2,3,4], 3:[0,1,2,3,4], 4:[0,2,4], 5:[0,2,4], 6:[0,2,4], 7:[2,4] };
@@ -107,20 +108,56 @@ function candidatosAIP(wd, hora, fecha) {
   if (fecha && (!slotActivo(fecha,'sec',hora,wd) || !slotActivo(fecha,'sec',par,wd))) return [];
   return list.filter(c => mismoGrupo(wd, hora, par, c.seccion));
 }
+function esFeriado(f) { return !!(feriados && feriados[f]); }
 function loadCfg() {
   try {
     const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
     if (c.bloque) document.getElementById('selBloque').value = c.bloque;
     if (c.modo) document.getElementById('selModo').value = c.modo;
     plantilla = (c.plantilla && c.plantilla.pri && c.plantilla.sec) ? c.plantilla : plantillaDefault();
-  } catch (e) { plantilla = plantillaDefault(); }
+    if (c.feriados && typeof c.feriados === 'object') feriados = c.feriados;
+    else feriados = Object.assign({}, FERIADOS_DEF);
+  } catch (e) { plantilla = plantillaDefault(); feriados = Object.assign({}, FERIADOS_DEF); }
 }
 function guardarCfg() {
   localStorage.setItem(CFG_KEY, JSON.stringify({
     bloque: bloqueCfg(),
     modo: (document.getElementById('selModo') || {}).value || 'asignar',
-    plantilla: plantilla || plantillaDefault()
+    plantilla: plantilla || plantillaDefault(),
+    feriados: feriados
   }));
+}
+function renderFeriados() {
+  const box = document.getElementById('listaFer');
+  if (!box) return;
+  const keys = Object.keys(feriados).sort();
+  if (!keys.length) { box.innerHTML = '<span class="text-[11px] text-slate-400">Ningún feriado marcado</span>'; return; }
+  box.innerHTML = keys.map(f =>
+    '<button type="button" class="btn btn-ghost text-xs" style="padding:.25rem .5rem" onclick="quitarFeriado(\''+f+'\')">'+
+    f+' · '+(feriados[f]||'Feriado')+' ✕</button>'
+  ).join('');
+}
+function agregarFeriado() {
+  const f = (document.getElementById('inpFerFecha') || {}).value;
+  const n = ((document.getElementById('inpFerNom') || {}).value || '').trim() || 'Feriado';
+  if (!f) { alert('Elige la fecha del feriado.'); return; }
+  feriados[f] = n;
+  guardarCfg();
+  renderFeriados();
+  render();
+}
+function quitarFeriado(f) {
+  delete feriados[f];
+  guardarCfg();
+  renderFeriados();
+  render();
+}
+function toggleFeriadoDia(f) {
+  if (esFeriado(f)) delete feriados[f];
+  else feriados[f] = 'Feriado';
+  guardarCfg();
+  renderFeriados();
+  render();
 }
 function load() {
   try { plan = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { plan = {}; }
@@ -208,8 +245,8 @@ function armarMes() {
       });
     });
   });
-  const tues = days.filter(d => d.getDay()===2 && !FERIADOS[ymd(d)]);
-  const thus = days.filter(d => d.getDay()===4 && !FERIADOS[ymd(d)]);
+  const tues = days.filter(d => d.getDay()===2 && !esFeriado(ymd(d)));
+  const thus = days.filter(d => d.getDay()===4 && !esFeriado(ymd(d)));
   const rotMar = ['3°','5°'];
   const rotJue = ['4°','6°'];
   tues.forEach((d,i) => {
@@ -230,7 +267,7 @@ function armarMes() {
   SECS.forEach(s => visits[s]=0);
   days.forEach(d => {
     const f = ymd(d);
-    if (FERIADOS[f]) return;
+    if (esFeriado(f)) return;
     const wd = d.getDay()-1;
     const usedDay = {};
     [1,2,3,4,5,6,7].forEach(h => {
@@ -275,13 +312,13 @@ function render() {
     let h = '<th>N°</th><th>Hora</th>';
     days.forEach(d => {
       const f = ymd(d);
-      h += '<th>'+String(d.getDate()).padStart(2,'0')+'<br>'+DOW[d.getDay()-1]+(FERIADOS[f]?'<br>FER':'')+'</th>';
+      h += '<th style="cursor:pointer" title="Clic para marcar o quitar feriado" onclick="toggleFeriadoDia(\''+f+'\')">'+String(d.getDate()).padStart(2,'0')+'<br>'+DOW[d.getDay()-1]+(esFeriado(f)?'<br>FER':'')+'</th>';
     });
     return h;
   }
   function cell(d, nivel, hora) {
     const f = ymd(d); const wd = d.getDay()-1;
-    if (FERIADOS[f]) return '<td class="c-fer">FERIADO</td>';
+    if (esFeriado(f)) return '<td class="c-fer" onclick="toggleFeriadoDia(\''+f+'\')">FERIADO</td>';
     if (hora==='R') return '<td class="c-rec">RECREO</td>';
     const on = slotActivo(f,nivel,hora,wd);
     const c = celda(f,nivel,hora);
@@ -290,7 +327,7 @@ function render() {
     return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\','+hora+')">'+t+'</td>';
   }
   let p = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
-  p += '<tr><td></td><td>10:15-10:30</td>'+days.map(d=>FERIADOS[ymd(d)]?'<td class="c-fer">FER</td>':'<td class="c-rec">RECREO</td>').join('')+'</tr>';
+  p += '<tr><td></td><td>10:15-10:30</td>'+days.map(d=>esFeriado(ymd(d))?'<td class="c-fer" onclick="toggleFeriadoDia(\''+ymd(d)+'\')">FER</td>':'<td class="c-rec">RECREO</td>').join('')+'</tr>';
   HPRI.forEach(([h,lab]) => { p += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'pri',h)).join('')+'</tr>'; });
   document.getElementById('boxPri').innerHTML = p+'</tbody></table>';
   let s = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
@@ -298,7 +335,11 @@ function render() {
   document.getElementById('boxSec').innerHTML = s+'</tbody></table>';
 }
 function clicCelda(fecha, nivel, hora) {
-  if (FERIADOS[fecha] || hora==='R') return;
+  if (hora==='R') return;
+  if (esFeriado(fecha) && !modoDefinir()) {
+    if (confirm('Este día está como feriado. ¿Quitar feriado y habilitar horas?')) toggleFeriadoDia(fecha);
+    return;
+  }
   if (modoDefinir()) {
     const d = new Date(fecha+'T12:00:00');
     const wd = d.getDay()-1;
@@ -312,7 +353,10 @@ function clicCelda(fecha, nivel, hora) {
 function abrir(fecha, nivel, hora) {
   const d = new Date(fecha+'T12:00:00');
   const wd = d.getDay()-1;
-  if (FERIADOS[fecha]) return;
+  if (esFeriado(fecha)) {
+    if (confirm('Este día está como feriado. ¿Quitar feriado?')) toggleFeriadoDia(fecha);
+    return;
+  }
   editKey = { fecha, nivel, hora, wd };
   const c = celda(fecha, nivel, hora) || {};
   document.getElementById('modTit').textContent = (nivel==='pri'?'Primaria':'Secundaria')+' · '+fecha+' · hora '+hora;
@@ -360,5 +404,7 @@ function onMes() { render(); }
 
 load();
 if (!plantilla) plantilla = plantillaDefault();
+if (!feriados) feriados = Object.assign({}, FERIADOS_DEF);
 renderPlantilla();
+renderFeriados();
 render();

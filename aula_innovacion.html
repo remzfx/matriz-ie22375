@@ -71,6 +71,22 @@
       </div>
     </div>
     <p class="text-[11px] text-slate-500">Entran <b>3°, 4°, 5° y 6°</b>. Si el director quita primaria: apaga esas celdas en la plantilla y prende horas de secundaria. Luego Aplicar plantilla al mes.</p>
+    <div class="border-t border-slate-200 pt-2 space-y-2">
+      <div class="text-xs font-black">Feriados (nacional o local)</div>
+      <div class="flex flex-wrap gap-2 items-end">
+        <div>
+          <label class="text-[10px] font-bold text-slate-500">Fecha</label>
+          <input type="date" id="inpFerFecha" />
+        </div>
+        <div class="flex-1 min-w-[140px]">
+          <label class="text-[10px] font-bold text-slate-500">Nombre</label>
+          <input type="text" id="inpFerNom" placeholder="Ej. Fiesta patronal" style="width:100%;border:1.5px solid #cbd5e1;border-radius:10px;padding:.5rem .65rem;font-size:14px" />
+        </div>
+        <button class="btn btn-ghost text-xs" type="button" onclick="agregarFeriado()">Agregar feriado</button>
+      </div>
+      <p class="text-[11px] text-slate-500">También puedes tocar el <b>nombre del día</b> en la cabecera del mes (01 JUE) para marcarlo o quitarlo. El 8 oct viene sugerido; si hay clase, quítalo.</p>
+      <div id="listaFer" class="flex flex-wrap gap-1"></div>
+    </div>
   </div>
   <div class="card p-3 no-print space-y-2">
     <div class="flex flex-wrap items-center justify-between gap-2">
