@@ -96,7 +96,7 @@
         <button class="btn btn-ghost text-xs" type="button" onclick="aplicarPlantillaAlMes()">Aplicar plantilla al mes</button>
       </div>
     </div>
-    <p class="text-[11px] text-slate-500">Verde = AIP todas las semanas. Clic para encender o apagar.</p>
+    <p class="text-[11px] text-slate-500">Primaria ya tiene la mañana completa (8:00 a 12:45). Verde = AIP. Clic para encender o apagar. Si el próximo año hay PIP de primaria, marca lun–vie desde la hora 1.</p>
     <div class="grid md:grid-cols-2 gap-3">
       <div><div class="text-xs font-bold mb-1">Primaria</div><div id="boxPlantPri"></div></div>
       <div><div class="text-xs font-bold mb-1">Secundaria</div><div id="boxPlantSec"></div></div>
@@ -132,9 +132,9 @@ const CFG_KEY = 'ie22375_aip_cfg_v1';
 const FERIADOS_DEF = {};
 let feriados = {};
 const DOW = ['LUN','MAR','MIE','JUE','VIE'];
-const PIP_PRI = { 4:[1,3], 5:[1,3], 6:[1,3] };
+const PIP_PRI = { 1:[], 2:[], 3:[], 4:[1,3], 5:[1,3], 6:[1,3] };
 const PIP_SEC = { 1:[0,1,3], 2:[0,1,2,3,4], 3:[0,1,2,3,4], 4:[0,2,4], 5:[0,2,4], 6:[0,2,4], 7:[2,4] };
-const HPRI = [[4,'10:30-11:15'],[5,'11:15-12:00'],[6,'12:00-12:45']];
+const HPRI = [[1,'08:00-08:45'],[2,'08:45-09:30'],[3,'09:30-10:15'],['R','10:15-10:30'],[4,'10:30-11:15'],[5,'11:15-12:00'],[6,'12:00-12:45']];
 const HSEC = [[1,'13:00-13:45'],[2,'13:45-14:30'],[3,'14:30-15:15'],[4,'15:15-16:00'],['R','16:00-16:30'],[5,'16:30-17:15'],[6,'17:15-18:00'],[7,'18:00-18:45']];
 const SECS = ['1A','1B','2A','2B','3A','3B','4A','4B','5U'];
 function L(area, doc) { return { area: area, doc: doc }; }
@@ -392,16 +392,16 @@ function armarMes() {
   tues.forEach((d,i) => {
     const g = rotMar[i % rotMar.length];
     const f = ymd(d); const wd = d.getDay()-1;
-    if (slotActivo(f,'pri',4,wd)) setCelda(f,'pri',4,{ tipo:'grupo', texto:g });
-    if (slotActivo(f,'pri',5,wd)) setCelda(f,'pri',5,{ tipo:'grupo', texto:g });
-    if (slotActivo(f,'pri',6,wd)) setCelda(f,'pri',6,{ tipo:'man', texto:'MAN. PREVENT' });
+    [1,2,3,4,5,6].forEach(h => {
+      if (slotActivo(f,'pri',h,wd)) setCelda(f,'pri',h,{ tipo:'grupo', texto:g });
+    });
   });
   thus.forEach((d,i) => {
     const g = rotJue[i % rotJue.length];
     const f = ymd(d); const wd = d.getDay()-1;
-    if (slotActivo(f,'pri',4,wd)) setCelda(f,'pri',4,{ tipo:'grupo', texto:g });
-    if (slotActivo(f,'pri',5,wd)) setCelda(f,'pri',5,{ tipo:'grupo', texto:g });
-    if (slotActivo(f,'pri',6,wd)) setCelda(f,'pri',6,{ tipo:'man', texto:'MAN. PREVENT' });
+    [1,2,3,4,5,6].forEach(h => {
+      if (slotActivo(f,'pri',h,wd)) setCelda(f,'pri',h,{ tipo:'grupo', texto:g });
+    });
   });
   const visits = {};
   SECS.forEach(s => visits[s]=0);
@@ -464,10 +464,9 @@ function render() {
     const c = celda(f,nivel,hora);
     const t = on ? ((c && c.tipo!=='abierto' && c.texto) ? c.texto : '—') : '';
     const cl = on ? (c ? clsDe(c.tipo) : 'c-aip') : 'c-gray';
-    return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\','+hora+')">'+t+'</td>';
+    return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+t+'</td>';
   }
   let p = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
-  p += '<tr><td></td><td>10:15-10:30</td>'+days.map(d=>esFeriado(ymd(d))?'<td class="c-fer" onclick="toggleFeriadoDia(\''+ymd(d)+'\')">FER</td>':'<td class="c-rec">RECREO</td>').join('')+'</tr>';
   HPRI.forEach(([h,lab]) => { p += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'pri',h)).join('')+'</tr>'; });
   document.getElementById('boxPri').innerHTML = p+'</tbody></table>';
   let s = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
