@@ -59,6 +59,13 @@
           <option value="2" selected>Solo si tiene 2 horas seguidas</option>
         </select>
       </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Qué hace el clic en el cuadrito</label>
+        <select id="selModo" onchange="guardarCfg()">
+          <option value="definir">Definir horas AIP (marcar / bloquear)</option>
+          <option value="asignar" selected>Asignar grupo o soporte</option>
+        </select>
+      </div>
       <label class="flex items-center gap-2 text-sm font-bold pb-2">
         <input type="checkbox" id="chkTer" checked onchange="guardarCfg()" /> Incluir 3° primaria
       </label>
@@ -69,8 +76,9 @@
       </div>
     </div>
     <p class="text-[11px] text-slate-500 leading-snug">
-      <b>2 horas:</b> el docente solo entra si tiene el mismo grupo en dos horas seguidas y ambas son AIP.
-      <b>1 hora / cualquier:</b> puede entrar en un solo bloque. Clic en la celda para cambiar.
+      El verde inicial es la plantilla de 30 h del PIP. En <b>Definir horas AIP</b> tocas un cuadrito para
+      <b>activarlo</b> (verde) o <b>bloquearlo</b> (gris). En <b>Asignar</b> eliges el grupo.
+      Las 2 horas seguidas solo se usan si ambas celdas están activas.
     </p>
   </div>
 
@@ -95,6 +103,8 @@
     <label class="text-[10px] font-bold text-slate-500">Tipo</label>
     <select id="modTipo" onchange="onModTipo()">
       <option value="grupo">Grupo (docente + sección)</option>
+      <option value="abierto">Hora AIP libre (sin grupo)</option>
+      <option value="bloqueado">Bloquear — no es hora AIP</option>
       <option value="soporte">SOPORTE</option>
       <option value="colegio">COLEGIO</option>
       <option value="man">MANTENIMIENTO</option>
@@ -180,6 +190,17 @@ function pipOk(nivel, hora, wd) {
   const m = nivel==='pri' ? PIP_PRI : PIP_SEC;
   return (m[hora] || []).indexOf(wd) >= 0;
 }
+function slotActivo(fecha, nivel, hora, wd) {
+  if (hora === 'R') return false;
+  const c = celda(fecha, nivel, hora);
+  if (c && c.tipo === 'bloqueado') return false;
+  if (c && c.tipo === 'abierto') return true;
+  if (c && c.tipo && c.tipo !== 'bloqueado') return true;
+  return pipOk(nivel, hora, wd);
+}
+function modoDefinir() {
+  return (document.getElementById('selModo') || {}).value === 'definir';
+}
 function candidatos(wd, hora) {
   const row = (HS[wd] && HS[wd][hora]) || {};
   return Object.keys(row).map(s => ({ seccion:s, area:row[s].area, doc:row[s].doc, texto: s+' '+row[s].area+' '+row[s].doc }));
@@ -202,23 +223,27 @@ function bloqueCfg() {
 function exigeDos() {
   return bloqueCfg() === '2';
 }
-function candidatosAIP(wd, hora) {
+function candidatosAIP(wd, hora, fecha) {
   let list = candidatos(wd, hora);
   if (!exigeDos()) return list;
   const par = horaPar(hora);
-  if (!par || !pipOk('sec', hora, wd) || !pipOk('sec', par, wd)) return [];
+  if (!par) return [];
+  if (fecha && (!slotActivo(fecha,'sec',hora,wd) || !slotActivo(fecha,'sec',par,wd))) return [];
+  if (!fecha && (!pipOk('sec', hora, wd) || !pipOk('sec', par, wd))) return [];
   return list.filter(c => mismoGrupo(wd, hora, par, c.seccion));
 }
 function loadCfg() {
   try {
     const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
     if (c.bloque) document.getElementById('selBloque').value = c.bloque;
+    if (c.modo) document.getElementById('selModo').value = c.modo;
     if (typeof c.inc3 === 'boolean') document.getElementById('chkTer').checked = c.inc3;
   } catch (e) {}
 }
 function guardarCfg() {
   localStorage.setItem(CFG_KEY, JSON.stringify({
     bloque: bloqueCfg(),
+    modo: (document.getElementById('selModo') || {}).value || 'asignar',
     inc3: document.getElementById('chkTer').checked
   }));
 }
@@ -246,7 +271,17 @@ function armarMes() {
   const ym = document.getElementById('inpMes').value;
   const inc3 = document.getElementById('chkTer').checked;
   const days = diasMes(ym);
-  days.forEach(d => { delete plan[ymd(d)]; });
+  days.forEach(d => {
+    const f = ymd(d);
+    ['pri','sec'].forEach(n => {
+      const o = plan[f] && plan[f][n];
+      if (!o) return;
+      Object.keys(o).forEach(h => {
+        if (o[h] && (o[h].tipo==='bloqueado' || o[h].tipo==='abierto')) return;
+        delete o[h];
+      });
+    });
+  });
 
   const tues = days.filter(d => d.getDay()===2 && !FERIADOS[ymd(d)]);
   const thus = days.filter(d => d.getDay()===4 && !FERIADOS[ymd(d)]);
@@ -256,16 +291,18 @@ function armarMes() {
   tues.forEach((d,i) => {
     const g = rotMar[i % rotMar.length];
     const f = ymd(d);
-    setCelda(f,'pri',4,{ tipo:'grupo', texto:g });
-    setCelda(f,'pri',5,{ tipo:'grupo', texto:g });
-    setCelda(f,'pri',6,{ tipo:'man', texto:'MAN. PREVENT' });
+    const wd = d.getDay()-1;
+    if (slotActivo(f,'pri',4,wd)) setCelda(f,'pri',4,{ tipo:'grupo', texto:g });
+    if (slotActivo(f,'pri',5,wd)) setCelda(f,'pri',5,{ tipo:'grupo', texto:g });
+    if (slotActivo(f,'pri',6,wd)) setCelda(f,'pri',6,{ tipo:'man', texto:'MAN. PREVENT' });
   });
   thus.forEach((d,i) => {
     const g = rotJue[i % rotJue.length];
     const f = ymd(d);
-    setCelda(f,'pri',4,{ tipo:'grupo', texto:g });
-    setCelda(f,'pri',5,{ tipo:'grupo', texto:g });
-    setCelda(f,'pri',6,{ tipo:'man', texto:'MAN. PREVENT' });
+    const wd = d.getDay()-1;
+    if (slotActivo(f,'pri',4,wd)) setCelda(f,'pri',4,{ tipo:'grupo', texto:g });
+    if (slotActivo(f,'pri',5,wd)) setCelda(f,'pri',5,{ tipo:'grupo', texto:g });
+    if (slotActivo(f,'pri',6,wd)) setCelda(f,'pri',6,{ tipo:'man', texto:'MAN. PREVENT' });
   });
 
   const visits = {};
@@ -278,8 +315,8 @@ function armarMes() {
     const wd = d.getDay()-1;
     usedDay[f] = {};
     [1,2,3,4,5,6,7].forEach(h => {
-      if (!pipOk('sec', h, wd)) return;
-      if (celda(f,'sec',h)) return;
+      if (!slotActivo(f,'sec', h, wd)) return;
+      if (celda(f,'sec',h) && celda(f,'sec',h).tipo !== 'abierto') return;
       if (h>=6 && (wd===0 || wd===4)) {
         setCelda(f,'sec',h,{ tipo:'man', texto:'MAN. PREVENT' });
         return;
@@ -290,7 +327,7 @@ function armarMes() {
       }
       const par = horaPar(h);
       const dos = exigeDos();
-      let cands = (dos ? candidatosAIP(wd, h) : candidatos(wd, h)).filter(c => !usedDay[f][c.seccion]);
+      let cands = (dos ? candidatosAIP(wd, h, f) : candidatos(wd, h)).filter(c => !usedDay[f][c.seccion]);
       if (dos && par && h > par) {
         setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
         return;
@@ -305,7 +342,7 @@ function armarMes() {
       usedDay[f][pick.seccion] = 1;
       const obj = { tipo:'grupo', seccion:pick.seccion, area:pick.area, doc:pick.doc, texto:pick.texto };
       setCelda(f,'sec',h, obj);
-      if (dos && par && pipOk('sec', par, wd) && mismoGrupo(wd, h, par, pick.seccion)) {
+      if (dos && par && slotActivo(f,'sec', par, wd) && mismoGrupo(wd, h, par, pick.seccion)) {
         const row2 = HS[wd][par][pick.seccion];
         setCelda(f,'sec',par, { tipo:'grupo', seccion:pick.seccion, area:row2.area, doc:row2.doc, texto:pick.seccion+' '+row2.area+' '+row2.doc });
       }
@@ -316,7 +353,7 @@ function armarMes() {
 
 function clsDe(tipo, fer) {
   if (fer) return 'c-fer';
-  return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', man:'c-man', vacio:'c-aip' })[tipo] || 'c-gray';
+  return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', man:'c-man', vacio:'c-aip', abierto:'c-aip', bloqueado:'c-gray' })[tipo] || 'c-gray';
 }
 
 function render() {
@@ -338,21 +375,21 @@ function render() {
   function cellPri(d, hora) {
     const f = ymd(d); const wd = d.getDay()-1;
     if (FERIADOS[f]) return '<td class="c-fer">FERIADO</td>';
-    if (!pipOk('pri', hora, wd)) return '<td class="c-gray"></td>';
+    const on = slotActivo(f,'pri',hora,wd);
     const c = celda(f,'pri',hora);
-    const t = c ? c.texto : '—';
-    const cl = c ? clsDe(c.tipo) : 'c-aip';
-    return '<td class="'+cl+'" onclick="abrir(\''+f+'\',\'pri\','+hora+')">'+t+'</td>';
+    const t = on ? ((c && c.tipo!=='abierto' && c.texto) ? c.texto : '—') : '';
+    const cl = on ? (c ? clsDe(c.tipo) : 'c-aip') : 'c-gray';
+    return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\'pri\','+hora+')">'+t+'</td>';
   }
   function cellSec(d, hora) {
     const f = ymd(d); const wd = d.getDay()-1;
     if (FERIADOS[f]) return '<td class="c-fer">FERIADO</td>';
     if (hora==='R') return '<td class="c-rec">RECREO</td>';
-    if (!pipOk('sec', hora, wd)) return '<td class="c-gray"></td>';
+    const on = slotActivo(f,'sec',hora,wd);
     const c = celda(f,'sec',hora);
-    const t = c ? c.texto : '—';
-    const cl = c ? clsDe(c.tipo) : 'c-aip';
-    return '<td class="'+cl+'" onclick="abrir(\''+f+'\',\'sec\','+hora+')">'+t+'</td>';
+    const t = on ? ((c && c.tipo!=='abierto' && c.texto) ? c.texto : '—') : '';
+    const cl = on ? (c ? clsDe(c.tipo) : 'c-aip') : 'c-gray';
+    return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\'sec\','+hora+')">'+t+'</td>';
   }
 
   let p = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
@@ -371,10 +408,22 @@ function render() {
   document.getElementById('boxSec').innerHTML = s;
 }
 
+function clicCelda(fecha, nivel, hora) {
+  if (FERIADOS[fecha]) return;
+  if (modoDefinir()) {
+    const d = new Date(fecha+'T12:00:00');
+    const wd = d.getDay()-1;
+    if (slotActivo(fecha, nivel, hora, wd)) setCelda(fecha, nivel, hora, { tipo:'bloqueado', texto:'' });
+    else setCelda(fecha, nivel, hora, { tipo:'abierto', texto:'—' });
+    render();
+    return;
+  }
+  abrir(fecha, nivel, hora);
+}
 function abrir(fecha, nivel, hora) {
   const d = new Date(fecha+'T12:00:00');
   const wd = d.getDay()-1;
-  if (FERIADOS[fecha] || !pipOk(nivel, hora, wd)) return;
+  if (FERIADOS[fecha]) return;
   editKey = { fecha, nivel, hora, wd };
   const c = celda(fecha, nivel, hora) || {};
   document.getElementById('modTit').textContent = (nivel==='pri'?'Primaria':'Secundaria')+' · '+fecha+' · hora '+hora;
@@ -388,7 +437,7 @@ function abrir(fecha, nivel, hora) {
     sel.innerHTML = gs.map(g => '<option value="'+g+'">'+g+'</option>').join('');
     if (c.texto) sel.value = c.texto;
   } else {
-    const cands = candidatosAIP(wd, hora);
+    const cands = candidatosAIP(wd, hora, fecha);
     sel.innerHTML = cands.map(x => '<option value="'+x.seccion+'">'+x.texto+'</option>').join('') || '<option value="">—</option>';
     if (c.seccion) sel.value = c.seccion;
   }
@@ -404,6 +453,8 @@ function aplicarModal() {
   const tipo = document.getElementById('modTipo').value;
   const { fecha, nivel, hora, wd } = editKey;
   if (tipo==='vacio') setCelda(fecha,nivel,hora,null);
+  else if (tipo==='bloqueado') setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
+  else if (tipo==='abierto') setCelda(fecha,nivel,hora,{ tipo:'abierto', texto:'—' });
   else if (tipo==='grupo') {
     if (nivel==='pri') setCelda(fecha,nivel,hora,{ tipo:'grupo', texto: document.getElementById('modGrupo').value });
     else {
@@ -412,7 +463,7 @@ function aplicarModal() {
       setCelda(fecha,nivel,hora, row ? { tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc } : { tipo:'grupo', texto:sec });
       if (exigeDos() && row) {
         const par = horaPar(hora);
-        if (par && pipOk('sec', par, wd) && mismoGrupo(wd, hora, par, sec)) {
+        if (par && slotActivo(fecha,'sec', par, wd) && mismoGrupo(wd, hora, par, sec)) {
           const r2 = HS[wd][par][sec];
           setCelda(fecha,nivel,par, { tipo:'grupo', seccion:sec, area:r2.area, doc:r2.doc, texto:sec+' '+r2.area+' '+r2.doc });
         }
