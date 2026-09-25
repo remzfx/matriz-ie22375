@@ -89,6 +89,33 @@
     </div>
   </div>
   <div class="card p-3 no-print space-y-2">
+    <div class="font-black text-sm">Horario institucional (como SIAGIE)</div>
+    <p class="text-[11px] text-slate-500">El director cambia hora de entrada, minutos por clase, cuántas horas y el recreo. Luego se arma la grilla sola.</p>
+    <div class="grid md:grid-cols-2 gap-3 text-xs">
+      <div class="border border-slate-200 rounded-xl p-2 space-y-2">
+        <div class="font-bold">Primaria</div>
+        <div class="grid grid-cols-2 gap-2">
+          <label>Inicio<input type="time" id="hpIni" value="08:00"></label>
+          <label>Minutos/hora<input type="number" id="hpMin" min="30" max="60" value="45"></label>
+          <label>N° de horas<input type="number" id="hpN" min="4" max="8" value="6"></label>
+          <label>Recreo después de hora<input type="number" id="hpRecH" min="1" max="7" value="3"></label>
+          <label>Recreo (min)<input type="number" id="hpRecM" min="10" max="40" value="15"></label>
+        </div>
+      </div>
+      <div class="border border-slate-200 rounded-xl p-2 space-y-2">
+        <div class="font-bold">Secundaria</div>
+        <div class="grid grid-cols-2 gap-2">
+          <label>Inicio<input type="time" id="hsIni" value="13:00"></label>
+          <label>Minutos/hora<input type="number" id="hsMin" min="30" max="60" value="45"></label>
+          <label>N° de horas<input type="number" id="hsN" min="5" max="9" value="7"></label>
+          <label>Recreo después de hora<input type="number" id="hsRecH" min="1" max="8" value="4"></label>
+          <label>Recreo (min)<input type="number" id="hsRecM" min="10" max="40" value="30"></label>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary text-xs" type="button" onclick="aplicarHorarioInst()">Aplicar horario y redibujar grillas</button>
+  </div>
+  <div class="card p-3 no-print space-y-2">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div class="font-black text-sm">Plantilla semanal del PIP — tú eliges las horas</div>
       <div class="flex gap-2">
@@ -134,8 +161,42 @@ let feriados = {};
 const DOW = ['LUN','MAR','MIE','JUE','VIE'];
 const PIP_PRI = { 1:[], 2:[], 3:[], 4:[1,3], 5:[1,3], 6:[1,3] };
 const PIP_SEC = { 1:[0,1,3], 2:[0,1,2,3,4], 3:[0,1,2,3,4], 4:[0,2,4], 5:[0,2,4], 6:[0,2,4], 7:[2,4] };
-const HPRI = [[1,'08:00-08:45'],[2,'08:45-09:30'],[3,'09:30-10:15'],['R','10:15-10:30'],[4,'10:30-11:15'],[5,'11:15-12:00'],[6,'12:00-12:45']];
-const HSEC = [[1,'13:00-13:45'],[2,'13:45-14:30'],[3,'14:30-15:15'],[4,'15:15-16:00'],['R','16:00-16:30'],[5,'16:30-17:15'],[6,'17:15-18:00'],[7,'18:00-18:45']];
+let horario = {
+  pri: { inicio:'08:00', minBloque:45, nHoras:6, recreoDespues:3, recreoMin:15 },
+  sec: { inicio:'13:00', minBloque:45, nHoras:7, recreoDespues:4, recreoMin:30 }
+};
+function toMin(hhmm) {
+  const p = String(hhmm||'00:00').split(':');
+  return (+p[0])*60 + (+p[1]||0);
+}
+function fromMin(m) {
+  m = ((m % (24*60)) + (24*60)) % (24*60);
+  return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+}
+function buildHoras(cfg) {
+  const out = [];
+  let t = toMin(cfg.inicio || '08:00');
+  const dur = +cfg.minBloque || 45;
+  const n = +cfg.nHoras || 6;
+  const recAfter = +cfg.recreoDespues || 0;
+  const recMin = +cfg.recreoMin || 0;
+  for (let i=1; i<=n; i++) {
+    const a = fromMin(t);
+    const b = fromMin(t+dur);
+    out.push([i, a+'-'+b]);
+    t += dur;
+    if (recAfter && i === recAfter) {
+      out.push(['R', fromMin(t)+'-'+fromMin(t+recMin)]);
+      t += recMin;
+    }
+  }
+  return out;
+}
+function HPRI() { return buildHoras(horario.pri); }
+function HSEC() { return buildHoras(horario.sec); }
+function horasPed(nivel) {
+  return (nivel==='pri'?HPRI():HSEC()).filter(x => x[0] !== 'R').map(x => +x[0]);
+}
 const SECS = ['1A','1B','2A','2B','3A','3B','4A','4B','5U'];
 function L(area, doc) { return { area: area, doc: doc }; }
 const HS = {
@@ -216,11 +277,12 @@ function candidatos(wd, hora) {
   const row = (HS[wd] && HS[wd][hora]) || {};
   return Object.keys(row).map(s => ({ seccion:s, area:row[s].area, doc:row[s].doc, texto: s+' '+row[s].area+' '+row[s].doc }));
 }
-function horaPar(h) {
-  if (h === 4) return 5;
-  if (h === 5) return 4;
-  if (h >= 1 && h < 7) return h + 1;
-  return null;
+function horaPar(h, nivel) {
+  const arr = horasPed(nivel || 'sec');
+  const i = arr.indexOf(+h);
+  if (i < 0) return null;
+  if (i % 2 === 0) return arr[i+1] || null;
+  return arr[i-1] || null;
 }
 function mismoGrupo(wd, h1, h2, seccion) {
   const a = HS[wd] && HS[wd][h1] && HS[wd][h1][seccion];
@@ -255,15 +317,40 @@ function loadCfg() {
     plantilla = (c.plantilla && c.plantilla.pri && c.plantilla.sec) ? c.plantilla : plantillaDefault();
     feriados = (c.feriados && typeof c.feriados === 'object') ? c.feriados : {};
     delete feriados['2026-10-08'];
-  } catch (e) { plantilla = plantillaDefault(); feriados = {}; }
+    if (c.horario && c.horario.pri && c.horario.sec) horario = c.horario;
+    pintarFormHorario();
+  } catch (e) { plantilla = plantillaDefault(); feriados = {}; pintarFormHorario(); }
 }
 function guardarCfg() {
+  leerFormHorario();
   localStorage.setItem(CFG_KEY, JSON.stringify({
     bloque: bloqueCfg(),
     modo: (document.getElementById('selModo') || {}).value || 'asignar',
     plantilla: plantilla || plantillaDefault(),
-    feriados: feriados
+    feriados: feriados,
+    horario: horario
   }));
+}
+function pintarFormHorario() {
+  const p = horario.pri, s = horario.sec;
+  const set = (id,v) => { const el=document.getElementById(id); if(el) el.value=v; };
+  set('hpIni', p.inicio); set('hpMin', p.minBloque); set('hpN', p.nHoras); set('hpRecH', p.recreoDespues); set('hpRecM', p.recreoMin);
+  set('hsIni', s.inicio); set('hsMin', s.minBloque); set('hsN', s.nHoras); set('hsRecH', s.recreoDespues); set('hsRecM', s.recreoMin);
+}
+function leerFormHorario() {
+  const num = (id, d) => { const v=+((document.getElementById(id)||{}).value); return isNaN(v)?d:v; };
+  const txt = (id, d) => ((document.getElementById(id)||{}).value || d);
+  horario.pri = { inicio:txt('hpIni','08:00'), minBloque:num('hpMin',45), nHoras:num('hpN',6), recreoDespues:num('hpRecH',3), recreoMin:num('hpRecM',15) };
+  horario.sec = { inicio:txt('hsIni','13:00'), minBloque:num('hsMin',45), nHoras:num('hsN',7), recreoDespues:num('hsRecH',4), recreoMin:num('hsRecM',30) };
+}
+function aplicarHorarioInst() {
+  leerFormHorario();
+  if (!plantilla) plantilla = plantillaDefault();
+  horasPed('pri').forEach(h => { if (!plantilla.pri[h] && !plantilla.pri[String(h)]) plantilla.pri[h] = []; });
+  horasPed('sec').forEach(h => { if (!plantilla.sec[h] && !plantilla.sec[String(h)]) plantilla.sec[h] = plantilla.sec[h] || []; });
+  guardarCfg();
+  renderPlantilla();
+  render();
 }
 function renderFeriados() {
   const box = document.getElementById('listaFer');
@@ -368,8 +455,8 @@ function renderPlantilla() {
     });
     return h+'</tbody></table>';
   }
-  document.getElementById('boxPlantPri').innerHTML = tabla('pri', HPRI);
-  document.getElementById('boxPlantSec').innerHTML = tabla('sec', HSEC);
+  document.getElementById('boxPlantPri').innerHTML = tabla('pri', HPRI());
+  document.getElementById('boxPlantSec').innerHTML = tabla('sec', HSEC());
 }
 function armarMes() {
   const ym = document.getElementById('inpMes').value;
@@ -392,14 +479,14 @@ function armarMes() {
   tues.forEach((d,i) => {
     const g = rotMar[i % rotMar.length];
     const f = ymd(d); const wd = d.getDay()-1;
-    [1,2,3,4,5,6].forEach(h => {
+    horasPed('pri').forEach(h => {
       if (slotActivo(f,'pri',h,wd)) setCelda(f,'pri',h,{ tipo:'grupo', texto:g });
     });
   });
   thus.forEach((d,i) => {
     const g = rotJue[i % rotJue.length];
     const f = ymd(d); const wd = d.getDay()-1;
-    [1,2,3,4,5,6].forEach(h => {
+    horasPed('pri').forEach(h => {
       if (slotActivo(f,'pri',h,wd)) setCelda(f,'pri',h,{ tipo:'grupo', texto:g });
     });
   });
@@ -410,7 +497,7 @@ function armarMes() {
     if (esFeriado(f)) return;
     const wd = d.getDay()-1;
     const usedDay = {};
-    [1,2,3,4,5,6,7].forEach(h => {
+    horasPed('sec').forEach(h => {
       if (!slotActivo(f,'sec', h, wd)) return;
       if (celda(f,'sec',h) && celda(f,'sec',h).tipo !== 'abierto') return;
       const par = horaPar(h);
@@ -467,10 +554,10 @@ function render() {
     return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+t+'</td>';
   }
   let p = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
-  HPRI.forEach(([h,lab]) => { p += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'pri',h)).join('')+'</tr>'; });
+  HPRI().forEach(([h,lab]) => { p += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'pri',h)).join('')+'</tr>'; });
   document.getElementById('boxPri').innerHTML = p+'</tbody></table>';
   let s = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
-  HSEC.forEach(([h,lab]) => { s += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'sec',h)).join('')+'</tr>'; });
+  HSEC().forEach(([h,lab]) => { s += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'sec',h)).join('')+'</tr>'; });
   document.getElementById('boxSec').innerHTML = s+'</tbody></table>';
 }
 function clicCelda(fecha, nivel, hora) {
