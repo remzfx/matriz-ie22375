@@ -20,7 +20,7 @@
   .c-sop { background:#fed7aa; cursor:pointer; font-weight:700; }
   .c-col { background:#86efac; cursor:pointer; font-weight:700; }
   .c-man { background:#ddd6fe; cursor:pointer; font-weight:700; }
-  .c-gray { background:#cbd5e1; color:#64748b; }
+  .c-gray { background:#cbd5e1; color:#64748b; cursor:pointer; }
   .c-fer { background:#fecaca; font-weight:800; }
   .c-rec { background:#fde68a; font-weight:700; }
   .sticky-top { position:sticky; top:0; z-index:20; }
@@ -28,7 +28,6 @@
     .no-print { display:none !important; }
     body { background:#fff; }
     table.cal { font-size:8px; }
-    table.cal td { padding:3px; }
     .card { box-shadow:none; }
   }
 </style>
@@ -43,444 +42,74 @@
     <a href="index.html" class="btn btn-ghost text-xs">Inicio</a>
   </div>
 </header>
-
 <main class="max-w-6xl mx-auto px-3 py-4 space-y-3">
   <div class="card p-3 no-print space-y-3">
-    <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 items-end">
       <div>
         <label class="text-[10px] font-bold text-slate-500">Mes</label>
         <input type="month" id="inpMes" value="2026-10" onchange="onMes()" />
       </div>
       <div>
-        <label class="text-[10px] font-bold text-slate-500">Bloque mínimo para entrar al AIP</label>
+        <label class="text-[10px] font-bold text-slate-500">Bloque mínimo AIP</label>
         <select id="selBloque" onchange="guardarCfg()">
-          <option value="cualquier">Cualquier hora (1 bloque)</option>
+          <option value="cualquier">Cualquier hora</option>
           <option value="1">Solo 1 hora</option>
-          <option value="2" selected>Solo si tiene 2 horas seguidas</option>
+          <option value="2" selected>Solo 2 horas seguidas</option>
         </select>
       </div>
       <div>
-        <label class="text-[10px] font-bold text-slate-500">Qué hace el clic en el cuadrito</label>
+        <label class="text-[10px] font-bold text-slate-500">Clic en el mes</label>
         <select id="selModo" onchange="guardarCfg()">
-          <option value="definir">Definir horas AIP (marcar / bloquear)</option>
-          <option value="asignar" selected>Asignar grupo o soporte</option>
+          <option value="definir">Marcar / bloquear un día</option>
+          <option value="asignar" selected>Asignar grupo</option>
         </select>
       </div>
-      <label class="flex items-center gap-2 text-sm font-bold pb-2">
-        <input type="checkbox" id="chkTer" checked onchange="guardarCfg()" /> Incluir 3° primaria
-      </label>
-      <button class="btn btn-ok" onclick="armarMes()">Armar mes automático</button>
       <div class="flex gap-2">
-        <button class="btn btn-ghost flex-1" onclick="window.print()">Imprimir</button>
-        <button class="btn btn-primary flex-1" onclick="guardar()">Guardar</button>
+        <button class="btn btn-ok flex-1" type="button" onclick="armarMes()">Armar mes</button>
+        <button class="btn btn-ghost" type="button" onclick="window.print()">Imprimir</button>
+        <button class="btn btn-primary" type="button" onclick="guardar()">Guardar</button>
       </div>
     </div>
-    <p class="text-[11px] text-slate-500 leading-snug">
-      El verde inicial es la plantilla de 30 h del PIP. En <b>Definir horas AIP</b> tocas un cuadrito para
-      <b>activarlo</b> (verde) o <b>bloquearlo</b> (gris). En <b>Asignar</b> eliges el grupo.
-      Las 2 horas seguidas solo se usan si ambas celdas están activas.
-    </p>
+    <p class="text-[11px] text-slate-500">Entran <b>3°, 4°, 5° y 6°</b>. Si el director quita primaria: apaga esas celdas en la plantilla y prende horas de secundaria. Luego Aplicar plantilla al mes.</p>
   </div>
-
-  <div class="card p-3 overflow-auto">
-    <div class="font-black text-sm mb-2" id="titPri">Primaria</div>
-    <div id="boxPri"></div>
+  <div class="card p-3 no-print space-y-2">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="font-black text-sm">Plantilla semanal del PIP — tú eliges las horas</div>
+      <div class="flex gap-2">
+        <button class="btn btn-ghost text-xs" type="button" onclick="restaurarPlantilla()">Volver a 30 h</button>
+        <button class="btn btn-ghost text-xs" type="button" onclick="aplicarPlantillaAlMes()">Aplicar plantilla al mes</button>
+      </div>
+    </div>
+    <p class="text-[11px] text-slate-500">Verde = AIP todas las semanas. Clic para encender o apagar.</p>
+    <div class="grid md:grid-cols-2 gap-3">
+      <div><div class="text-xs font-bold mb-1">Primaria</div><div id="boxPlantPri"></div></div>
+      <div><div class="text-xs font-bold mb-1">Secundaria</div><div id="boxPlantSec"></div></div>
+    </div>
   </div>
-  <div class="card p-3 overflow-auto">
-    <div class="font-black text-sm mb-2" id="titSec">Secundaria</div>
-    <div id="boxSec"></div>
-  </div>
-  <p class="text-[11px] text-center text-slate-400 pb-8">
-    Verde grupo · Naranja soporte · Lila mantenimiento · Amarillo recreo · Rojo feriado
-    · Mag. Efrain Ceopa Paredes
-  </p>
+  <div class="card p-3 overflow-auto"><div class="font-black text-sm mb-2" id="titPri">Primaria</div><div id="boxPri"></div></div>
+  <div class="card p-3 overflow-auto"><div class="font-black text-sm mb-2" id="titSec">Secundaria</div><div id="boxSec"></div></div>
+  <p class="text-[11px] text-center text-slate-400 pb-8">Mag. Efrain Ceopa Paredes</p>
 </main>
-
 <div id="modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-3 no-print">
   <div class="card w-full max-w-md p-4 space-y-2">
-    <div class="font-black" id="modTit">Cambiar bloque</div>
-    <div class="text-xs text-slate-500" id="modSub">—</div>
-    <label class="text-[10px] font-bold text-slate-500">Tipo</label>
+    <div class="font-black" id="modTit">Cambiar</div>
+    <div class="text-xs text-slate-500" id="modSub"></div>
     <select id="modTipo" onchange="onModTipo()">
-      <option value="grupo">Grupo (docente + sección)</option>
-      <option value="abierto">Hora AIP libre (sin grupo)</option>
-      <option value="bloqueado">Bloquear — no es hora AIP</option>
+      <option value="grupo">Grupo</option>
+      <option value="abierto">Hora AIP libre</option>
+      <option value="bloqueado">Bloquear este día</option>
       <option value="soporte">SOPORTE</option>
       <option value="colegio">COLEGIO</option>
       <option value="man">MANTENIMIENTO</option>
       <option value="vacio">Vacío</option>
     </select>
-    <div id="wrapGrupo">
-      <label class="text-[10px] font-bold text-slate-500">Quién entra (solo los que tienen clase a esta hora)</label>
-      <select id="modGrupo"></select>
-    </div>
+    <div id="wrapGrupo"><select id="modGrupo"></select></div>
     <div class="flex gap-2 pt-2">
-      <button class="btn btn-ghost flex-1" onclick="cerrarModal()">Cancelar</button>
-      <button class="btn btn-primary flex-1" onclick="aplicarModal()">Aplicar</button>
+      <button class="btn btn-ghost flex-1" type="button" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primary flex-1" type="button" onclick="aplicarModal()">Aplicar</button>
     </div>
   </div>
 </div>
-
-<script>
-const KEY = 'ie22375_aip_plan_v1';
-const CFG_KEY = 'ie22375_aip_cfg_v1';
-const FERIADOS = { '2026-10-08': 'Combate de Angamos' };
-const DOW = ['LUN','MAR','MIE','JUE','VIE'];
-const PIP_PRI = { 4:[1,3], 5:[1,3], 6:[1,3] };
-const PIP_SEC = { 1:[0,1,3], 2:[0,1,2,3,4], 3:[0,1,2,3,4], 4:[0,2,4], 5:[0,2,4], 6:[0,2,4], 7:[2,4] };
-const HPRI = [[4,'10:30-11:15'],[5,'11:15-12:00'],[6,'12:00-12:45']];
-const HSEC = [[1,'13:00-13:45'],[2,'13:45-14:30'],[3,'14:30-15:15'],[4,'15:15-16:00'],['R','16:00-16:30'],[5,'16:30-17:15'],[6,'17:15-18:00'],[7,'18:00-18:45']];
-const SECS = ['1A','1B','2A','2B','3A','3B','4A','4B','5U'];
-
-function L(area, doc) { return { area: area, doc: doc }; }
-const HS = {
-  0:{
-    1:{'1A':L('COM','Ninoska'),'1B':L('ART','María A.'),'2A':L('CC.SS','Benito'),'2B':L('ING','Nancy H.'),'3A':L('TUT','Pilar'),'3B':L('DPCC','Nilda'),'4A':L('EPT','Carmen'),'4B':L('MAT','Luis Ch.'),'5U':L('EFIS','Julio Z.')},
-    2:{'1A':L('ART','María A.'),'1B':L('CC.SS','Benito'),'2A':L('COM','Ana H.'),'2B':L('TUT','Iván G.'),'3A':L('EFIS','Julio Z.'),'3B':L('COM','Ninoska'),'4A':L('MAT','Luis Ch.'),'4B':L('DPCC','Nilda'),'5U':L('TUT','Nancy H.')},
-    3:{'1A':L('ART','María A.'),'1B':L('CC.SS','Benito'),'2A':L('COM','Ana H.'),'2B':L('TUT','Iván G.'),'3A':L('EFIS','Julio Z.'),'3B':L('COM','Ninoska'),'4A':L('MAT','Luis Ch.'),'4B':L('DPCC','Nilda'),'5U':L('TUT','Nancy H.')},
-    4:{'1A':L('EPT','Carmen'),'1B':L('ART','María A.'),'2A':L('ART','María A.'),'2B':L('CYT','Pilar'),'3A':L('CYT','Pilar'),'3B':L('MAT','Luis Ch.'),'4A':L('EFIS','Julio Z.'),'4B':L('COM','Ana H.'),'5U':L('COM','Ana H.')},
-    5:{'1A':L('EPT','Carmen'),'1B':L('COM','Ninoska'),'2A':L('ART','María A.'),'2B':L('MAT','Iván G.'),'3A':L('CYT','Pilar'),'3B':L('MAT','Luis Ch.'),'4A':L('CYT','Pilar'),'4B':L('COM','Ana H.'),'5U':L('INGLÉS','Nancy H.')},
-    6:{'1A':L('CYT','Carmen'),'1B':L('MAT','Iván G.'),'2A':L('CYT','Pilar'),'2B':L('DPCC','Nilda'),'3A':L('ART','María A.'),'3B':L('ING','Nancy H.'),'4A':L('COM','Ana H.'),'4B':L('EFIS','Julio Z.'),'5U':L('MAT','Luis Ch.')}
-  },
-  1:{
-    1:{'1A':L('MAT','Iván G.'),'1B':L('CC.SS','Benito'),'2A':L('INGLÉS','Nancy H.'),'2B':L('EFIS','Julio Z.'),'3A':L('MAT','Luis Ch.'),'3B':L('TUT','Nilda'),'4A':L('EFIS','Julio Z.'),'4B':L('CYT','Pilar'),'5U':L('ART','María A.')},
-    2:{'1A':L('CC.SS','Benito'),'1B':L('ING','Nancy H.'),'2A':L('EPT','Carmen'),'2B':L('MAT','Iván G.'),'3A':L('EFIS','Julio Z.'),'3B':L('CYT','Pilar'),'4A':L('MAT','Luis Ch.'),'4B':L('ART','María A.'),'5U':L('DPCC','Nilda')},
-    3:{'1A':L('DPCC','Nilda'),'1B':L('MAT','Iván G.'),'2A':L('COM','Ana H.'),'2B':L('ART','María A.'),'3A':L('EPT','Carmen'),'3B':L('CYT','Pilar'),'4A':L('INGLÉS','Nancy H.'),'4B':L('CC.SS','Benito'),'5U':L('MAT','Luis Ch.')}
-  },
-  2:{
-    2:{'1A':L('COM','Ninoska'),'1B':L('MAT','Iván G.'),'2A':L('TUT','Julio Z.'),'2B':L('REL','Laura S.'),'3A':L('DPCC','Nilda'),'3B':L('CYT','Carmen'),'4A':L('CC.SS','Benito'),'4B':L('MAT','Luis Ch.'),'5U':L('ART','María A.')},
-    3:{'1A':L('ING','Nancy H.'),'1B':L('COM','Ninoska'),'2A':L('ART','María A.'),'2B':L('CYT','Pilar'),'3A':L('CC.SS','Benito'),'3B':L('MAT','Luis Ch.'),'4A':L('DPCC','Nilda'),'4B':L('CYT','Carmen'),'5U':L('EFIS','Julio Z.')},
-    4:{'1A':L('ING','Nancy H.'),'1B':L('DPCC','Nilda'),'2A':L('CC.SS','Benito'),'2B':L('CYT','Pilar'),'3A':L('COM','Ninoska'),'3B':L('ART','María A.'),'4A':L('ART','María A.'),'4B':L('CYT','Carmen'),'5U':L('MAT','Iván G.')},
-    5:{'1A':L('CC.SS','Benito'),'1B':L('EFIS','Julio Z.'),'2A':L('COM','Ana H.'),'2B':L('INGLÉS','Nancy R.'),'3A':L('COM','Ninoska'),'3B':L('REL','Laura S.'),'4A':L('ART','María A.'),'4B':L('DPCC','Nilda'),'5U':L('MAT','Iván G.')},
-    6:{'1A':L('MAT','Iván G.'),'1B':L('TUT','María A.'),'2A':L('COM','Ana H.'),'2B':L('CC.SS','Benito'),'3A':L('REL','Laura S.'),'3B':L('EFIS','Julio Z.'),'4A':L('ING','Nancy H.'),'4B':L('COM','Ana H.'),'5U':L('COM','Ninoska')},
-    7:{'1A':L('MAT','Iván G.'),'1B':L('TUT','María A.'),'2A':L('DPCC','Nilda'),'2B':L('CC.SS','Benito'),'3A':L('REL','Laura S.'),'3B':L('EFIS','Julio Z.'),'4A':L('COM','Ana H.'),'4B':L('COM','Ana H.'),'5U':L('COM','Ninoska')}
-  },
-  3:{
-    1:{'1A':L('ART','María A.'),'1B':L('CYT','Carmen'),'2A':L('EFIS','Julio Z.'),'2B':L('MAT','Iván G.'),'3A':L('COM','Ninoska'),'3B':L('CYT','Pilar'),'4A':L('TUT','Ana H.'),'4B':L('ING','Nancy H.'),'5U':L('REL','Laura S.')},
-    2:{'1A':L('ART','María A.'),'1B':L('EPT','Carmen'),'2A':L('DPCC','Nilda'),'2B':L('EFIS','Julio Z.'),'3A':L('COM','Ninoska'),'3B':L('COM','Ninoska'),'4A':L('ART','María A.'),'4B':L('CC.SS','Benito'),'5U':L('CYT','Iván G.')},
-    3:{'1A':L('REL','Laura S.'),'1B':L('EPT','Carmen'),'2A':L('MAT','Iván G.'),'2B':L('ART','María A.'),'3A':L('CYT','Pilar'),'3B':L('COM','Ninoska'),'4A':L('ART','María A.'),'4B':L('COM','Ana H.'),'5U':L('CYT','Iván G.')}
-  },
-  4:{
-    2:{'1A':L('TUT','Benito'),'1B':L('REL','Laura S.'),'2A':L('EFIS','Julio Z.'),'2B':L('EPT','Carmen'),'3A':L('ING','Nancy H.'),'3B':L('MAT','Luis Ch.'),'4A':L('CYT','Pilar'),'4B':L('ART','María A.'),'5U':L('DPCC','Nilda')},
-    3:{'1A':L('DPCC','Nilda'),'1B':L('COM','Ninoska'),'2A':L('ING','Nancy H.'),'2B':L('CYT','Pilar'),'3A':L('CC.SS','Benito'),'3B':L('MAT','Luis Ch.'),'4A':L('ART','María A.'),'4B':L('EFIS','Julio Z.'),'5U':L('ART','María A.')},
-    4:{'1A':L('DPCC','Nilda'),'1B':L('COM','Ninoska'),'2A':L('ING','Nancy H.'),'2B':L('CYT','Pilar'),'3A':L('CC.SS','Benito'),'3B':L('MAT','Luis Ch.'),'4A':L('REL','Laura S.'),'4B':L('ART','María A.'),'5U':L('ART','María A.')},
-    5:{'1A':L('CYT','Iván G.'),'1B':L('EPT','Carmen'),'2A':L('CYT','Pilar'),'2B':L('COM','Ana H.'),'3A':L('COM','Ninoska'),'3B':L('CC.SS','Benito'),'4A':L('DPCC','Nilda'),'4B':L('REL','Laura S.'),'5U':L('MAT','Luis Ch.')},
-    6:{'1A':L('EFIS','Julio Z.'),'1B':L('INGLÉS','Nancy R.'),'2A':L('MAT','Iván G.'),'2B':L('DPCC','Nilda'),'3A':L('MAT','Luis Ch.'),'3B':L('COM','Ninoska'),'4A':L('REL','Sandra S.'),'4B':L('COM','Ana H.'),'5U':L('CC.SS','Benito')},
-    7:{'1A':L('EFIS','Julio Z.'),'1B':L('INGLÉS','Nancy R.'),'2A':L('MAT','Iván G.'),'2B':L('DPCC','Nilda'),'3A':L('MAT','Luis Ch.'),'3B':L('COM','Ninoska'),'4A':L('REL','Sandra S.'),'4B':L('COM','Ana H.'),'5U':L('CC.SS','Benito')}
-  }
-};
-
-let plan = {};
-let editKey = null;
-
-function ymd(d) {
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-function diasMes(ym) {
-  const [Y,M] = ym.split('-').map(Number);
-  const out = [];
-  const d = new Date(Y, M-1, 1);
-  while (d.getMonth() === M-1) {
-    if (d.getDay()>=1 && d.getDay()<=5) out.push(new Date(d));
-    d.setDate(d.getDate()+1);
-  }
-  return out;
-}
-function pipOk(nivel, hora, wd) {
-  const m = nivel==='pri' ? PIP_PRI : PIP_SEC;
-  return (m[hora] || []).indexOf(wd) >= 0;
-}
-function slotActivo(fecha, nivel, hora, wd) {
-  if (hora === 'R') return false;
-  const c = celda(fecha, nivel, hora);
-  if (c && c.tipo === 'bloqueado') return false;
-  if (c && c.tipo === 'abierto') return true;
-  if (c && c.tipo && c.tipo !== 'bloqueado') return true;
-  return pipOk(nivel, hora, wd);
-}
-function modoDefinir() {
-  return (document.getElementById('selModo') || {}).value === 'definir';
-}
-function candidatos(wd, hora) {
-  const row = (HS[wd] && HS[wd][hora]) || {};
-  return Object.keys(row).map(s => ({ seccion:s, area:row[s].area, doc:row[s].doc, texto: s+' '+row[s].area+' '+row[s].doc }));
-}
-function horaPar(h) {
-  if (h === 4) return 5;
-  if (h === 5) return 4;
-  if (h >= 1 && h < 7) return h + 1;
-  return null;
-}
-function mismoGrupo(wd, h1, h2, seccion) {
-  const a = HS[wd] && HS[wd][h1] && HS[wd][h1][seccion];
-  const b = HS[wd] && HS[wd][h2] && HS[wd][h2][seccion];
-  if (!a || !b) return false;
-  return a.doc === b.doc;
-}
-function bloqueCfg() {
-  return (document.getElementById('selBloque') || {}).value || '2';
-}
-function exigeDos() {
-  return bloqueCfg() === '2';
-}
-function candidatosAIP(wd, hora, fecha) {
-  let list = candidatos(wd, hora);
-  if (!exigeDos()) return list;
-  const par = horaPar(hora);
-  if (!par) return [];
-  if (fecha && (!slotActivo(fecha,'sec',hora,wd) || !slotActivo(fecha,'sec',par,wd))) return [];
-  if (!fecha && (!pipOk('sec', hora, wd) || !pipOk('sec', par, wd))) return [];
-  return list.filter(c => mismoGrupo(wd, hora, par, c.seccion));
-}
-function loadCfg() {
-  try {
-    const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
-    if (c.bloque) document.getElementById('selBloque').value = c.bloque;
-    if (c.modo) document.getElementById('selModo').value = c.modo;
-    if (typeof c.inc3 === 'boolean') document.getElementById('chkTer').checked = c.inc3;
-  } catch (e) {}
-}
-function guardarCfg() {
-  localStorage.setItem(CFG_KEY, JSON.stringify({
-    bloque: bloqueCfg(),
-    modo: (document.getElementById('selModo') || {}).value || 'asignar',
-    inc3: document.getElementById('chkTer').checked
-  }));
-}
-function load() {
-  try { plan = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { plan = {}; }
-  loadCfg();
-}
-function guardar() {
-  localStorage.setItem(KEY, JSON.stringify(plan));
-  alert('Guardado en este navegador.');
-}
-function celda(fecha, nivel, hora) {
-  if (!plan[fecha]) plan[fecha] = {};
-  if (!plan[fecha][nivel]) plan[fecha][nivel] = {};
-  return plan[fecha][nivel][hora];
-}
-function setCelda(fecha, nivel, hora, obj) {
-  if (!plan[fecha]) plan[fecha] = {};
-  if (!plan[fecha][nivel]) plan[fecha][nivel] = {};
-  if (!obj) delete plan[fecha][nivel][hora];
-  else plan[fecha][nivel][hora] = obj;
-}
-
-function armarMes() {
-  const ym = document.getElementById('inpMes').value;
-  const inc3 = document.getElementById('chkTer').checked;
-  const days = diasMes(ym);
-  days.forEach(d => {
-    const f = ymd(d);
-    ['pri','sec'].forEach(n => {
-      const o = plan[f] && plan[f][n];
-      if (!o) return;
-      Object.keys(o).forEach(h => {
-        if (o[h] && (o[h].tipo==='bloqueado' || o[h].tipo==='abierto')) return;
-        delete o[h];
-      });
-    });
-  });
-
-  const tues = days.filter(d => d.getDay()===2 && !FERIADOS[ymd(d)]);
-  const thus = days.filter(d => d.getDay()===4 && !FERIADOS[ymd(d)]);
-  const rotMar = inc3 ? ['3°','6°'] : ['4°','6°'];
-  const rotJue = inc3 ? ['4°','5°'] : ['5°','4°'];
-
-  tues.forEach((d,i) => {
-    const g = rotMar[i % rotMar.length];
-    const f = ymd(d);
-    const wd = d.getDay()-1;
-    if (slotActivo(f,'pri',4,wd)) setCelda(f,'pri',4,{ tipo:'grupo', texto:g });
-    if (slotActivo(f,'pri',5,wd)) setCelda(f,'pri',5,{ tipo:'grupo', texto:g });
-    if (slotActivo(f,'pri',6,wd)) setCelda(f,'pri',6,{ tipo:'man', texto:'MAN. PREVENT' });
-  });
-  thus.forEach((d,i) => {
-    const g = rotJue[i % rotJue.length];
-    const f = ymd(d);
-    const wd = d.getDay()-1;
-    if (slotActivo(f,'pri',4,wd)) setCelda(f,'pri',4,{ tipo:'grupo', texto:g });
-    if (slotActivo(f,'pri',5,wd)) setCelda(f,'pri',5,{ tipo:'grupo', texto:g });
-    if (slotActivo(f,'pri',6,wd)) setCelda(f,'pri',6,{ tipo:'man', texto:'MAN. PREVENT' });
-  });
-
-  const visits = {};
-  SECS.forEach(s => visits[s]=0);
-  const usedDay = {};
-
-  days.forEach(d => {
-    const f = ymd(d);
-    if (FERIADOS[f]) return;
-    const wd = d.getDay()-1;
-    usedDay[f] = {};
-    [1,2,3,4,5,6,7].forEach(h => {
-      if (!slotActivo(f,'sec', h, wd)) return;
-      if (celda(f,'sec',h) && celda(f,'sec',h).tipo !== 'abierto') return;
-      if (h>=6 && (wd===0 || wd===4)) {
-        setCelda(f,'sec',h,{ tipo:'man', texto:'MAN. PREVENT' });
-        return;
-      }
-      if (h===5 && wd===0) {
-        setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
-        return;
-      }
-      const par = horaPar(h);
-      const dos = exigeDos();
-      let cands = (dos ? candidatosAIP(wd, h, f) : candidatos(wd, h)).filter(c => !usedDay[f][c.seccion]);
-      if (dos && par && h > par) {
-        setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
-        return;
-      }
-      if (!cands.length) {
-        setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
-        return;
-      }
-      cands.sort((a,b) => visits[a.seccion]-visits[b.seccion] || a.seccion.localeCompare(b.seccion));
-      const pick = cands[0];
-      visits[pick.seccion]++;
-      usedDay[f][pick.seccion] = 1;
-      const obj = { tipo:'grupo', seccion:pick.seccion, area:pick.area, doc:pick.doc, texto:pick.texto };
-      setCelda(f,'sec',h, obj);
-      if (dos && par && slotActivo(f,'sec', par, wd) && mismoGrupo(wd, h, par, pick.seccion)) {
-        const row2 = HS[wd][par][pick.seccion];
-        setCelda(f,'sec',par, { tipo:'grupo', seccion:pick.seccion, area:row2.area, doc:row2.doc, texto:pick.seccion+' '+row2.area+' '+row2.doc });
-      }
-    });
-  });
-  render();
-}
-
-function clsDe(tipo, fer) {
-  if (fer) return 'c-fer';
-  return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', man:'c-man', vacio:'c-aip', abierto:'c-aip', bloqueado:'c-gray' })[tipo] || 'c-gray';
-}
-
-function render() {
-  const ym = document.getElementById('inpMes').value;
-  const days = diasMes(ym);
-  const [Y,M] = ym.split('-');
-  const meses = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  document.getElementById('titPri').textContent = 'Primaria · '+meses[+M]+' '+Y;
-  document.getElementById('titSec').textContent = 'Secundaria · '+meses[+M]+' '+Y;
-
-  function head() {
-    let h = '<th>N°</th><th>Hora</th>';
-    days.forEach(d => {
-      const f = ymd(d);
-      h += '<th>'+String(d.getDate()).padStart(2,'0')+'<br>'+DOW[d.getDay()-1]+(FERIADOS[f]?'<br>FER':'')+'</th>';
-    });
-    return h;
-  }
-  function cellPri(d, hora) {
-    const f = ymd(d); const wd = d.getDay()-1;
-    if (FERIADOS[f]) return '<td class="c-fer">FERIADO</td>';
-    const on = slotActivo(f,'pri',hora,wd);
-    const c = celda(f,'pri',hora);
-    const t = on ? ((c && c.tipo!=='abierto' && c.texto) ? c.texto : '—') : '';
-    const cl = on ? (c ? clsDe(c.tipo) : 'c-aip') : 'c-gray';
-    return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\'pri\','+hora+')">'+t+'</td>';
-  }
-  function cellSec(d, hora) {
-    const f = ymd(d); const wd = d.getDay()-1;
-    if (FERIADOS[f]) return '<td class="c-fer">FERIADO</td>';
-    if (hora==='R') return '<td class="c-rec">RECREO</td>';
-    const on = slotActivo(f,'sec',hora,wd);
-    const c = celda(f,'sec',hora);
-    const t = on ? ((c && c.tipo!=='abierto' && c.texto) ? c.texto : '—') : '';
-    const cl = on ? (c ? clsDe(c.tipo) : 'c-aip') : 'c-gray';
-    return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\'sec\','+hora+')">'+t+'</td>';
-  }
-
-  let p = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
-  p += '<tr><td></td><td>10:15-10:30</td>'+days.map(d=>FERIADOS[ymd(d)]?'<td class="c-fer">FER</td>':'<td class="c-rec">RECREO</td>').join('')+'</tr>';
-  HPRI.forEach(([h,lab]) => {
-    p += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cellPri(d,h)).join('')+'</tr>';
-  });
-  p += '</tbody></table>';
-  document.getElementById('boxPri').innerHTML = p;
-
-  let s = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
-  HSEC.forEach(([h,lab]) => {
-    s += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cellSec(d,h)).join('')+'</tr>';
-  });
-  s += '</tbody></table>';
-  document.getElementById('boxSec').innerHTML = s;
-}
-
-function clicCelda(fecha, nivel, hora) {
-  if (FERIADOS[fecha]) return;
-  if (modoDefinir()) {
-    const d = new Date(fecha+'T12:00:00');
-    const wd = d.getDay()-1;
-    if (slotActivo(fecha, nivel, hora, wd)) setCelda(fecha, nivel, hora, { tipo:'bloqueado', texto:'' });
-    else setCelda(fecha, nivel, hora, { tipo:'abierto', texto:'—' });
-    render();
-    return;
-  }
-  abrir(fecha, nivel, hora);
-}
-function abrir(fecha, nivel, hora) {
-  const d = new Date(fecha+'T12:00:00');
-  const wd = d.getDay()-1;
-  if (FERIADOS[fecha]) return;
-  editKey = { fecha, nivel, hora, wd };
-  const c = celda(fecha, nivel, hora) || {};
-  document.getElementById('modTit').textContent = (nivel==='pri'?'Primaria':'Secundaria')+' · '+fecha+' · hora '+hora;
-  document.getElementById('modSub').textContent = exigeDos()
-    ? 'Modo 2 horas: solo docentes con el mismo grupo en dos horas seguidas AIP.'
-    : 'Solo se listan quienes tienen hora pedagógica aquí.';
-  document.getElementById('modTipo').value = c.tipo || 'grupo';
-  const sel = document.getElementById('modGrupo');
-  if (nivel==='pri') {
-    const gs = document.getElementById('chkTer').checked ? ['3°','4°','5°','6°'] : ['4°','5°','6°'];
-    sel.innerHTML = gs.map(g => '<option value="'+g+'">'+g+'</option>').join('');
-    if (c.texto) sel.value = c.texto;
-  } else {
-    const cands = candidatosAIP(wd, hora, fecha);
-    sel.innerHTML = cands.map(x => '<option value="'+x.seccion+'">'+x.texto+'</option>').join('') || '<option value="">—</option>';
-    if (c.seccion) sel.value = c.seccion;
-  }
-  onModTipo();
-  document.getElementById('modal').classList.remove('hidden');
-}
-function onModTipo() {
-  document.getElementById('wrapGrupo').style.display = document.getElementById('modTipo').value==='grupo' ? 'block' : 'none';
-}
-function cerrarModal() { document.getElementById('modal').classList.add('hidden'); editKey=null; }
-function aplicarModal() {
-  if (!editKey) return;
-  const tipo = document.getElementById('modTipo').value;
-  const { fecha, nivel, hora, wd } = editKey;
-  if (tipo==='vacio') setCelda(fecha,nivel,hora,null);
-  else if (tipo==='bloqueado') setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
-  else if (tipo==='abierto') setCelda(fecha,nivel,hora,{ tipo:'abierto', texto:'—' });
-  else if (tipo==='grupo') {
-    if (nivel==='pri') setCelda(fecha,nivel,hora,{ tipo:'grupo', texto: document.getElementById('modGrupo').value });
-    else {
-      const sec = document.getElementById('modGrupo').value;
-      const row = (HS[wd]&&HS[wd][hora]&&HS[wd][hora][sec]);
-      setCelda(fecha,nivel,hora, row ? { tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc } : { tipo:'grupo', texto:sec });
-      if (exigeDos() && row) {
-        const par = horaPar(hora);
-        if (par && slotActivo(fecha,'sec', par, wd) && mismoGrupo(wd, hora, par, sec)) {
-          const r2 = HS[wd][par][sec];
-          setCelda(fecha,nivel,par, { tipo:'grupo', seccion:sec, area:r2.area, doc:r2.doc, texto:sec+' '+r2.area+' '+r2.doc });
-        }
-      }
-    }
-  } else {
-    const map = { soporte:'SOPORTE', colegio:'COLEGIO', man:'MAN. PREVENT' };
-    setCelda(fecha,nivel,hora,{ tipo:tipo, texto: map[tipo] });
-  }
-  cerrarModal();
-  render();
-}
-function onMes() { render(); }
-
-load();
-render();
-if (!Object.keys(plan).length) armarMes();
-</script>
+<script src="aula_innovacion.js"></script>
 </body>
 </html>

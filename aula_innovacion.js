@@ -1,0 +1,364 @@
+const KEY = 'ie22375_aip_plan_v1';
+const CFG_KEY = 'ie22375_aip_cfg_v1';
+const FERIADOS = { '2026-10-08': 'Combate de Angamos' };
+const DOW = ['LUN','MAR','MIE','JUE','VIE'];
+const PIP_PRI = { 4:[1,3], 5:[1,3], 6:[1,3] };
+const PIP_SEC = { 1:[0,1,3], 2:[0,1,2,3,4], 3:[0,1,2,3,4], 4:[0,2,4], 5:[0,2,4], 6:[0,2,4], 7:[2,4] };
+const HPRI = [[4,'10:30-11:15'],[5,'11:15-12:00'],[6,'12:00-12:45']];
+const HSEC = [[1,'13:00-13:45'],[2,'13:45-14:30'],[3,'14:30-15:15'],[4,'15:15-16:00'],['R','16:00-16:30'],[5,'16:30-17:15'],[6,'17:15-18:00'],[7,'18:00-18:45']];
+const SECS = ['1A','1B','2A','2B','3A','3B','4A','4B','5U'];
+function L(area, doc) { return { area: area, doc: doc }; }
+const HS = {
+  0:{
+    1:{'1A':L('COM','Ninoska'),'1B':L('ART','María A.'),'2A':L('CC.SS','Benito'),'2B':L('ING','Nancy H.'),'3A':L('TUT','Pilar'),'3B':L('DPCC','Nilda'),'4A':L('EPT','Carmen'),'4B':L('MAT','Luis Ch.'),'5U':L('EFIS','Julio Z.')},
+    2:{'1A':L('ART','María A.'),'1B':L('CC.SS','Benito'),'2A':L('COM','Ana H.'),'2B':L('TUT','Iván G.'),'3A':L('EFIS','Julio Z.'),'3B':L('COM','Ninoska'),'4A':L('MAT','Luis Ch.'),'4B':L('DPCC','Nilda'),'5U':L('TUT','Nancy H.')},
+    3:{'1A':L('ART','María A.'),'1B':L('CC.SS','Benito'),'2A':L('COM','Ana H.'),'2B':L('TUT','Iván G.'),'3A':L('EFIS','Julio Z.'),'3B':L('COM','Ninoska'),'4A':L('MAT','Luis Ch.'),'4B':L('DPCC','Nilda'),'5U':L('TUT','Nancy H.')},
+    4:{'1A':L('EPT','Carmen'),'1B':L('ART','María A.'),'2A':L('ART','María A.'),'2B':L('CYT','Pilar'),'3A':L('CYT','Pilar'),'3B':L('MAT','Luis Ch.'),'4A':L('EFIS','Julio Z.'),'4B':L('COM','Ana H.'),'5U':L('COM','Ana H.')},
+    5:{'1A':L('EPT','Carmen'),'1B':L('COM','Ninoska'),'2A':L('ART','María A.'),'2B':L('MAT','Iván G.'),'3A':L('CYT','Pilar'),'3B':L('MAT','Luis Ch.'),'4A':L('CYT','Pilar'),'4B':L('COM','Ana H.'),'5U':L('INGLÉS','Nancy H.')},
+    6:{'1A':L('CYT','Carmen'),'1B':L('MAT','Iván G.'),'2A':L('CYT','Pilar'),'2B':L('DPCC','Nilda'),'3A':L('ART','María A.'),'3B':L('ING','Nancy H.'),'4A':L('COM','Ana H.'),'4B':L('EFIS','Julio Z.'),'5U':L('MAT','Luis Ch.')}
+  },
+  1:{
+    1:{'1A':L('MAT','Iván G.'),'1B':L('CC.SS','Benito'),'2A':L('INGLÉS','Nancy H.'),'2B':L('EFIS','Julio Z.'),'3A':L('MAT','Luis Ch.'),'3B':L('TUT','Nilda'),'4A':L('EFIS','Julio Z.'),'4B':L('CYT','Pilar'),'5U':L('ART','María A.')},
+    2:{'1A':L('CC.SS','Benito'),'1B':L('ING','Nancy H.'),'2A':L('EPT','Carmen'),'2B':L('MAT','Iván G.'),'3A':L('EFIS','Julio Z.'),'3B':L('CYT','Pilar'),'4A':L('MAT','Luis Ch.'),'4B':L('ART','María A.'),'5U':L('DPCC','Nilda')},
+    3:{'1A':L('DPCC','Nilda'),'1B':L('MAT','Iván G.'),'2A':L('COM','Ana H.'),'2B':L('ART','María A.'),'3A':L('EPT','Carmen'),'3B':L('CYT','Pilar'),'4A':L('INGLÉS','Nancy H.'),'4B':L('CC.SS','Benito'),'5U':L('MAT','Luis Ch.')}
+  },
+  2:{
+    2:{'1A':L('COM','Ninoska'),'1B':L('MAT','Iván G.'),'2A':L('TUT','Julio Z.'),'2B':L('REL','Laura S.'),'3A':L('DPCC','Nilda'),'3B':L('CYT','Carmen'),'4A':L('CC.SS','Benito'),'4B':L('MAT','Luis Ch.'),'5U':L('ART','María A.')},
+    3:{'1A':L('ING','Nancy H.'),'1B':L('COM','Ninoska'),'2A':L('ART','María A.'),'2B':L('CYT','Pilar'),'3A':L('CC.SS','Benito'),'3B':L('MAT','Luis Ch.'),'4A':L('DPCC','Nilda'),'4B':L('CYT','Carmen'),'5U':L('EFIS','Julio Z.')},
+    4:{'1A':L('ING','Nancy H.'),'1B':L('DPCC','Nilda'),'2A':L('CC.SS','Benito'),'2B':L('CYT','Pilar'),'3A':L('COM','Ninoska'),'3B':L('ART','María A.'),'4A':L('ART','María A.'),'4B':L('CYT','Carmen'),'5U':L('MAT','Iván G.')},
+    5:{'1A':L('CC.SS','Benito'),'1B':L('EFIS','Julio Z.'),'2A':L('COM','Ana H.'),'2B':L('INGLÉS','Nancy R.'),'3A':L('COM','Ninoska'),'3B':L('REL','Laura S.'),'4A':L('ART','María A.'),'4B':L('DPCC','Nilda'),'5U':L('MAT','Iván G.')},
+    6:{'1A':L('MAT','Iván G.'),'1B':L('TUT','María A.'),'2A':L('COM','Ana H.'),'2B':L('CC.SS','Benito'),'3A':L('REL','Laura S.'),'3B':L('EFIS','Julio Z.'),'4A':L('ING','Nancy H.'),'4B':L('COM','Ana H.'),'5U':L('COM','Ninoska')},
+    7:{'1A':L('MAT','Iván G.'),'1B':L('TUT','María A.'),'2A':L('DPCC','Nilda'),'2B':L('CC.SS','Benito'),'3A':L('REL','Laura S.'),'3B':L('EFIS','Julio Z.'),'4A':L('COM','Ana H.'),'4B':L('COM','Ana H.'),'5U':L('COM','Ninoska')}
+  },
+  3:{
+    1:{'1A':L('ART','María A.'),'1B':L('CYT','Carmen'),'2A':L('EFIS','Julio Z.'),'2B':L('MAT','Iván G.'),'3A':L('COM','Ninoska'),'3B':L('CYT','Pilar'),'4A':L('TUT','Ana H.'),'4B':L('ING','Nancy H.'),'5U':L('REL','Laura S.')},
+    2:{'1A':L('ART','María A.'),'1B':L('EPT','Carmen'),'2A':L('DPCC','Nilda'),'2B':L('EFIS','Julio Z.'),'3A':L('COM','Ninoska'),'3B':L('COM','Ninoska'),'4A':L('ART','María A.'),'4B':L('CC.SS','Benito'),'5U':L('CYT','Iván G.')},
+    3:{'1A':L('REL','Laura S.'),'1B':L('EPT','Carmen'),'2A':L('MAT','Iván G.'),'2B':L('ART','María A.'),'3A':L('CYT','Pilar'),'3B':L('COM','Ninoska'),'4A':L('ART','María A.'),'4B':L('COM','Ana H.'),'5U':L('CYT','Iván G.')}
+  },
+  4:{
+    2:{'1A':L('TUT','Benito'),'1B':L('REL','Laura S.'),'2A':L('EFIS','Julio Z.'),'2B':L('EPT','Carmen'),'3A':L('ING','Nancy H.'),'3B':L('MAT','Luis Ch.'),'4A':L('CYT','Pilar'),'4B':L('ART','María A.'),'5U':L('DPCC','Nilda')},
+    3:{'1A':L('DPCC','Nilda'),'1B':L('COM','Ninoska'),'2A':L('ING','Nancy H.'),'2B':L('CYT','Pilar'),'3A':L('CC.SS','Benito'),'3B':L('MAT','Luis Ch.'),'4A':L('ART','María A.'),'4B':L('EFIS','Julio Z.'),'5U':L('ART','María A.')},
+    4:{'1A':L('DPCC','Nilda'),'1B':L('COM','Ninoska'),'2A':L('ING','Nancy H.'),'2B':L('CYT','Pilar'),'3A':L('CC.SS','Benito'),'3B':L('MAT','Luis Ch.'),'4A':L('REL','Laura S.'),'4B':L('ART','María A.'),'5U':L('ART','María A.')},
+    5:{'1A':L('CYT','Iván G.'),'1B':L('EPT','Carmen'),'2A':L('CYT','Pilar'),'2B':L('COM','Ana H.'),'3A':L('COM','Ninoska'),'3B':L('CC.SS','Benito'),'4A':L('DPCC','Nilda'),'4B':L('REL','Laura S.'),'5U':L('MAT','Luis Ch.')},
+    6:{'1A':L('EFIS','Julio Z.'),'1B':L('INGLÉS','Nancy R.'),'2A':L('MAT','Iván G.'),'2B':L('DPCC','Nilda'),'3A':L('MAT','Luis Ch.'),'3B':L('COM','Ninoska'),'4A':L('REL','Sandra S.'),'4B':L('COM','Ana H.'),'5U':L('CC.SS','Benito')},
+    7:{'1A':L('EFIS','Julio Z.'),'1B':L('INGLÉS','Nancy R.'),'2A':L('MAT','Iván G.'),'2B':L('DPCC','Nilda'),'3A':L('MAT','Luis Ch.'),'3B':L('COM','Ninoska'),'4A':L('REL','Sandra S.'),'4B':L('COM','Ana H.'),'5U':L('CC.SS','Benito')}
+  }
+};
+
+let plan = {};
+let editKey = null;
+let plantilla = null;
+
+function plantillaDefault() {
+  return { pri: JSON.parse(JSON.stringify(PIP_PRI)), sec: JSON.parse(JSON.stringify(PIP_SEC)) };
+}
+function ymd(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function diasMes(ym) {
+  const [Y,M] = ym.split('-').map(Number);
+  const out = [];
+  const d = new Date(Y, M-1, 1);
+  while (d.getMonth() === M-1) {
+    if (d.getDay()>=1 && d.getDay()<=5) out.push(new Date(d));
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+function diasDe(m, hora) {
+  const a = m[String(hora)] || m[hora] || [];
+  return a;
+}
+function pipOk(nivel, hora, wd) {
+  if (!plantilla) plantilla = plantillaDefault();
+  return diasDe(plantilla[nivel] || {}, hora).indexOf(wd) >= 0;
+}
+function slotActivo(fecha, nivel, hora, wd) {
+  if (hora === 'R') return false;
+  const c = celda(fecha, nivel, hora);
+  if (c && c.tipo === 'bloqueado') return false;
+  if (c && c.tipo === 'abierto') return true;
+  if (c && c.tipo && c.tipo !== 'bloqueado') return true;
+  return pipOk(nivel, hora, wd);
+}
+function modoDefinir() { return (document.getElementById('selModo') || {}).value === 'definir'; }
+function candidatos(wd, hora) {
+  const row = (HS[wd] && HS[wd][hora]) || {};
+  return Object.keys(row).map(s => ({ seccion:s, area:row[s].area, doc:row[s].doc, texto: s+' '+row[s].area+' '+row[s].doc }));
+}
+function horaPar(h) {
+  if (h === 4) return 5;
+  if (h === 5) return 4;
+  if (h >= 1 && h < 7) return h + 1;
+  return null;
+}
+function mismoGrupo(wd, h1, h2, seccion) {
+  const a = HS[wd] && HS[wd][h1] && HS[wd][h1][seccion];
+  const b = HS[wd] && HS[wd][h2] && HS[wd][h2][seccion];
+  return !!(a && b && a.doc === b.doc);
+}
+function bloqueCfg() { return (document.getElementById('selBloque') || {}).value || '2'; }
+function exigeDos() { return bloqueCfg() === '2'; }
+function candidatosAIP(wd, hora, fecha) {
+  let list = candidatos(wd, hora);
+  if (!exigeDos()) return list;
+  const par = horaPar(hora);
+  if (!par) return [];
+  if (fecha && (!slotActivo(fecha,'sec',hora,wd) || !slotActivo(fecha,'sec',par,wd))) return [];
+  return list.filter(c => mismoGrupo(wd, hora, par, c.seccion));
+}
+function loadCfg() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+    if (c.bloque) document.getElementById('selBloque').value = c.bloque;
+    if (c.modo) document.getElementById('selModo').value = c.modo;
+    plantilla = (c.plantilla && c.plantilla.pri && c.plantilla.sec) ? c.plantilla : plantillaDefault();
+  } catch (e) { plantilla = plantillaDefault(); }
+}
+function guardarCfg() {
+  localStorage.setItem(CFG_KEY, JSON.stringify({
+    bloque: bloqueCfg(),
+    modo: (document.getElementById('selModo') || {}).value || 'asignar',
+    plantilla: plantilla || plantillaDefault()
+  }));
+}
+function load() {
+  try { plan = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { plan = {}; }
+  loadCfg();
+}
+function guardar() {
+  guardarCfg();
+  localStorage.setItem(KEY, JSON.stringify(plan));
+  alert('Guardado en este navegador.');
+}
+function celda(fecha, nivel, hora) {
+  if (!plan[fecha]) plan[fecha] = {};
+  if (!plan[fecha][nivel]) plan[fecha][nivel] = {};
+  return plan[fecha][nivel][hora];
+}
+function setCelda(fecha, nivel, hora, obj) {
+  if (!plan[fecha]) plan[fecha] = {};
+  if (!plan[fecha][nivel]) plan[fecha][nivel] = {};
+  if (!obj) delete plan[fecha][nivel][hora];
+  else plan[fecha][nivel][hora] = obj;
+}
+function togglePlantilla(nivel, hora, wd) {
+  if (!plantilla) plantilla = plantillaDefault();
+  const key = String(hora);
+  if (!plantilla[nivel][key]) plantilla[nivel][key] = (plantilla[nivel][hora] || []).slice();
+  const arr = plantilla[nivel][key];
+  const i = arr.indexOf(wd);
+  if (i >= 0) arr.splice(i, 1); else arr.push(wd);
+  plantilla[nivel][hora] = arr;
+  plantilla[nivel][key] = arr;
+  guardarCfg();
+  renderPlantilla();
+  render();
+}
+function restaurarPlantilla() {
+  plantilla = plantillaDefault();
+  guardarCfg();
+  renderPlantilla();
+  render();
+}
+function aplicarPlantillaAlMes() {
+  const days = diasMes(document.getElementById('inpMes').value);
+  days.forEach(d => {
+    const f = ymd(d);
+    ['pri','sec'].forEach(n => {
+      const o = plan[f] && plan[f][n];
+      if (!o) return;
+      Object.keys(o).forEach(h => {
+        if (o[h] && (o[h].tipo === 'bloqueado' || o[h].tipo === 'abierto')) delete o[h];
+      });
+    });
+  });
+  render();
+}
+function renderPlantilla() {
+  function tabla(nivel, horas) {
+    let h = '<table class="cal"><thead><tr><th>Hora</th>';
+    DOW.forEach(x => h += '<th>'+x+'</th>');
+    h += '</tr></thead><tbody>';
+    horas.forEach(([num, lab]) => {
+      if (num === 'R') return;
+      h += '<tr><td>'+num+' '+lab+'</td>';
+      for (let wd=0; wd<5; wd++) {
+        const on = pipOk(nivel, num, wd);
+        h += '<td class="'+(on?'c-aip':'c-gray')+'" onclick="togglePlantilla(\''+nivel+'\','+num+','+wd+')">'+(on?'AIP':'')+'</td>';
+      }
+      h += '</tr>';
+    });
+    return h+'</tbody></table>';
+  }
+  document.getElementById('boxPlantPri').innerHTML = tabla('pri', HPRI);
+  document.getElementById('boxPlantSec').innerHTML = tabla('sec', HSEC);
+}
+function armarMes() {
+  const ym = document.getElementById('inpMes').value;
+  const days = diasMes(ym);
+  days.forEach(d => {
+    const f = ymd(d);
+    ['pri','sec'].forEach(n => {
+      const o = plan[f] && plan[f][n];
+      if (!o) return;
+      Object.keys(o).forEach(h => {
+        if (o[h] && (o[h].tipo==='bloqueado' || o[h].tipo==='abierto')) return;
+        delete o[h];
+      });
+    });
+  });
+  const tues = days.filter(d => d.getDay()===2 && !FERIADOS[ymd(d)]);
+  const thus = days.filter(d => d.getDay()===4 && !FERIADOS[ymd(d)]);
+  const rotMar = ['3°','5°'];
+  const rotJue = ['4°','6°'];
+  tues.forEach((d,i) => {
+    const g = rotMar[i % rotMar.length];
+    const f = ymd(d); const wd = d.getDay()-1;
+    if (slotActivo(f,'pri',4,wd)) setCelda(f,'pri',4,{ tipo:'grupo', texto:g });
+    if (slotActivo(f,'pri',5,wd)) setCelda(f,'pri',5,{ tipo:'grupo', texto:g });
+    if (slotActivo(f,'pri',6,wd)) setCelda(f,'pri',6,{ tipo:'man', texto:'MAN. PREVENT' });
+  });
+  thus.forEach((d,i) => {
+    const g = rotJue[i % rotJue.length];
+    const f = ymd(d); const wd = d.getDay()-1;
+    if (slotActivo(f,'pri',4,wd)) setCelda(f,'pri',4,{ tipo:'grupo', texto:g });
+    if (slotActivo(f,'pri',5,wd)) setCelda(f,'pri',5,{ tipo:'grupo', texto:g });
+    if (slotActivo(f,'pri',6,wd)) setCelda(f,'pri',6,{ tipo:'man', texto:'MAN. PREVENT' });
+  });
+  const visits = {};
+  SECS.forEach(s => visits[s]=0);
+  days.forEach(d => {
+    const f = ymd(d);
+    if (FERIADOS[f]) return;
+    const wd = d.getDay()-1;
+    const usedDay = {};
+    [1,2,3,4,5,6,7].forEach(h => {
+      if (!slotActivo(f,'sec', h, wd)) return;
+      if (celda(f,'sec',h) && celda(f,'sec',h).tipo !== 'abierto') return;
+      const par = horaPar(h);
+      const dos = exigeDos();
+      let cands = (dos ? candidatosAIP(wd, h, f) : candidatos(wd, h)).filter(c => !usedDay[c.seccion]);
+      if (dos && par && h > par) {
+        if (!celda(f,'sec',h) || celda(f,'sec',h).tipo==='abierto')
+          setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
+        return;
+      }
+      if (!cands.length) {
+        setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
+        return;
+      }
+      cands.sort((a,b) => visits[a.seccion]-visits[b.seccion] || a.seccion.localeCompare(b.seccion));
+      const pick = cands[0];
+      visits[pick.seccion]++;
+      usedDay[pick.seccion] = 1;
+      setCelda(f,'sec',h, { tipo:'grupo', seccion:pick.seccion, area:pick.area, doc:pick.doc, texto:pick.texto });
+      if (dos && par && slotActivo(f,'sec', par, wd) && mismoGrupo(wd, h, par, pick.seccion)) {
+        const row2 = HS[wd][par][pick.seccion];
+        setCelda(f,'sec',par, { tipo:'grupo', seccion:pick.seccion, area:row2.area, doc:row2.doc, texto:pick.seccion+' '+row2.area+' '+row2.doc });
+      }
+    });
+  });
+  render();
+}
+function clsDe(tipo) {
+  return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', man:'c-man', vacio:'c-aip', abierto:'c-aip', bloqueado:'c-gray' })[tipo] || 'c-gray';
+}
+function render() {
+  const ym = document.getElementById('inpMes').value;
+  const days = diasMes(ym);
+  const [Y,M] = ym.split('-');
+  const meses = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  document.getElementById('titPri').textContent = 'Primaria · '+meses[+M]+' '+Y+' · 3° 4° 5° 6°';
+  document.getElementById('titSec').textContent = 'Secundaria · '+meses[+M]+' '+Y;
+  function head() {
+    let h = '<th>N°</th><th>Hora</th>';
+    days.forEach(d => {
+      const f = ymd(d);
+      h += '<th>'+String(d.getDate()).padStart(2,'0')+'<br>'+DOW[d.getDay()-1]+(FERIADOS[f]?'<br>FER':'')+'</th>';
+    });
+    return h;
+  }
+  function cell(d, nivel, hora) {
+    const f = ymd(d); const wd = d.getDay()-1;
+    if (FERIADOS[f]) return '<td class="c-fer">FERIADO</td>';
+    if (hora==='R') return '<td class="c-rec">RECREO</td>';
+    const on = slotActivo(f,nivel,hora,wd);
+    const c = celda(f,nivel,hora);
+    const t = on ? ((c && c.tipo!=='abierto' && c.texto) ? c.texto : '—') : '';
+    const cl = on ? (c ? clsDe(c.tipo) : 'c-aip') : 'c-gray';
+    return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\','+hora+')">'+t+'</td>';
+  }
+  let p = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
+  p += '<tr><td></td><td>10:15-10:30</td>'+days.map(d=>FERIADOS[ymd(d)]?'<td class="c-fer">FER</td>':'<td class="c-rec">RECREO</td>').join('')+'</tr>';
+  HPRI.forEach(([h,lab]) => { p += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'pri',h)).join('')+'</tr>'; });
+  document.getElementById('boxPri').innerHTML = p+'</tbody></table>';
+  let s = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
+  HSEC.forEach(([h,lab]) => { s += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'sec',h)).join('')+'</tr>'; });
+  document.getElementById('boxSec').innerHTML = s+'</tbody></table>';
+}
+function clicCelda(fecha, nivel, hora) {
+  if (FERIADOS[fecha] || hora==='R') return;
+  if (modoDefinir()) {
+    const d = new Date(fecha+'T12:00:00');
+    const wd = d.getDay()-1;
+    if (slotActivo(fecha, nivel, hora, wd)) setCelda(fecha, nivel, hora, { tipo:'bloqueado', texto:'' });
+    else setCelda(fecha, nivel, hora, { tipo:'abierto', texto:'—' });
+    render();
+    return;
+  }
+  abrir(fecha, nivel, hora);
+}
+function abrir(fecha, nivel, hora) {
+  const d = new Date(fecha+'T12:00:00');
+  const wd = d.getDay()-1;
+  if (FERIADOS[fecha]) return;
+  editKey = { fecha, nivel, hora, wd };
+  const c = celda(fecha, nivel, hora) || {};
+  document.getElementById('modTit').textContent = (nivel==='pri'?'Primaria':'Secundaria')+' · '+fecha+' · hora '+hora;
+  document.getElementById('modSub').textContent = 'Grupo o bloquear solo este día.';
+  document.getElementById('modTipo').value = c.tipo || (slotActivo(fecha,nivel,hora,wd) ? 'grupo' : 'bloqueado');
+  const sel = document.getElementById('modGrupo');
+  if (nivel==='pri') {
+    sel.innerHTML = ['3°','4°','5°','6°'].map(g => '<option value="'+g+'">'+g+'</option>').join('');
+    if (c.texto) sel.value = c.texto;
+  } else {
+    const cands = candidatosAIP(wd, hora, fecha);
+    const list = cands.length ? cands : candidatos(wd,hora);
+    sel.innerHTML = list.map(x => '<option value="'+x.seccion+'">'+x.texto+'</option>').join('') || '<option value="">—</option>';
+    if (c.seccion) sel.value = c.seccion;
+  }
+  onModTipo();
+  document.getElementById('modal').classList.remove('hidden');
+}
+function onModTipo() {
+  document.getElementById('wrapGrupo').style.display = document.getElementById('modTipo').value==='grupo' ? 'block' : 'none';
+}
+function cerrarModal() { document.getElementById('modal').classList.add('hidden'); editKey=null; }
+function aplicarModal() {
+  if (!editKey) return;
+  const tipo = document.getElementById('modTipo').value;
+  const { fecha, nivel, hora, wd } = editKey;
+  if (tipo==='vacio') setCelda(fecha,nivel,hora,null);
+  else if (tipo==='bloqueado') setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
+  else if (tipo==='abierto') setCelda(fecha,nivel,hora,{ tipo:'abierto', texto:'—' });
+  else if (tipo==='grupo') {
+    if (nivel==='pri') setCelda(fecha,nivel,hora,{ tipo:'grupo', texto: document.getElementById('modGrupo').value });
+    else {
+      const sec = document.getElementById('modGrupo').value;
+      const row = (HS[wd]&&HS[wd][hora]&&HS[wd][hora][sec]);
+      setCelda(fecha,nivel,hora, row ? { tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc } : { tipo:'grupo', texto:sec });
+    }
+  } else {
+    const map = { soporte:'SOPORTE', colegio:'COLEGIO', man:'MAN. PREVENT' };
+    setCelda(fecha,nivel,hora,{ tipo:tipo, texto: map[tipo] });
+  }
+  cerrarModal();
+  render();
+}
+function onMes() { render(); }
+
+load();
+if (!plantilla) plantilla = plantillaDefault();
+renderPlantilla();
+render();
