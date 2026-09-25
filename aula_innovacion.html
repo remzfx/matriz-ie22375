@@ -46,13 +46,21 @@
 
 <main class="max-w-6xl mx-auto px-3 py-4 space-y-3">
   <div class="card p-3 no-print space-y-3">
-    <div class="grid sm:grid-cols-4 gap-2 items-end">
+    <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end">
       <div>
         <label class="text-[10px] font-bold text-slate-500">Mes</label>
         <input type="month" id="inpMes" value="2026-10" onchange="onMes()" />
       </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Bloque mínimo para entrar al AIP</label>
+        <select id="selBloque" onchange="guardarCfg()">
+          <option value="cualquier">Cualquier hora (1 bloque)</option>
+          <option value="1">Solo 1 hora</option>
+          <option value="2" selected>Solo si tiene 2 horas seguidas</option>
+        </select>
+      </div>
       <label class="flex items-center gap-2 text-sm font-bold pb-2">
-        <input type="checkbox" id="chkTer" checked /> Incluir 3° primaria
+        <input type="checkbox" id="chkTer" checked onchange="guardarCfg()" /> Incluir 3° primaria
       </label>
       <button class="btn btn-ok" onclick="armarMes()">Armar mes automático</button>
       <div class="flex gap-2">
@@ -61,8 +69,8 @@
       </div>
     </div>
     <p class="text-[11px] text-slate-500 leading-snug">
-      Un grupo por hora AIP. El botón reparte a quien menos ha ido en el mes, usando el horario de clases.
-      Clic en una celda verde/naranja para cambiar. Gris = el PIP no está.
+      <b>2 horas:</b> el docente solo entra si tiene el mismo grupo en dos horas seguidas y ambas son AIP.
+      <b>1 hora / cualquier:</b> puede entrar en un solo bloque. Clic en la celda para cambiar.
     </p>
   </div>
 
@@ -105,6 +113,7 @@
 
 <script>
 const KEY = 'ie22375_aip_plan_v1';
+const CFG_KEY = 'ie22375_aip_cfg_v1';
 const FERIADOS = { '2026-10-08': 'Combate de Angamos' };
 const DOW = ['LUN','MAR','MIE','JUE','VIE'];
 const PIP_PRI = { 4:[1,3], 5:[1,3], 6:[1,3] };
@@ -175,8 +184,47 @@ function candidatos(wd, hora) {
   const row = (HS[wd] && HS[wd][hora]) || {};
   return Object.keys(row).map(s => ({ seccion:s, area:row[s].area, doc:row[s].doc, texto: s+' '+row[s].area+' '+row[s].doc }));
 }
+function horaPar(h) {
+  if (h === 4) return 5;
+  if (h === 5) return 4;
+  if (h >= 1 && h < 7) return h + 1;
+  return null;
+}
+function mismoGrupo(wd, h1, h2, seccion) {
+  const a = HS[wd] && HS[wd][h1] && HS[wd][h1][seccion];
+  const b = HS[wd] && HS[wd][h2] && HS[wd][h2][seccion];
+  if (!a || !b) return false;
+  return a.doc === b.doc;
+}
+function bloqueCfg() {
+  return (document.getElementById('selBloque') || {}).value || '2';
+}
+function exigeDos() {
+  return bloqueCfg() === '2';
+}
+function candidatosAIP(wd, hora) {
+  let list = candidatos(wd, hora);
+  if (!exigeDos()) return list;
+  const par = horaPar(hora);
+  if (!par || !pipOk('sec', hora, wd) || !pipOk('sec', par, wd)) return [];
+  return list.filter(c => mismoGrupo(wd, hora, par, c.seccion));
+}
+function loadCfg() {
+  try {
+    const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+    if (c.bloque) document.getElementById('selBloque').value = c.bloque;
+    if (typeof c.inc3 === 'boolean') document.getElementById('chkTer').checked = c.inc3;
+  } catch (e) {}
+}
+function guardarCfg() {
+  localStorage.setItem(CFG_KEY, JSON.stringify({
+    bloque: bloqueCfg(),
+    inc3: document.getElementById('chkTer').checked
+  }));
+}
 function load() {
   try { plan = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { plan = {}; }
+  loadCfg();
 }
 function guardar() {
   localStorage.setItem(KEY, JSON.stringify(plan));
@@ -231,6 +279,7 @@ function armarMes() {
     usedDay[f] = {};
     [1,2,3,4,5,6,7].forEach(h => {
       if (!pipOk('sec', h, wd)) return;
+      if (celda(f,'sec',h)) return;
       if (h>=6 && (wd===0 || wd===4)) {
         setCelda(f,'sec',h,{ tipo:'man', texto:'MAN. PREVENT' });
         return;
@@ -239,7 +288,13 @@ function armarMes() {
         setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
         return;
       }
-      const cands = candidatos(wd, h).filter(c => !usedDay[f][c.seccion]);
+      const par = horaPar(h);
+      const dos = exigeDos();
+      let cands = (dos ? candidatosAIP(wd, h) : candidatos(wd, h)).filter(c => !usedDay[f][c.seccion]);
+      if (dos && par && h > par) {
+        setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
+        return;
+      }
       if (!cands.length) {
         setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
         return;
@@ -248,7 +303,12 @@ function armarMes() {
       const pick = cands[0];
       visits[pick.seccion]++;
       usedDay[f][pick.seccion] = 1;
-      setCelda(f,'sec',h,{ tipo:'grupo', seccion:pick.seccion, area:pick.area, doc:pick.doc, texto:pick.texto });
+      const obj = { tipo:'grupo', seccion:pick.seccion, area:pick.area, doc:pick.doc, texto:pick.texto };
+      setCelda(f,'sec',h, obj);
+      if (dos && par && pipOk('sec', par, wd) && mismoGrupo(wd, h, par, pick.seccion)) {
+        const row2 = HS[wd][par][pick.seccion];
+        setCelda(f,'sec',par, { tipo:'grupo', seccion:pick.seccion, area:row2.area, doc:row2.doc, texto:pick.seccion+' '+row2.area+' '+row2.doc });
+      }
     });
   });
   render();
@@ -318,7 +378,9 @@ function abrir(fecha, nivel, hora) {
   editKey = { fecha, nivel, hora, wd };
   const c = celda(fecha, nivel, hora) || {};
   document.getElementById('modTit').textContent = (nivel==='pri'?'Primaria':'Secundaria')+' · '+fecha+' · hora '+hora;
-  document.getElementById('modSub').textContent = 'Solo se listan quienes tienen hora pedagógica aquí.';
+  document.getElementById('modSub').textContent = exigeDos()
+    ? 'Modo 2 horas: solo docentes con el mismo grupo en dos horas seguidas AIP.'
+    : 'Solo se listan quienes tienen hora pedagógica aquí.';
   document.getElementById('modTipo').value = c.tipo || 'grupo';
   const sel = document.getElementById('modGrupo');
   if (nivel==='pri') {
@@ -326,7 +388,7 @@ function abrir(fecha, nivel, hora) {
     sel.innerHTML = gs.map(g => '<option value="'+g+'">'+g+'</option>').join('');
     if (c.texto) sel.value = c.texto;
   } else {
-    const cands = candidatos(wd, hora);
+    const cands = candidatosAIP(wd, hora);
     sel.innerHTML = cands.map(x => '<option value="'+x.seccion+'">'+x.texto+'</option>').join('') || '<option value="">—</option>';
     if (c.seccion) sel.value = c.seccion;
   }
@@ -348,6 +410,13 @@ function aplicarModal() {
       const sec = document.getElementById('modGrupo').value;
       const row = (HS[wd]&&HS[wd][hora]&&HS[wd][hora][sec]);
       setCelda(fecha,nivel,hora, row ? { tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc } : { tipo:'grupo', texto:sec });
+      if (exigeDos() && row) {
+        const par = horaPar(hora);
+        if (par && pipOk('sec', par, wd) && mismoGrupo(wd, hora, par, sec)) {
+          const r2 = HS[wd][par][sec];
+          setCelda(fecha,nivel,par, { tipo:'grupo', seccion:sec, area:r2.area, doc:r2.doc, texto:sec+' '+r2.area+' '+r2.doc });
+        }
+      }
     }
   } else {
     const map = { soporte:'SOPORTE', colegio:'COLEGIO', man:'MAN. PREVENT' };
