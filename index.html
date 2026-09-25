@@ -89,6 +89,7 @@
 const ADMIN_PASS = 'admin22375';
 const SESSION_KEY = 'ie22375_session_v1';
 const DOCENTES_KEY = 'ie22375_docentes_v1';
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
 function loadDocentesLocal() {
   try { const raw = localStorage.getItem(DOCENTES_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
   return [];
@@ -97,16 +98,24 @@ function loadDocentes() {
   return loadDocentesLocal();
 }
 async function asegurarDocentesRemotos() {
-  // Si en esta máquina no hay docentes, intenta bajar docentes.json del sitio (GitHub Pages)
+  try {
+    const r = await fetch(CLOUD_API_URL + '?action=loaddoc&t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) {
+      const data = await r.json();
+      const list = (data && data.ok && Array.isArray(data.docentes)) ? data.docentes : [];
+      if (list.length) {
+        localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
+        return;
+      }
+    }
+  } catch (e) {}
   if (loadDocentesLocal().length) return;
   try {
     const r = await fetch('docentes.json?t=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) return;
     const data = await r.json();
     const list = Array.isArray(data) ? data : (data.docentes || []);
-    if (list.length) {
-      localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
-    }
+    if (list.length) localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
   } catch(e) {}
 }
 function getSession() {

@@ -364,16 +364,18 @@
         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
           <div class="font-bold text-sm">Usuarios registrados</div>
           <div class="flex flex-wrap gap-2">
-            <button type="button" class="btn btn-ghost text-xs" onclick="exportarDocentes()">Descargar docentes.json</button>
+            <button type="button" class="btn btn-ok text-xs" onclick="subirDocentesNube()">Nube ↑</button>
+            <button type="button" class="btn btn-ghost text-xs" onclick="bajarDocentesNube()">Nube ↓</button>
+            <button type="button" class="btn btn-ghost text-xs" onclick="exportarDocentes()">Descargar JSON</button>
             <label class="btn btn-ghost text-xs cursor-pointer">
               Importar JSON
               <input type="file" accept=".json,application/json" class="hidden" onchange="importarDocentes(event)">
             </label>
           </div>
         </div>
-        <p class="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mb-2">
-          Los docentes se guardan en ESTE navegador. Para que funcionen en otra PC o celular:
-          descarga <b>docentes.json</b> y súbelo a GitHub (junto a index.html), o impórtalo en esa máquina.
+        <p class="text-[11px] text-sky-800 bg-sky-50 rounded-lg px-2 py-1 mb-2">
+          <b>Nube ↑</b> sube usuarios, nivel, grados y áreas al mismo Sheets.
+          En otra PC o celular: entra a Admin y pulsa <b>Nube ↓</b> (el login también intenta bajarlos solo).
         </p>
         <div id="docLista" class="space-y-2 text-sm"></div>
       </div>
@@ -838,6 +840,7 @@ function savePeriodos() {
 
 
 const DOCENTES_KEY = 'ie22375_docentes_v1';
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
 const AREAS_SEC_LIST = ["Desarrollo Personal, Ciudadanía y Cívica", "Ciencias Sociales", "Educación para el Trabajo (EPT)", "Educación Física", "Comunicación", "Arte y Cultura", "Inglés", "Matemática", "Ciencia y Tecnología", "Educación Religiosa", "Competencias Transversales"];
 
 function loadDocentes() {
@@ -849,6 +852,35 @@ function loadDocentes() {
 }
 function saveDocentes(list) {
   localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
+}
+async function subirDocentesNube(silencio) {
+  const list = loadDocentes();
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'savedoc', docentes: list, ts: Date.now() })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Error nube');
+    if (!silencio) alert('Subidos ' + list.length + ' docentes a la nube.');
+    else alert('Docente guardado en este equipo y en la nube (' + list.length + ').');
+  } catch (e) {
+    alert('Guardado aquí, pero no subió a la nube.\n' + e.message + '\nPublica Nueva versión del Apps Script (savedoc).');
+  }
+}
+async function bajarDocentesNube() {
+  try {
+    const res = await fetch(CLOUD_API_URL + '?action=loaddoc&t=' + Date.now(), { cache: 'no-store' });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Error nube');
+    const list = Array.isArray(data.docentes) ? data.docentes : [];
+    if (!list.length) { alert('La nube no tiene docentes todavía. En la otra PC pulsa Nube ↑.'); return; }
+    saveDocentes(list);
+    renderDocentes();
+    alert('Descargados ' + list.length + ' docentes. Ya pueden iniciar sesión en esta máquina.');
+  } catch (e) {
+    alert('No se pudo bajar de la nube.\n' + e.message + '\nPublica Nueva versión del Apps Script (loaddoc).');
+  }
 }
 function exportarDocentes() {
   const list = loadDocentes();
@@ -957,7 +989,7 @@ function guardarDocente() {
   saveDocentes(list);
   limpiarFormDocente();
   renderDocentes();
-  alert('Docente guardado. Ya puede ingresar en el login del inicio.');
+  subirDocentesNube(true);
 }
 
 function editarDocente(id) {
@@ -986,6 +1018,7 @@ function eliminarDocente(id) {
   if (!confirm('¿Eliminar este acceso de docente?')) return;
   saveDocentes(loadDocentes().filter(d => d.id !== id));
   renderDocentes();
+  subirDocentesNube(true);
 }
 
 function renderDocentes() {
