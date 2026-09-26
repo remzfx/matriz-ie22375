@@ -24,6 +24,8 @@
   .c-fer { background:#fecaca; font-weight:800; }
   .c-rec { background:#fde68a; font-weight:700; }
   .sticky-top { position:sticky; top:0; z-index:20; }
+  .aip-tab { border:0; border-radius:12px; font-weight:800; padding:.55rem 1rem; cursor:pointer; font-size:13px; background:#e2e8f0; color:#0f172a; }
+  .aip-tab.on { background:#065f46; color:#fff; }
   @media print {
     .no-print { display:none !important; }
     body { background:#fff; }
@@ -43,6 +45,12 @@
   </div>
 </header>
 <main class="max-w-6xl mx-auto px-3 py-4 space-y-3">
+  <div class="no-print flex flex-wrap gap-2">
+    <button type="button" class="aip-tab on" id="tabBtnMes" onclick="showAipTab('mes')">Plan del mes</button>
+    <button type="button" class="aip-tab" id="tabBtnHs" onclick="showAipTab('hs')">Horario de docentes</button>
+    <button type="button" class="aip-tab" id="tabBtnReloj" onclick="showAipTab('reloj')">Reloj / feriados</button>
+  </div>
+  <div id="pane-mes" class="space-y-3 pane-print">
   <div class="card p-3 no-print space-y-3">
     <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 items-end">
       <div>
@@ -70,25 +78,10 @@
         <button class="btn btn-primary" type="button" onclick="guardar()">Guardar</button>
       </div>
     </div>
-    <p class="text-[11px] text-slate-500">Entran <b>3°, 4°, 5° y 6°</b>. Si el director quita primaria: apaga esas celdas en la plantilla y prende horas de secundaria. Luego Aplicar plantilla al mes.</p>
-    <div class="border-t border-slate-200 pt-2 space-y-2">
-      <div class="text-xs font-black">Feriados (nacional o local)</div>
-      <div class="flex flex-wrap gap-2 items-end">
-        <div>
-          <label class="text-[10px] font-bold text-slate-500">Fecha</label>
-          <input type="date" id="inpFerFecha" />
-        </div>
-        <div class="flex-1 min-w-[140px]">
-          <label class="text-[10px] font-bold text-slate-500">Nombre</label>
-          <input type="text" id="inpFerNom" placeholder="Ej. Fiesta patronal" style="width:100%;border:1.5px solid #cbd5e1;border-radius:10px;padding:.5rem .65rem;font-size:14px" />
-        </div>
-        <button class="btn btn-ghost text-xs" type="button" onclick="agregarFeriado()">Agregar feriado</button>
-      </div>
-      <p class="text-[11px] text-slate-500">También puedes tocar el <b>nombre del día</b> en la cabecera del mes (01 JUE) para marcarlo o quitarlo. El 8 oct viene sugerido; si hay clase, quítalo.</p>
-      <div id="listaFer" class="flex flex-wrap gap-1"></div>
-    </div>
+    <p class="text-[11px] text-slate-500">Entran <b>3°, 4°, 5° y 6°</b>. Reloj y feriados están en la pestaña <b>Reloj / feriados</b>. El horario de secundaria está en <b>Horario de docentes</b>.</p>
   </div>
-  <div class="card p-3 no-print space-y-2">
+  <div id="pane-reloj" class="space-y-3 hidden no-print">
+  <div class="card p-3 no-print space-y-2" id="cardRelojOrig">
     <div class="font-black text-sm">Horario institucional (como SIAGIE)</div>
     <p class="text-[11px] text-slate-500">El director cambia hora de entrada, minutos por clase, cuántas horas y el recreo. Luego se arma la grilla sola.</p>
     <div class="grid md:grid-cols-2 gap-3 text-xs">
@@ -114,8 +107,24 @@
       </div>
     </div>
     <button class="btn btn-primary text-xs" type="button" onclick="aplicarHorarioInst()">Aplicar horario y redibujar grillas</button>
+    <div class="border-t border-slate-200 pt-2 space-y-2">
+      <div class="text-xs font-black">Feriados (nacional o local)</div>
+      <div class="flex flex-wrap gap-2 items-end">
+        <div>
+          <label class="text-[10px] font-bold text-slate-500">Fecha</label>
+          <input type="date" id="inpFerFecha" />
+        </div>
+        <div class="flex-1 min-w-[140px]">
+          <label class="text-[10px] font-bold text-slate-500">Nombre</label>
+          <input type="text" id="inpFerNom" placeholder="Ej. Fiesta patronal" style="width:100%;border:1.5px solid #cbd5e1;border-radius:10px;padding:.5rem .65rem;font-size:14px" />
+        </div>
+        <button class="btn btn-ghost text-xs" type="button" onclick="agregarFeriado()">Agregar feriado</button>
+      </div>
+      <div id="listaFer" class="flex flex-wrap gap-1"></div>
+    </div>
   </div>
-  <div class="card p-3 no-print space-y-2">
+  </div>
+  <div class="card p-3 no-print space-y-2 mes-only">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div class="font-black text-sm">Plantilla semanal del PIP — tú eliges las horas</div>
       <div class="flex gap-2">
@@ -129,6 +138,10 @@
       <div><div class="text-xs font-bold mb-1">Secundaria</div><div id="boxPlantSec"></div></div>
     </div>
   </div>
+  <div class="card p-3 overflow-auto mes-only"><div class="font-black text-sm mb-2" id="titPri">Primaria</div><div id="boxPri"></div></div>
+  <div class="card p-3 overflow-auto mes-only"><div class="font-black text-sm mb-2" id="titSec">Secundaria</div><div id="boxSec"></div></div>
+  </div>
+  <div id="pane-hs" class="space-y-3 hidden no-print">
   <div class="card p-3 no-print space-y-2">
     <div class="font-black text-sm">Horario de docentes (sin IA)</div>
     <p class="text-[11px] text-slate-500 leading-snug">
@@ -146,10 +159,10 @@
       <button class="btn btn-ghost text-xs" type="button" onclick="restaurarHSEjemplo()">Volver al horario ejemplo</button>
     </div>
     <div class="overflow-auto" id="boxEditorHS"></div>
+    <div id="boxChoques" class="text-xs"></div>
   </div>
-  <div class="card p-3 overflow-auto"><div class="font-black text-sm mb-2" id="titPri">Primaria</div><div id="boxPri"></div></div>
-  <div class="card p-3 overflow-auto"><div class="font-black text-sm mb-2" id="titSec">Secundaria</div><div id="boxSec"></div></div>
-  <p class="text-[11px] text-center text-slate-400 pb-8">Mag. Efrain Ceopa Paredes</p>
+  </div>
+  <p class="text-[11px] text-center text-slate-400 pb-8 no-print">Mag. Efrain Ceopa Paredes</p>
 </main>
 <div id="modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-3 no-print">
   <div class="card w-full max-w-md p-4 space-y-2">
@@ -672,6 +685,21 @@ function aplicarModal() {
   cerrarModal();
   render();
 }
+function showAipTab(t) {
+  const mes = document.getElementById('pane-mes');
+  const hs = document.getElementById('pane-hs');
+  const reloj = document.getElementById('pane-reloj');
+  if (mes) mes.classList.toggle('hidden', t === 'hs');
+  if (hs) hs.classList.toggle('hidden', t !== 'hs');
+  if (reloj) reloj.classList.toggle('hidden', t !== 'reloj');
+  document.querySelectorAll('.mes-only').forEach(el => el.classList.toggle('hidden', t !== 'mes'));
+  document.querySelectorAll('.aip-tab').forEach(b => b.classList.remove('on'));
+  const map = { mes:'tabBtnMes', hs:'tabBtnHs', reloj:'tabBtnReloj' };
+  const btn = document.getElementById(map[t]);
+  if (btn) btn.classList.add('on');
+  if (t === 'hs') renderEditorHS();
+  if (t === 'reloj') renderFeriados();
+}
 function onMes() { render(); }
 
 function wdNombre(i){ return DOW[i] || ('D'+i); }
@@ -683,6 +711,82 @@ function initSelDiaHS() {
   const sel = document.getElementById('selDiaHS');
   if (!sel || sel.options.length) return;
   sel.innerHTML = DOW.map((n,i) => '<option value="'+i+'">'+n+'</option>').join('');
+}
+function normDoc(s) {
+  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
+}
+function esDocValido(s) {
+  const n = normDoc(s);
+  return n && n !== '-' && n !== '—' && n !== 'RECESO';
+}
+function mapaPorHora(M, wd, hora) {
+  const row = (M[wd] && M[wd][hora]) || {};
+  const by = {};
+  Object.keys(row).forEach(sec => {
+    const d = row[sec] && row[sec].doc;
+    if (!esDocValido(d)) return;
+    const k = normDoc(d);
+    if (!by[k]) by[k] = { nombre: row[sec].doc, secs: [] };
+    by[k].secs.push(sec);
+  });
+  return by;
+}
+function choquesHS(M) {
+  const out = [];
+  M = M || getHS();
+  for (let wd=0; wd<5; wd++) {
+    horasPed('sec').forEach(h => {
+      const by = mapaPorHora(M, wd, h);
+      Object.keys(by).forEach(k => {
+        if (by[k].secs.length > 1) out.push({ wd:wd, hora:h, doc:by[k].nombre, secs:by[k].secs });
+      });
+    });
+  }
+  return out;
+}
+function cargaSemanal(M) {
+  M = M || getHS();
+  const carga = {};
+  for (let wd=0; wd<5; wd++) {
+    horasPed('sec').forEach(h => {
+      const row = (M[wd] && M[wd][h]) || {};
+      const vistos = {};
+      Object.keys(row).forEach(sec => {
+        const d = row[sec] && row[sec].doc;
+        if (!esDocValido(d)) return;
+        const k = normDoc(d);
+        if (vistos[k]) return;
+        vistos[k] = 1;
+        if (!carga[k]) carga[k] = { nombre: row[sec].doc, h: 0 };
+        carga[k].h++;
+      });
+    });
+  }
+  return Object.keys(carga).map(k => carga[k]).sort((a,b) => b.h-a.h || a.nombre.localeCompare(b.nombre));
+}
+function renderChoques() {
+  const box = document.getElementById('boxChoques');
+  if (!box) return;
+  const ch = choquesHS();
+  const carga = cargaSemanal();
+  let html = '';
+  if (ch.length) {
+    html += '<div class="mt-2 p-2 rounded-lg" style="background:#fef2f2;border:1px solid #fecaca">';
+    html += '<div class="font-black text-red-700 mb-1">Choques ('+ch.length+'): el mismo docente en dos secciones a la misma hora</div>';
+    html += ch.map(c => '<div>• '+wdNombre(c.wd)+' hora '+c.hora+' — <b>'+c.doc+'</b> en '+c.secs.join(', ')+'</div>').join('');
+    html += '</div>';
+  } else {
+    html += '<div class="mt-2 text-emerald-700 font-bold">Sin choques de docente en el horario.</div>';
+  }
+  html += '<div class="mt-2 text-[11px] text-slate-600"><b>Carga semanal (horas distintas):</b> '+
+    carga.map(x => x.nombre+' '+x.h+'h').join(' · ')+'</div>';
+  box.innerHTML = html;
+}
+function celdaEnChoque(wd, hora, doc) {
+  if (!esDocValido(doc)) return false;
+  const by = mapaPorHora(getHS(), wd, hora);
+  const k = normDoc(doc);
+  return !!(by[k] && by[k].secs.length > 1);
 }
 function renderEditorHS() {
   const box = document.getElementById('boxEditorHS');
@@ -702,14 +806,16 @@ function renderEditorHS() {
       const c = (M[wd] && M[wd][num] && M[wd][num][s]) || {};
       const ida = 'hsA_'+wd+'_'+num+'_'+s;
       const idd = 'hsD_'+wd+'_'+num+'_'+s;
-      h += '<td style="min-width:90px;padding:3px">'+
+      const choque = celdaEnChoque(wd, num, c.doc);
+      h += '<td class="'+(choque?'c-fer':'')+'" style="min-width:90px;padding:3px">'+
         '<input data-hs="1" id="'+ida+'" placeholder="Área" value="'+(c.area||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px;margin-bottom:2px">'+
-        '<input data-hs="1" id="'+idd+'" placeholder="Docente" value="'+(c.doc||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px">'+
+        '<input data-hs="1" id="'+idd+'" placeholder="Docente" value="'+(c.doc||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px'+(choque?';background:#fecaca':'')+'">'+
         '</td>';
     });
     h += '</tr>';
   });
   box.innerHTML = h+'</tbody></table>';
+  renderChoques();
 }
 function guardarDiaHS() {
   const sel = document.getElementById('selDiaHS');
@@ -727,7 +833,9 @@ function guardarDiaHS() {
     });
   });
   saveHS();
-  alert('Horario de '+wdNombre(wd)+' guardado. Ya se usa al armar el mes.');
+  renderEditorHS();
+  const n = choquesHS().filter(c => c.wd===wd).length;
+  alert('Horario de '+wdNombre(wd)+' guardado.'+(n?('\nOjo: hay '+n+' choque(s) este día (celdas en rojo).'):' Sin choques este día.'));
 }
 function exportarHS() {
   const data = getHS();
