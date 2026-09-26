@@ -155,7 +155,8 @@
       </div>
       <button class="btn btn-primary text-xs" type="button" onclick="guardarDiaHS()">Guardar este día</button>
       <button class="btn btn-ghost text-xs" type="button" onclick="exportarHS()">Exportar JSON</button>
-      <label class="btn btn-ghost text-xs">Importar JSON/CSV<input type="file" accept=".json,.csv,text/csv,application/json" hidden onchange="importarHS(this)"></label>
+      <label class="btn btn-ok text-xs">Importar ASC (XML / ROZ)<input type="file" accept=".xml,.roz,.json,.csv,text/xml,application/xml,text/csv,application/json" hidden onchange="importarHS(this)"></label>
+      <label class="btn btn-ghost text-xs">JSON/CSV<input type="file" accept=".json,.csv,text/csv,application/json" hidden onchange="importarHS(this)"></label>
       <button class="btn btn-ghost text-xs" type="button" onclick="restaurarHSEjemplo()">Volver al horario ejemplo</button>
     </div>
     <div class="overflow-auto" id="boxEditorHS"></div>
@@ -890,6 +891,72 @@ function parseCsvHS(text) {
   }
   return M;
 }
+function mapSecASC(name) {
+  let s = String(name||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  s = s.replace(/GRADO|SECUNDARIA|PRIMARIA|SECCION|SECCIÓN/g,'');
+  s = s.replace(/["'°º]/g,'').replace(/\s+/g,' ').trim();
+  const m = s.match(/([1-6])\s*([AB])\b/);
+  if (m) return m[1]+m[2];
+  if (/5/.test(s) && /UNIC/.test(s)) return '5U';
+  if (s === '5U' || s === '5') return '5U';
+  const m2 = s.match(/^([1-6])([AB])$/);
+  return m2 ? m2[1]+m2[2] : '';
+}
+function attrMap(el) {
+  const o = {};
+  if (!el || !el.attributes) return o;
+  for (let i=0;i<el.attributes.length;i++) o[el.attributes[i].name.toLowerCase()] = el.attributes[i].value;
+  return o;
+}
+function parseAscXml(txt) {
+  const doc = new DOMParser().parseFromString(txt, 'text/xml');
+  if (doc.querySelector('parsererror')) throw new Error('XML inválido');
+  const byId = (tag) => {
+    const m = {};
+    doc.querySelectorAll(tag).forEach(n => {
+      const a = attrMap(n);
+      const id = a.id || a.teacherid || '';
+      if (id) m[id] = a;
+    });
+    return m;
+  };
+  const teachers = byId('teacher');
+  const subjects = byId('subject');
+  const classes = byId('class');
+  const lessons = {};
+  doc.querySelectorAll('lesson').forEach(n => {
+    const a = attrMap(n);
+    if (a.id) lessons[a.id] = a;
+  });
+  const cards = [];
+  doc.querySelectorAll('card').forEach(n => cards.push(attrMap(n)));
+  if (!cards.length) throw new Error('El XML no tiene <card> (exporta el horario ya generado en ASC)');
+  const M = { 0:{}, 1:{}, 2:{}, 3:{}, 4:{} };
+  let n = 0;
+  cards.forEach(c => {
+    const les = lessons[c.lessonid || c.lesson || ''] || {};
+    let day = parseInt(c.day || c.days || les.day || '0', 10);
+    if (day >= 1 && day <= 5) day = day - 1;
+    if (day < 0 || day > 4) return;
+    const hora = parseInt(c.period || c.periods || c.hour || les.period || '0', 10);
+    if (!hora) return;
+    const classids = String(c.classids || les.classids || les.classid || '').split(',').map(x => x.trim()).filter(Boolean);
+    const teacherids = String(c.teacherids || les.teacherids || les.teacherid || '').split(',').map(x => x.trim()).filter(Boolean);
+    const subid = c.subjectid || les.subjectid || '';
+    const area = (subjects[subid] && (subjects[subid].short || subjects[subid].name)) || c.subject || '—';
+    const docName = teacherids.map(id => (teachers[id] && (teachers[id].name || teachers[id].short)) || id).filter(Boolean).join(' / ') || '—';
+    classids.forEach(cid => {
+      const cl = classes[cid] || {};
+      const sec = mapSecASC(cl.short || cl.name || cid);
+      if (!sec || SECS.indexOf(sec) < 0) return;
+      if (!M[day][hora]) M[day][hora] = {};
+      M[day][hora][sec] = { area: String(area), doc: String(docName) };
+      n++;
+    });
+  });
+  if (!n) throw new Error('No pude cruzar clases 1A–5U. Revisa que en ASC las secciones se llamen 1A, 1° A, 5 Única…');
+  return M;
+}
 function importarHS(inp) {
   const f = inp.files && inp.files[0];
   inp.value = '';
@@ -898,13 +965,23 @@ function importarHS(inp) {
   reader.onload = function() {
     try {
       const txt = String(reader.result||'');
-      if (f.name.toLowerCase().endsWith('.csv') || txt.indexOf(';')>=0 && txt.split('\n')[0].toLowerCase().indexOf('hora')>=0) {
+      const name = (f.name||'').toLowerCase();
+      const pareceXml = name.endsWith('.xml') || name.endsWith('.roz') || /<\s*(timetable|days|cards|lessons|teachers)/i.test(txt);
+      if (name.endsWith('.roz') && !/<\s*(timetable|cards|lessons)/i.test(txt)) {
+        alert('El .ROZ de ASC es un archivo cerrado y no se puede leer aquí.\n\nEn ASC: Archivo → Exportar → aSc Timetables XML.\nLuego importa ese .xml en este mismo botón.');
+        return;
+      }
+      if (pareceXml) {
+        aplicarMapaHS(parseAscXml(txt));
+        alert('Horario ASC importado. Revisa choques en rojo.');
+      } else if (name.endsWith('.csv') || (txt.indexOf(';')>=0 && txt.split('\n')[0].toLowerCase().indexOf('hora')>=0)) {
         aplicarMapaHS(parseCsvHS(txt));
+        alert('Horario importado.');
       } else {
         const j = JSON.parse(txt);
         aplicarMapaHS(j.horario || j.HS || j);
+        alert('Horario importado.');
       }
-      alert('Horario importado.');
     } catch (e) {
       alert('No se pudo leer el archivo: ' + e.message);
     }
