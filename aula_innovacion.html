@@ -235,6 +235,21 @@ function HPRI(){ return buildHoras(horario.pri); }
 function HSEC(){ return buildHoras(horario.sec); }
 function horasPed(nivel){ return (nivel==='pri'?HPRI():HSEC()).filter(x=>x[0]!=='R').map(x=>+x[0]); }
 const SECS = ['1A','1B','2A','2B','3A','3B','4A','4B','5U'];
+function ordenSec(a,b){
+  const na=parseInt(a,10)||0, nb=parseInt(b,10)||0;
+  if(na!==nb) return na-nb;
+  return String(a).localeCompare(String(b));
+}
+function secsVivas(){
+  const M=getHS(); const set={};
+  Object.keys(M||{}).forEach(wd=>{
+    Object.keys(M[wd]||{}).forEach(h=>{
+      Object.keys(M[wd][h]||{}).forEach(s=>{ if(s) set[s]=1; });
+    });
+  });
+  const list=Object.keys(set).sort(ordenSec);
+  return list.length?list:SECS.slice();
+}
 function L(area, doc){ return { area:area, doc:doc }; }
 const HS = {
   0:{
@@ -673,7 +688,8 @@ function armarSecundariaMes(days, silencio){
   const first=days[0];
   const slots=[];
   days.forEach(d=>paresLibresSec(d).forEach(s=>{ s.sem=semanaDelMes(d,first); slots.push(s); }));
-  const visits={}; SECS.forEach(s=>visits[s]=0);
+  const SECS_NOW=secsVivas();
+  const visits={}; SECS_NOW.forEach(s=>visits[s]=0);
   const weekGot={};
   const ordenPrimera=[];
   function tomar(slot, soloNuevos){
@@ -687,7 +703,7 @@ function armarSecundariaMes(days, silencio){
       if(dv) return dv;
       const ia=ordenPrimera.indexOf(a.seccion), ib=ordenPrimera.indexOf(b.seccion);
       if(ia>=0 || ib>=0) return (ia<0?99:ia)-(ib<0?99:ib);
-      return SECS.indexOf(a.seccion)-SECS.indexOf(b.seccion);
+      return ordenSec(a.seccion,b.seccion);
     });
     const pick=cands[0];
     if(visits[pick.seccion]===0) ordenPrimera.push(pick.seccion);
@@ -708,7 +724,7 @@ function armarSecundariaMes(days, silencio){
       if(!c2 || c2.tipo==='abierto' || !c2.tipo) setCelda(s.f,'sec',s.h2,{ tipo:'man', texto:'MAN. PREVENT' });
     }
   });
-  const faltan=SECS.filter(s=>!visits[s]);
+  const faltan=SECS_NOW.filter(s=>!visits[s]);
   const pedidas=cursosDelMes();
   const usadas={};
   days.forEach(d=>{
@@ -861,11 +877,12 @@ function celdaEnChoque(wd,hora,doc){ if(!esDocValido(doc)) return false; const b
 function renderEditorHS(){
   const box=document.getElementById('boxEditorHS'); const sel=document.getElementById('selDiaHS'); if(!box||!sel) return;
   initSelDiaHS(); const wd=+sel.value; const M=getHS(); const horas=horasPed('sec');
-  let h='<table class="cal"><thead><tr><th>Hora</th>'; SECS.forEach(s=>h+='<th>'+s+'</th>'); h+='</tr></thead><tbody>';
+  const SECS_NOW=secsVivas();
+  let h='<table class="cal"><thead><tr><th>Hora</th>'; SECS_NOW.forEach(s=>h+='<th>'+s+'</th>'); h+='</tr></thead><tbody>';
   horas.forEach(num=>{
     const lab=(HSEC().find(x=>+x[0]===+num)||[num,''])[1];
     h+='<tr><td>'+num+'<br><span style="font-weight:400">'+lab+'</span></td>';
-    SECS.forEach(s=>{
+    SECS_NOW.forEach(s=>{
       const c=(M[wd]&&M[wd][num]&&M[wd][num][s])||{};
       const choque=celdaEnChoque(wd,num,c.doc);
       h+='<td class="'+(choque?'c-fer':'')+'" style="min-width:90px;padding:3px"><input id="hsA_'+wd+'_'+num+'_'+s+'" placeholder="Área" value="'+(c.area||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px;margin-bottom:2px"><input id="hsD_'+wd+'_'+num+'_'+s+'" placeholder="Docente" value="'+(c.doc||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px'+(choque?';background:#fecaca':'')+'"></td>';
@@ -878,7 +895,7 @@ function guardarDiaHS(){
   const sel=document.getElementById('selDiaHS'); if(!sel) return; const wd=+sel.value; const M=ensureHS(); if(!M[wd]) M[wd]={};
   horasPed('sec').forEach(num=>{
     if(!M[wd][num]) M[wd][num]={};
-    SECS.forEach(s=>{
+    secsVivas().forEach(s=>{
       const area=((document.getElementById('hsA_'+wd+'_'+num+'_'+s)||{}).value||'').trim();
       const doc=((document.getElementById('hsD_'+wd+'_'+num+'_'+s)||{}).value||'').trim();
       if(area||doc) M[wd][num][s]={ area:area||'—', doc:doc||'—' }; else delete M[wd][num][s];
@@ -913,9 +930,9 @@ function parseCsvHS(text){
 function mapSecASC(name){
   let s=String(name||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   s=s.replace(/GRADO|SECUNDARIA|PRIMARIA|SECCION|SECCIÓN/g,'').replace(/["'°º]/g,'').replace(/\s+/g,' ').trim();
-  const m=s.match(/([1-6])\s*([AB])\b/); if(m) return m[1]+m[2];
-  if(/5/.test(s)&&/UNIC/.test(s)) return '5U';
-  const m2=s.match(/^([1-6])([AB])$/); return m2?m2[1]+m2[2]:'';
+  const m=s.match(/([1-6])\s*([A-F])\b/); if(m) return m[1]+m[2];
+  if(/UNIC/.test(s)){ const g=s.match(/([1-6])/); return g?g[1]+'U':'5U'; }
+  const m2=s.match(/^([1-6])([A-F])$/); return m2?m2[1]+m2[2]:'';
 }
 function attrMap(el){ const o={}; if(!el||!el.attributes) return o; for(let i=0;i<el.attributes.length;i++) o[el.attributes[i].name.toLowerCase()]=el.attributes[i].value; return o; }
 function parseAscXml(txt){
@@ -943,7 +960,7 @@ function parseAscXml(txt){
     const docName=teacherids.map(id=>(teachers[id]&&(teachers[id].name||teachers[id].short))||id).filter(Boolean).join(' / ')||'—';
     classids.forEach(cid=>{
       const cl=classes[cid]||{}; const sec=mapSecASC(cl.short||cl.name||cid);
-      if(!sec||SECS.indexOf(sec)<0) return;
+      if(!sec) return;
       if(!M[day][hora]) M[day][hora]={}; M[day][hora][sec]={ area:String(area), doc:String(docName) }; n++;
     });
   });
