@@ -308,7 +308,8 @@ function mismoGrupo(wd,h1,h2,seccion){
   const M=getHS();
   const a=M[wd]&&M[wd][h1]&&M[wd][h1][seccion];
   const b=M[wd]&&M[wd][h2]&&M[wd][h2][seccion];
-  return !!(a&&b&&a.doc===b.doc);
+  if(!a||!b) return false;
+  return normDoc(a.doc)===normDoc(b.doc) && esDocValido(a.doc);
 }
 function bloqueCfg(){ return (document.getElementById('selBloque')||{}).value||'2'; }
 function exigeDos(){ return bloqueCfg()==='2'; }
@@ -529,8 +530,8 @@ function ponerGrupoSec(slot, pick){
   }
 }
 function candsPar(slot){
-  if(slot.h2) return candidatosAIP(slot.wd, slot.h1, slot.f);
-  return candidatos(slot.wd, slot.h1);
+  if(!slot.h2) return [];
+  return candidatos(slot.wd, slot.h1).filter(c=>mismoGrupo(slot.wd, slot.h1, slot.h2, c.seccion));
 }
 function armarSecundariaMes(days){
   if(!days.length) return;
