@@ -539,25 +539,30 @@ function armarSecundariaMes(days){
   days.forEach(d=>paresLibresSec(d).forEach(s=>{ s.sem=semanaDelMes(d,first); slots.push(s); }));
   const visits={}; SECS.forEach(s=>visits[s]=0);
   const weekGot={};
-  function tomar(slot, maxVis){
+  const ordenPrimera=[];
+  function tomar(slot, soloNuevos){
     if(celda(slot.f,'sec',slot.h1)&&celda(slot.f,'sec',slot.h1).tipo==='grupo') return false;
     const got=weekGot[slot.sem]||(weekGot[slot.sem]={});
-    let cands=candsPar(slot).filter(c=>visits[c.seccion]<maxVis && !got[c.seccion]);
+    let cands=candsPar(slot).filter(c=>!got[c.seccion]);
+    if(soloNuevos) cands=cands.filter(c=>visits[c.seccion]===0);
     if(!cands.length) return false;
     cands.sort((a,b)=>{
       const dv=(visits[a.seccion]||0)-(visits[b.seccion]||0);
       if(dv) return dv;
+      const ia=ordenPrimera.indexOf(a.seccion), ib=ordenPrimera.indexOf(b.seccion);
+      if(ia>=0 || ib>=0) return (ia<0?99:ia)-(ib<0?99:ib);
       return SECS.indexOf(a.seccion)-SECS.indexOf(b.seccion);
     });
     const pick=cands[0];
+    if(visits[pick.seccion]===0) ordenPrimera.push(pick.seccion);
     visits[pick.seccion]++;
     got[pick.seccion]=1;
     ponerGrupoSec(slot, pick);
     return true;
   }
   const maxSem=slots.reduce((m,s)=>Math.max(m,s.sem),0);
-  for(let sem=0; sem<=maxSem; sem++) slots.filter(s=>s.sem===sem && s.h2).forEach(s=>tomar(s,1));
-  for(let sem=0; sem<=maxSem; sem++) slots.filter(s=>s.sem===sem && s.h2).forEach(s=>tomar(s,2));
+  for(let sem=0; sem<=maxSem; sem++) slots.filter(s=>s.sem===sem && s.h2).forEach(s=>tomar(s,true));
+  for(let sem=0; sem<=maxSem; sem++) slots.filter(s=>s.sem===sem && s.h2).forEach(s=>tomar(s,false));
   slots.forEach(s=>{
     const c=celda(s.f,'sec',s.h1);
     if(c && c.tipo==='grupo') return;
