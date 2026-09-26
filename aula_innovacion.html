@@ -93,6 +93,17 @@
         </div>
       </div>
       <p class="text-[11px] text-slate-500">Entran <b>3°, 4°, 5° y 6°</b>. Verde = salón en AIP. Verde agua = <b>Colegiado AIP</b> (el PIP acompaña, no se asigna salón).</p>
+      <div class="border-t border-slate-200 pt-2 space-y-1">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="text-xs font-black">Cursos de este mes (secundaria)</div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost text-xs" type="button" onclick="marcarCursosMes(true)">Todos</button>
+            <button class="btn btn-ghost text-xs" type="button" onclick="marcarCursosMes(false)">Ninguno</button>
+          </div>
+        </div>
+        <p class="text-[11px] text-slate-500">Marca lo que priorizas este mes. El siguiente mes marcas la otra mitad. Solo entran bloques de 2 h de esos cursos.</p>
+        <div id="boxCursosMes" class="flex flex-wrap gap-2"></div>
+      </div>
     </div>
     <div id="pane-reloj" class="space-y-3 hidden no-print">
       <div class="card p-3 space-y-2">
@@ -311,6 +322,60 @@ function mismoGrupo(wd,h1,h2,seccion){
   if(!a||!b) return false;
   return normDoc(a.doc)===normDoc(b.doc) && esDocValido(a.doc);
 }
+const AREAS_MES = [
+  { id:'MAT', nom:'Matemática' },
+  { id:'COM', nom:'Comunicación' },
+  { id:'CYT', nom:'Ciencia y Tecnología' },
+  { id:'CCSS', nom:'Ciencias Sociales' },
+  { id:'ING', nom:'Inglés' },
+  { id:'ART', nom:'Arte' },
+  { id:'EFIS', nom:'Educación Física' },
+  { id:'EPT', nom:'EPT' },
+  { id:'DPCC', nom:'DPCC' },
+  { id:'REL', nom:'Religión' },
+  { id:'TUT', nom:'Tutoría' }
+];
+let cursosPorMes = {};
+function normArea(s){
+  let x=String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  x=x.replace(/[^A-Z]/g,'');
+  if(x.indexOf('MATE')===0||x==='MAT') return 'MAT';
+  if(x.indexOf('COM')===0) return 'COM';
+  if(x.indexOf('CYT')===0||x.indexOf('CIENCIA')===0) return 'CYT';
+  if(x.indexOf('CCSS')===0||x.indexOf('SOCIAL')>=0) return 'CCSS';
+  if(x.indexOf('ING')===0) return 'ING';
+  if(x.indexOf('ART')===0) return 'ART';
+  if(x.indexOf('EFIS')===0||x.indexOf('FISICA')>=0||x==='EF') return 'EFIS';
+  if(x.indexOf('EPT')===0) return 'EPT';
+  if(x.indexOf('DPCC')===0||x.indexOf('CIVICA')>=0) return 'DPCC';
+  if(x.indexOf('REL')===0) return 'REL';
+  if(x.indexOf('TUT')===0) return 'TUT';
+  return x;
+}
+function mesActual(){ return (document.getElementById('inpMes')||{}).value||'2026-10'; }
+function cursosDelMes(){
+  const m=mesActual();
+  if(!Object.prototype.hasOwnProperty.call(cursosPorMes,m)) return AREAS_MES.map(a=>a.id);
+  return cursosPorMes[m]||[];
+}
+function cursoPermitido(area){ return cursosDelMes().indexOf(normArea(area))>=0; }
+function renderCursosMes(){
+  const box=document.getElementById('boxCursosMes'); if(!box) return;
+  const sel=cursosDelMes();
+  box.innerHTML=AREAS_MES.map(a=>'<label class="text-xs font-bold px-2 py-1 rounded-lg cursor-pointer" style="border:1px solid #cbd5e1;background:'+(sel.indexOf(a.id)>=0?'#bbf7d0':'#f1f5f9')+'"><input type="checkbox" '+(sel.indexOf(a.id)>=0?'checked':'')+' onchange="toggleCursoMes(\''+a.id+'\')" style="margin-right:4px">'+a.nom+'</label>').join('');
+}
+function toggleCursoMes(id){
+  const m=mesActual();
+  let cur=(cursosPorMes[m]||AREAS_MES.map(a=>a.id)).slice();
+  const i=cur.indexOf(id);
+  if(i>=0) cur.splice(i,1); else cur.push(id);
+  cursosPorMes[m]=cur;
+  guardarCfg(); renderCursosMes();
+}
+function marcarCursosMes(todos){
+  cursosPorMes[mesActual()]=todos?AREAS_MES.map(a=>a.id):[];
+  guardarCfg(); renderCursosMes();
+}
 function bloqueCfg(){ return (document.getElementById('selBloque')||{}).value||'2'; }
 function exigeDos(){ return bloqueCfg()==='2'; }
 function candidatosAIP(wd,hora,fecha){
@@ -339,6 +404,7 @@ function loadCfg(){
     delete feriados['2026-10-08'];
     if(c.horario&&c.horario.pri&&c.horario.sec) horario=c.horario;
     if(c.plantModo&&document.getElementById('selPlantModo')) document.getElementById('selPlantModo').value=c.plantModo;
+    if(c.cursosPorMes&&typeof c.cursosPorMes==='object') cursosPorMes=c.cursosPorMes;
     pintarFormHorario();
   }catch(e){ plantilla=plantillaDefault(); colegiado=colegiadoDefault(); feriados={}; pintarFormHorario(); }
 }
@@ -350,7 +416,8 @@ function guardarCfg(){
     plantilla:plantilla||plantillaDefault(),
     colegiado:colegiado||colegiadoDefault(),
     feriados:feriados, horario:horario,
-    plantModo:(document.getElementById('selPlantModo')||{}).value||'aip'
+    plantModo:(document.getElementById('selPlantModo')||{}).value||'aip',
+    cursosPorMes:cursosPorMes
   }));
 }
 function pintarFormHorario(){
@@ -389,7 +456,7 @@ function load(){ try{ plan=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){
 function guardar(silencio){ guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS(); if(!silencio) alert('Guardado en este navegador. Use Nube ↑ para otra PC.'); }
 function paqueteAip(){
   leerFormHorario();
-  return { plan, plantilla, colegiado, feriados, horario, horarioDoc:getHS(), mes:(document.getElementById('inpMes')||{}).value||'', bloque:bloqueCfg(), ts:Date.now() };
+  return { plan, plantilla, colegiado, feriados, horario, horarioDoc:getHS(), cursosPorMes, mes:(document.getElementById('inpMes')||{}).value||'', bloque:bloqueCfg(), ts:Date.now() };
 }
 function aplicarPaqueteAip(p){
   if(!p||typeof p!=='object') return;
@@ -398,8 +465,9 @@ function aplicarPaqueteAip(p){
   if(p.horarioDoc){ horarioDoc=p.horarioDoc; saveHS(); }
   if(p.mes&&document.getElementById('inpMes')) document.getElementById('inpMes').value=p.mes;
   if(p.bloque&&document.getElementById('selBloque')) document.getElementById('selBloque').value=p.bloque;
+  if(p.cursosPorMes) cursosPorMes=p.cursosPorMes;
   pintarFormHorario(); guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan||{}));
-  renderPlantilla(); renderFeriados(); renderEditorHS(); render();
+  renderPlantilla(); renderFeriados(); renderCursosMes(); renderEditorHS(); render();
 }
 async function subirAipNube(){
   guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS();
@@ -531,7 +599,7 @@ function ponerGrupoSec(slot, pick){
 }
 function candsPar(slot){
   if(!slot.h2) return [];
-  return candidatos(slot.wd, slot.h1).filter(c=>mismoGrupo(slot.wd, slot.h1, slot.h2, c.seccion));
+  return candidatos(slot.wd, slot.h1).filter(c=>mismoGrupo(slot.wd, slot.h1, slot.h2, c.seccion) && cursoPermitido(c.area));
 }
 function armarSecundariaMes(days){
   if(!days.length) return;
@@ -664,7 +732,7 @@ function showAipTab(t){
   const btn=document.getElementById(map[t]); if(btn) btn.classList.add('on');
   if(t==='hs') renderEditorHS(); if(t==='reloj') renderFeriados();
 }
-function onMes(){ render(); }
+function onMes(){ renderCursosMes(); render(); }
 function wdNombre(i){ return DOW[i]||('D'+i); }
 function ensureHS(){ if(!horarioDoc) horarioDoc=JSON.parse(JSON.stringify(HS)); return horarioDoc; }
 function initSelDiaHS(){ const sel=document.getElementById('selDiaHS'); if(!sel||sel.options.length) return; sel.innerHTML=DOW.map((n,i)=>'<option value="'+i+'">'+n+'</option>').join(''); }
@@ -812,6 +880,7 @@ if(!colegiado) colegiado=colegiadoDefault();
 if(!feriados) feriados={};
 renderPlantilla();
 renderFeriados();
+renderCursosMes();
 renderEditorHS();
 render();
 </script>
