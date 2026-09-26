@@ -129,6 +129,24 @@
       <div><div class="text-xs font-bold mb-1">Secundaria</div><div id="boxPlantSec"></div></div>
     </div>
   </div>
+  <div class="card p-3 no-print space-y-2">
+    <div class="font-black text-sm">Horario de docentes (sin IA)</div>
+    <p class="text-[11px] text-slate-500 leading-snug">
+      Carga el horario de secundaria hora por hora. Elige el día, escribe área y docente en cada sección y pulsa <b>Guardar este día</b>.
+      También puedes importar JSON o CSV (columnas: dia,hora,seccion,area,docente).
+    </p>
+    <div class="flex flex-wrap gap-2 items-end">
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Día</label>
+        <select id="selDiaHS" onchange="renderEditorHS()"></select>
+      </div>
+      <button class="btn btn-primary text-xs" type="button" onclick="guardarDiaHS()">Guardar este día</button>
+      <button class="btn btn-ghost text-xs" type="button" onclick="exportarHS()">Exportar JSON</button>
+      <label class="btn btn-ghost text-xs">Importar JSON/CSV<input type="file" accept=".json,.csv,text/csv,application/json" hidden onchange="importarHS(this)"></label>
+      <button class="btn btn-ghost text-xs" type="button" onclick="restaurarHSEjemplo()">Volver al horario ejemplo</button>
+    </div>
+    <div class="overflow-auto" id="boxEditorHS"></div>
+  </div>
   <div class="card p-3 overflow-auto"><div class="font-black text-sm mb-2" id="titPri">Primaria</div><div id="boxPri"></div></div>
   <div class="card p-3 overflow-auto"><div class="font-black text-sm mb-2" id="titSec">Secundaria</div><div id="boxSec"></div></div>
   <p class="text-[11px] text-center text-slate-400 pb-8">Mag. Efrain Ceopa Paredes</p>
@@ -273,8 +291,24 @@ function slotActivo(fecha, nivel, hora, wd) {
   return pipOk(nivel, hora, wd);
 }
 function modoDefinir() { return (document.getElementById('selModo') || {}).value === 'definir'; }
+const HS_KEY = 'ie22375_aip_hs_v1';
+let horarioDoc = null;
+function getHS() { return horarioDoc || HS; }
+function loadHS() {
+  try {
+    const raw = localStorage.getItem(HS_KEY);
+    if (raw) {
+      const j = JSON.parse(raw);
+      if (j && typeof j === 'object') horarioDoc = j;
+    }
+  } catch (e) { horarioDoc = null; }
+}
+function saveHS() {
+  if (horarioDoc) localStorage.setItem(HS_KEY, JSON.stringify(horarioDoc));
+}
 function candidatos(wd, hora) {
-  const row = (HS[wd] && HS[wd][hora]) || {};
+  const M = getHS();
+  const row = (M[wd] && M[wd][hora]) || {};
   return Object.keys(row).map(s => ({ seccion:s, area:row[s].area, doc:row[s].doc, texto: s+' '+row[s].area+' '+row[s].doc }));
 }
 function horaPar(h, nivel) {
@@ -285,8 +319,9 @@ function horaPar(h, nivel) {
   return arr[i-1] || null;
 }
 function mismoGrupo(wd, h1, h2, seccion) {
-  const a = HS[wd] && HS[wd][h1] && HS[wd][h1][seccion];
-  const b = HS[wd] && HS[wd][h2] && HS[wd][h2][seccion];
+  const M = getHS();
+  const a = M[wd] && M[wd][h1] && M[wd][h1][seccion];
+  const b = M[wd] && M[wd][h2] && M[wd][h2][seccion];
   return !!(a && b && a.doc === b.doc);
 }
 function bloqueCfg() { return (document.getElementById('selBloque') || {}).value || '2'; }
@@ -518,7 +553,7 @@ function armarMes() {
       usedDay[pick.seccion] = 1;
       setCelda(f,'sec',h, { tipo:'grupo', seccion:pick.seccion, area:pick.area, doc:pick.doc, texto:pick.texto });
       if (dos && par && slotActivo(f,'sec', par, wd) && mismoGrupo(wd, h, par, pick.seccion)) {
-        const row2 = HS[wd][par][pick.seccion];
+        const row2 = getHS()[wd][par][pick.seccion];
         setCelda(f,'sec',par, { tipo:'grupo', seccion:pick.seccion, area:row2.area, doc:row2.doc, texto:pick.seccion+' '+row2.area+' '+row2.doc });
       }
     });
@@ -616,7 +651,7 @@ function aplicarModal() {
     if (nivel==='pri') setCelda(fecha,nivel,hora,{ tipo:'grupo', texto: document.getElementById('modGrupo').value });
     else {
       const sec = document.getElementById('modGrupo').value;
-      const row = (HS[wd]&&HS[wd][hora]&&HS[wd][hora][sec]);
+      const row = (getHS()[wd]&&getHS()[wd][hora]&&getHS()[wd][hora][sec]);
       setCelda(fecha,nivel,hora, row ? { tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc } : { tipo:'grupo', texto:sec });
     }
   } else {
@@ -628,11 +663,143 @@ function aplicarModal() {
 }
 function onMes() { render(); }
 
+function wdNombre(i){ return DOW[i] || ('D'+i); }
+function ensureHS() {
+  if (!horarioDoc) horarioDoc = JSON.parse(JSON.stringify(HS));
+  return horarioDoc;
+}
+function initSelDiaHS() {
+  const sel = document.getElementById('selDiaHS');
+  if (!sel || sel.options.length) return;
+  sel.innerHTML = DOW.map((n,i) => '<option value="'+i+'">'+n+'</option>').join('');
+}
+function renderEditorHS() {
+  const box = document.getElementById('boxEditorHS');
+  const sel = document.getElementById('selDiaHS');
+  if (!box || !sel) return;
+  initSelDiaHS();
+  const wd = +sel.value;
+  const M = getHS();
+  const horas = horasPed('sec');
+  let h = '<table class="cal"><thead><tr><th>Hora</th>';
+  SECS.forEach(s => h += '<th>'+s+'</th>');
+  h += '</tr></thead><tbody>';
+  horas.forEach(num => {
+    const lab = (HSEC().find(x => +x[0]===+num) || [num,''])[1];
+    h += '<tr><td>'+num+'<br><span style="font-weight:400">'+lab+'</span></td>';
+    SECS.forEach(s => {
+      const c = (M[wd] && M[wd][num] && M[wd][num][s]) || {};
+      const ida = 'hsA_'+wd+'_'+num+'_'+s;
+      const idd = 'hsD_'+wd+'_'+num+'_'+s;
+      h += '<td style="min-width:90px;padding:3px">'+
+        '<input data-hs="1" id="'+ida+'" placeholder="Área" value="'+(c.area||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px;margin-bottom:2px">'+
+        '<input data-hs="1" id="'+idd+'" placeholder="Docente" value="'+(c.doc||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px">'+
+        '</td>';
+    });
+    h += '</tr>';
+  });
+  box.innerHTML = h+'</tbody></table>';
+}
+function guardarDiaHS() {
+  const sel = document.getElementById('selDiaHS');
+  if (!sel) return;
+  const wd = +sel.value;
+  const M = ensureHS();
+  if (!M[wd]) M[wd] = {};
+  horasPed('sec').forEach(num => {
+    if (!M[wd][num]) M[wd][num] = {};
+    SECS.forEach(s => {
+      const area = ((document.getElementById('hsA_'+wd+'_'+num+'_'+s)||{}).value || '').trim();
+      const doc = ((document.getElementById('hsD_'+wd+'_'+num+'_'+s)||{}).value || '').trim();
+      if (area || doc) M[wd][num][s] = { area: area || '—', doc: doc || '—' };
+      else delete M[wd][num][s];
+    });
+  });
+  saveHS();
+  alert('Horario de '+wdNombre(wd)+' guardado. Ya se usa al armar el mes.');
+}
+function exportarHS() {
+  const data = getHS();
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'horario_docentes_aip.json';
+  a.click();
+}
+function restaurarHSEjemplo() {
+  if (!confirm('¿Volver al horario de ejemplo que cargamos al inicio?')) return;
+  horarioDoc = JSON.parse(JSON.stringify(HS));
+  saveHS();
+  renderEditorHS();
+  alert('Se restauró el horario ejemplo.');
+}
+function diaCsvAIndex(v) {
+  v = String(v||'').trim().toUpperCase();
+  const map = {LUN:0,LUNES:0,MAR:1,MARTES:1,MIE:2,MIERCOLES:2,MIÉRCOLES:2,'0':0,'1':1,'2':2,'3':3,'4':4,JUE:3,JUEVES:3,VIE:4,VIERNES:4};
+  return map[v] !== undefined ? map[v] : parseInt(v,10);
+}
+function aplicarMapaHS(obj) {
+  if (!obj || typeof obj !== 'object') return false;
+  horarioDoc = obj;
+  saveHS();
+  renderEditorHS();
+  return true;
+}
+function parseCsvHS(text) {
+  const lines = text.replace(/\r/g,'').split('\n').filter(x => x.trim());
+  if (lines.length < 2) throw new Error('CSV vacío');
+  const head = lines[0].split(/[;,]/).map(x => x.trim().toLowerCase().replace(/['"]/g,''));
+  const iDia = head.findIndex(x => /dia|día|dow/.test(x));
+  const iHora = head.findIndex(x => /hora|h$/.test(x));
+  const iSec = head.findIndex(x => /secc/.test(x));
+  const iArea = head.findIndex(x => /area|área/.test(x));
+  const iDoc = head.findIndex(x => /docen|prof|nombre/.test(x));
+  if (iDia<0 || iHora<0 || iSec<0) throw new Error('Faltan columnas dia, hora, seccion');
+  const M = JSON.parse(JSON.stringify(getHS()));
+  for (let i=1;i<lines.length;i++) {
+    const cols = lines[i].split(/[;,]/).map(x => x.trim().replace(/^["']|["']$/g,''));
+    const wd = diaCsvAIndex(cols[iDia]);
+    const hora = parseInt(cols[iHora],10);
+    let sec = String(cols[iSec]||'').toUpperCase().replace(/\s+/g,'').replace('°','');
+    if (sec === '5U' || sec === '5UNICA' || sec === '5ÚNICA') sec = '5U';
+    const area = iArea>=0 ? cols[iArea] : '';
+    const doc = iDoc>=0 ? cols[iDoc] : '';
+    if (isNaN(wd) || isNaN(hora) || !sec) continue;
+    if (!M[wd]) M[wd] = {};
+    if (!M[wd][hora]) M[wd][hora] = {};
+    M[wd][hora][sec] = { area: area || '—', doc: doc || '—' };
+  }
+  return M;
+}
+function importarHS(inp) {
+  const f = inp.files && inp.files[0];
+  inp.value = '';
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = function() {
+    try {
+      const txt = String(reader.result||'');
+      if (f.name.toLowerCase().endsWith('.csv') || txt.indexOf(';')>=0 && txt.split('\n')[0].toLowerCase().indexOf('hora')>=0) {
+        aplicarMapaHS(parseCsvHS(txt));
+      } else {
+        const j = JSON.parse(txt);
+        aplicarMapaHS(j.horario || j.HS || j);
+      }
+      alert('Horario importado.');
+    } catch (e) {
+      alert('No se pudo leer el archivo: ' + e.message);
+    }
+  };
+  reader.readAsText(f);
+}
+
 load();
+loadHS();
 if (!plantilla) plantilla = plantillaDefault();
 if (!feriados) feriados = Object.assign({}, FERIADOS_DEF);
 renderPlantilla();
 renderFeriados();
+renderEditorHS();
 render();
 
 </script>
