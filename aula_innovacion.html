@@ -12,13 +12,13 @@
   .btn-primary { background:#0284c7; color:#fff; }
   .btn-ok { background:#15803d; color:#fff; }
   .btn-ghost { background:#e2e8f0; color:#0f172a; }
-  select, input[type=month] { border:1.5px solid #cbd5e1; border-radius:10px; padding:.5rem .65rem; font-size:16px; background:#fff; }
+  select, input[type=month], input[type=time], input[type=number], input[type=date], input[type=text] { border:1.5px solid #cbd5e1; border-radius:10px; padding:.5rem .65rem; font-size:16px; background:#fff; }
   table.cal { width:100%; border-collapse:collapse; font-size:11px; }
   table.cal th, table.cal td { border:1px solid #cbd5e1; padding:4px; text-align:center; vertical-align:middle; }
   table.cal th { background:#0f172a; color:#fff; font-size:10px; }
   .c-aip { background:#bbf7d0; cursor:pointer; font-weight:700; }
   .c-sop { background:#fed7aa; cursor:pointer; font-weight:700; }
-  .c-col { background:#86efac; cursor:pointer; font-weight:700; }
+  .c-col { background:#6ee7b7; cursor:pointer; font-weight:800; }
   .c-man { background:#ddd6fe; cursor:pointer; font-weight:700; }
   .c-gray { background:#cbd5e1; color:#64748b; cursor:pointer; }
   .c-fer { background:#fecaca; font-weight:800; }
@@ -65,117 +65,108 @@
     <button type="button" class="aip-tab" id="tabBtnReloj" onclick="showAipTab('reloj')">Reloj / feriados</button>
   </div>
   <div id="pane-mes" class="space-y-3 pane-print">
-  <div class="card p-3 no-print space-y-3">
-    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 items-end">
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Mes</label>
-        <input type="month" id="inpMes" value="2026-10" onchange="onMes()" />
-      </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Bloque mínimo AIP</label>
-        <select id="selBloque" onchange="guardarCfg()">
-          <option value="cualquier">Cualquier hora</option>
-          <option value="1">Solo 1 hora</option>
-          <option value="2" selected>Solo 2 horas seguidas</option>
-        </select>
-      </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Clic en el mes</label>
-        <select id="selModo" onchange="guardarCfg()">
-          <option value="definir">Marcar / bloquear un día</option>
-          <option value="asignar" selected>Asignar grupo</option>
-        </select>
-      </div>
-      <div class="flex gap-2">
-        <button class="btn btn-ok flex-1" type="button" onclick="armarMes()">Armar mes</button>
-        <button class="btn btn-ghost" type="button" onclick="imprimirPDF()">PDF / Imprimir</button>
-        <button class="btn btn-primary" type="button" onclick="guardar()">Guardar</button>
-      </div>
-    </div>
-    <p class="text-[11px] text-slate-500">Entran <b>3°, 4°, 5° y 6°</b>. Reloj y feriados están en la pestaña <b>Reloj / feriados</b>. El horario de secundaria está en <b>Horario de docentes</b>.</p>
-  </div>
-  <div id="pane-reloj" class="space-y-3 hidden no-print">
-  <div class="card p-3 no-print space-y-2" id="cardRelojOrig">
-    <div class="font-black text-sm">Horario institucional (como SIAGIE)</div>
-    <p class="text-[11px] text-slate-500">El director cambia hora de entrada, minutos por clase, cuántas horas y el recreo. Luego se arma la grilla sola.</p>
-    <div class="grid md:grid-cols-2 gap-3 text-xs">
-      <div class="border border-slate-200 rounded-xl p-2 space-y-2">
-        <div class="font-bold">Primaria</div>
-        <div class="grid grid-cols-2 gap-2">
-          <label>Inicio<input type="time" id="hpIni" value="08:00"></label>
-          <label>Minutos/hora<input type="number" id="hpMin" min="30" max="60" value="45"></label>
-          <label>N° de horas<input type="number" id="hpN" min="4" max="8" value="6"></label>
-          <label>Recreo después de hora<input type="number" id="hpRecH" min="1" max="7" value="3"></label>
-          <label>Recreo (min)<input type="number" id="hpRecM" min="10" max="40" value="15"></label>
-        </div>
-      </div>
-      <div class="border border-slate-200 rounded-xl p-2 space-y-2">
-        <div class="font-bold">Secundaria</div>
-        <div class="grid grid-cols-2 gap-2">
-          <label>Inicio<input type="time" id="hsIni" value="13:00"></label>
-          <label>Minutos/hora<input type="number" id="hsMin" min="30" max="60" value="45"></label>
-          <label>N° de horas<input type="number" id="hsN" min="5" max="9" value="7"></label>
-          <label>Recreo después de hora<input type="number" id="hsRecH" min="1" max="8" value="4"></label>
-          <label>Recreo (min)<input type="number" id="hsRecM" min="10" max="40" value="30"></label>
-        </div>
-      </div>
-    </div>
-    <button class="btn btn-primary text-xs" type="button" onclick="aplicarHorarioInst()">Aplicar horario y redibujar grillas</button>
-    <div class="border-t border-slate-200 pt-2 space-y-2">
-      <div class="text-xs font-black">Feriados (nacional o local)</div>
-      <div class="flex flex-wrap gap-2 items-end">
+    <div class="card p-3 no-print space-y-3">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 items-end">
         <div>
-          <label class="text-[10px] font-bold text-slate-500">Fecha</label>
-          <input type="date" id="inpFerFecha" />
+          <label class="text-[10px] font-bold text-slate-500">Mes</label>
+          <input type="month" id="inpMes" value="2026-10" onchange="onMes()" />
         </div>
-        <div class="flex-1 min-w-[140px]">
-          <label class="text-[10px] font-bold text-slate-500">Nombre</label>
-          <input type="text" id="inpFerNom" placeholder="Ej. Fiesta patronal" style="width:100%;border:1.5px solid #cbd5e1;border-radius:10px;padding:.5rem .65rem;font-size:14px" />
+        <div>
+          <label class="text-[10px] font-bold text-slate-500">Bloque mínimo AIP</label>
+          <select id="selBloque" onchange="guardarCfg()">
+            <option value="cualquier">Cualquier hora</option>
+            <option value="1">Solo 1 hora</option>
+            <option value="2" selected>Solo 2 horas seguidas</option>
+          </select>
         </div>
-        <button class="btn btn-ghost text-xs" type="button" onclick="agregarFeriado()">Agregar feriado</button>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500">Clic en el mes</label>
+          <select id="selModo" onchange="guardarCfg()">
+            <option value="definir">Marcar / bloquear un día</option>
+            <option value="asignar" selected>Asignar grupo</option>
+          </select>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-ok flex-1" type="button" onclick="armarMes()">Armar mes</button>
+          <button class="btn btn-ghost" type="button" onclick="imprimirPDF()">PDF / Imprimir</button>
+          <button class="btn btn-primary" type="button" onclick="guardar()">Guardar</button>
+        </div>
       </div>
-      <div id="listaFer" class="flex flex-wrap gap-1"></div>
+      <p class="text-[11px] text-slate-500">Entran <b>3°, 4°, 5° y 6°</b>. Verde = salón en AIP. Verde agua = <b>Colegiado AIP</b> (el PIP acompaña, no se asigna salón).</p>
     </div>
-  </div>
-  </div>
-  <div class="card p-3 no-print space-y-2 mes-only">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <div class="font-black text-sm">Plantilla semanal del PIP — tú eliges las horas</div>
-      <div class="flex gap-2">
-        <button class="btn btn-ghost text-xs" type="button" onclick="restaurarPlantilla()">Volver a 30 h</button>
-        <button class="btn btn-ghost text-xs" type="button" onclick="aplicarPlantillaAlMes()">Aplicar plantilla al mes</button>
+    <div id="pane-reloj" class="space-y-3 hidden no-print">
+      <div class="card p-3 space-y-2">
+        <div class="font-black text-sm">Horario institucional (como SIAGIE)</div>
+        <div class="grid md:grid-cols-2 gap-3 text-xs">
+          <div class="border border-slate-200 rounded-xl p-2 space-y-2">
+            <div class="font-bold">Primaria</div>
+            <div class="grid grid-cols-2 gap-2">
+              <label>Inicio<input type="time" id="hpIni" value="08:00"></label>
+              <label>Minutos/hora<input type="number" id="hpMin" min="30" max="60" value="45"></label>
+              <label>N° de horas<input type="number" id="hpN" min="4" max="8" value="6"></label>
+              <label>Recreo después de hora<input type="number" id="hpRecH" min="1" max="7" value="3"></label>
+              <label>Recreo (min)<input type="number" id="hpRecM" min="10" max="40" value="15"></label>
+            </div>
+          </div>
+          <div class="border border-slate-200 rounded-xl p-2 space-y-2">
+            <div class="font-bold">Secundaria</div>
+            <div class="grid grid-cols-2 gap-2">
+              <label>Inicio<input type="time" id="hsIni" value="13:00"></label>
+              <label>Minutos/hora<input type="number" id="hsMin" min="30" max="60" value="45"></label>
+              <label>N° de horas<input type="number" id="hsN" min="5" max="9" value="7"></label>
+              <label>Recreo después de hora<input type="number" id="hsRecH" min="1" max="8" value="4"></label>
+              <label>Recreo (min)<input type="number" id="hsRecM" min="10" max="40" value="30"></label>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary text-xs" type="button" onclick="aplicarHorarioInst()">Aplicar horario y redibujar grillas</button>
+        <div class="border-t border-slate-200 pt-2 space-y-2">
+          <div class="text-xs font-black">Feriados</div>
+          <div class="flex flex-wrap gap-2 items-end">
+            <div><label class="text-[10px] font-bold text-slate-500">Fecha</label><input type="date" id="inpFerFecha" /></div>
+            <div class="flex-1 min-w-[140px]"><label class="text-[10px] font-bold text-slate-500">Nombre</label><input type="text" id="inpFerNom" placeholder="Ej. Fiesta patronal" style="width:100%" /></div>
+            <button class="btn btn-ghost text-xs" type="button" onclick="agregarFeriado()">Agregar feriado</button>
+          </div>
+          <div id="listaFer" class="flex flex-wrap gap-1"></div>
+        </div>
       </div>
     </div>
-    <p class="text-[11px] text-slate-500">Primaria ya tiene la mañana completa (8:00 a 12:45). Verde = AIP. Clic para encender o apagar. Si el próximo año hay PIP de primaria, marca lun–vie desde la hora 1.</p>
-    <div class="grid md:grid-cols-2 gap-3">
-      <div><div class="text-xs font-bold mb-1">Primaria</div><div id="boxPlantPri"></div></div>
-      <div><div class="text-xs font-bold mb-1">Secundaria</div><div id="boxPlantSec"></div></div>
+    <div class="card p-3 no-print space-y-2 mes-only">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="font-black text-sm">Plantilla semanal del PIP</div>
+        <div class="flex flex-wrap gap-2">
+          <select id="selPlantModo" onchange="guardarCfg()" style="font-size:12px">
+            <option value="aip">Clic = hora AIP (salón)</option>
+            <option value="col">Clic = Colegiado AIP</option>
+          </select>
+          <button class="btn btn-ghost text-xs" type="button" onclick="restaurarPlantilla()">Volver a 30 h</button>
+          <button class="btn btn-ghost text-xs" type="button" onclick="aplicarPlantillaAlMes()">Aplicar plantilla al mes</button>
+        </div>
+      </div>
+      <p class="text-[11px] text-slate-500">Verde = salón. Verde agua = Colegiado AIP. Esas horas no reciben un aula al armar el mes.</p>
+      <div class="grid md:grid-cols-2 gap-3">
+        <div><div class="text-xs font-bold mb-1">Primaria</div><div id="boxPlantPri"></div></div>
+        <div><div class="text-xs font-bold mb-1">Secundaria</div><div id="boxPlantSec"></div></div>
+      </div>
     </div>
-  </div>
-  <div class="card p-3 overflow-auto mes-only"><div class="font-black text-sm mb-2" id="titPri">Primaria</div><div id="boxPri"></div></div>
-  <div class="card p-3 overflow-auto mes-only"><div class="font-black text-sm mb-2" id="titSec">Secundaria</div><div id="boxSec"></div></div>
+    <div class="card p-3 overflow-auto mes-only"><div class="font-black text-sm mb-2" id="titPri">Primaria</div><div id="boxPri"></div></div>
+    <div class="card p-3 overflow-auto mes-only"><div class="font-black text-sm mb-2" id="titSec">Secundaria</div><div id="boxSec"></div></div>
   </div>
   <div id="pane-hs" class="space-y-3 hidden no-print">
-  <div class="card p-3 no-print space-y-2">
-    <div class="font-black text-sm">Horario de docentes (sin IA)</div>
-    <p class="text-[11px] text-slate-500 leading-snug">
-      Carga el horario de secundaria hora por hora. Elige el día, escribe área y docente en cada sección y pulsa <b>Guardar este día</b>.
-      También puedes importar JSON o CSV (columnas: dia,hora,seccion,area,docente).
-    </p>
-    <div class="flex flex-wrap gap-2 items-end">
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Día</label>
-        <select id="selDiaHS" onchange="renderEditorHS()"></select>
+    <div class="card p-3 space-y-2">
+      <div class="font-black text-sm">Horario de docentes</div>
+      <p class="text-[11px] text-slate-500">Importa el XML de ASC (Archivo → Exportar → aSc Timetables 2012 XML). El .ROZ no se lee.</p>
+      <div class="flex flex-wrap gap-2 items-end">
+        <div><label class="text-[10px] font-bold text-slate-500">Día</label><select id="selDiaHS" onchange="renderEditorHS()"></select></div>
+        <button class="btn btn-primary text-xs" type="button" onclick="guardarDiaHS()">Guardar este día</button>
+        <button class="btn btn-ghost text-xs" type="button" onclick="exportarHS()">Exportar JSON</button>
+        <label class="btn btn-ok text-xs">Importar ASC (XML / ROZ)<input type="file" accept=".xml,.roz,.json,.csv,text/xml" hidden onchange="importarHS(this)"></label>
+        <label class="btn btn-ghost text-xs">JSON/CSV<input type="file" accept=".json,.csv" hidden onchange="importarHS(this)"></label>
+        <button class="btn btn-ghost text-xs" type="button" onclick="restaurarHSEjemplo()">Volver al horario ejemplo</button>
       </div>
-      <button class="btn btn-primary text-xs" type="button" onclick="guardarDiaHS()">Guardar este día</button>
-      <button class="btn btn-ghost text-xs" type="button" onclick="exportarHS()">Exportar JSON</button>
-      <label class="btn btn-ok text-xs">Importar ASC (XML / ROZ)<input type="file" accept=".xml,.roz,.json,.csv,text/xml,application/xml,text/csv,application/json" hidden onchange="importarHS(this)"></label>
-      <label class="btn btn-ghost text-xs">JSON/CSV<input type="file" accept=".json,.csv,text/csv,application/json" hidden onchange="importarHS(this)"></label>
-      <button class="btn btn-ghost text-xs" type="button" onclick="restaurarHSEjemplo()">Volver al horario ejemplo</button>
+      <div class="overflow-auto" id="boxEditorHS"></div>
+      <div id="boxChoques" class="text-xs"></div>
     </div>
-    <div class="overflow-auto" id="boxEditorHS"></div>
-    <div id="boxChoques" class="text-xs"></div>
-  </div>
   </div>
   <p class="text-[11px] text-center text-slate-400 pb-8 no-print">Mag. Efrain Ceopa Paredes</p>
 </main>
@@ -184,11 +175,11 @@
     <div class="font-black" id="modTit">Cambiar</div>
     <div class="text-xs text-slate-500" id="modSub"></div>
     <select id="modTipo" onchange="onModTipo()">
-      <option value="grupo">Grupo</option>
+      <option value="grupo">Grupo / salón</option>
       <option value="abierto">Hora AIP libre</option>
       <option value="bloqueado">Bloquear este día</option>
       <option value="soporte">SOPORTE</option>
-      <option value="colegio">COLEGIO</option>
+      <option value="colegio">Colegiado AIP</option>
       <option value="man">MANTENIMIENTO</option>
       <option value="vacio">Vacío</option>
     </select>
@@ -200,6 +191,7 @@
   </div>
 </div>
 <script>
+
 const KEY = 'ie22375_aip_plan_v1';
 const CFG_KEY = 'ie22375_aip_cfg_v1';
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
@@ -212,40 +204,20 @@ let horario = {
   pri: { inicio:'08:00', minBloque:45, nHoras:6, recreoDespues:3, recreoMin:15 },
   sec: { inicio:'13:00', minBloque:45, nHoras:7, recreoDespues:4, recreoMin:30 }
 };
-function toMin(hhmm) {
-  const p = String(hhmm||'00:00').split(':');
-  return (+p[0])*60 + (+p[1]||0);
-}
-function fromMin(m) {
-  m = ((m % (24*60)) + (24*60)) % (24*60);
-  return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
-}
-function buildHoras(cfg) {
-  const out = [];
-  let t = toMin(cfg.inicio || '08:00');
-  const dur = +cfg.minBloque || 45;
-  const n = +cfg.nHoras || 6;
-  const recAfter = +cfg.recreoDespues || 0;
-  const recMin = +cfg.recreoMin || 0;
-  for (let i=1; i<=n; i++) {
-    const a = fromMin(t);
-    const b = fromMin(t+dur);
-    out.push([i, a+'-'+b]);
-    t += dur;
-    if (recAfter && i === recAfter) {
-      out.push(['R', fromMin(t)+'-'+fromMin(t+recMin)]);
-      t += recMin;
-    }
-  }
+function toMin(hhmm){ const p=String(hhmm||'00:00').split(':'); return (+p[0])*60+(+p[1]||0); }
+function fromMin(m){ m=((m%(24*60))+(24*60))%(24*60); return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function buildHoras(cfg){
+  const out=[]; let t=toMin(cfg.inicio||'08:00'); const dur=+cfg.minBloque||45; const n=+cfg.nHoras||6;
+  const recAfter=+cfg.recreoDespues||0; const recMin=+cfg.recreoMin||0;
+  for(let i=1;i<=n;i++){ const a=fromMin(t), b=fromMin(t+dur); out.push([i,a+'-'+b]); t+=dur;
+    if(recAfter && i===recAfter){ out.push(['R', fromMin(t)+'-'+fromMin(t+recMin)]); t+=recMin; } }
   return out;
 }
-function HPRI() { return buildHoras(horario.pri); }
-function HSEC() { return buildHoras(horario.sec); }
-function horasPed(nivel) {
-  return (nivel==='pri'?HPRI():HSEC()).filter(x => x[0] !== 'R').map(x => +x[0]);
-}
+function HPRI(){ return buildHoras(horario.pri); }
+function HSEC(){ return buildHoras(horario.sec); }
+function horasPed(nivel){ return (nivel==='pri'?HPRI():HSEC()).filter(x=>x[0]!=='R').map(x=>+x[0]); }
 const SECS = ['1A','1B','2A','2B','3A','3B','4A','4B','5U'];
-function L(area, doc) { return { area: area, doc: doc }; }
+function L(area, doc){ return { area:area, doc:doc }; }
 const HS = {
   0:{
     1:{'1A':L('COM','NINOSKA G.'),'1B':L('ART','MARIA A.'),'2A':L('CC.SS','EDGAR B.'),'2B':L('ING','NANCY H.'),'3A':L('TUTORIA','PILAR A.'),'3B':L('DPCC','NILDA S.'),'4A':L('EPT','CARMEN B.'),'4B':L('MAT','LUIS CH.'),'5U':L('E.FIS','JULIO Z.')},
@@ -293,811 +265,488 @@ const HS = {
     7:{'1A':L('E.FIS','JULIO Z.'),'1B':L('INGLES','NANCY R.'),'2A':L('MAT','IVAN G.'),'2B':L('DPCC','NILDA S.'),'3A':L('MAT','LUIS CH.'),'3B':L('COM','NINOSKA G.'),'4A':L('REL','SANDRA S.'),'4B':L('COM','ANA H.'),'5U':L('CC.SS','EDGAR B.')},
   },
 };
-
 let plan = {};
 let editKey = null;
 let plantilla = null;
-
-function plantillaDefault() {
-  return { pri: JSON.parse(JSON.stringify(PIP_PRI)), sec: JSON.parse(JSON.stringify(PIP_SEC)) };
-}
-function ymd(d) {
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-function diasMes(ym) {
-  const [Y,M] = ym.split('-').map(Number);
-  const out = [];
-  const d = new Date(Y, M-1, 1);
-  while (d.getMonth() === M-1) {
-    if (d.getDay()>=1 && d.getDay()<=5) out.push(new Date(d));
-    d.setDate(d.getDate()+1);
-  }
+let colegiado = { pri:{}, sec:{} };
+function plantillaDefault(){ return { pri: JSON.parse(JSON.stringify(PIP_PRI)), sec: JSON.parse(JSON.stringify(PIP_SEC)) }; }
+function colegiadoDefault(){ return { pri:{}, sec:{} }; }
+function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function diasMes(ym){
+  const [Y,M]=ym.split('-').map(Number); const out=[]; const d=new Date(Y,M-1,1);
+  while(d.getMonth()===M-1){ if(d.getDay()>=1 && d.getDay()<=5) out.push(new Date(d)); d.setDate(d.getDate()+1); }
   return out;
 }
-function diasDe(m, hora) {
-  const a = m[String(hora)] || m[hora] || [];
-  return a;
+function diasDe(m, hora){ return m[String(hora)] || m[hora] || []; }
+function pipOk(nivel,hora,wd){ if(!plantilla) plantilla=plantillaDefault(); return diasDe(plantilla[nivel]||{},hora).indexOf(wd)>=0; }
+function colOk(nivel,hora,wd){ return diasDe((colegiado&&colegiado[nivel])||{},hora).indexOf(wd)>=0; }
+function slotActivo(fecha,nivel,hora,wd){
+  if(hora==='R') return false;
+  const c=celda(fecha,nivel,hora);
+  if(c && c.tipo==='bloqueado') return false;
+  if(c && (c.tipo==='colegio'||c.tipo==='colegiado')) return false;
+  if(colOk(nivel,hora,wd) && !(c && c.tipo==='abierto')) return false;
+  if(c && c.tipo==='abierto') return true;
+  if(c && c.tipo && c.tipo!=='bloqueado') return true;
+  return pipOk(nivel,hora,wd);
 }
-function pipOk(nivel, hora, wd) {
-  if (!plantilla) plantilla = plantillaDefault();
-  return diasDe(plantilla[nivel] || {}, hora).indexOf(wd) >= 0;
+function modoDefinir(){ return (document.getElementById('selModo')||{}).value==='definir'; }
+const HS_KEY='ie22375_aip_hs_oficial_2026';
+let horarioDoc=null;
+function getHS(){ return horarioDoc||HS; }
+function loadHS(){ try{ const raw=localStorage.getItem(HS_KEY); if(raw){ const j=JSON.parse(raw); if(j&&typeof j==='object') horarioDoc=j; } }catch(e){ horarioDoc=null; } }
+function saveHS(){ if(horarioDoc) localStorage.setItem(HS_KEY, JSON.stringify(horarioDoc)); }
+function candidatos(wd,hora){
+  const M=getHS(); const row=(M[wd]&&M[wd][hora])||{};
+  return Object.keys(row).map(s=>({ seccion:s, area:row[s].area, doc:row[s].doc, texto:s+' '+row[s].area+' '+row[s].doc }));
 }
-function slotActivo(fecha, nivel, hora, wd) {
-  if (hora === 'R') return false;
-  const c = celda(fecha, nivel, hora);
-  if (c && c.tipo === 'bloqueado') return false;
-  if (c && c.tipo === 'abierto') return true;
-  if (c && c.tipo && c.tipo !== 'bloqueado') return true;
-  return pipOk(nivel, hora, wd);
+function horaPar(h,nivel){
+  const arr=horasPed(nivel||'sec'); const i=arr.indexOf(+h);
+  if(i<0) return null; if(i%2===0) return arr[i+1]||null; return arr[i-1]||null;
 }
-function modoDefinir() { return (document.getElementById('selModo') || {}).value === 'definir'; }
-const HS_KEY = 'ie22375_aip_hs_oficial_2026';
-let horarioDoc = null;
-function getHS() { return horarioDoc || HS; }
-function loadHS() {
-  try {
-    const raw = localStorage.getItem(HS_KEY);
-    if (raw) {
-      const j = JSON.parse(raw);
-      if (j && typeof j === 'object') horarioDoc = j;
-    }
-  } catch (e) { horarioDoc = null; }
+function mismoGrupo(wd,h1,h2,seccion){
+  const M=getHS();
+  const a=M[wd]&&M[wd][h1]&&M[wd][h1][seccion];
+  const b=M[wd]&&M[wd][h2]&&M[wd][h2][seccion];
+  return !!(a&&b&&a.doc===b.doc);
 }
-function saveHS() {
-  if (horarioDoc) localStorage.setItem(HS_KEY, JSON.stringify(horarioDoc));
+function bloqueCfg(){ return (document.getElementById('selBloque')||{}).value||'2'; }
+function exigeDos(){ return bloqueCfg()==='2'; }
+function candidatosAIP(wd,hora,fecha){
+  let list=candidatos(wd,hora);
+  if(!exigeDos()) return list;
+  const par=horaPar(hora);
+  if(!par) return [];
+  if(fecha && (!slotActivo(fecha,'sec',hora,wd)||!slotActivo(fecha,'sec',par,wd))) return [];
+  return list.filter(c=>mismoGrupo(wd,hora,par,c.seccion));
 }
-function candidatos(wd, hora) {
-  const M = getHS();
-  const row = (M[wd] && M[wd][hora]) || {};
-  return Object.keys(row).map(s => ({ seccion:s, area:row[s].area, doc:row[s].doc, texto: s+' '+row[s].area+' '+row[s].doc }));
-}
-function horaPar(h, nivel) {
-  const arr = horasPed(nivel || 'sec');
-  const i = arr.indexOf(+h);
-  if (i < 0) return null;
-  if (i % 2 === 0) return arr[i+1] || null;
-  return arr[i-1] || null;
-}
-function mismoGrupo(wd, h1, h2, seccion) {
-  const M = getHS();
-  const a = M[wd] && M[wd][h1] && M[wd][h1][seccion];
-  const b = M[wd] && M[wd][h2] && M[wd][h2][seccion];
-  return !!(a && b && a.doc === b.doc);
-}
-function bloqueCfg() { return (document.getElementById('selBloque') || {}).value || '2'; }
-function exigeDos() { return bloqueCfg() === '2'; }
-function candidatosAIP(wd, hora, fecha) {
-  let list = candidatos(wd, hora);
-  if (!exigeDos()) return list;
-  const par = horaPar(hora);
-  if (!par) return [];
-  if (fecha && (!slotActivo(fecha,'sec',hora,wd) || !slotActivo(fecha,'sec',par,wd))) return [];
-  return list.filter(c => mismoGrupo(wd, hora, par, c.seccion));
-}
-function esFeriado(f) { return !!(feriados && feriados[f]); }
-function normFecha(v) {
-  if (!v) return '';
-  v = String(v).trim();
-  let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-  if (m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
-  m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+function esFeriado(f){ return !!(feriados&&feriados[f]); }
+function normFecha(v){
+  if(!v) return ''; v=String(v).trim();
+  let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+  m=v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
   return '';
 }
-function loadCfg() {
-  try {
-    const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
-    if (c.bloque) document.getElementById('selBloque').value = c.bloque;
-    if (c.modo) document.getElementById('selModo').value = c.modo;
-    plantilla = (c.plantilla && c.plantilla.pri && c.plantilla.sec) ? c.plantilla : plantillaDefault();
-    feriados = (c.feriados && typeof c.feriados === 'object') ? c.feriados : {};
+function loadCfg(){
+  try{
+    const c=JSON.parse(localStorage.getItem(CFG_KEY)||'{}');
+    if(c.bloque) document.getElementById('selBloque').value=c.bloque;
+    if(c.modo) document.getElementById('selModo').value=c.modo;
+    plantilla=(c.plantilla&&c.plantilla.pri&&c.plantilla.sec)?c.plantilla:plantillaDefault();
+    colegiado=(c.colegiado&&c.colegiado.pri&&c.colegiado.sec)?c.colegiado:colegiadoDefault();
+    feriados=(c.feriados&&typeof c.feriados==='object')?c.feriados:{};
     delete feriados['2026-10-08'];
-    if (c.horario && c.horario.pri && c.horario.sec) horario = c.horario;
+    if(c.horario&&c.horario.pri&&c.horario.sec) horario=c.horario;
+    if(c.plantModo&&document.getElementById('selPlantModo')) document.getElementById('selPlantModo').value=c.plantModo;
     pintarFormHorario();
-  } catch (e) { plantilla = plantillaDefault(); feriados = {}; pintarFormHorario(); }
+  }catch(e){ plantilla=plantillaDefault(); colegiado=colegiadoDefault(); feriados={}; pintarFormHorario(); }
 }
-function guardarCfg() {
+function guardarCfg(){
   leerFormHorario();
   localStorage.setItem(CFG_KEY, JSON.stringify({
-    bloque: bloqueCfg(),
-    modo: (document.getElementById('selModo') || {}).value || 'asignar',
-    plantilla: plantilla || plantillaDefault(),
-    feriados: feriados,
-    horario: horario
+    bloque:bloqueCfg(),
+    modo:(document.getElementById('selModo')||{}).value||'asignar',
+    plantilla:plantilla||plantillaDefault(),
+    colegiado:colegiado||colegiadoDefault(),
+    feriados:feriados, horario:horario,
+    plantModo:(document.getElementById('selPlantModo')||{}).value||'aip'
   }));
 }
-function pintarFormHorario() {
-  const p = horario.pri, s = horario.sec;
-  const set = (id,v) => { const el=document.getElementById(id); if(el) el.value=v; };
-  set('hpIni', p.inicio); set('hpMin', p.minBloque); set('hpN', p.nHoras); set('hpRecH', p.recreoDespues); set('hpRecM', p.recreoMin);
-  set('hsIni', s.inicio); set('hsMin', s.minBloque); set('hsN', s.nHoras); set('hsRecH', s.recreoDespues); set('hsRecM', s.recreoMin);
+function pintarFormHorario(){
+  const p=horario.pri,s=horario.sec;
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
+  set('hpIni',p.inicio); set('hpMin',p.minBloque); set('hpN',p.nHoras); set('hpRecH',p.recreoDespues); set('hpRecM',p.recreoMin);
+  set('hsIni',s.inicio); set('hsMin',s.minBloque); set('hsN',s.nHoras); set('hsRecH',s.recreoDespues); set('hsRecM',s.recreoMin);
 }
-function leerFormHorario() {
-  const num = (id, d) => { const v=+((document.getElementById(id)||{}).value); return isNaN(v)?d:v; };
-  const txt = (id, d) => ((document.getElementById(id)||{}).value || d);
-  horario.pri = { inicio:txt('hpIni','08:00'), minBloque:num('hpMin',45), nHoras:num('hpN',6), recreoDespues:num('hpRecH',3), recreoMin:num('hpRecM',15) };
-  horario.sec = { inicio:txt('hsIni','13:00'), minBloque:num('hsMin',45), nHoras:num('hsN',7), recreoDespues:num('hsRecH',4), recreoMin:num('hsRecM',30) };
+function leerFormHorario(){
+  const num=(id,d)=>{ const v=+((document.getElementById(id)||{}).value); return isNaN(v)?d:v; };
+  const txt=(id,d)=>((document.getElementById(id)||{}).value||d);
+  horario.pri={ inicio:txt('hpIni','08:00'), minBloque:num('hpMin',45), nHoras:num('hpN',6), recreoDespues:num('hpRecH',3), recreoMin:num('hpRecM',15) };
+  horario.sec={ inicio:txt('hsIni','13:00'), minBloque:num('hsMin',45), nHoras:num('hsN',7), recreoDespues:num('hsRecH',4), recreoMin:num('hsRecM',30) };
 }
-function aplicarHorarioInst() {
+function aplicarHorarioInst(){
   leerFormHorario();
-  if (!plantilla) plantilla = plantillaDefault();
-  horasPed('pri').forEach(h => { if (!plantilla.pri[h] && !plantilla.pri[String(h)]) plantilla.pri[h] = []; });
-  horasPed('sec').forEach(h => { if (!plantilla.sec[h] && !plantilla.sec[String(h)]) plantilla.sec[h] = plantilla.sec[h] || []; });
-  guardarCfg();
-  renderPlantilla();
-  render();
+  if(!plantilla) plantilla=plantillaDefault();
+  horasPed('pri').forEach(h=>{ if(!plantilla.pri[h]&&!plantilla.pri[String(h)]) plantilla.pri[h]=[]; });
+  horasPed('sec').forEach(h=>{ if(!plantilla.sec[h]&&!plantilla.sec[String(h)]) plantilla.sec[h]=[]; });
+  guardarCfg(); renderPlantilla(); render();
 }
-function renderFeriados() {
-  const box = document.getElementById('listaFer');
-  if (!box) return;
-  const keys = Object.keys(feriados).sort();
-  if (!keys.length) { box.innerHTML = '<span class="text-[11px] text-slate-400">Ningún feriado marcado</span>'; return; }
-  box.innerHTML = keys.map(f =>
-    '<button type="button" class="btn btn-ghost text-xs" style="padding:.25rem .5rem" onclick="quitarFeriado(\''+f+'\')">'+
-    f+' · '+(feriados[f]||'Feriado')+' ✕</button>'
-  ).join('');
+function renderFeriados(){
+  const box=document.getElementById('listaFer'); if(!box) return;
+  const keys=Object.keys(feriados).sort();
+  box.innerHTML=keys.length?keys.map(f=>'<button class="btn btn-ghost text-xs" type="button" onclick="quitarFeriado(\''+f+'\')">'+f+' '+(feriados[f]||'')+' ×</button>').join(''):'<span class="text-slate-400">Sin feriados</span>';
 }
-function agregarFeriado() {
-  const raw = (document.getElementById('inpFerFecha') || {}).value;
-  const f = normFecha(raw);
-  const n = ((document.getElementById('inpFerNom') || {}).value || '').trim() || 'Feriado';
-  if (!f) { alert('Elige la fecha del feriado.'); return; }
-  if (!feriados) feriados = {};
-  feriados[f] = n;
-  guardarCfg();
-  renderFeriados();
-  render();
+function agregarFeriado(){
+  const f=normFecha((document.getElementById('inpFerFecha')||{}).value);
+  const n=((document.getElementById('inpFerNom')||{}).value||'Feriado').trim();
+  if(!f){ alert('Elige una fecha'); return; }
+  feriados[f]=n; guardarCfg(); renderFeriados(); render();
 }
-function quitarFeriado(f) {
-  delete feriados[f];
-  guardarCfg();
-  renderFeriados();
-  render();
-}
-function toggleFeriadoDia(f) {
-  if (esFeriado(f)) delete feriados[f];
-  else feriados[f] = 'Feriado';
-  guardarCfg();
-  renderFeriados();
-  render();
-}
-function load() {
-  try { plan = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { plan = {}; }
-  loadCfg();
-}
-function guardar() {
-  guardarCfg();
-  localStorage.setItem(KEY, JSON.stringify(plan));
-  saveHS();
-  alert('Guardado en este navegador. Use Nube ↑ para llevarlo a otra PC.');
-}
-function paqueteAip() {
+function quitarFeriado(f){ delete feriados[f]; guardarCfg(); renderFeriados(); render(); }
+function toggleFeriadoDia(f){ if(feriados[f]) delete feriados[f]; else feriados[f]='Feriado'; guardarCfg(); renderFeriados(); render(); }
+function load(){ try{ plan=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ plan={}; } loadCfg(); }
+function guardar(){ guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS(); alert('Guardado en este navegador. Use Nube ↑ para otra PC.'); }
+function paqueteAip(){
   leerFormHorario();
-  return {
-    plan: plan,
-    plantilla: plantilla,
-    feriados: feriados,
-    horario: horario,
-    horarioDoc: getHS(),
-    mes: (document.getElementById('inpMes') || {}).value || '',
-    bloque: bloqueCfg(),
-    ts: Date.now()
-  };
+  return { plan, plantilla, colegiado, feriados, horario, horarioDoc:getHS(), mes:(document.getElementById('inpMes')||{}).value||'', bloque:bloqueCfg(), ts:Date.now() };
 }
-function aplicarPaqueteAip(p) {
-  if (!p || typeof p !== 'object') return;
-  if (p.plan) plan = p.plan;
-  if (p.plantilla) plantilla = p.plantilla;
-  if (p.feriados) feriados = p.feriados;
-  if (p.horario) horario = p.horario;
-  if (p.horarioDoc) { horarioDoc = p.horarioDoc; saveHS(); }
-  if (p.mes && document.getElementById('inpMes')) document.getElementById('inpMes').value = p.mes;
-  if (p.bloque && document.getElementById('selBloque')) document.getElementById('selBloque').value = p.bloque;
-  pintarFormHorario();
-  guardarCfg();
-  localStorage.setItem(KEY, JSON.stringify(plan || {}));
-  renderPlantilla();
-  renderFeriados();
-  renderEditorHS();
-  render();
+function aplicarPaqueteAip(p){
+  if(!p||typeof p!=='object') return;
+  if(p.plan) plan=p.plan; if(p.plantilla) plantilla=p.plantilla; if(p.colegiado) colegiado=p.colegiado;
+  if(p.feriados) feriados=p.feriados; if(p.horario) horario=p.horario;
+  if(p.horarioDoc){ horarioDoc=p.horarioDoc; saveHS(); }
+  if(p.mes&&document.getElementById('inpMes')) document.getElementById('inpMes').value=p.mes;
+  if(p.bloque&&document.getElementById('selBloque')) document.getElementById('selBloque').value=p.bloque;
+  pintarFormHorario(); guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan||{}));
+  renderPlantilla(); renderFeriados(); renderEditorHS(); render();
 }
-async function subirAipNube() {
-  guardarCfg();
-  localStorage.setItem(KEY, JSON.stringify(plan));
-  saveHS();
-  try {
-    const res = await fetch(CLOUD_API_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'saveaip', payload: paqueteAip(), ts: Date.now() })
-    });
-    const data = await res.json();
-    if (!data || !data.ok) throw new Error((data && data.error) || 'Sin respuesta');
+async function subirAipNube(){
+  guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS();
+  try{
+    const res=await fetch(CLOUD_API_URL,{ method:'POST', body:JSON.stringify({ action:'saveaip', payload:paqueteAip(), ts:Date.now() }) });
+    const data=await res.json();
+    if(!data||!data.ok) throw new Error((data&&data.error)||'Sin respuesta');
     alert('Plan AIP subido a la nube.');
-  } catch (e) {
-    alert('No subió a la nube.\n' + e.message + '\nPublica Nueva versión del Apps Script (saveaip).');
-  }
+  }catch(e){ alert('No subió a la nube.\n'+e.message+'\nPublica Nueva versión del Apps Script (saveaip).'); }
 }
-async function bajarAipNube() {
-  try {
-    const res = await fetch(CLOUD_API_URL + '?action=loadaip&t=' + Date.now(), { cache: 'no-store' });
-    const data = await res.json();
-    if (!data || !data.ok) throw new Error((data && data.error) || 'Sin respuesta');
-    if (!data.payload) { alert('En la nube no hay plan AIP todavía. Sube con Nube ↑.'); return; }
-    aplicarPaqueteAip(data.payload);
-    alert('Plan AIP bajado de la nube.');
-  } catch (e) {
-    alert('No bajó de la nube.\n' + e.message + '\nPublica Nueva versión del Apps Script (loadaip).');
-  }
+async function bajarAipNube(){
+  try{
+    const res=await fetch(CLOUD_API_URL+'?action=loadaip&t='+Date.now(),{ cache:'no-store' });
+    const data=await res.json();
+    if(!data||!data.ok) throw new Error((data&&data.error)||'Sin respuesta');
+    if(!data.payload){ alert('En la nube no hay plan AIP. Sube con Nube ↑.'); return; }
+    aplicarPaqueteAip(data.payload); alert('Plan AIP bajado de la nube.');
+  }catch(e){ alert('No bajó de la nube.\n'+e.message); }
 }
-function imprimirPDF() {
+function imprimirPDF(){
   showAipTab('mes');
-  const ym = (document.getElementById('inpMes') || {}).value || '';
-  const el = document.getElementById('printMesTit');
-  if (el) {
-    const [Y,M] = ym.split('-');
-    const meses = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-    el.textContent = (meses[+M] || '') + ' ' + Y;
-  }
-  setTimeout(() => window.print(), 200);
+  const ym=(document.getElementById('inpMes')||{}).value||'';
+  const el=document.getElementById('printMesTit');
+  if(el){ const [Y,M]=ym.split('-'); const meses=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; el.textContent=(meses[+M]||'')+' '+Y; }
+  setTimeout(()=>window.print(),200);
 }
-function celda(fecha, nivel, hora) {
-  if (!plan[fecha]) plan[fecha] = {};
-  if (!plan[fecha][nivel]) plan[fecha][nivel] = {};
-  return plan[fecha][nivel][hora];
+function celda(fecha,nivel,hora){ if(!plan[fecha]) plan[fecha]={}; if(!plan[fecha][nivel]) plan[fecha][nivel]={}; return plan[fecha][nivel][hora]; }
+function setCelda(fecha,nivel,hora,obj){ if(!plan[fecha]) plan[fecha]={}; if(!plan[fecha][nivel]) plan[fecha][nivel]={}; if(!obj) delete plan[fecha][nivel][hora]; else plan[fecha][nivel][hora]=obj; }
+function toggleLista(obj,nivel,hora,wd){
+  if(!obj[nivel]) obj[nivel]={}; const key=String(hora);
+  if(!obj[nivel][key]) obj[nivel][key]=(obj[nivel][hora]||[]).slice();
+  const arr=obj[nivel][key]; const i=arr.indexOf(wd); if(i>=0) arr.splice(i,1); else arr.push(wd);
+  obj[nivel][hora]=arr; obj[nivel][key]=arr;
 }
-function setCelda(fecha, nivel, hora, obj) {
-  if (!plan[fecha]) plan[fecha] = {};
-  if (!plan[fecha][nivel]) plan[fecha][nivel] = {};
-  if (!obj) delete plan[fecha][nivel][hora];
-  else plan[fecha][nivel][hora] = obj;
+function quitarDeLista(obj,nivel,hora,wd){
+  if(!obj[nivel]) return;
+  [hora,String(hora)].forEach(key=>{ const arr=obj[nivel][key]; if(!arr) return; const i=arr.indexOf(wd); if(i>=0) arr.splice(i,1); });
 }
-function togglePlantilla(nivel, hora, wd) {
-  if (!plantilla) plantilla = plantillaDefault();
-  const key = String(hora);
-  if (!plantilla[nivel][key]) plantilla[nivel][key] = (plantilla[nivel][hora] || []).slice();
-  const arr = plantilla[nivel][key];
-  const i = arr.indexOf(wd);
-  if (i >= 0) arr.splice(i, 1); else arr.push(wd);
-  plantilla[nivel][hora] = arr;
-  plantilla[nivel][key] = arr;
-  guardarCfg();
-  renderPlantilla();
-  render();
+function togglePlantilla(nivel,hora,wd){
+  if(!plantilla) plantilla=plantillaDefault();
+  if(!colegiado) colegiado=colegiadoDefault();
+  const modo=(document.getElementById('selPlantModo')||{}).value||'aip';
+  if(modo==='col'){ toggleLista(colegiado,nivel,hora,wd); quitarDeLista(plantilla,nivel,hora,wd); }
+  else { toggleLista(plantilla,nivel,hora,wd); quitarDeLista(colegiado,nivel,hora,wd); }
+  guardarCfg(); renderPlantilla(); render();
 }
-function restaurarPlantilla() {
-  plantilla = plantillaDefault();
-  guardarCfg();
-  renderPlantilla();
-  render();
-}
-function aplicarPlantillaAlMes() {
-  const days = diasMes(document.getElementById('inpMes').value);
-  days.forEach(d => {
-    const f = ymd(d);
-    ['pri','sec'].forEach(n => {
-      const o = plan[f] && plan[f][n];
-      if (!o) return;
-      Object.keys(o).forEach(h => {
-        if (o[h] && (o[h].tipo === 'bloqueado' || o[h].tipo === 'abierto')) delete o[h];
-      });
-    });
-  });
-  render();
-}
-function renderPlantilla() {
-  function tabla(nivel, horas) {
-    let h = '<table class="cal"><thead><tr><th>Hora</th>';
-    DOW.forEach(x => h += '<th>'+x+'</th>');
-    h += '</tr></thead><tbody>';
-    horas.forEach(([num, lab]) => {
-      if (num === 'R') return;
-      h += '<tr><td>'+num+' '+lab+'</td>';
-      for (let wd=0; wd<5; wd++) {
-        const on = pipOk(nivel, num, wd);
-        h += '<td class="'+(on?'c-aip':'c-gray')+'" onclick="togglePlantilla(\''+nivel+'\','+num+','+wd+')">'+(on?'AIP':'')+'</td>';
+function restaurarPlantilla(){ plantilla=plantillaDefault(); colegiado=colegiadoDefault(); guardarCfg(); renderPlantilla(); render(); }
+function aplicarPlantillaAlMes(){ render(); }
+function renderPlantilla(){
+  function tabla(nivel,horas){
+    let h='<table class="cal"><thead><tr><th>Hora</th>'; DOW.forEach(x=>h+='<th>'+x+'</th>'); h+='</tr></thead><tbody>';
+    horas.forEach(([num,lab])=>{
+      if(num==='R') return;
+      h+='<tr><td>'+num+' '+lab+'</td>';
+      for(let wd=0;wd<5;wd++){
+        const col=colOk(nivel,num,wd), on=pipOk(nivel,num,wd);
+        const cl=col?'c-col':(on?'c-aip':'c-gray'); const tx=col?'COL':(on?'AIP':'');
+        h+='<td class="'+cl+'" onclick="togglePlantilla(\''+nivel+'\','+num+','+wd+')">'+tx+'</td>';
       }
-      h += '</tr>';
+      h+='</tr>';
     });
     return h+'</tbody></table>';
   }
-  document.getElementById('boxPlantPri').innerHTML = tabla('pri', HPRI());
-  document.getElementById('boxPlantSec').innerHTML = tabla('sec', HSEC());
+  document.getElementById('boxPlantPri').innerHTML=tabla('pri',HPRI());
+  document.getElementById('boxPlantSec').innerHTML=tabla('sec',HSEC());
 }
-function armarMes() {
-  const ym = document.getElementById('inpMes').value;
-  const days = diasMes(ym);
-  days.forEach(d => {
-    const f = ymd(d);
-    ['pri','sec'].forEach(n => {
-      const o = plan[f] && plan[f][n];
-      if (!o) return;
-      Object.keys(o).forEach(h => {
-        if (o[h] && (o[h].tipo==='bloqueado' || o[h].tipo==='abierto')) return;
-        delete o[h];
-      });
+function armarMes(){
+  const ym=document.getElementById('inpMes').value; const days=diasMes(ym);
+  days.forEach(d=>{
+    const f=ymd(d);
+    ['pri','sec'].forEach(n=>{
+      const o=plan[f]&&plan[f][n]; if(!o) return;
+      Object.keys(o).forEach(h=>{ if(o[h]&&(o[h].tipo==='bloqueado'||o[h].tipo==='abierto')) return; delete o[h]; });
     });
   });
-  const rotPri = ['3°','4°','5°','6°'];
-  let ip = 0;
-  days.forEach(d => {
-    const f = ymd(d);
-    if (esFeriado(f)) return;
-    const wd = d.getDay()-1;
-    const act = horasPed('pri').filter(h => slotActivo(f,'pri',h,wd)).sort((a,b)=>a-b);
-    if (!act.length) return;
-    const g = rotPri[ip++ % rotPri.length];
-    const modo = bloqueCfg();
-    let usar = act.slice();
-    if (modo === '1') usar = act.slice(0,1);
-    else if (modo === '2') {
-      usar = [];
-      for (let i=0;i<act.length-1;i++) {
-        if (act[i+1] === act[i]+1) { usar = [act[i], act[i+1]]; break; }
-      }
-      if (!usar.length) usar = act.slice(0,2);
-    }
-    act.forEach(h => {
-      if (usar.indexOf(h) >= 0) setCelda(f,'pri',h,{ tipo:'grupo', texto:g });
-      else setCelda(f,'pri',h,{ tipo:'man', texto:'MAN. PREVENT' });
-    });
+  days.forEach(d=>{
+    const f=ymd(d); if(esFeriado(f)) return; const wd=d.getDay()-1;
+    ['pri','sec'].forEach(n=>{ horasPed(n).forEach(h=>{ if(colOk(n,h,wd)) setCelda(f,n,h,{ tipo:'colegio', texto:'Colegiado AIP' }); }); });
   });
-  const visits = {};
-  SECS.forEach(s => visits[s]=0);
-  days.forEach(d => {
-    const f = ymd(d);
-    if (esFeriado(f)) return;
-    const wd = d.getDay()-1;
-    const usedDay = {};
-    horasPed('sec').forEach(h => {
-      if (!slotActivo(f,'sec', h, wd)) return;
-      if (celda(f,'sec',h) && celda(f,'sec',h).tipo !== 'abierto') return;
-      const par = horaPar(h);
-      const dos = exigeDos();
-      let cands = (dos ? candidatosAIP(wd, h, f) : candidatos(wd, h)).filter(c => !usedDay[c.seccion]);
-      if (dos && par && h > par) {
-        if (!celda(f,'sec',h) || celda(f,'sec',h).tipo==='abierto')
-          setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
-        return;
-      }
-      if (!cands.length) {
-        setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
-        return;
-      }
-      cands.sort((a,b) => visits[a.seccion]-visits[b.seccion] || a.seccion.localeCompare(b.seccion));
-      const pick = cands[0];
-      visits[pick.seccion]++;
-      usedDay[pick.seccion] = 1;
-      setCelda(f,'sec',h, { tipo:'grupo', seccion:pick.seccion, area:pick.area, doc:pick.doc, texto:pick.texto });
-      if (dos && par && slotActivo(f,'sec', par, wd) && mismoGrupo(wd, h, par, pick.seccion)) {
-        const row2 = getHS()[wd][par][pick.seccion];
-        setCelda(f,'sec',par, { tipo:'grupo', seccion:pick.seccion, area:row2.area, doc:row2.doc, texto:pick.seccion+' '+row2.area+' '+row2.doc });
+  const rotPri=['3°','4°','5°','6°']; let ip=0;
+  days.forEach(d=>{
+    const f=ymd(d); if(esFeriado(f)) return; const wd=d.getDay()-1;
+    const act=horasPed('pri').filter(h=>slotActivo(f,'pri',h,wd)&&!colOk('pri',h,wd)).sort((a,b)=>a-b);
+    if(!act.length) return;
+    const g=rotPri[ip++%rotPri.length]; const modo=bloqueCfg(); let usar=act.slice();
+    if(modo==='1') usar=act.slice(0,1);
+    else if(modo==='2'){ usar=[]; for(let i=0;i<act.length-1;i++){ if(act[i+1]===act[i]+1){ usar=[act[i],act[i+1]]; break; } } if(!usar.length) usar=act.slice(0,2); }
+    act.forEach(h=>{ if(usar.indexOf(h)>=0) setCelda(f,'pri',h,{ tipo:'grupo', texto:g }); else setCelda(f,'pri',h,{ tipo:'man', texto:'MAN. PREVENT' }); });
+  });
+  const visits={}; SECS.forEach(s=>visits[s]=0);
+  days.forEach(d=>{
+    const f=ymd(d); if(esFeriado(f)) return; const wd=d.getDay()-1; const usedDay={};
+    horasPed('sec').forEach(h=>{
+      if(!slotActivo(f,'sec',h,wd)||colOk('sec',h,wd)) return;
+      if(celda(f,'sec',h)&&celda(f,'sec',h).tipo!=='abierto') return;
+      const par=horaPar(h); const dos=exigeDos();
+      let cands=(dos?candidatosAIP(wd,h,f):candidatos(wd,h)).filter(c=>!usedDay[c.seccion]);
+      if(dos&&par&&h>par){ if(!celda(f,'sec',h)||celda(f,'sec',h).tipo==='abierto') setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' }); return; }
+      if(!cands.length){ if(dos) setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' }); return; }
+      cands.sort((a,b)=>(visits[a.seccion]||0)-(visits[b.seccion]||0));
+      const pick=cands[0]; usedDay[pick.seccion]=1; visits[pick.seccion]=(visits[pick.seccion]||0)+1;
+      setCelda(f,'sec',h,{ tipo:'grupo', seccion:pick.seccion, area:pick.area, doc:pick.doc, texto:pick.texto });
+      if(dos&&par&&!colOk('sec',par,wd)&&slotActivo(f,'sec',par,wd)){
+        const row2=getHS()[wd]&&getHS()[wd][par]&&getHS()[wd][par][pick.seccion];
+        if(row2) setCelda(f,'sec',par,{ tipo:'grupo', seccion:pick.seccion, area:row2.area, doc:row2.doc, texto:pick.seccion+' '+row2.area+' '+row2.doc });
       }
     });
   });
-  render();
+  guardar(); render();
 }
-function clsDe(tipo) {
-  return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', man:'c-man', vacio:'c-aip', abierto:'c-aip', bloqueado:'c-gray' })[tipo] || 'c-gray';
-}
-function render() {
-  const ym = document.getElementById('inpMes').value;
-  const days = diasMes(ym);
-  const [Y,M] = ym.split('-');
-  const meses = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  document.getElementById('titPri').textContent = 'Primaria · '+meses[+M]+' '+Y+' · 3° 4° 5° 6°';
-  document.getElementById('titSec').textContent = 'Secundaria · '+meses[+M]+' '+Y;
-  function head() {
-    let h = '<th>N°</th><th>Hora</th>';
-    days.forEach(d => {
-      const f = ymd(d);
-      h += '<th style="cursor:pointer" title="Clic para marcar o quitar feriado" onclick="toggleFeriadoDia(\''+f+'\')">'+String(d.getDate()).padStart(2,'0')+'<br>'+DOW[d.getDay()-1]+(esFeriado(f)?'<br>FER':'')+'</th>';
-    });
+function clsDe(tipo){ return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', colegiado:'c-col', man:'c-man', vacio:'c-aip', abierto:'c-aip', bloqueado:'c-gray' })[tipo]||'c-gray'; }
+function render(){
+  const ym=document.getElementById('inpMes').value; const [Y,M]=ym.split('-');
+  const meses=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const days=diasMes(ym);
+  document.getElementById('titPri').textContent='Primaria · '+meses[+M]+' '+Y+' · 3° 4° 5° 6°';
+  document.getElementById('titSec').textContent='Secundaria · '+meses[+M]+' '+Y;
+  function head(){
+    let h='<th>N°</th><th>Hora</th>';
+    days.forEach(d=>{ const f=ymd(d); h+='<th style="cursor:pointer" onclick="toggleFeriadoDia(\''+f+'\')">'+String(d.getDate()).padStart(2,'0')+'<br>'+DOW[d.getDay()-1]+(esFeriado(f)?'<br>FER':'')+'</th>'; });
     return h;
   }
-  function cell(d, nivel, hora) {
-    const f = ymd(d); const wd = d.getDay()-1;
-    if (esFeriado(f)) return '<td class="c-fer" onclick="toggleFeriadoDia(\''+f+'\')">FERIADO</td>';
-    if (hora==='R') return '<td class="c-rec">RECREO</td>';
-    const on = slotActivo(f,nivel,hora,wd);
-    const c = celda(f,nivel,hora);
-    const t = on ? ((c && c.tipo!=='abierto' && c.texto) ? c.texto : '—') : '';
-    const cl = on ? (c ? clsDe(c.tipo) : 'c-aip') : 'c-gray';
+  function cell(d,nivel,hora){
+    const f=ymd(d); const wd=d.getDay()-1;
+    if(esFeriado(f)) return '<td class="c-fer" onclick="toggleFeriadoDia(\''+f+'\')">FERIADO</td>';
+    if(hora==='R') return '<td class="c-rec">RECREO</td>';
+    const c=celda(f,nivel,hora);
+    if((c&&(c.tipo==='colegio'||c.tipo==='colegiado')) || (colOk(nivel,hora,wd)&&!(c&&c.tipo==='grupo'))){
+      return '<td class="c-col" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+(c&&c.texto?c.texto:'Colegiado AIP')+'</td>';
+    }
+    const on=slotActivo(f,nivel,hora,wd);
+    const t=on?((c&&c.tipo!=='abierto'&&c.texto)?c.texto:'—'):'';
+    const cl=on?(c?clsDe(c.tipo):'c-aip'):'c-gray';
     return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+t+'</td>';
   }
-  let p = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
-  HPRI().forEach(([h,lab]) => { p += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'pri',h)).join('')+'</tr>'; });
-  document.getElementById('boxPri').innerHTML = p+'</tbody></table>';
-  let s = '<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
-  HSEC().forEach(([h,lab]) => { s += '<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'sec',h)).join('')+'</tr>'; });
-  document.getElementById('boxSec').innerHTML = s+'</tbody></table>';
+  let p='<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
+  HPRI().forEach(([h,lab])=>{ p+='<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'pri',h)).join('')+'</tr>'; });
+  document.getElementById('boxPri').innerHTML=p+'</tbody></table>';
+  let s='<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
+  HSEC().forEach(([h,lab])=>{ s+='<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'sec',h)).join('')+'</tr>'; });
+  document.getElementById('boxSec').innerHTML=s+'</tbody></table>';
 }
-function clicCelda(fecha, nivel, hora) {
-  if (hora==='R') return;
-  if (esFeriado(fecha) && !modoDefinir()) {
-    if (confirm('Este día está como feriado. ¿Quitar feriado y habilitar horas?')) toggleFeriadoDia(fecha);
-    return;
+function clicCelda(fecha,nivel,hora){
+  if(hora==='R') return;
+  if(esFeriado(fecha)&&!modoDefinir()){ if(confirm('¿Quitar feriado?')) toggleFeriadoDia(fecha); return; }
+  if(modoDefinir()){
+    const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
+    if(slotActivo(fecha,nivel,hora,wd)||colOk(nivel,hora,wd)) setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
+    else setCelda(fecha,nivel,hora,{ tipo:'abierto', texto:'—' });
+    render(); return;
   }
-  if (modoDefinir()) {
-    const d = new Date(fecha+'T12:00:00');
-    const wd = d.getDay()-1;
-    if (slotActivo(fecha, nivel, hora, wd)) setCelda(fecha, nivel, hora, { tipo:'bloqueado', texto:'' });
-    else setCelda(fecha, nivel, hora, { tipo:'abierto', texto:'—' });
-    render();
-    return;
-  }
-  abrir(fecha, nivel, hora);
+  abrirModal(fecha,nivel,hora);
 }
-function abrir(fecha, nivel, hora) {
-  const d = new Date(fecha+'T12:00:00');
-  const wd = d.getDay()-1;
-  if (esFeriado(fecha)) {
-    if (confirm('Este día está como feriado. ¿Quitar feriado?')) toggleFeriadoDia(fecha);
-    return;
-  }
-  editKey = { fecha, nivel, hora, wd };
-  const c = celda(fecha, nivel, hora) || {};
-  document.getElementById('modTit').textContent = (nivel==='pri'?'Primaria':'Secundaria')+' · '+fecha+' · hora '+hora;
-  document.getElementById('modSub').textContent = 'Grupo o bloquear solo este día.';
-  document.getElementById('modTipo').value = c.tipo || (slotActivo(fecha,nivel,hora,wd) ? 'grupo' : 'bloqueado');
-  const sel = document.getElementById('modGrupo');
-  if (nivel==='pri') {
-    sel.innerHTML = ['3°','4°','5°','6°'].map(g => '<option value="'+g+'">'+g+'</option>').join('');
-    if (c.texto) sel.value = c.texto;
-  } else {
-    const cands = candidatosAIP(wd, hora, fecha);
-    const list = cands.length ? cands : candidatos(wd,hora);
-    sel.innerHTML = list.map(x => '<option value="'+x.seccion+'">'+x.texto+'</option>').join('') || '<option value="">—</option>';
-    if (c.seccion) sel.value = c.seccion;
-  }
-  onModTipo();
+function abrirModal(fecha,nivel,hora){
+  editKey={ fecha,nivel,hora };
+  const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
+  document.getElementById('modTit').textContent=(nivel==='pri'?'Primaria':'Secundaria')+' · '+fecha+' · hora '+hora;
+  document.getElementById('modSub').textContent=colOk(nivel,hora,wd)?'Esta hora está marcada como Colegiado AIP en la plantilla.':'';
+  const wrap=document.getElementById('wrapGrupo'); const sel=document.getElementById('modGrupo');
+  sel.innerHTML='';
+  if(nivel==='pri'){ ['3°','4°','5°','6°'].forEach(g=>{ const o=document.createElement('option'); o.value=g; o.textContent=g; sel.appendChild(o); }); }
+  else { candidatos(wd,+hora).forEach(c=>{ const o=document.createElement('option'); o.value=c.seccion; o.textContent=c.texto; sel.appendChild(o); }); }
+  document.getElementById('modTipo').value='grupo'; onModTipo();
   document.getElementById('modal').classList.remove('hidden');
 }
-function onModTipo() {
-  document.getElementById('wrapGrupo').style.display = document.getElementById('modTipo').value==='grupo' ? 'block' : 'none';
-}
-function cerrarModal() { document.getElementById('modal').classList.add('hidden'); editKey=null; }
-function aplicarModal() {
-  if (!editKey) return;
-  const tipo = document.getElementById('modTipo').value;
-  const { fecha, nivel, hora, wd } = editKey;
-  if (tipo==='vacio') setCelda(fecha,nivel,hora,null);
-  else if (tipo==='bloqueado') setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
-  else if (tipo==='abierto') setCelda(fecha,nivel,hora,{ tipo:'abierto', texto:'—' });
-  else if (tipo==='grupo') {
-    if (nivel==='pri') setCelda(fecha,nivel,hora,{ tipo:'grupo', texto: document.getElementById('modGrupo').value });
+function onModTipo(){ document.getElementById('wrapGrupo').classList.toggle('hidden', document.getElementById('modTipo').value!=='grupo'); }
+function cerrarModal(){ document.getElementById('modal').classList.add('hidden'); editKey=null; }
+function aplicarModal(){
+  if(!editKey) return;
+  const {fecha,nivel,hora}=editKey; const tipo=document.getElementById('modTipo').value;
+  const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
+  if(tipo==='vacio') setCelda(fecha,nivel,hora,null);
+  else if(tipo==='bloqueado') setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
+  else if(tipo==='abierto') setCelda(fecha,nivel,hora,{ tipo:'abierto', texto:'—' });
+  else if(tipo==='grupo'){
+    if(nivel==='pri') setCelda(fecha,nivel,hora,{ tipo:'grupo', texto:document.getElementById('modGrupo').value });
     else {
-      const sec = document.getElementById('modGrupo').value;
-      const row = (getHS()[wd]&&getHS()[wd][hora]&&getHS()[wd][hora][sec]);
-      setCelda(fecha,nivel,hora, row ? { tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc } : { tipo:'grupo', texto:sec });
+      const sec=document.getElementById('modGrupo').value;
+      const row=(getHS()[wd]&&getHS()[wd][hora]&&getHS()[wd][hora][sec]);
+      setCelda(fecha,nivel,hora, row?{ tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc }:{ tipo:'grupo', texto:sec });
     }
   } else {
-    const map = { soporte:'SOPORTE', colegio:'COLEGIO', man:'MAN. PREVENT' };
-    setCelda(fecha,nivel,hora,{ tipo:tipo, texto: map[tipo] });
+    const map={ soporte:'SOPORTE', colegio:'Colegiado AIP', man:'MAN. PREVENT' };
+    setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
   }
-  cerrarModal();
-  render();
+  cerrarModal(); render();
 }
-function showAipTab(t) {
-  const mes = document.getElementById('pane-mes');
-  const hs = document.getElementById('pane-hs');
-  const reloj = document.getElementById('pane-reloj');
-  if (mes) mes.classList.toggle('hidden', t === 'hs');
-  if (hs) hs.classList.toggle('hidden', t !== 'hs');
-  if (reloj) reloj.classList.toggle('hidden', t !== 'reloj');
-  document.querySelectorAll('.mes-only').forEach(el => el.classList.toggle('hidden', t !== 'mes'));
-  document.querySelectorAll('.aip-tab').forEach(b => b.classList.remove('on'));
-  const map = { mes:'tabBtnMes', hs:'tabBtnHs', reloj:'tabBtnReloj' };
-  const btn = document.getElementById(map[t]);
-  if (btn) btn.classList.add('on');
-  if (t === 'hs') renderEditorHS();
-  if (t === 'reloj') renderFeriados();
+function showAipTab(t){
+  const mes=document.getElementById('pane-mes'), hs=document.getElementById('pane-hs'), reloj=document.getElementById('pane-reloj');
+  if(mes) mes.classList.toggle('hidden', t==='hs');
+  if(hs) hs.classList.toggle('hidden', t!=='hs');
+  if(reloj) reloj.classList.toggle('hidden', t!=='reloj');
+  document.querySelectorAll('.mes-only').forEach(el=>el.classList.toggle('hidden', t!=='mes'));
+  document.querySelectorAll('.aip-tab').forEach(b=>b.classList.remove('on'));
+  const map={ mes:'tabBtnMes', hs:'tabBtnHs', reloj:'tabBtnReloj' };
+  const btn=document.getElementById(map[t]); if(btn) btn.classList.add('on');
+  if(t==='hs') renderEditorHS(); if(t==='reloj') renderFeriados();
 }
-function onMes() { render(); }
-
-function wdNombre(i){ return DOW[i] || ('D'+i); }
-function ensureHS() {
-  if (!horarioDoc) horarioDoc = JSON.parse(JSON.stringify(HS));
-  return horarioDoc;
-}
-function initSelDiaHS() {
-  const sel = document.getElementById('selDiaHS');
-  if (!sel || sel.options.length) return;
-  sel.innerHTML = DOW.map((n,i) => '<option value="'+i+'">'+n+'</option>').join('');
-}
-function normDoc(s) {
-  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
-}
-function esDocValido(s) {
-  const n = normDoc(s);
-  return n && n !== '-' && n !== '—' && n !== 'RECESO';
-}
-function mapaPorHora(M, wd, hora) {
-  const row = (M[wd] && M[wd][hora]) || {};
-  const by = {};
-  Object.keys(row).forEach(sec => {
-    const d = row[sec] && row[sec].doc;
-    if (!esDocValido(d)) return;
-    const k = normDoc(d);
-    if (!by[k]) by[k] = { nombre: row[sec].doc, secs: [] };
-    by[k].secs.push(sec);
-  });
+function onMes(){ render(); }
+function wdNombre(i){ return DOW[i]||('D'+i); }
+function ensureHS(){ if(!horarioDoc) horarioDoc=JSON.parse(JSON.stringify(HS)); return horarioDoc; }
+function initSelDiaHS(){ const sel=document.getElementById('selDiaHS'); if(!sel||sel.options.length) return; sel.innerHTML=DOW.map((n,i)=>'<option value="'+i+'">'+n+'</option>').join(''); }
+function normDoc(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim(); }
+function esDocValido(s){ const n=normDoc(s); return n&&n!=='-'&&n!=='—'&&n!=='RECESO'; }
+function mapaPorHora(M,wd,hora){
+  const row=(M[wd]&&M[wd][hora])||{}; const by={};
+  Object.keys(row).forEach(sec=>{ const d=row[sec]&&row[sec].doc; if(!esDocValido(d)) return; const k=normDoc(d); if(!by[k]) by[k]={ nombre:row[sec].doc, secs:[] }; by[k].secs.push(sec); });
   return by;
 }
-function choquesHS(M) {
-  const out = [];
-  M = M || getHS();
-  for (let wd=0; wd<5; wd++) {
-    horasPed('sec').forEach(h => {
-      const by = mapaPorHora(M, wd, h);
-      Object.keys(by).forEach(k => {
-        if (by[k].secs.length > 1) out.push({ wd:wd, hora:h, doc:by[k].nombre, secs:by[k].secs });
-      });
-    });
-  }
+function choquesHS(M){
+  const out=[]; M=M||getHS();
+  for(let wd=0;wd<5;wd++) horasPed('sec').forEach(h=>{ const by=mapaPorHora(M,wd,h); Object.keys(by).forEach(k=>{ if(by[k].secs.length>1) out.push({ wd,hora:h,doc:by[k].nombre,secs:by[k].secs }); }); });
   return out;
 }
-function cargaSemanal(M) {
-  M = M || getHS();
-  const carga = {};
-  for (let wd=0; wd<5; wd++) {
-    horasPed('sec').forEach(h => {
-      const row = (M[wd] && M[wd][h]) || {};
-      const vistos = {};
-      Object.keys(row).forEach(sec => {
-        const d = row[sec] && row[sec].doc;
-        if (!esDocValido(d)) return;
-        const k = normDoc(d);
-        if (vistos[k]) return;
-        vistos[k] = 1;
-        if (!carga[k]) carga[k] = { nombre: row[sec].doc, h: 0 };
-        carga[k].h++;
-      });
-    });
-  }
-  return Object.keys(carga).map(k => carga[k]).sort((a,b) => b.h-a.h || a.nombre.localeCompare(b.nombre));
-}
-function renderChoques() {
-  const box = document.getElementById('boxChoques');
-  if (!box) return;
-  const ch = choquesHS();
-  const carga = cargaSemanal();
-  let html = '';
-  if (ch.length) {
-    html += '<div class="mt-2 p-2 rounded-lg" style="background:#fef2f2;border:1px solid #fecaca">';
-    html += '<div class="font-black text-red-700 mb-1">Choques ('+ch.length+'): el mismo docente en dos secciones a la misma hora</div>';
-    html += ch.map(c => '<div>• '+wdNombre(c.wd)+' hora '+c.hora+' — <b>'+c.doc+'</b> en '+c.secs.join(', ')+'</div>').join('');
-    html += '</div>';
-  } else {
-    html += '<div class="mt-2 text-emerald-700 font-bold">Sin choques de docente en el horario.</div>';
-  }
-  html += '<div class="mt-2 text-[11px] text-slate-600"><b>Carga semanal (horas distintas):</b> '+
-    carga.map(x => x.nombre+' '+x.h+'h').join(' · ')+'</div>';
-  box.innerHTML = html;
-}
-function celdaEnChoque(wd, hora, doc) {
-  if (!esDocValido(doc)) return false;
-  const by = mapaPorHora(getHS(), wd, hora);
-  const k = normDoc(doc);
-  return !!(by[k] && by[k].secs.length > 1);
-}
-function renderEditorHS() {
-  const box = document.getElementById('boxEditorHS');
-  const sel = document.getElementById('selDiaHS');
-  if (!box || !sel) return;
-  initSelDiaHS();
-  const wd = +sel.value;
-  const M = getHS();
-  const horas = horasPed('sec');
-  let h = '<table class="cal"><thead><tr><th>Hora</th>';
-  SECS.forEach(s => h += '<th>'+s+'</th>');
-  h += '</tr></thead><tbody>';
-  horas.forEach(num => {
-    const lab = (HSEC().find(x => +x[0]===+num) || [num,''])[1];
-    h += '<tr><td>'+num+'<br><span style="font-weight:400">'+lab+'</span></td>';
-    SECS.forEach(s => {
-      const c = (M[wd] && M[wd][num] && M[wd][num][s]) || {};
-      const ida = 'hsA_'+wd+'_'+num+'_'+s;
-      const idd = 'hsD_'+wd+'_'+num+'_'+s;
-      const choque = celdaEnChoque(wd, num, c.doc);
-      h += '<td class="'+(choque?'c-fer':'')+'" style="min-width:90px;padding:3px">'+
-        '<input data-hs="1" id="'+ida+'" placeholder="Área" value="'+(c.area||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px;margin-bottom:2px">'+
-        '<input data-hs="1" id="'+idd+'" placeholder="Docente" value="'+(c.doc||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px'+(choque?';background:#fecaca':'')+'">'+
-        '</td>';
-    });
-    h += '</tr>';
+function cargaSemanal(M){
+  M=M||getHS(); const carga={};
+  for(let wd=0;wd<5;wd++) horasPed('sec').forEach(h=>{
+    const row=(M[wd]&&M[wd][h])||{}; const vistos={};
+    Object.keys(row).forEach(sec=>{ const d=row[sec]&&row[sec].doc; if(!esDocValido(d)) return; const k=normDoc(d); if(vistos[k]) return; vistos[k]=1; if(!carga[k]) carga[k]={ nombre:row[sec].doc,h:0 }; carga[k].h++; });
   });
-  box.innerHTML = h+'</tbody></table>';
-  renderChoques();
+  return Object.keys(carga).map(k=>carga[k]).sort((a,b)=>b.h-a.h||a.nombre.localeCompare(b.nombre));
 }
-function guardarDiaHS() {
-  const sel = document.getElementById('selDiaHS');
-  if (!sel) return;
-  const wd = +sel.value;
-  const M = ensureHS();
-  if (!M[wd]) M[wd] = {};
-  horasPed('sec').forEach(num => {
-    if (!M[wd][num]) M[wd][num] = {};
-    SECS.forEach(s => {
-      const area = ((document.getElementById('hsA_'+wd+'_'+num+'_'+s)||{}).value || '').trim();
-      const doc = ((document.getElementById('hsD_'+wd+'_'+num+'_'+s)||{}).value || '').trim();
-      if (area || doc) M[wd][num][s] = { area: area || '—', doc: doc || '—' };
-      else delete M[wd][num][s];
+function renderChoques(){
+  const box=document.getElementById('boxChoques'); if(!box) return;
+  const ch=choquesHS(); const carga=cargaSemanal(); let html='';
+  if(ch.length){ html+='<div class="mt-2 p-2 rounded-lg" style="background:#fef2f2;border:1px solid #fecaca"><div class="font-black text-red-700 mb-1">Choques ('+ch.length+')</div>'+ch.map(c=>'<div>• '+wdNombre(c.wd)+' hora '+c.hora+' — <b>'+c.doc+'</b> en '+c.secs.join(', ')+'</div>').join('')+'</div>'; }
+  else html+='<div class="mt-2 text-emerald-700 font-bold">Sin choques de docente en el horario.</div>';
+  html+='<div class="mt-2 text-[11px] text-slate-600"><b>Carga semanal:</b> '+carga.map(x=>x.nombre+' '+x.h+'h').join(' · ')+'</div>';
+  box.innerHTML=html;
+}
+function celdaEnChoque(wd,hora,doc){ if(!esDocValido(doc)) return false; const by=mapaPorHora(getHS(),wd,hora); const k=normDoc(doc); return !!(by[k]&&by[k].secs.length>1); }
+function renderEditorHS(){
+  const box=document.getElementById('boxEditorHS'); const sel=document.getElementById('selDiaHS'); if(!box||!sel) return;
+  initSelDiaHS(); const wd=+sel.value; const M=getHS(); const horas=horasPed('sec');
+  let h='<table class="cal"><thead><tr><th>Hora</th>'; SECS.forEach(s=>h+='<th>'+s+'</th>'); h+='</tr></thead><tbody>';
+  horas.forEach(num=>{
+    const lab=(HSEC().find(x=>+x[0]===+num)||[num,''])[1];
+    h+='<tr><td>'+num+'<br><span style="font-weight:400">'+lab+'</span></td>';
+    SECS.forEach(s=>{
+      const c=(M[wd]&&M[wd][num]&&M[wd][num][s])||{};
+      const choque=celdaEnChoque(wd,num,c.doc);
+      h+='<td class="'+(choque?'c-fer':'')+'" style="min-width:90px;padding:3px"><input id="hsA_'+wd+'_'+num+'_'+s+'" placeholder="Área" value="'+(c.area||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px;margin-bottom:2px"><input id="hsD_'+wd+'_'+num+'_'+s+'" placeholder="Docente" value="'+(c.doc||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:10px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px'+(choque?';background:#fecaca':'')+'"></td>';
+    });
+    h+='</tr>';
+  });
+  box.innerHTML=h+'</tbody></table>'; renderChoques();
+}
+function guardarDiaHS(){
+  const sel=document.getElementById('selDiaHS'); if(!sel) return; const wd=+sel.value; const M=ensureHS(); if(!M[wd]) M[wd]={};
+  horasPed('sec').forEach(num=>{
+    if(!M[wd][num]) M[wd][num]={};
+    SECS.forEach(s=>{
+      const area=((document.getElementById('hsA_'+wd+'_'+num+'_'+s)||{}).value||'').trim();
+      const doc=((document.getElementById('hsD_'+wd+'_'+num+'_'+s)||{}).value||'').trim();
+      if(area||doc) M[wd][num][s]={ area:area||'—', doc:doc||'—' }; else delete M[wd][num][s];
     });
   });
-  saveHS();
-  renderEditorHS();
-  const n = choquesHS().filter(c => c.wd===wd).length;
-  alert('Horario de '+wdNombre(wd)+' guardado.'+(n?('\nOjo: hay '+n+' choque(s) este día (celdas en rojo).'):' Sin choques este día.'));
+  saveHS(); renderEditorHS();
+  const n=choquesHS().filter(c=>c.wd===wd).length;
+  alert('Horario de '+wdNombre(wd)+' guardado.'+(n?('\nOjo: '+n+' choque(s).'):' Sin choques.'));
 }
-function exportarHS() {
-  const data = getHS();
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'horario_docentes_aip.json';
-  a.click();
-}
-function restaurarHSEjemplo() {
-  if (!confirm('¿Volver al horario de ejemplo que cargamos al inicio?')) return;
-  horarioDoc = JSON.parse(JSON.stringify(HS));
-  saveHS();
-  renderEditorHS();
-  alert('Se restauró el horario ejemplo.');
-}
-function diaCsvAIndex(v) {
-  v = String(v||'').trim().toUpperCase();
-  const map = {LUN:0,LUNES:0,MAR:1,MARTES:1,MIE:2,MIERCOLES:2,MIÉRCOLES:2,'0':0,'1':1,'2':2,'3':3,'4':4,JUE:3,JUEVES:3,VIE:4,VIERNES:4};
-  return map[v] !== undefined ? map[v] : parseInt(v,10);
-}
-function aplicarMapaHS(obj) {
-  if (!obj || typeof obj !== 'object') return false;
-  horarioDoc = obj;
-  saveHS();
-  renderEditorHS();
-  return true;
-}
-function parseCsvHS(text) {
-  const lines = text.replace(/\r/g,'').split('\n').filter(x => x.trim());
-  if (lines.length < 2) throw new Error('CSV vacío');
-  const head = lines[0].split(/[;,]/).map(x => x.trim().toLowerCase().replace(/['"]/g,''));
-  const iDia = head.findIndex(x => /dia|día|dow/.test(x));
-  const iHora = head.findIndex(x => /hora|h$/.test(x));
-  const iSec = head.findIndex(x => /secc/.test(x));
-  const iArea = head.findIndex(x => /area|área/.test(x));
-  const iDoc = head.findIndex(x => /docen|prof|nombre/.test(x));
-  if (iDia<0 || iHora<0 || iSec<0) throw new Error('Faltan columnas dia, hora, seccion');
-  const M = JSON.parse(JSON.stringify(getHS()));
-  for (let i=1;i<lines.length;i++) {
-    const cols = lines[i].split(/[;,]/).map(x => x.trim().replace(/^["']|["']$/g,''));
-    const wd = diaCsvAIndex(cols[iDia]);
-    const hora = parseInt(cols[iHora],10);
-    let sec = String(cols[iSec]||'').toUpperCase().replace(/\s+/g,'').replace('°','');
-    if (sec === '5U' || sec === '5UNICA' || sec === '5ÚNICA') sec = '5U';
-    const area = iArea>=0 ? cols[iArea] : '';
-    const doc = iDoc>=0 ? cols[iDoc] : '';
-    if (isNaN(wd) || isNaN(hora) || !sec) continue;
-    if (!M[wd]) M[wd] = {};
-    if (!M[wd][hora]) M[wd][hora] = {};
-    M[wd][hora][sec] = { area: area || '—', doc: doc || '—' };
+function exportarHS(){ const blob=new Blob([JSON.stringify(getHS(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='horario_docentes_aip.json'; a.click(); }
+function restaurarHSEjemplo(){ if(!confirm('¿Volver al horario oficial del Excel?')) return; horarioDoc=JSON.parse(JSON.stringify(HS)); saveHS(); renderEditorHS(); }
+function diaCsvAIndex(v){ v=String(v||'').trim().toUpperCase(); const map={LUN:0,LUNES:0,MAR:1,MARTES:1,MIE:2,MIERCOLES:2,MIÉRCOLES:2,JUE:3,JUEVES:3,VIE:4,VIERNES:4,'0':0,'1':1,'2':2,'3':3,'4':4}; return map[v]!==undefined?map[v]:parseInt(v,10); }
+function aplicarMapaHS(obj){ if(!obj||typeof obj!=='object') return false; horarioDoc=obj; saveHS(); renderEditorHS(); return true; }
+function parseCsvHS(text){
+  const lines=text.replace(/\r/g,'').split('\n').filter(x=>x.trim()); if(lines.length<2) throw new Error('CSV vacío');
+  const head=lines[0].split(/[;,]/).map(x=>x.trim().toLowerCase().replace(/['"]/g,''));
+  const iDia=head.findIndex(x=>/dia|día|dow/.test(x)), iHora=head.findIndex(x=>/hora|h$/.test(x)), iSec=head.findIndex(x=>/secc/.test(x));
+  const iArea=head.findIndex(x=>/area|área/.test(x)), iDoc=head.findIndex(x=>/docen|prof|nombre/.test(x));
+  if(iDia<0||iHora<0||iSec<0) throw new Error('Faltan columnas dia, hora, seccion');
+  const M=JSON.parse(JSON.stringify(getHS()));
+  for(let i=1;i<lines.length;i++){
+    const cols=lines[i].split(/[;,]/).map(x=>x.trim().replace(/^["']|["']$/g,''));
+    const wd=diaCsvAIndex(cols[iDia]); const hora=parseInt(cols[iHora],10);
+    let sec=String(cols[iSec]||'').toUpperCase().replace(/\s+/g,'').replace('°','');
+    if(sec==='5U'||sec==='5UNICA'||sec==='5ÚNICA') sec='5U';
+    if(isNaN(wd)||isNaN(hora)||!sec) continue;
+    if(!M[wd]) M[wd]={}; if(!M[wd][hora]) M[wd][hora]={};
+    M[wd][hora][sec]={ area:iArea>=0?cols[iArea]:'—', doc:iDoc>=0?cols[iDoc]:'—' };
   }
   return M;
 }
-function mapSecASC(name) {
-  let s = String(name||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  s = s.replace(/GRADO|SECUNDARIA|PRIMARIA|SECCION|SECCIÓN/g,'');
-  s = s.replace(/["'°º]/g,'').replace(/\s+/g,' ').trim();
-  const m = s.match(/([1-6])\s*([AB])\b/);
-  if (m) return m[1]+m[2];
-  if (/5/.test(s) && /UNIC/.test(s)) return '5U';
-  if (s === '5U' || s === '5') return '5U';
-  const m2 = s.match(/^([1-6])([AB])$/);
-  return m2 ? m2[1]+m2[2] : '';
+function mapSecASC(name){
+  let s=String(name||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  s=s.replace(/GRADO|SECUNDARIA|PRIMARIA|SECCION|SECCIÓN/g,'').replace(/["'°º]/g,'').replace(/\s+/g,' ').trim();
+  const m=s.match(/([1-6])\s*([AB])\b/); if(m) return m[1]+m[2];
+  if(/5/.test(s)&&/UNIC/.test(s)) return '5U';
+  const m2=s.match(/^([1-6])([AB])$/); return m2?m2[1]+m2[2]:'';
 }
-function attrMap(el) {
-  const o = {};
-  if (!el || !el.attributes) return o;
-  for (let i=0;i<el.attributes.length;i++) o[el.attributes[i].name.toLowerCase()] = el.attributes[i].value;
-  return o;
-}
-function parseAscXml(txt) {
-  const doc = new DOMParser().parseFromString(txt, 'text/xml');
-  if (doc.querySelector('parsererror')) throw new Error('XML inválido');
-  const byId = (tag) => {
-    const m = {};
-    doc.querySelectorAll(tag).forEach(n => {
-      const a = attrMap(n);
-      const id = a.id || a.teacherid || '';
-      if (id) m[id] = a;
-    });
-    return m;
-  };
-  const teachers = byId('teacher');
-  const subjects = byId('subject');
-  const classes = byId('class');
-  const lessons = {};
-  doc.querySelectorAll('lesson').forEach(n => {
-    const a = attrMap(n);
-    if (a.id) lessons[a.id] = a;
-  });
-  const cards = [];
-  doc.querySelectorAll('card').forEach(n => cards.push(attrMap(n)));
-  if (!cards.length) throw new Error('El XML no tiene <card> (exporta el horario ya generado en ASC)');
-  const M = { 0:{}, 1:{}, 2:{}, 3:{}, 4:{} };
-  let n = 0;
-  cards.forEach(c => {
-    const les = lessons[c.lessonid || c.lesson || ''] || {};
-    const rawD = String(c.days || c.day || les.days || les.day || '').trim();
-    let day = -1;
-    if (/^[01]{5,7}$/.test(rawD)) day = rawD.indexOf('1');
-    else {
-      const d = parseInt(rawD, 10);
-      if (d >= 1 && d <= 5) day = d - 1;
-      else if (d >= 0 && d <= 4) day = d;
-    }
-    if (day < 0 || day > 4) return;
-    const rawH = String(c.period || c.periods || c.hour || les.period || les.periods || '').trim();
-    let hora = 0;
-    if (/^[01]{5,10}$/.test(rawH)) hora = rawH.indexOf('1') + 1;
-    else hora = parseInt(rawH, 10) || 0;
-    if (!hora) return;
-    const classids = String(c.classids || les.classids || les.classid || '').split(',').map(x => x.trim()).filter(Boolean);
-    const teacherids = String(c.teacherids || les.teacherids || les.teacherid || '').split(',').map(x => x.trim()).filter(Boolean);
-    const subid = c.subjectid || les.subjectid || '';
-    const area = (subjects[subid] && (subjects[subid].short || subjects[subid].name)) || c.subject || '—';
-    const docName = teacherids.map(id => (teachers[id] && (teachers[id].name || teachers[id].short)) || id).filter(Boolean).join(' / ') || '—';
-    classids.forEach(cid => {
-      const cl = classes[cid] || {};
-      const sec = mapSecASC(cl.short || cl.name || cid);
-      if (!sec || SECS.indexOf(sec) < 0) return;
-      if (!M[day][hora]) M[day][hora] = {};
-      M[day][hora][sec] = { area: String(area), doc: String(docName) };
-      n++;
+function attrMap(el){ const o={}; if(!el||!el.attributes) return o; for(let i=0;i<el.attributes.length;i++) o[el.attributes[i].name.toLowerCase()]=el.attributes[i].value; return o; }
+function parseAscXml(txt){
+  const doc=new DOMParser().parseFromString(txt,'text/xml');
+  if(doc.querySelector('parsererror')) throw new Error('XML inválido');
+  const byId=(tag)=>{ const m={}; doc.querySelectorAll(tag).forEach(n=>{ const a=attrMap(n); const id=a.id||''; if(id) m[id]=a; }); return m; };
+  const teachers=byId('teacher'), subjects=byId('subject'), classes=byId('class'), lessons={};
+  doc.querySelectorAll('lesson').forEach(n=>{ const a=attrMap(n); if(a.id) lessons[a.id]=a; });
+  const cards=[]; doc.querySelectorAll('card').forEach(n=>cards.push(attrMap(n)));
+  if(!cards.length) throw new Error('El XML no tiene <card>');
+  const M={0:{},1:{},2:{},3:{},4:{}}; let n=0;
+  cards.forEach(c=>{
+    const les=lessons[c.lessonid||c.lesson||'']||{};
+    const rawD=String(c.days||c.day||les.days||les.day||'').trim(); let day=-1;
+    if(/^[01]{5,7}$/.test(rawD)) day=rawD.indexOf('1');
+    else { const d=parseInt(rawD,10); if(d>=1&&d<=5) day=d-1; else if(d>=0&&d<=4) day=d; }
+    if(day<0||day>4) return;
+    const rawH=String(c.period||c.periods||c.hour||les.period||les.periods||'').trim(); let hora=0;
+    if(/^[01]{5,10}$/.test(rawH)) hora=rawH.indexOf('1')+1; else hora=parseInt(rawH,10)||0;
+    if(!hora) return;
+    const classids=String(c.classids||les.classids||les.classid||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const teacherids=String(c.teacherids||les.teacherids||les.teacherid||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const subid=c.subjectid||les.subjectid||'';
+    const area=(subjects[subid]&&(subjects[subid].short||subjects[subid].name))||c.subject||'—';
+    const docName=teacherids.map(id=>(teachers[id]&&(teachers[id].name||teachers[id].short))||id).filter(Boolean).join(' / ')||'—';
+    classids.forEach(cid=>{
+      const cl=classes[cid]||{}; const sec=mapSecASC(cl.short||cl.name||cid);
+      if(!sec||SECS.indexOf(sec)<0) return;
+      if(!M[day][hora]) M[day][hora]={}; M[day][hora][sec]={ area:String(area), doc:String(docName) }; n++;
     });
   });
-  if (!n) throw new Error('No pude cruzar clases 1A–5U. Revisa que en ASC las secciones se llamen 1A, 1° A, 5 Única…');
+  if(!n) throw new Error('No pude cruzar clases 1A–5U');
   return M;
 }
-function importarHS(inp) {
-  const f = inp.files && inp.files[0];
-  inp.value = '';
-  if (!f) return;
-  const reader = new FileReader();
-  reader.onload = function() {
-    try {
-      const txt = String(reader.result||'');
-      const name = (f.name||'').toLowerCase();
-      const pareceXml = name.endsWith('.xml') || name.endsWith('.roz') || /<\s*(timetable|days|cards|lessons|teachers)/i.test(txt);
-      if (name.endsWith('.roz') && !/<\s*(timetable|cards|lessons)/i.test(txt)) {
-        alert('El .ROZ de ASC es un archivo cerrado y no se puede leer aquí.\n\nEn ASC: Archivo → Exportar → aSc Timetables XML.\nLuego importa ese .xml en este mismo botón.');
-        return;
-      }
-      if (pareceXml) {
-        aplicarMapaHS(parseAscXml(txt));
-        alert('Horario ASC importado. Revisa choques en rojo.');
-      } else if (name.endsWith('.csv') || (txt.indexOf(';')>=0 && txt.split('\n')[0].toLowerCase().indexOf('hora')>=0)) {
-        aplicarMapaHS(parseCsvHS(txt));
-        alert('Horario importado.');
-      } else {
-        const j = JSON.parse(txt);
-        aplicarMapaHS(j.horario || j.HS || j);
-        alert('Horario importado.');
-      }
-    } catch (e) {
-      alert('No se pudo leer el archivo: ' + e.message);
-    }
+function importarHS(inp){
+  const f=inp.files&&inp.files[0]; inp.value=''; if(!f) return;
+  const reader=new FileReader();
+  reader.onload=function(){
+    try{
+      const txt=String(reader.result||''); const name=(f.name||'').toLowerCase();
+      const pareceXml=name.endsWith('.xml')||name.endsWith('.roz')||/<\s*(timetable|days|cards|lessons|teachers)/i.test(txt);
+      if(name.endsWith('.roz')&&!/<\s*(timetable|cards|lessons)/i.test(txt)){ alert('El .ROZ no se lee.\nEn ASC: Archivo → Exportar → aSc Timetables 2012 XML.'); return; }
+      if(pareceXml){ aplicarMapaHS(parseAscXml(txt)); alert('Horario ASC importado.'); }
+      else if(name.endsWith('.csv')||(txt.indexOf(';')>=0&&txt.split('\n')[0].toLowerCase().indexOf('hora')>=0)){ aplicarMapaHS(parseCsvHS(txt)); alert('Horario importado.'); }
+      else { const j=JSON.parse(txt); aplicarMapaHS(j.horario||j.HS||j); alert('Horario importado.'); }
+    }catch(e){ alert('No se pudo leer: '+e.message); }
   };
   reader.readAsText(f);
 }
 
 load();
 loadHS();
-if (!plantilla) plantilla = plantillaDefault();
-if (!feriados) feriados = Object.assign({}, FERIADOS_DEF);
+if(!plantilla) plantilla=plantillaDefault();
+if(!colegiado) colegiado=colegiadoDefault();
+if(!feriados) feriados={};
 renderPlantilla();
 renderFeriados();
 renderEditorHS();
 render();
-
 </script>
 </body>
 </html>
