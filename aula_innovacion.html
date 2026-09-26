@@ -219,39 +219,50 @@ const SECS = ['1A','1B','2A','2B','3A','3B','4A','4B','5U'];
 function L(area, doc) { return { area: area, doc: doc }; }
 const HS = {
   0:{
-    1:{'1A':L('COM','Ninoska'),'1B':L('ART','María A.'),'2A':L('CC.SS','Benito'),'2B':L('ING','Nancy H.'),'3A':L('TUT','Pilar'),'3B':L('DPCC','Nilda'),'4A':L('EPT','Carmen'),'4B':L('MAT','Luis Ch.'),'5U':L('EFIS','Julio Z.')},
-    2:{'1A':L('ART','María A.'),'1B':L('CC.SS','Benito'),'2A':L('COM','Ana H.'),'2B':L('TUT','Iván G.'),'3A':L('EFIS','Julio Z.'),'3B':L('COM','Ninoska'),'4A':L('MAT','Luis Ch.'),'4B':L('DPCC','Nilda'),'5U':L('TUT','Nancy H.')},
-    3:{'1A':L('ART','María A.'),'1B':L('CC.SS','Benito'),'2A':L('COM','Ana H.'),'2B':L('TUT','Iván G.'),'3A':L('EFIS','Julio Z.'),'3B':L('COM','Ninoska'),'4A':L('MAT','Luis Ch.'),'4B':L('DPCC','Nilda'),'5U':L('TUT','Nancy H.')},
-    4:{'1A':L('EPT','Carmen'),'1B':L('ART','María A.'),'2A':L('ART','María A.'),'2B':L('CYT','Pilar'),'3A':L('CYT','Pilar'),'3B':L('MAT','Luis Ch.'),'4A':L('EFIS','Julio Z.'),'4B':L('COM','Ana H.'),'5U':L('COM','Ana H.')},
-    5:{'1A':L('EPT','Carmen'),'1B':L('COM','Ninoska'),'2A':L('ART','María A.'),'2B':L('MAT','Iván G.'),'3A':L('CYT','Pilar'),'3B':L('MAT','Luis Ch.'),'4A':L('CYT','Pilar'),'4B':L('COM','Ana H.'),'5U':L('INGLÉS','Nancy H.')},
-    6:{'1A':L('CYT','Carmen'),'1B':L('MAT','Iván G.'),'2A':L('CYT','Pilar'),'2B':L('DPCC','Nilda'),'3A':L('ART','María A.'),'3B':L('ING','Nancy H.'),'4A':L('COM','Ana H.'),'4B':L('EFIS','Julio Z.'),'5U':L('MAT','Luis Ch.')}
+    1:{'1A':L('COM','NINOSKA G.'),'1B':L('ART','MARIA A.'),'2A':L('CC.SS','EDGAR B.'),'2B':L('ING','NANCY H.'),'3A':L('TUTORIA','PILAR A.'),'3B':L('DPCC','NILDA S.'),'4A':L('EPT','CARMEN B.'),'4B':L('MAT','LUIS CH.'),'5U':L('E.FIS','JULIO Z.')},
+    2:{'1A':L('COM','NINOSKA G.'),'1B':L('ART','MARIA A.'),'2A':L('CC.SS','EDGAR B.'),'2B':L('ING','NANCY H.'),'3A':L('TUTORIA','PILAR A.'),'3B':L('DPCC','NILDA S.'),'4A':L('EPT','CARMEN B.'),'4B':L('MAT','LUIS CH.'),'5U':L('E.FIS','JULIO Z.')},
+    3:{'1A':L('ART','MARIA A.'),'1B':L('CC.SS','EDGAR B.'),'2A':L('COM','ANA H.'),'2B':L('TUTORIA','IVAN G.'),'3A':L('E.FIS','JULIO Z.'),'3B':L('COM','NINOSKA G.'),'4A':L('MAT','LUIS CH.'),'4B':L('DPCC','NILDA S.'),'5U':L('TUT','NANCY H.')},
+    4:{'1A':L('EPT','CARMEN B.'),'1B':L('CC.SS','EDGAR B.'),'2A':L('ART','MARIA A.'),'2B':L('TUTORIA','IVAN G.'),'3A':L('CYT','PILAR A.'),'3B':L('MAT','LUIS CH.'),'4A':L('E.FIS','JULIO Z.'),'4B':L('COM','ANA H.'),'5U':L('TUT','NANCY H.')},
+    5:{'1A':L('EPT','CARMEN B.'),'1B':L('COM','NINOSKA G.'),'2A':L('ART','MARIA A.'),'2B':L('MAT','IVAN G.'),'3A':L('CYT','PILAR A.'),'3B':L('MAT','LUIS CH.'),'4A':L('CYT','PILAR A.'),'4B':L('COM','ANA H.'),'5U':L('INGLES','NANCY H.')},
+    6:{'1A':L('CYT','CARMEN B.'),'1B':L('COM','NINOSKA G.'),'2A':L('CYT','PILAR A.'),'2B':L('MAT','IVAN G.'),'3A':L('ART','MARIA A.'),'3B':L('ING','NANCY H.'),'4A':L('COM','ANA H.'),'4B':L('E.FIS','JULIO Z.'),'5U':L('MAT','LUIS CH.')},
+    7:{'1A':L('CYT','CARMEN B.'),'1B':L('MAT','IVAN G.'),'2A':L('CYT','PILAR A.'),'2B':L('DPCC','NILDA S.'),'3A':L('ART','MARIA A.'),'3B':L('ING','NANCY H.'),'4A':L('COM','ANA H.'),'4B':L('E.FIS','JULIO Z.'),'5U':L('MAT','LUIS CH.')},
   },
   1:{
-    1:{'1A':L('MAT','Iván G.'),'1B':L('CC.SS','Benito'),'2A':L('INGLÉS','Nancy H.'),'2B':L('EFIS','Julio Z.'),'3A':L('MAT','Luis Ch.'),'3B':L('TUT','Nilda'),'4A':L('EFIS','Julio Z.'),'4B':L('CYT','Pilar'),'5U':L('ART','María A.')},
-    2:{'1A':L('CC.SS','Benito'),'1B':L('ING','Nancy H.'),'2A':L('EPT','Carmen'),'2B':L('MAT','Iván G.'),'3A':L('EFIS','Julio Z.'),'3B':L('CYT','Pilar'),'4A':L('MAT','Luis Ch.'),'4B':L('ART','María A.'),'5U':L('DPCC','Nilda')},
-    3:{'1A':L('DPCC','Nilda'),'1B':L('MAT','Iván G.'),'2A':L('COM','Ana H.'),'2B':L('ART','María A.'),'3A':L('EPT','Carmen'),'3B':L('CYT','Pilar'),'4A':L('INGLÉS','Nancy H.'),'4B':L('CC.SS','Benito'),'5U':L('MAT','Luis Ch.')}
+    1:{'1A':L('MAT','IVAN G.'),'1B':L('CC.SS','EDGAR B.'),'2A':L('INGLES','NANCY H.'),'2B':L('E.FIS','JULIO Z.'),'3A':L('MAT','LUIS CH.'),'3B':L('TUTORIA','NILDA S.'),'4A':L('E.FIS','JULIO Z.'),'4B':L('CYT','PILAR A.'),'5U':L('ART','MARIA A.')},
+    2:{'1A':L('CC.SS','EDGAR B.'),'1B':L('ING','NANCY H.'),'2A':L('EPT','CARMEN B.'),'2B':L('MAT','IVAN G.'),'3A':L('E.FIS','JULIO Z.'),'3B':L('TUTORIA','NILDA S.'),'4A':L('MAT','LUIS CH.'),'4B':L('CYT','PILAR A.'),'5U':L('ART','MARIA A.')},
+    3:{'1A':L('CC.SS','EDGAR B.'),'1B':L('ING','NANCY H.'),'2A':L('EPT','CARMEN B.'),'2B':L('MAT','IVAN G.'),'3A':L('E.FIS','JULIO Z.'),'3B':L('CYT','PILAR A.'),'4A':L('MAT','LUIS CH.'),'4B':L('ART','MARIA A.'),'5U':L('DPCC','NILDA S.')},
+    4:{'1A':L('DPCC','NILDA S.'),'1B':L('MAT','IVAN G.'),'2A':L('COM','ANA H.'),'2B':L('ART','MARIA A.'),'3A':L('EPT','CARMEN B.'),'3B':L('CYT','PILAR A.'),'4A':L('INGLES','NANCY H.'),'4B':L('CC.SS','EDGAR B.'),'5U':L('MAT','LUIS CH.')},
+    5:{'1A':L('INGLES','NANCY H.'),'1B':L('MAT','IVAN G.'),'2A':L('COM','ANA H.'),'2B':L('ART','MARIA A.'),'3A':L('EPT','CARMEN B.'),'3B':L('DPCC','NILDA S.'),'4A':L('CC.SS','EDGAR B.'),'4B':L('CC.SS','EDGAR B.'),'5U':L('MAT','LUIS CH.')},
+    6:{'1A':L('CYT','CARMEN B.'),'1B':L('E.FIS','JULIO Z.'),'2A':L('MAT','IVAN G.'),'2B':L('COM','ANA H.'),'3A':L('TUT','NILDA S.'),'3B':L('CC.SS','EDGAR B.'),'4A':L('CYT','PILAR A.'),'4B':L('INGLES','NANCY H.'),'5U':L('COM','NINOSKA G.')},
+    7:{'1A':L('CYT','CARMEN B.'),'1B':L('E.FIS','JULIO Z.'),'2A':L('MAT','IVAN G.'),'2B':L('COM','ANA H.'),'3A':L('TUT','NILDA S.'),'3B':L('CC.SS','EDGAR B.'),'4A':L('CYT','PILAR A.'),'4B':L('MAT','LUIS CH.'),'5U':L('COM','NINOSKA G.')},
   },
   2:{
-    2:{'1A':L('COM','Ninoska'),'1B':L('MAT','Iván G.'),'2A':L('TUT','Julio Z.'),'2B':L('REL','Laura S.'),'3A':L('DPCC','Nilda'),'3B':L('CYT','Carmen'),'4A':L('CC.SS','Benito'),'4B':L('MAT','Luis Ch.'),'5U':L('ART','María A.')},
-    3:{'1A':L('ING','Nancy H.'),'1B':L('COM','Ninoska'),'2A':L('ART','María A.'),'2B':L('CYT','Pilar'),'3A':L('CC.SS','Benito'),'3B':L('MAT','Luis Ch.'),'4A':L('DPCC','Nilda'),'4B':L('CYT','Carmen'),'5U':L('EFIS','Julio Z.')},
-    4:{'1A':L('ING','Nancy H.'),'1B':L('DPCC','Nilda'),'2A':L('CC.SS','Benito'),'2B':L('CYT','Pilar'),'3A':L('COM','Ninoska'),'3B':L('ART','María A.'),'4A':L('ART','María A.'),'4B':L('CYT','Carmen'),'5U':L('MAT','Iván G.')},
-    5:{'1A':L('CC.SS','Benito'),'1B':L('EFIS','Julio Z.'),'2A':L('COM','Ana H.'),'2B':L('INGLÉS','Nancy R.'),'3A':L('COM','Ninoska'),'3B':L('REL','Laura S.'),'4A':L('ART','María A.'),'4B':L('DPCC','Nilda'),'5U':L('MAT','Iván G.')},
-    6:{'1A':L('MAT','Iván G.'),'1B':L('TUT','María A.'),'2A':L('COM','Ana H.'),'2B':L('CC.SS','Benito'),'3A':L('REL','Laura S.'),'3B':L('EFIS','Julio Z.'),'4A':L('ING','Nancy H.'),'4B':L('COM','Ana H.'),'5U':L('COM','Ninoska')},
-    7:{'1A':L('MAT','Iván G.'),'1B':L('TUT','María A.'),'2A':L('DPCC','Nilda'),'2B':L('CC.SS','Benito'),'3A':L('REL','Laura S.'),'3B':L('EFIS','Julio Z.'),'4A':L('COM','Ana H.'),'4B':L('COM','Ana H.'),'5U':L('COM','Ninoska')}
+    1:{'1A':L('COM','NINOSKA G.'),'1B':L('MAT','IVAN G.'),'2A':L('TUTORIA','JULIO Z.'),'2B':L('REL','LAURA S.'),'3A':L('DPCC','NILDA S.'),'3B':L('CYT','CARMEN B.'),'4A':L('CC.SS','EDGAR B.'),'4B':L('MAT','LUIS CH.'),'5U':L('ART','MARIA A.')},
+    2:{'1A':L('COM','NINOSKA G.'),'1B':L('MAT','IVAN G.'),'2A':L('TUTORIA','JULIO Z.'),'2B':L('REL','LAURA S.'),'3A':L('ART','MARIA A.'),'3B':L('CYT','CARMEN B.'),'4A':L('DPCC','NILDA S.'),'4B':L('MAT','LUIS CH.'),'5U':L('CC.SS','EDGAR B.')},
+    3:{'1A':L('ING','NANCY H.'),'1B':L('COM','NINOSKA G.'),'2A':L('ART','MARIA A.'),'2B':L('CYT','PILAR A.'),'3A':L('CC.SS','EDGAR B.'),'3B':L('MAT','LUIS CH.'),'4A':L('DPCC','NILDA S.'),'4B':L('CYT','CARMEN B.'),'5U':L('E.FIS','JULIO Z.')},
+    4:{'1A':L('ING','NANCY H.'),'1B':L('DPCC','NILDA S.'),'2A':L('CC.SS','EDGAR B.'),'2B':L('CYT','PILAR A.'),'3A':L('COM','NINOSKA G.'),'3B':L('REL','LAURA S.'),'4A':L('ART','MARIA A.'),'4B':L('CYT','CARMEN B.'),'5U':L('MAT','IVAN G.')},
+    5:{'1A':L('CC.SS','EDGAR B.'),'1B':L('E.FIS','JULIO Z.'),'2A':L('COM','ANA H.'),'2B':L('INGLES','NANCY R.'),'3A':L('COM','NINOSKA G.'),'3B':L('REL','LAURA S.'),'4A':L('ART','MARIA A.'),'4B':L('DPCC','NILDA S.'),'5U':L('MAT','IVAN G.')},
+    6:{'1A':L('MAT','IVAN G.'),'1B':L('TUTORIA','MARIA A.'),'2A':L('COM','ANA H.'),'2B':L('CC.SS','EDGAR B.'),'3A':L('REL','LAURA S.'),'3B':L('E.FIS','JULIO Z.'),'4A':L('ING','NANCY H.'),'4B':L('DPCC','NILDA S.'),'5U':L('COM','NINOSKA G.')},
+    7:{'1A':L('MAT','IVAN G.'),'1B':L('TUTORIA','MARIA A.'),'2A':L('DPCC','NILDA S.'),'2B':L('CC.SS','EDGAR B.'),'3A':L('REL','LAURA S.'),'3B':L('E.FIS','JULIO Z.'),'4A':L('ING','NANCY H.'),'4B':L('COM','ANA H.'),'5U':L('COM','NINOSKA G.')},
   },
   3:{
-    1:{'1A':L('ART','María A.'),'1B':L('CYT','Carmen'),'2A':L('EFIS','Julio Z.'),'2B':L('MAT','Iván G.'),'3A':L('COM','Ninoska'),'3B':L('CYT','Pilar'),'4A':L('TUT','Ana H.'),'4B':L('ING','Nancy H.'),'5U':L('REL','Laura S.')},
-    2:{'1A':L('ART','María A.'),'1B':L('EPT','Carmen'),'2A':L('DPCC','Nilda'),'2B':L('EFIS','Julio Z.'),'3A':L('COM','Ninoska'),'3B':L('COM','Ninoska'),'4A':L('ART','María A.'),'4B':L('CC.SS','Benito'),'5U':L('CYT','Iván G.')},
-    3:{'1A':L('REL','Laura S.'),'1B':L('EPT','Carmen'),'2A':L('MAT','Iván G.'),'2B':L('ART','María A.'),'3A':L('CYT','Pilar'),'3B':L('COM','Ninoska'),'4A':L('ART','María A.'),'4B':L('COM','Ana H.'),'5U':L('CYT','Iván G.')}
+    1:{'1A':L('ART','MARIA A.'),'1B':L('CYT','CARMEN B.'),'2A':L('E.FIS','JULIO Z.'),'2B':L('MAT','IVAN G.'),'3A':L('COM','NINOSKA G.'),'3B':L('CYT','PILAR A.'),'4A':L('TUTORIA','ANA H.'),'4B':L('ING','NANCY H.'),'5U':L('REL','LAURA S.')},
+    2:{'1A':L('ART','MARIA A.'),'1B':L('CYT','CARMEN B.'),'2A':L('DPCC','NILDA S.'),'2B':L('E.FIS','JULIO Z.'),'3A':L('COM','NINOSKA G.'),'3B':L('CYT','PILAR A.'),'4A':L('TUTORIA','ANA H.'),'4B':L('ING','NANCY H.'),'5U':L('REL','LAURA S.')},
+    3:{'1A':L('REL','LAURA S.'),'1B':L('EPT','CARMEN B.'),'2A':L('DPCC','NILDA S.'),'2B':L('E.FIS','JULIO Z.'),'3A':L('CYT','PILAR A.'),'3B':L('COM','NINOSKA G.'),'4A':L('ART','MARIA A.'),'4B':L('CC.SS','EDGAR B.'),'5U':L('CYT','IVAN G.')},
+    4:{'1A':L('REL','LAURA S.'),'1B':L('EPT','CARMEN B.'),'2A':L('MAT','IVAN G.'),'2B':L('ART','MARIA A.'),'3A':L('CYT','PILAR A.'),'3B':L('COM','NINOSKA G.'),'4A':L('MAT','LUIS CH.'),'4B':L('COM','ANA H.'),'5U':L('CYT','IVAN G.')},
+    5:{'1A':L('COM','NINOSKA G.'),'1B':L('ART','MARIA A.'),'2A':L('MAT','IVAN G.'),'2B':L('CC.SS','EDGAR B.'),'3A':L('INGLES','NANCY R.'),'3B':L('E.FIS','JULIO Z.'),'4A':L('MAT','LUIS CH.'),'4B':L('COM','ANA H.'),'5U':L('EPT','CARMEN B.')},
+    6:{'1A':L('E.FIS','JULIO Z.'),'1B':L('DPCC','NILDA S.'),'2A':L('REL','LAURA S.'),'2B':L('COM','ANA H.'),'3A':L('MAT','LUIS CH.'),'3B':L('ART','MARIA A.'),'4A':L('CC.SS','EDGAR B.'),'4B':L('CYT','PILAR A.'),'5U':L('EPT','CARMEN B.')},
+    7:{'1A':L('E.FIS','JULIO Z.'),'1B':L('DPCC','NILDA S.'),'2A':L('REL','LAURA S.'),'2B':L('COM','ANA H.'),'3A':L('MAT','LUIS CH.'),'3B':L('INGLES','NANCY R.'),'4A':L('CC.SS','EDGAR B.'),'4B':L('CYT','PILAR A.'),'5U':L('COM','NINOSKA G.')},
   },
   4:{
-    2:{'1A':L('TUT','Benito'),'1B':L('REL','Laura S.'),'2A':L('EFIS','Julio Z.'),'2B':L('EPT','Carmen'),'3A':L('ING','Nancy H.'),'3B':L('MAT','Luis Ch.'),'4A':L('CYT','Pilar'),'4B':L('ART','María A.'),'5U':L('DPCC','Nilda')},
-    3:{'1A':L('DPCC','Nilda'),'1B':L('COM','Ninoska'),'2A':L('ING','Nancy H.'),'2B':L('CYT','Pilar'),'3A':L('CC.SS','Benito'),'3B':L('MAT','Luis Ch.'),'4A':L('ART','María A.'),'4B':L('EFIS','Julio Z.'),'5U':L('ART','María A.')},
-    4:{'1A':L('DPCC','Nilda'),'1B':L('COM','Ninoska'),'2A':L('ING','Nancy H.'),'2B':L('CYT','Pilar'),'3A':L('CC.SS','Benito'),'3B':L('MAT','Luis Ch.'),'4A':L('REL','Laura S.'),'4B':L('ART','María A.'),'5U':L('ART','María A.')},
-    5:{'1A':L('CYT','Iván G.'),'1B':L('EPT','Carmen'),'2A':L('CYT','Pilar'),'2B':L('COM','Ana H.'),'3A':L('COM','Ninoska'),'3B':L('CC.SS','Benito'),'4A':L('DPCC','Nilda'),'4B':L('REL','Laura S.'),'5U':L('MAT','Luis Ch.')},
-    6:{'1A':L('EFIS','Julio Z.'),'1B':L('INGLÉS','Nancy R.'),'2A':L('MAT','Iván G.'),'2B':L('DPCC','Nilda'),'3A':L('MAT','Luis Ch.'),'3B':L('COM','Ninoska'),'4A':L('REL','Sandra S.'),'4B':L('COM','Ana H.'),'5U':L('CC.SS','Benito')},
-    7:{'1A':L('EFIS','Julio Z.'),'1B':L('INGLÉS','Nancy R.'),'2A':L('MAT','Iván G.'),'2B':L('DPCC','Nilda'),'3A':L('MAT','Luis Ch.'),'3B':L('COM','Ninoska'),'4A':L('REL','Sandra S.'),'4B':L('COM','Ana H.'),'5U':L('CC.SS','Benito')}
-  }
+    1:{'1A':L('TUTORIA','EDGAR B.'),'1B':L('REL','LAURA S.'),'2A':L('E.FIS','JULIO Z.'),'2B':L('EPT','CARMEN B.'),'3A':L('ING','NANCY H.'),'3B':L('MAT','LUIS CH.'),'4A':L('CYT','PILAR A.'),'4B':L('ART','MARIA A.'),'5U':L('DPCC','NILDA S.')},
+    2:{'1A':L('TUTORIA','EDGAR B.'),'1B':L('REL','LAURA S.'),'2A':L('E.FIS','JULIO Z.'),'2B':L('EPT','CARMEN B.'),'3A':L('ING','NANCY H.'),'3B':L('MAT','LUIS CH.'),'4A':L('CYT','PILAR A.'),'4B':L('ART','MARIA A.'),'5U':L('DPCC','NILDA S.')},
+    3:{'1A':L('DPCC','NILDA S.'),'1B':L('COM','NINOSKA G.'),'2A':L('ING','NANCY H.'),'2B':L('CYT','PILAR A.'),'3A':L('CC.SS','EDGAR B.'),'3B':L('MAT','LUIS CH.'),'4A':L('ART','MARIA A.'),'4B':L('E.FIS','JULIO Z.'),'5U':L('ART','MARIA A.')},
+    4:{'1A':L('DPCC','NILDA S.'),'1B':L('COM','NINOSKA G.'),'2A':L('ING','NANCY H.'),'2B':L('CYT','PILAR A.'),'3A':L('CC.SS','EDGAR B.'),'3B':L('MAT','LUIS CH.'),'4A':L('ART','MARIA A.'),'4B':L('REL','LAURA S.'),'5U':L('ART','MARIA A.')},
+    5:{'1A':L('CYT','IVAN G.'),'1B':L('EPT','CARMEN B.'),'2A':L('CYT','PILAR A.'),'2B':L('COM','ANA H.'),'3A':L('COM','NINOSKA G.'),'3B':L('CC.SS','EDGAR B.'),'4A':L('DPCC','NILDA S.'),'4B':L('REL','LAURA S.'),'5U':L('MAT','LUIS CH.')},
+    6:{'1A':L('CYT','IVAN G.'),'1B':L('EPT','CARMEN B.'),'2A':L('CYT','PILAR A.'),'2B':L('DPCC','NILDA S.'),'3A':L('MAT','LUIS CH.'),'3B':L('COM','NINOSKA G.'),'4A':L('REL','SANDRA S.'),'4B':L('COM','ANA H.'),'5U':L('CC.SS','EDGAR B.')},
+    7:{'1A':L('E.FIS','JULIO Z.'),'1B':L('INGLES','NANCY R.'),'2A':L('MAT','IVAN G.'),'2B':L('DPCC','NILDA S.'),'3A':L('MAT','LUIS CH.'),'3B':L('COM','NINOSKA G.'),'4A':L('REL','SANDRA S.'),'4B':L('COM','ANA H.'),'5U':L('CC.SS','EDGAR B.')},
+  },
 };
 
 let plan = {};
@@ -291,7 +302,7 @@ function slotActivo(fecha, nivel, hora, wd) {
   return pipOk(nivel, hora, wd);
 }
 function modoDefinir() { return (document.getElementById('selModo') || {}).value === 'definir'; }
-const HS_KEY = 'ie22375_aip_hs_v1';
+const HS_KEY = 'ie22375_aip_hs_oficial_2026';
 let horarioDoc = null;
 function getHS() { return horarioDoc || HS; }
 function loadHS() {
