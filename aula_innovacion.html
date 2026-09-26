@@ -500,7 +500,14 @@ function armarMes(){
       if(celda(f,'sec',h)&&celda(f,'sec',h).tipo!=='abierto') return;
       const par=horaPar(h); const dos=exigeDos();
       let cands=(dos?candidatosAIP(wd,h,f):candidatos(wd,h)).filter(c=>!usedDay[c.seccion]);
-      if(dos&&par&&h>par){ if(!celda(f,'sec',h)||celda(f,'sec',h).tipo==='abierto') setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' }); return; }
+      if(dos&&par&&h>par){
+        if(!celda(f,'sec',h)||celda(f,'sec',h).tipo==='abierto') setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
+        return;
+      }
+      if(dos&&par&&!slotActivo(f,'sec',par,wd)){
+        setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
+        return;
+      }
       if(!cands.length){ if(dos) setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' }); return; }
       cands.sort((a,b)=>(visits[a.seccion]||0)-(visits[b.seccion]||0));
       const pick=cands[0]; usedDay[pick.seccion]=1; visits[pick.seccion]=(visits[pick.seccion]||0)+1;
@@ -587,11 +594,6 @@ function aplicarModal(){
   } else {
     const map={ soporte:'SOPORTE', colegio:'Colegiado AIP', man:'MAN. PREVENT' };
     setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
-    if(tipo==='colegio'){
-      if(!colegiado) colegiado=colegiadoDefault();
-      if(!colOk(nivel,hora,wd)) toggleLista(colegiado,nivel,+hora,wd);
-      guardarCfg(); renderPlantilla();
-    }
   }
   cerrarModal(); render();
 }
