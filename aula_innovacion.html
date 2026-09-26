@@ -103,6 +103,13 @@
         </div>
         <p class="text-[11px] text-slate-500">Marca lo que priorizas este mes. El siguiente mes marcas la otra mitad. Solo entran bloques de 2 h de esos cursos.</p>
         <div id="boxCursosMes" class="flex flex-wrap gap-2"></div>
+        <div id="boxDeudaMes" class="text-[11px] text-amber-800"></div>
+        <div class="border-t border-slate-200 pt-2 space-y-1">
+          <div class="text-xs font-black">Panorama del año</div>
+          <p class="text-[11px] text-slate-500">Marca los meses lectivos y arma de un tiro. Un mes mitad A (MAT COM CYT CCSS ING TUT), el siguiente mitad B (ART EFIS EPT DPCC REL TUT).</p>
+          <div id="boxMesesAnio" class="flex flex-wrap gap-1"></div>
+          <button class="btn btn-ok text-xs" type="button" onclick="armarAnio()">Armar meses marcados</button>
+        </div>
       </div>
     </div>
     <div id="pane-reloj" class="space-y-3 hidden no-print">
@@ -336,6 +343,7 @@ const AREAS_MES = [
   { id:'TUT', nom:'Tutoría' }
 ];
 let cursosPorMes = {};
+let deudaAip = {};
 function normArea(s){
   let x=String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   x=x.replace(/[^A-Z]/g,'');
@@ -359,10 +367,26 @@ function cursosDelMes(){
   return cursosPorMes[m]||[];
 }
 function cursoPermitido(area){ return cursosDelMes().indexOf(normArea(area))>=0; }
+function mesSiguiente(ym){
+  const [Y,M]=(ym||mesActual()).split('-').map(Number);
+  const d=new Date(Y,M,1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
 function renderCursosMes(){
   const box=document.getElementById('boxCursosMes'); if(!box) return;
   const sel=cursosDelMes();
-  box.innerHTML=AREAS_MES.map(a=>'<label class="text-xs font-bold px-2 py-1 rounded-lg cursor-pointer" style="border:1px solid #cbd5e1;background:'+(sel.indexOf(a.id)>=0?'#bbf7d0':'#f1f5f9')+'"><input type="checkbox" '+(sel.indexOf(a.id)>=0?'checked':'')+' onchange="toggleCursoMes(\''+a.id+'\')" style="margin-right:4px">'+a.nom+'</label>').join('');
+  const deuda=deudaAip[mesActual()]||{};
+  const prios=deuda.areas||[];
+  box.innerHTML=AREAS_MES.map(a=>{
+    const on=sel.indexOf(a.id)>=0; const deb=prios.indexOf(a.id)>=0;
+    return '<label class="text-xs font-bold px-2 py-1 rounded-lg cursor-pointer" style="border:1px solid '+(deb?'#d97706':'#cbd5e1')+';background:'+(on?'#bbf7d0':'#f1f5f9')+'"><input type="checkbox" '+(on?'checked':'')+' onchange="toggleCursoMes(\''+a.id+'\')" style="margin-right:4px">'+a.nom+(deb?' ★':'')+'</label>';
+  }).join('');
+  const nota=document.getElementById('boxDeudaMes');
+  if(nota){
+    if(deuda.secciones||deuda.areas){
+      nota.textContent='Prioridad del mes anterior ('+(deuda.de||'')+'): secciones '+(deuda.secciones||[]).join(', ')+' · cursos '+(deuda.areas||[]).map(id=>(AREAS_MES.find(a=>a.id===id)||{nom:id}).nom).join(', ');
+    } else nota.textContent='';
+  }
 }
 function toggleCursoMes(id){
   const m=mesActual();
@@ -375,6 +399,47 @@ function toggleCursoMes(id){
 function marcarCursosMes(todos){
   cursosPorMes[mesActual()]=todos?AREAS_MES.map(a=>a.id):[];
   guardarCfg(); renderCursosMes();
+}
+const MITAD_A=['MAT','COM','CYT','CCSS','ING','TUT'];
+const MITAD_B=['ART','EFIS','EPT','DPCC','REL','TUT'];
+const NOM_MES=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'];
+let mesesAnioSel=null;
+function anioDeMes(){ return +(mesActual().split('-')[0]||2026); }
+function mesesAnioDefault(){
+  const Y=anioDeMes();
+  return [3,4,5,6,8,9,10,11,12].map(m=>Y+'-'+String(m).padStart(2,'0'));
+}
+function renderMesesAnio(){
+  const box=document.getElementById('boxMesesAnio'); if(!box) return;
+  if(!mesesAnioSel) mesesAnioSel=mesesAnioDefault();
+  const Y=anioDeMes();
+  box.innerHTML=[3,4,5,6,7,8,9,10,11,12].map(m=>{
+    const id=Y+'-'+String(m).padStart(2,'0');
+    const on=mesesAnioSel.indexOf(id)>=0;
+    return '<button type="button" class="btn text-xs '+(on?'btn-ok':'btn-ghost')+'" onclick="toggleMesAnio(\''+id+'\')">'+NOM_MES[m]+'</button>';
+  }).join('');
+}
+function toggleMesAnio(id){
+  if(!mesesAnioSel) mesesAnioSel=mesesAnioDefault();
+  const i=mesesAnioSel.indexOf(id);
+  if(i>=0) mesesAnioSel.splice(i,1); else mesesAnioSel.push(id);
+  mesesAnioSel.sort();
+  renderMesesAnio();
+}
+function armarAnio(){
+  if(!mesesAnioSel||!mesesAnioSel.length){ alert('Marca al menos un mes.'); return; }
+  const origen=mesActual();
+  const orden=mesesAnioSel.slice().sort();
+  orden.forEach((ym,i)=>{
+    document.getElementById('inpMes').value=ym;
+    if(!Object.prototype.hasOwnProperty.call(cursosPorMes,ym) || !cursosPorMes[ym] || !cursosPorMes[ym].length){
+      cursosPorMes[ym]=(i%2===0)?MITAD_A.slice():MITAD_B.slice();
+    }
+    armarMes(true);
+  });
+  document.getElementById('inpMes').value=origen;
+  renderCursosMes(); renderMesesAnio(); render();
+  alert('Listo: '+orden.join(', ')+'. Revisa mes por mes. Colegiado no se tocó.');
 }
 function bloqueCfg(){ return (document.getElementById('selBloque')||{}).value||'2'; }
 function exigeDos(){ return bloqueCfg()==='2'; }
@@ -405,6 +470,7 @@ function loadCfg(){
     if(c.horario&&c.horario.pri&&c.horario.sec) horario=c.horario;
     if(c.plantModo&&document.getElementById('selPlantModo')) document.getElementById('selPlantModo').value=c.plantModo;
     if(c.cursosPorMes&&typeof c.cursosPorMes==='object') cursosPorMes=c.cursosPorMes;
+    if(c.deudaAip&&typeof c.deudaAip==='object') deudaAip=c.deudaAip;
     pintarFormHorario();
   }catch(e){ plantilla=plantillaDefault(); colegiado=colegiadoDefault(); feriados={}; pintarFormHorario(); }
 }
@@ -417,7 +483,8 @@ function guardarCfg(){
     colegiado:colegiado||colegiadoDefault(),
     feriados:feriados, horario:horario,
     plantModo:(document.getElementById('selPlantModo')||{}).value||'aip',
-    cursosPorMes:cursosPorMes
+    cursosPorMes:cursosPorMes,
+    deudaAip:deudaAip
   }));
 }
 function pintarFormHorario(){
@@ -534,7 +601,7 @@ function renderPlantilla(){
   document.getElementById('boxPlantPri').innerHTML=tabla('pri',HPRI());
   document.getElementById('boxPlantSec').innerHTML=tabla('sec',HSEC());
 }
-function armarMes(){
+function armarMes(silencio){
   const ym=document.getElementById('inpMes').value; const days=diasMes(ym);
   days.forEach(d=>{
     const f=ymd(d);
@@ -561,8 +628,8 @@ function armarMes(){
     else if(modo==='2'){ usar=[]; for(let i=0;i<act.length-1;i++){ if(act[i+1]===act[i]+1){ usar=[act[i],act[i+1]]; break; } } if(!usar.length) usar=act.slice(0,2); }
     act.forEach(h=>{ if(usar.indexOf(h)>=0) setCelda(f,'pri',h,{ tipo:'grupo', texto:g }); else setCelda(f,'pri',h,{ tipo:'man', texto:'MAN. PREVENT' }); });
   });
-  armarSecundariaMes(days);
-  guardar(true); render();
+  armarSecundariaMes(days, silencio);
+  guardar(true); if(!silencio) render();
 }
 function semanaDelMes(d, first){
   const mon=new Date(first.getFullYear(), first.getMonth(), first.getDate());
@@ -601,7 +668,7 @@ function candsPar(slot){
   if(!slot.h2) return [];
   return candidatos(slot.wd, slot.h1).filter(c=>mismoGrupo(slot.wd, slot.h1, slot.h2, c.seccion) && cursoPermitido(c.area));
 }
-function armarSecundariaMes(days){
+function armarSecundariaMes(days, silencio){
   if(!days.length) return;
   const first=days[0];
   const slots=[];
@@ -642,7 +709,33 @@ function armarSecundariaMes(days){
     }
   });
   const faltan=SECS.filter(s=>!visits[s]);
-  if(faltan.length) alert('Armado listo. No hubo bloque de 2 h libre para: '+faltan.join(', ')+'. Revisa plantilla o colegiados.');
+  const pedidas=cursosDelMes();
+  const usadas={};
+  days.forEach(d=>{
+    const f=ymd(d);
+    horasPed('sec').forEach(h=>{
+      const c=celda(f,'sec',h);
+      if(c&&c.tipo==='grupo'&&c.area) usadas[normArea(c.area)]=1;
+    });
+  });
+  const areasFaltan=pedidas.filter(a=>!usadas[a]);
+  const nxt=mesSiguiente(mesActual());
+  deudaAip[nxt]={ de:mesActual(), secciones:faltan.slice(), areas:areasFaltan.slice() };
+  if(!Object.prototype.hasOwnProperty.call(cursosPorMes,nxt)){
+    cursosPorMes[nxt]=areasFaltan.concat(pedidas.filter(a=>areasFaltan.indexOf(a)<0)).filter((a,i,arr)=>arr.indexOf(a)===i);
+    if(!cursosPorMes[nxt].length) cursosPorMes[nxt]=pedidas.slice();
+  } else {
+    const cur=cursosPorMes[nxt].slice();
+    areasFaltan.forEach(a=>{ if(cur.indexOf(a)<0) cur.unshift(a); });
+    cursosPorMes[nxt]=cur;
+  }
+  guardarCfg();
+  if(silencio) return;
+  let msg='Armado listo.';
+  if(faltan.length) msg+=' No entraron: '+faltan.join(', ')+'.';
+  if(areasFaltan.length) msg+=' Cursos sin visita: '+areasFaltan.join(', ')+'.';
+  if(faltan.length||areasFaltan.length) msg+=' Quedan prioridad en '+nxt+'.';
+  alert(msg);
 }
 function clsDe(tipo){ return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', colegiado:'c-col', man:'c-man', vacio:'c-aip', abierto:'c-aip', bloqueado:'c-gray' })[tipo]||'c-gray'; }
 function render(){
@@ -732,7 +825,7 @@ function showAipTab(t){
   const btn=document.getElementById(map[t]); if(btn) btn.classList.add('on');
   if(t==='hs') renderEditorHS(); if(t==='reloj') renderFeriados();
 }
-function onMes(){ renderCursosMes(); render(); }
+function onMes(){ renderCursosMes(); renderMesesAnio(); render(); }
 function wdNombre(i){ return DOW[i]||('D'+i); }
 function ensureHS(){ if(!horarioDoc) horarioDoc=JSON.parse(JSON.stringify(HS)); return horarioDoc; }
 function initSelDiaHS(){ const sel=document.getElementById('selDiaHS'); if(!sel||sel.options.length) return; sel.innerHTML=DOW.map((n,i)=>'<option value="'+i+'">'+n+'</option>').join(''); }
@@ -881,6 +974,7 @@ if(!feriados) feriados={};
 renderPlantilla();
 renderFeriados();
 renderCursosMes();
+renderMesesAnio();
 renderEditorHS();
 render();
 </script>
