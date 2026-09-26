@@ -471,7 +471,11 @@ function armarMes(){
     const f=ymd(d);
     ['pri','sec'].forEach(n=>{
       const o=plan[f]&&plan[f][n]; if(!o) return;
-      Object.keys(o).forEach(h=>{ if(o[h]&&(o[h].tipo==='bloqueado'||o[h].tipo==='abierto')) return; delete o[h]; });
+      Object.keys(o).forEach(h=>{
+        const t=o[h]&&o[h].tipo;
+        if(t==='bloqueado'||t==='abierto'||t==='colegio'||t==='colegiado') return;
+        delete o[h];
+      });
     });
   });
   days.forEach(d=>{
@@ -583,6 +587,11 @@ function aplicarModal(){
   } else {
     const map={ soporte:'SOPORTE', colegio:'Colegiado AIP', man:'MAN. PREVENT' };
     setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
+    if(tipo==='colegio'){
+      if(!colegiado) colegiado=colegiadoDefault();
+      if(!colOk(nivel,hora,wd)) toggleLista(colegiado,nivel,+hora,wd);
+      guardarCfg(); renderPlantilla();
+    }
   }
   cerrarModal(); render();
 }
