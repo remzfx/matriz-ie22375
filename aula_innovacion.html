@@ -26,11 +26,15 @@
   .sticky-top { position:sticky; top:0; z-index:20; }
   .aip-tab { border:0; border-radius:12px; font-weight:800; padding:.55rem 1rem; cursor:pointer; font-size:13px; background:#e2e8f0; color:#0f172a; }
   .aip-tab.on { background:#065f46; color:#fff; }
+  .only-print { display:none; }
   @media print {
     .no-print { display:none !important; }
+    .only-print { display:block !important; }
     body { background:#fff; }
-    table.cal { font-size:8px; }
-    .card { box-shadow:none; }
+    table.cal { font-size:7.5px; }
+    table.cal th, table.cal td { padding:2px; }
+    .card { box-shadow:none; border:0; }
+    @page { size: landscape; margin: 8mm; }
   }
 </style>
 </head>
@@ -41,9 +45,19 @@
       <div class="text-[10px] font-bold tracking-widest text-emerald-200">IE 22375 · PIP</div>
       <div class="font-black">Aula de Innovación · Competencia 28</div>
     </div>
-    <a href="index.html" class="btn btn-ghost text-xs">Inicio</a>
+    <div class="flex gap-2">
+      <button class="btn btn-ok text-xs" type="button" onclick="subirAipNube()">Nube ↑</button>
+      <button class="btn btn-ghost text-xs" type="button" onclick="bajarAipNube()">Nube ↓</button>
+      <a href="index.html" class="btn btn-ghost text-xs">Inicio</a>
+    </div>
   </div>
 </header>
+<div class="only-print" style="text-align:center;margin-bottom:8px">
+  <div style="font-size:11px;font-weight:800">INSTITUCIÓN EDUCATIVA 22375 SANTA ROSA DE LOS MOLINOS</div>
+  <div style="font-size:16px;font-weight:900">Plan mensual · Aula de Innovación (AIP) · Competencia 28</div>
+  <div id="printMesTit" style="font-size:12px;margin-top:2px"></div>
+  <div style="font-size:10px">PIP · Horario de ingreso al aula de innovación</div>
+</div>
 <main class="max-w-6xl mx-auto px-3 py-4 space-y-3">
   <div class="no-print flex flex-wrap gap-2">
     <button type="button" class="aip-tab on" id="tabBtnMes" onclick="showAipTab('mes')">Plan del mes</button>
@@ -74,7 +88,7 @@
       </div>
       <div class="flex gap-2">
         <button class="btn btn-ok flex-1" type="button" onclick="armarMes()">Armar mes</button>
-        <button class="btn btn-ghost" type="button" onclick="window.print()">Imprimir</button>
+        <button class="btn btn-ghost" type="button" onclick="imprimirPDF()">PDF / Imprimir</button>
         <button class="btn btn-primary" type="button" onclick="guardar()">Guardar</button>
       </div>
     </div>
@@ -188,6 +202,7 @@
 <script>
 const KEY = 'ie22375_aip_plan_v1';
 const CFG_KEY = 'ie22375_aip_cfg_v1';
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
 const FERIADOS_DEF = {};
 let feriados = {};
 const DOW = ['LUN','MAR','MIE','JUE','VIE'];
@@ -453,7 +468,77 @@ function load() {
 function guardar() {
   guardarCfg();
   localStorage.setItem(KEY, JSON.stringify(plan));
-  alert('Guardado en este navegador.');
+  saveHS();
+  alert('Guardado en este navegador. Use Nube ↑ para llevarlo a otra PC.');
+}
+function paqueteAip() {
+  leerFormHorario();
+  return {
+    plan: plan,
+    plantilla: plantilla,
+    feriados: feriados,
+    horario: horario,
+    horarioDoc: getHS(),
+    mes: (document.getElementById('inpMes') || {}).value || '',
+    bloque: bloqueCfg(),
+    ts: Date.now()
+  };
+}
+function aplicarPaqueteAip(p) {
+  if (!p || typeof p !== 'object') return;
+  if (p.plan) plan = p.plan;
+  if (p.plantilla) plantilla = p.plantilla;
+  if (p.feriados) feriados = p.feriados;
+  if (p.horario) horario = p.horario;
+  if (p.horarioDoc) { horarioDoc = p.horarioDoc; saveHS(); }
+  if (p.mes && document.getElementById('inpMes')) document.getElementById('inpMes').value = p.mes;
+  if (p.bloque && document.getElementById('selBloque')) document.getElementById('selBloque').value = p.bloque;
+  pintarFormHorario();
+  guardarCfg();
+  localStorage.setItem(KEY, JSON.stringify(plan || {}));
+  renderPlantilla();
+  renderFeriados();
+  renderEditorHS();
+  render();
+}
+async function subirAipNube() {
+  guardarCfg();
+  localStorage.setItem(KEY, JSON.stringify(plan));
+  saveHS();
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'saveaip', payload: paqueteAip(), ts: Date.now() })
+    });
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Sin respuesta');
+    alert('Plan AIP subido a la nube.');
+  } catch (e) {
+    alert('No subió a la nube.\n' + e.message + '\nPublica Nueva versión del Apps Script (saveaip).');
+  }
+}
+async function bajarAipNube() {
+  try {
+    const res = await fetch(CLOUD_API_URL + '?action=loadaip&t=' + Date.now(), { cache: 'no-store' });
+    const data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Sin respuesta');
+    if (!data.payload) { alert('En la nube no hay plan AIP todavía. Sube con Nube ↑.'); return; }
+    aplicarPaqueteAip(data.payload);
+    alert('Plan AIP bajado de la nube.');
+  } catch (e) {
+    alert('No bajó de la nube.\n' + e.message + '\nPublica Nueva versión del Apps Script (loadaip).');
+  }
+}
+function imprimirPDF() {
+  showAipTab('mes');
+  const ym = (document.getElementById('inpMes') || {}).value || '';
+  const el = document.getElementById('printMesTit');
+  if (el) {
+    const [Y,M] = ym.split('-');
+    const meses = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    el.textContent = (meses[+M] || '') + ' ' + Y;
+  }
+  setTimeout(() => window.print(), 200);
 }
 function celda(fecha, nivel, hora) {
   if (!plan[fecha]) plan[fecha] = {};

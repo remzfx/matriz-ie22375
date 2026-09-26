@@ -51,6 +51,7 @@
             <option value="docente">Docente</option>
             <option value="admin">Administrador</option>
             <option value="auxiliar">Auxiliar del colegio</option>
+            <option value="pip">PIP · Aula de innovación</option>
           </select>
         </div>
         <div id="wrapDocente">
@@ -64,7 +65,7 @@
         </div>
         <p id="loginErr" class="hidden text-sm text-red-600 font-semibold bg-red-50 rounded-lg px-3 py-2"></p>
         <button type="button" class="btn btn-primary" onclick="intentarLogin()">Ingresar</button>
-        <p class="text-[11px] text-slate-400 text-center">Docente · Admin · Auxiliar del colegio (ingreso / puerta)</p>
+        <p class="text-[11px] text-slate-400 text-center">Docente · Admin · Auxiliar · PIP (aula de innovación)</p>
       </div>
       <p class="text-[10px] text-center text-slate-400 mt-8">Desarrollo · Diseño e integración Mag. Efrain Ceopa Paredes</p>
     </div>
@@ -166,6 +167,17 @@ async function intentarLogin() {
     mostrarHub();
     return;
   }
+  if (tipo === 'pip') {
+    if (pass !== 'pip22375') {
+      err.textContent = 'Contraseña de PIP incorrecta.';
+      err.classList.remove('hidden');
+      return;
+    }
+    setSession({ user:'pip', label:'PIP · Aula de innovación', nivel:'colegio', role:'pip',
+      grados:null, areas:null, mods:['aip'], ts:Date.now() });
+    mostrarHub();
+    return;
+  }
   const docUser = document.getElementById('inpDocUser').value.trim().toLowerCase();
   if (!docUser) { err.textContent = 'Ingrese su usuario de docente.'; err.classList.remove('hidden'); return; }
   const d = loadDocentes().find(x => x.user === docUser && x.pass === pass);
@@ -194,6 +206,7 @@ function modsDe(s) {
   if (s.role === 'admin' || s.user === 'admin') return ['admin_bd','registro','auxiliar','matriz_pri','matriz_sec','aip'];
   if (s.mods && s.mods.length) return s.mods;
   if (s.role === 'auxiliar' || s.user === 'auxiliar') return ['auxiliar'];
+  if (s.role === 'pip' || s.user === 'pip') return ['aip'];
   if (s.nivel === 'primaria') return ['matriz_pri','registro'];
   if (s.nivel === 'secundaria') return ['matriz_sec','registro'];
   return ['registro'];
