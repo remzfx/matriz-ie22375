@@ -385,7 +385,7 @@ function agregarFeriado(){
 function quitarFeriado(f){ delete feriados[f]; guardarCfg(); renderFeriados(); render(); }
 function toggleFeriadoDia(f){ if(feriados[f]) delete feriados[f]; else feriados[f]='Feriado'; guardarCfg(); renderFeriados(); render(); }
 function load(){ try{ plan=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ plan={}; } loadCfg(); }
-function guardar(){ guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS(); alert('Guardado en este navegador. Use Nube ↑ para otra PC.'); }
+function guardar(silencio){ guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS(); if(!silencio) alert('Guardado en este navegador. Use Nube ↑ para otra PC.'); }
 function paqueteAip(){
   leerFormHorario();
   return { plan, plantilla, colegiado, feriados, horario, horarioDoc:getHS(), mes:(document.getElementById('inpMes')||{}).value||'', bloque:bloqueCfg(), ts:Date.now() };
@@ -492,33 +492,83 @@ function armarMes(){
     else if(modo==='2'){ usar=[]; for(let i=0;i<act.length-1;i++){ if(act[i+1]===act[i]+1){ usar=[act[i],act[i+1]]; break; } } if(!usar.length) usar=act.slice(0,2); }
     act.forEach(h=>{ if(usar.indexOf(h)>=0) setCelda(f,'pri',h,{ tipo:'grupo', texto:g }); else setCelda(f,'pri',h,{ tipo:'man', texto:'MAN. PREVENT' }); });
   });
-  const visits={}; SECS.forEach(s=>visits[s]=0);
-  days.forEach(d=>{
-    const f=ymd(d); if(esFeriado(f)) return; const wd=d.getDay()-1; const usedDay={};
-    horasPed('sec').forEach(h=>{
-      if(!slotActivo(f,'sec',h,wd)||colOk('sec',h,wd)) return;
-      if(celda(f,'sec',h)&&celda(f,'sec',h).tipo!=='abierto') return;
-      const par=horaPar(h); const dos=exigeDos();
-      let cands=(dos?candidatosAIP(wd,h,f):candidatos(wd,h)).filter(c=>!usedDay[c.seccion]);
-      if(dos&&par&&h>par){
-        if(!celda(f,'sec',h)||celda(f,'sec',h).tipo==='abierto') setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
-        return;
-      }
-      if(dos&&par&&!slotActivo(f,'sec',par,wd)){
-        setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' });
-        return;
-      }
-      if(!cands.length){ if(dos) setCelda(f,'sec',h,{ tipo:'soporte', texto:'SOPORTE' }); return; }
-      cands.sort((a,b)=>(visits[a.seccion]||0)-(visits[b.seccion]||0));
-      const pick=cands[0]; usedDay[pick.seccion]=1; visits[pick.seccion]=(visits[pick.seccion]||0)+1;
-      setCelda(f,'sec',h,{ tipo:'grupo', seccion:pick.seccion, area:pick.area, doc:pick.doc, texto:pick.texto });
-      if(dos&&par&&!colOk('sec',par,wd)&&slotActivo(f,'sec',par,wd)){
-        const row2=getHS()[wd]&&getHS()[wd][par]&&getHS()[wd][par][pick.seccion];
-        if(row2) setCelda(f,'sec',par,{ tipo:'grupo', seccion:pick.seccion, area:row2.area, doc:row2.doc, texto:pick.seccion+' '+row2.area+' '+row2.doc });
-      }
-    });
+  armarSecundariaMes(days);
+  guardar(true); render();
+}
+function semanaDelMes(d, first){
+  const mon=new Date(first.getFullYear(), first.getMonth(), first.getDate());
+  const shift=(mon.getDay()+6)%7;
+  mon.setDate(mon.getDate()-shift);
+  return Math.floor((d-mon)/86400000/7);
+}
+function paresLibresSec(d){
+  const f=ymd(d); if(esFeriado(f)) return [];
+  const wd=d.getDay()-1;
+  const act=horasPed('sec').filter(h=>{
+    if(!slotActivo(f,'sec',h,wd)||colOk('sec',h,wd)) return false;
+    const c=celda(f,'sec',h);
+    if(c && c.tipo && c.tipo!=='abierto') return false;
+    return true;
+  }).sort((a,b)=>a-b);
+  const pares=[]; const taken={};
+  act.forEach(h=>{
+    if(taken[h]) return;
+    if(act.indexOf(h+1)>=0){ pares.push({ d:d, f:f, wd:wd, h1:h, h2:h+1 }); taken[h]=taken[h+1]=1; }
+    else pares.push({ d:d, f:f, wd:wd, h1:h, h2:null });
   });
-  guardar(); render();
+  return pares;
+}
+function ponerGrupoSec(slot, pick){
+  const M=getHS();
+  const r1=M[slot.wd]&&M[slot.wd][slot.h1]&&M[slot.wd][slot.h1][pick.seccion];
+  setCelda(slot.f,'sec',slot.h1,{ tipo:'grupo', seccion:pick.seccion, area:pick.area|| (r1&&r1.area), doc:pick.doc||(r1&&r1.doc), texto:pick.texto });
+  if(slot.h2){
+    const r2=M[slot.wd]&&M[slot.wd][slot.h2]&&M[slot.wd][slot.h2][pick.seccion];
+    if(r2) setCelda(slot.f,'sec',slot.h2,{ tipo:'grupo', seccion:pick.seccion, area:r2.area, doc:r2.doc, texto:pick.seccion+' '+r2.area+' '+r2.doc });
+    else setCelda(slot.f,'sec',slot.h2,{ tipo:'man', texto:'MAN. PREVENT' });
+  }
+}
+function candsPar(slot){
+  if(slot.h2) return candidatosAIP(slot.wd, slot.h1, slot.f);
+  return candidatos(slot.wd, slot.h1);
+}
+function armarSecundariaMes(days){
+  if(!days.length) return;
+  const first=days[0];
+  const slots=[];
+  days.forEach(d=>paresLibresSec(d).forEach(s=>{ s.sem=semanaDelMes(d,first); slots.push(s); }));
+  const visits={}; SECS.forEach(s=>visits[s]=0);
+  const weekGot={};
+  function tomar(slot, maxVis){
+    if(celda(slot.f,'sec',slot.h1)&&celda(slot.f,'sec',slot.h1).tipo==='grupo') return false;
+    const got=weekGot[slot.sem]||(weekGot[slot.sem]={});
+    let cands=candsPar(slot).filter(c=>visits[c.seccion]<maxVis && !got[c.seccion]);
+    if(!cands.length) return false;
+    cands.sort((a,b)=>{
+      const dv=(visits[a.seccion]||0)-(visits[b.seccion]||0);
+      if(dv) return dv;
+      return SECS.indexOf(a.seccion)-SECS.indexOf(b.seccion);
+    });
+    const pick=cands[0];
+    visits[pick.seccion]++;
+    got[pick.seccion]=1;
+    ponerGrupoSec(slot, pick);
+    return true;
+  }
+  const maxSem=slots.reduce((m,s)=>Math.max(m,s.sem),0);
+  for(let sem=0; sem<=maxSem; sem++) slots.filter(s=>s.sem===sem && s.h2).forEach(s=>tomar(s,1));
+  for(let sem=0; sem<=maxSem; sem++) slots.filter(s=>s.sem===sem && s.h2).forEach(s=>tomar(s,2));
+  slots.forEach(s=>{
+    const c=celda(s.f,'sec',s.h1);
+    if(c && c.tipo==='grupo') return;
+    setCelda(s.f,'sec',s.h1,{ tipo:'soporte', texto:'SOPORTE' });
+    if(s.h2){
+      const c2=celda(s.f,'sec',s.h2);
+      if(!c2 || c2.tipo==='abierto' || !c2.tipo) setCelda(s.f,'sec',s.h2,{ tipo:'man', texto:'MAN. PREVENT' });
+    }
+  });
+  const faltan=SECS.filter(s=>!visits[s]);
+  if(faltan.length) alert('Armado listo. No hubo bloque de 2 h libre para: '+faltan.join(', ')+'. Revisa plantilla o colegiados.');
 }
 function clsDe(tipo){ return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', colegiado:'c-col', man:'c-man', vacio:'c-aip', abierto:'c-aip', bloqueado:'c-gray' })[tipo]||'c-gray'; }
 function render(){
