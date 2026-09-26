@@ -935,10 +935,19 @@ function parseAscXml(txt) {
   let n = 0;
   cards.forEach(c => {
     const les = lessons[c.lessonid || c.lesson || ''] || {};
-    let day = parseInt(c.day || c.days || les.day || '0', 10);
-    if (day >= 1 && day <= 5) day = day - 1;
+    const rawD = String(c.days || c.day || les.days || les.day || '').trim();
+    let day = -1;
+    if (/^[01]{5,7}$/.test(rawD)) day = rawD.indexOf('1');
+    else {
+      const d = parseInt(rawD, 10);
+      if (d >= 1 && d <= 5) day = d - 1;
+      else if (d >= 0 && d <= 4) day = d;
+    }
     if (day < 0 || day > 4) return;
-    const hora = parseInt(c.period || c.periods || c.hour || les.period || '0', 10);
+    const rawH = String(c.period || c.periods || c.hour || les.period || les.periods || '').trim();
+    let hora = 0;
+    if (/^[01]{5,10}$/.test(rawH)) hora = rawH.indexOf('1') + 1;
+    else hora = parseInt(rawH, 10) || 0;
     if (!hora) return;
     const classids = String(c.classids || les.classids || les.classid || '').split(',').map(x => x.trim()).filter(Boolean);
     const teacherids = String(c.teacherids || les.teacherids || les.teacherid || '').split(',').map(x => x.trim()).filter(Boolean);
