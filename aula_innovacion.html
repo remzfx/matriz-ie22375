@@ -532,22 +532,28 @@ function armarMes() {
       });
     });
   });
-  const tues = days.filter(d => d.getDay()===2 && !esFeriado(ymd(d)));
-  const thus = days.filter(d => d.getDay()===4 && !esFeriado(ymd(d)));
-  const rotMar = ['3°','5°'];
-  const rotJue = ['4°','6°'];
-  tues.forEach((d,i) => {
-    const g = rotMar[i % rotMar.length];
-    const f = ymd(d); const wd = d.getDay()-1;
-    horasPed('pri').forEach(h => {
-      if (slotActivo(f,'pri',h,wd)) setCelda(f,'pri',h,{ tipo:'grupo', texto:g });
-    });
-  });
-  thus.forEach((d,i) => {
-    const g = rotJue[i % rotJue.length];
-    const f = ymd(d); const wd = d.getDay()-1;
-    horasPed('pri').forEach(h => {
-      if (slotActivo(f,'pri',h,wd)) setCelda(f,'pri',h,{ tipo:'grupo', texto:g });
+  const rotPri = ['3°','4°','5°','6°'];
+  let ip = 0;
+  days.forEach(d => {
+    const f = ymd(d);
+    if (esFeriado(f)) return;
+    const wd = d.getDay()-1;
+    const act = horasPed('pri').filter(h => slotActivo(f,'pri',h,wd)).sort((a,b)=>a-b);
+    if (!act.length) return;
+    const g = rotPri[ip++ % rotPri.length];
+    const modo = bloqueCfg();
+    let usar = act.slice();
+    if (modo === '1') usar = act.slice(0,1);
+    else if (modo === '2') {
+      usar = [];
+      for (let i=0;i<act.length-1;i++) {
+        if (act[i+1] === act[i]+1) { usar = [act[i], act[i+1]]; break; }
+      }
+      if (!usar.length) usar = act.slice(0,2);
+    }
+    act.forEach(h => {
+      if (usar.indexOf(h) >= 0) setCelda(f,'pri',h,{ tipo:'grupo', texto:g });
+      else setCelda(f,'pri',h,{ tipo:'man', texto:'MAN. PREVENT' });
     });
   });
   const visits = {};
