@@ -22,6 +22,8 @@
   .c-man { background:#ddd6fe; cursor:pointer; font-weight:700; }
   .c-gray { background:#cbd5e1; color:#64748b; cursor:pointer; }
   .c-fer { background:#fecaca; font-weight:800; }
+  .c-ges { background:#fdba74; cursor:pointer; font-weight:800; }
+  .c-vac { background:#fda4af; cursor:pointer; font-weight:800; }
   .c-rec { background:#fde68a; font-weight:700; }
   .sticky-top { position:sticky; top:0; z-index:20; }
   .aip-tab { border:0; border-radius:12px; font-weight:800; padding:.55rem 1rem; cursor:pointer; font-size:13px; background:#e2e8f0; color:#0f172a; }
@@ -200,9 +202,11 @@
       <option value="grupo">Grupo / salón</option>
       <option value="abierto">Hora AIP libre</option>
       <option value="bloqueado">Bloquear este día</option>
-      <option value="soporte">SOPORTE</option>
+      <option value="soporte">Soporte</option>
       <option value="colegio">Colegiado AIP</option>
-      <option value="man">MANTENIMIENTO</option>
+      <option value="man">Mantenimiento</option>
+      <option value="gestion">Semana gestión</option>
+      <option value="vacaciones">Vacaciones</option>
       <option value="vacio">Vacío</option>
     </select>
     <div id="wrapGrupo"><select id="modGrupo"></select></div>
@@ -321,7 +325,7 @@ function slotActivo(fecha,nivel,hora,wd){
   if(hora==='R') return false;
   const c=celda(fecha,nivel,hora);
   if(c && c.tipo==='bloqueado') return false;
-  if(c && (c.tipo==='colegio'||c.tipo==='colegiado')) return false;
+  if(c && (c.tipo==='colegio'||c.tipo==='colegiado'||c.tipo==='gestion'||c.tipo==='vacaciones')) return false;
   if(colOk(nivel,hora,wd) && !(c && c.tipo==='abierto')) return false;
   if(c && c.tipo==='abierto') return true;
   if(c && c.tipo && c.tipo!=='bloqueado') return true;
@@ -622,7 +626,7 @@ function renderPlantilla(){
 }
 function limpiarMes(){
   const ym=document.getElementById('inpMes').value;
-  if(!confirm('¿Limpiar el plan de '+ym+'?\nSe quitan salones, SOPORTE y mantenimiento.\nFeriados y Colegiado AIP se quedan.')) return;
+  if(!confirm('¿Limpiar el plan de '+ym+'?\nSe quitan salones, Soporte y Mantenimiento.\nFeriados, gestión, vacaciones y Colegiado AIP se quedan.')) return;
   const days=diasMes(ym);
   days.forEach(d=>{
     const f=ymd(d);
@@ -630,7 +634,7 @@ function limpiarMes(){
       const o=plan[f]&&plan[f][n]; if(!o) return;
       Object.keys(o).forEach(h=>{
         const t=o[h]&&o[h].tipo;
-        if(t==='colegio'||t==='colegiado') return;
+        if(t==='colegio'||t==='colegiado'||t==='gestion'||t==='vacaciones') return;
         delete o[h];
       });
     });
@@ -645,7 +649,7 @@ function armarMes(silencio){
       const o=plan[f]&&plan[f][n]; if(!o) return;
       Object.keys(o).forEach(h=>{
         const t=o[h]&&o[h].tipo;
-        if(t==='bloqueado'||t==='abierto'||t==='colegio'||t==='colegiado') return;
+        if(t==='bloqueado'||t==='abierto'||t==='colegio'||t==='colegiado'||t==='gestion'||t==='vacaciones') return;
         delete o[h];
       });
     });
@@ -662,7 +666,7 @@ function armarMes(silencio){
     const g=rotPri[ip++%rotPri.length]; const modo=bloqueCfg(); let usar=act.slice();
     if(modo==='1') usar=act.slice(0,1);
     else if(modo==='2'){ usar=[]; for(let i=0;i<act.length-1;i++){ if(act[i+1]===act[i]+1){ usar=[act[i],act[i+1]]; break; } } if(!usar.length) usar=act.slice(0,2); }
-    act.forEach(h=>{ if(usar.indexOf(h)>=0) setCelda(f,'pri',h,{ tipo:'grupo', texto:g }); else setCelda(f,'pri',h,{ tipo:'man', texto:'MAN. PREVENT' }); });
+    act.forEach(h=>{ if(usar.indexOf(h)>=0) setCelda(f,'pri',h,{ tipo:'grupo', texto:g }); else setCelda(f,'pri',h,{ tipo:'man', texto:'Mantenimiento' }); });
   });
   armarSecundariaMes(days, silencio);
   guardar(true); if(!silencio) render();
@@ -697,7 +701,7 @@ function ponerGrupoSec(slot, pick){
   if(slot.h2){
     const r2=M[slot.wd]&&M[slot.wd][slot.h2]&&M[slot.wd][slot.h2][pick.seccion];
     if(r2) setCelda(slot.f,'sec',slot.h2,{ tipo:'grupo', seccion:pick.seccion, area:r2.area, doc:r2.doc, texto:pick.seccion+' '+r2.area+' '+r2.doc });
-    else setCelda(slot.f,'sec',slot.h2,{ tipo:'man', texto:'MAN. PREVENT' });
+    else setCelda(slot.f,'sec',slot.h2,{ tipo:'man', texto:'Mantenimiento' });
   }
 }
 function candsPar(slot){
@@ -739,10 +743,10 @@ function armarSecundariaMes(days, silencio){
   slots.forEach(s=>{
     const c=celda(s.f,'sec',s.h1);
     if(c && c.tipo==='grupo') return;
-    setCelda(s.f,'sec',s.h1,{ tipo:'soporte', texto:'SOPORTE' });
+    setCelda(s.f,'sec',s.h1,{ tipo:'soporte', texto:'Soporte' });
     if(s.h2){
       const c2=celda(s.f,'sec',s.h2);
-      if(!c2 || c2.tipo==='abierto' || !c2.tipo) setCelda(s.f,'sec',s.h2,{ tipo:'man', texto:'MAN. PREVENT' });
+      if(!c2 || c2.tipo==='abierto' || !c2.tipo) setCelda(s.f,'sec',s.h2,{ tipo:'man', texto:'Mantenimiento' });
     }
   });
   const faltan=SECS_NOW.filter(s=>!visits[s]);
@@ -774,7 +778,7 @@ function armarSecundariaMes(days, silencio){
   if(faltan.length||areasFaltan.length) msg+=' Quedan prioridad en '+nxt+'.';
   alert(msg);
 }
-function clsDe(tipo){ return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', colegiado:'c-col', man:'c-man', vacio:'c-aip', abierto:'c-aip', bloqueado:'c-gray' })[tipo]||'c-gray'; }
+function clsDe(tipo){ return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', colegiado:'c-col', man:'c-man', gestion:'c-ges', vacaciones:'c-vac', vacio:'c-aip', abierto:'c-aip', bloqueado:'c-gray' })[tipo]||'c-gray'; }
 function render(){
   const ym=document.getElementById('inpMes').value; const [Y,M]=ym.split('-');
   const meses=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -788,7 +792,7 @@ function render(){
   }
   function cell(d,nivel,hora){
     const f=ymd(d); const wd=d.getDay()-1;
-    if(esFeriado(f)) return '<td class="c-fer" onclick="toggleFeriadoDia(\''+f+'\')">FERIADO</td>';
+    if(esFeriado(f)) return '<td class="c-fer" onclick="toggleFeriadoDia(\''+f+'\')">'+(feriados[f]||'Feriado')+'</td>';
     if(hora==='R') return '<td class="c-rec">RECREO</td>';
     const c=celda(f,nivel,hora);
     if((c&&(c.tipo==='colegio'||c.tipo==='colegiado')) || (colOk(nivel,hora,wd)&&!(c&&c.tipo==='grupo'))){
@@ -846,10 +850,30 @@ function aplicarModal(){
       setCelda(fecha,nivel,hora, row?{ tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc }:{ tipo:'grupo', texto:sec });
     }
   } else {
-    const map={ soporte:'SOPORTE', colegio:'Colegiado AIP', man:'MAN. PREVENT' };
-    setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
+    const map={ soporte:'Soporte', colegio:'Colegiado AIP', man:'Mantenimiento', gestion:'Semana gestión', vacaciones:'Vacaciones' };
+    if(tipo==='gestion'||tipo==='vacaciones') marcarNoClases(fecha, tipo);
+    else setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
   }
   cerrarModal(); render();
+}
+function fechasSemana(fecha){
+  const d=new Date(fecha+'T12:00:00');
+  const wd=(d.getDay()+6)%7;
+  const lun=new Date(d); lun.setDate(d.getDate()-wd);
+  const out=[];
+  for(let i=0;i<5;i++){ const x=new Date(lun); x.setDate(lun.getDate()+i); out.push(ymd(x)); }
+  return out;
+}
+function marcarNoClases(fecha, tipo){
+  const nom=tipo==='gestion'?'Semana gestión':'Vacaciones';
+  const fechas=tipo==='gestion'?fechasSemana(fecha):[fecha];
+  fechas.forEach(f=>{
+    feriados[f]=nom;
+    ['pri','sec'].forEach(n=>{
+      horasPed(n).forEach(h=>setCelda(f,n,h,{ tipo:tipo, texto:nom }));
+    });
+  });
+  guardarCfg(); renderFeriados();
 }
 function showAipTab(t){
   const mes=document.getElementById('pane-mes'), hs=document.getElementById('pane-hs'), reloj=document.getElementById('pane-reloj');
