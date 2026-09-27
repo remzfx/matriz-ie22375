@@ -7,8 +7,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; color:#0f172a; margin:0; }
-  .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); }
-  .btn { border:0; border-radius:12px; font-weight:800; padding:.65rem 1rem; cursor:pointer; font-size:14px; }
+  .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); overflow:hidden; }
+  .btn { border:0; border-radius:12px; font-weight:800; padding:.5rem .8rem; cursor:pointer; font-size:13px; white-space:nowrap; }
   .btn-primary { background:#0284c7; color:#fff; }
   .btn-ok { background:#15803d; color:#fff; }
   .btn-ghost { background:#e2e8f0; color:#0f172a; }
@@ -90,7 +90,6 @@
           <button class="btn btn-ok text-xs" type="button" onclick="armarMes()">Armar mes</button>
           <button class="btn btn-ghost text-xs" type="button" onclick="imprimirPDF()">PDF / Imprimir</button>
           <button class="btn btn-ghost text-xs" type="button" onclick="limpiarMes()">Limpiar</button>
-          <button class="btn btn-primary text-xs" type="button" onclick="guardar()">Guardar</button>
         </div>
       </div>
       <p class="text-[11px] text-slate-500">Entran <b>3°, 4°, 5° y 6°</b>. Verde = salón en AIP. Verde agua = <b>Colegiado AIP</b> (el PIP acompaña, no se asigna salón).</p>
