@@ -66,13 +66,13 @@
   </div>
   <div id="pane-mes" class="space-y-3 pane-print">
     <div class="card p-3 no-print space-y-3">
-      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 items-end">
+      <div class="flex flex-wrap items-end gap-2">
         <div>
-          <label class="text-[10px] font-bold text-slate-500">Mes</label>
+          <label class="text-[10px] font-bold text-slate-500">Mes</label><br>
           <input type="month" id="inpMes" value="2026-10" onchange="onMes()" />
         </div>
         <div>
-          <label class="text-[10px] font-bold text-slate-500">Bloque mínimo AIP</label>
+          <label class="text-[10px] font-bold text-slate-500">Bloque mínimo AIP</label><br>
           <select id="selBloque" onchange="guardarCfg()">
             <option value="cualquier">Cualquier hora</option>
             <option value="1">Solo 1 hora</option>
@@ -80,17 +80,17 @@
           </select>
         </div>
         <div>
-          <label class="text-[10px] font-bold text-slate-500">Clic en el mes</label>
+          <label class="text-[10px] font-bold text-slate-500">Clic en el mes</label><br>
           <select id="selModo" onchange="guardarCfg()">
             <option value="definir">Marcar / bloquear un día</option>
             <option value="asignar" selected>Asignar grupo</option>
           </select>
         </div>
-        <div class="flex gap-2">
-          <button class="btn btn-ok flex-1" type="button" onclick="armarMes()">Armar mes</button>
-          <button class="btn btn-ghost" type="button" onclick="imprimirPDF()">PDF / Imprimir</button>
-          <button class="btn btn-ghost" type="button" onclick="limpiarMes()">Limpiar</button>
-          <button class="btn btn-primary" type="button" onclick="guardar()">Guardar</button>
+        <div class="flex flex-wrap gap-2 ml-auto">
+          <button class="btn btn-ok text-xs" type="button" onclick="armarMes()">Armar mes</button>
+          <button class="btn btn-ghost text-xs" type="button" onclick="imprimirPDF()">PDF / Imprimir</button>
+          <button class="btn btn-ghost text-xs" type="button" onclick="limpiarMes()">Limpiar</button>
+          <button class="btn btn-primary text-xs" type="button" onclick="guardar()">Guardar</button>
         </div>
       </div>
       <p class="text-[11px] text-slate-500">Entran <b>3°, 4°, 5° y 6°</b>. Verde = salón en AIP. Verde agua = <b>Colegiado AIP</b> (el PIP acompaña, no se asigna salón).</p>
@@ -108,8 +108,11 @@
         <div class="border-t border-slate-200 pt-2 space-y-1">
           <div class="text-xs font-black">Panorama del año</div>
           <p class="text-[11px] text-slate-500">Primero marca feriados, gestión o vacaciones mes a mes (clic en el día). Luego arma. Esas fechas y el colegiado no se pisan; solo se llenan días hábiles. Mitad A / mitad B de cursos si el mes no tenía checklist.</p>
-          <div id="boxMesesAnio" class="flex flex-wrap gap-1"></div>
-          <button class="btn btn-ok text-xs" type="button" onclick="armarAnio()">Armar meses marcados</button>
+          <div class="flex flex-wrap items-center gap-3">
+            <div id="boxMesesAnio" class="flex flex-wrap gap-1"></div>
+            <span class="hidden sm:inline w-px h-7 bg-slate-300"></span>
+            <button class="btn btn-ok text-xs" type="button" onclick="armarAnio()">Armar meses marcados</button>
+          </div>
         </div>
       </div>
     </div>
