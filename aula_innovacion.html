@@ -89,6 +89,7 @@
         <div class="flex gap-2">
           <button class="btn btn-ok flex-1" type="button" onclick="armarMes()">Armar mes</button>
           <button class="btn btn-ghost" type="button" onclick="imprimirPDF()">PDF / Imprimir</button>
+          <button class="btn btn-ghost" type="button" onclick="limpiarMes()">Limpiar</button>
           <button class="btn btn-primary" type="button" onclick="guardar()">Guardar</button>
         </div>
       </div>
@@ -615,6 +616,23 @@ function renderPlantilla(){
   }
   document.getElementById('boxPlantPri').innerHTML=tabla('pri',HPRI());
   document.getElementById('boxPlantSec').innerHTML=tabla('sec',HSEC());
+}
+function limpiarMes(){
+  const ym=document.getElementById('inpMes').value;
+  if(!confirm('¿Limpiar el plan de '+ym+'?\nSe quitan salones, SOPORTE y mantenimiento.\nFeriados y Colegiado AIP se quedan.')) return;
+  const days=diasMes(ym);
+  days.forEach(d=>{
+    const f=ymd(d);
+    ['pri','sec'].forEach(n=>{
+      const o=plan[f]&&plan[f][n]; if(!o) return;
+      Object.keys(o).forEach(h=>{
+        const t=o[h]&&o[h].tipo;
+        if(t==='colegio'||t==='colegiado') return;
+        delete o[h];
+      });
+    });
+  });
+  guardar(true); render();
 }
 function armarMes(silencio){
   const ym=document.getElementById('inpMes').value; const days=diasMes(ym);
