@@ -332,7 +332,8 @@
       <div id="chipsCaps" class="flex flex-wrap gap-1"></div>
     </div>
     <div class="card p-3" id="wrapSesiones">
-      <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS (este bimestre / área)</div>
+      <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS</div>
+      <p class="text-[11px] text-slate-500 mb-1">Para ver un día anterior: cambia la <b>fecha</b> arriba o toca una sesión. Las notas de ese día vuelven a la grilla.</p>
       <div id="listaSesiones" class="flex flex-wrap gap-1"></div>
       <p class="text-[11px] text-slate-400 mt-1" id="lblSinSesiones">Aún no hay sesiones guardadas.</p>
     </div>
@@ -1038,6 +1039,16 @@ function pad2(n) {
 
 function onSesionChange() {
   loadCapsElegidas();
+  const c = ctxBase();
+  const fecha = (document.getElementById('inpFecha')||{}).value || '';
+  const comp = (document.getElementById('selComp')||{}).value || '';
+  (store.sessions||[]).forEach(s => {
+    if (s.nivel===c.nivel && s.bim===c.bim && String(s.grado)===String(c.grado) &&
+        s.seccion===c.seccion && s.area===c.area && s.comp===comp && s.fecha===fecha && s.capacidad) {
+      if (capsElegidas.indexOf(s.capacidad) < 0) capsElegidas.push(s.capacidad);
+    }
+  });
+  saveCapsElegidas();
   renderChipsCaps();
   renderStudents();
 }
@@ -1158,9 +1169,16 @@ function renderSesiones() {
     document.getElementById('inpFecha').value = s.fecha || hoyISO();
     document.getElementById('selUnidad').value = s.unidad || '';
     document.getElementById('selComp').value = s.comp || '';
+    fillCaps();
     setCapacidadUI(s.capacidad || '');
+    loadCapsElegidas();
+    if (s.capacidad && capsElegidas.indexOf(s.capacidad) < 0) {
+      capsElegidas.push(s.capacidad);
+      saveCapsElegidas();
+    }
     sesionActiva = { fecha: s.fecha, unidad: s.unidad || '', comp: s.comp, capacidad: s.capacidad };
     loadNotasSesion();
+    renderChipsCaps();
     renderSesiones();
     renderStudents();
     document.getElementById('lblSesionActiva').textContent =
