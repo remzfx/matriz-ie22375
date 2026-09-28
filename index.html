@@ -44,29 +44,32 @@
         <h1 class="text-xl font-black mt-1">Santa Rosa de los Molinos</h1>
         <p class="text-sm text-slate-500 mt-1">Ingreso al sistema · 2026</p>
       </div>
-      <div class="card p-5 space-y-3">
+      <form class="card p-5 space-y-3" id="formLogin" autocomplete="on" onsubmit="intentarLogin(); return false;">
         <div>
           <label class="text-[10px] font-bold text-slate-500">Tipo de acceso</label>
-          <select id="inpTipo" onchange="onTipoChange()">
+          <select id="inpTipo" name="rol" onchange="onTipoChange()" autocomplete="off">
             <option value="docente">Docente</option>
             <option value="admin">Administrador</option>
             <option value="auxiliar">Auxiliar del colegio</option>
             <option value="pip">PIP · Aula de innovación</option>
           </select>
         </div>
-        <div id="wrapDocente">
-          <label class="text-[10px] font-bold text-slate-500">Usuario docente</label>
-          <input type="text" id="inpDocUser" placeholder="usuario asignado por el admin" autocomplete="username" />
+        <div>
+          <label class="text-[10px] font-bold text-slate-500">Usuario</label>
+          <input type="text" id="inpDocUser" name="username" placeholder="usuario" autocomplete="username" />
         </div>
         <div>
           <label class="text-[10px] font-bold text-slate-500">Contraseña</label>
-          <input type="password" id="inpPass" placeholder="••••••••" autocomplete="current-password"
-                 onkeydown="if(event.key==='Enter')intentarLogin()" />
+          <input type="password" id="inpPass" name="password" placeholder="••••••••" autocomplete="current-password" />
         </div>
+        <label class="flex items-center gap-2 text-sm text-slate-600 font-semibold cursor-pointer">
+          <input type="checkbox" id="inpRecordar" class="w-4 h-4" />
+          Recordar sesión en este equipo (12 horas)
+        </label>
         <p id="loginErr" class="hidden text-sm text-red-600 font-semibold bg-red-50 rounded-lg px-3 py-2"></p>
-        <button type="button" class="btn btn-primary" onclick="intentarLogin()">Ingresar</button>
-        <p class="text-[11px] text-slate-400 text-center">Docente · Admin · Auxiliar · PIP (aula de innovación)</p>
-      </div>
+        <button type="submit" class="btn btn-primary">Ingresar</button>
+        <p class="text-[11px] text-slate-400 text-center">El navegador puede ofrecer guardar la contraseña al ingresar.</p>
+      </form>
       <p class="text-[10px] text-center text-slate-400 mt-8">Desarrollo · Diseño e integración Mag. Efrain Ceopa Paredes</p>
     </div>
   </div>
@@ -119,16 +122,29 @@ async function asegurarDocentesRemotos() {
     if (list.length) localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
   } catch(e) {}
 }
-function getSession() {
+const SESSION_MS = 12 * 60 * 60 * 1000;
+function leerSesionCruda() {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch(e) { return null; }
+    const a = sessionStorage.getItem(SESSION_KEY);
+    if (a) return JSON.parse(a);
+  } catch (e) {}
+  try {
+    const b = localStorage.getItem(SESSION_KEY);
+    if (b) return JSON.parse(b);
+  } catch (e) {}
+  return null;
+}
+function getSession() {
+  const s = leerSesionCruda();
+  if (!s || !s.ts) return null;
+  if (Date.now() - s.ts > SESSION_MS) { clearSession(); return null; }
+  return s;
 }
 function setSession(obj) {
   const data = JSON.stringify(obj);
   sessionStorage.setItem(SESSION_KEY, data);
-  localStorage.setItem(SESSION_KEY, data);
+  if (obj.recordar) localStorage.setItem(SESSION_KEY, data);
+  else localStorage.removeItem(SESSION_KEY);
 }
 function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
@@ -136,14 +152,24 @@ function clearSession() {
 }
 function onTipoChange() {
   const t = document.getElementById('inpTipo').value;
-  document.getElementById('wrapDocente').classList.toggle('hidden', t !== 'docente');
+  const u = document.getElementById('inpDocUser');
+  if (!u) return;
+  if (t === 'admin' && !u.value) u.value = 'admin';
+  if (t === 'auxiliar' && !u.value) u.value = 'auxiliar';
+  if (t === 'pip' && !u.value) u.value = 'pip';
+  if (t === 'docente' && (u.value === 'admin' || u.value === 'auxiliar' || u.value === 'pip')) u.value = '';
 }
 async function intentarLogin() {
   const err = document.getElementById('loginErr');
   err.classList.add('hidden');
   await asegurarDocentesRemotos();
   const tipo = document.getElementById('inpTipo').value;
-  const pass = document.getElementById('inpPass').value;
+  const pass = (document.getElementById('inpPass').value || '').trim();
+  if (!pass) {
+    err.textContent = 'Escriba su contraseña.';
+    err.classList.remove('hidden');
+    return;
+  }
   if (tipo === 'admin') {
     const custom = localStorage.getItem('ie22375_admin_pass');
     if (pass !== (custom || ADMIN_PASS)) {
@@ -152,7 +178,8 @@ async function intentarLogin() {
       return;
     }
     setSession({ user:'admin', label:'Administrador', nivel:'admin', role:'admin', grados:null, areas:null,
-      mods:['admin_bd','registro','auxiliar','matriz_pri','matriz_sec','aip'], ts:Date.now() });
+      mods:['admin_bd','registro','auxiliar','matriz_pri','matriz_sec','aip'], ts:Date.now(),
+      recordar: !!(document.getElementById('inpRecordar')||{}).checked });
     mostrarHub();
     return;
   }
@@ -163,7 +190,8 @@ async function intentarLogin() {
       return;
     }
     setSession({ user:'auxiliar', label:'Auxiliar del colegio', nivel:'colegio', role:'auxiliar',
-      grados:null, areas:null, mods:['auxiliar'], ts:Date.now() });
+      grados:null, areas:null, mods:['auxiliar'], ts:Date.now(),
+      recordar: !!(document.getElementById('inpRecordar')||{}).checked });
     mostrarHub();
     return;
   }
@@ -174,7 +202,8 @@ async function intentarLogin() {
       return;
     }
     setSession({ user:'pip', label:'PIP · Aula de innovación', nivel:'colegio', role:'pip',
-      grados:null, areas:null, mods:['aip'], ts:Date.now() });
+      grados:null, areas:null, mods:['aip'], ts:Date.now(),
+      recordar: !!(document.getElementById('inpRecordar')||{}).checked });
     mostrarHub();
     return;
   }
@@ -192,7 +221,8 @@ async function intentarLogin() {
     areas: d.nivel === 'secundaria' ? (d.areas || []) : null,
     aulas: d.nivel === 'secundaria' ? (d.aulas || []) : null,
     mods: d.nivel === 'primaria' ? ['matriz_pri','registro'] : ['matriz_sec','registro'],
-    ts: Date.now()
+    ts: Date.now(),
+    recordar: !!(document.getElementById('inpRecordar')||{}).checked
   });
   mostrarHub();
 }
@@ -245,9 +275,8 @@ function mostrarHub() {
   }).join('') || '<p class="text-sm text-slate-500">No hay módulos para este usuario.</p>';
 }
 onTipoChange();
-asegurarDocentesRemotos().then(function(){
-  if (getSession()) mostrarHub();
-});
+if (getSession()) mostrarHub();
+asegurarDocentesRemotos();
 </script>
 </body>
 </html>
