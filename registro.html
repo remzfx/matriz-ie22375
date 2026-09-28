@@ -66,6 +66,17 @@
   .panel-as.on { display:block; }
   .panel-fin { display:none; }
   .panel-fin.on { display:block; }
+  .fin-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .fin-grid { width:100%; border-collapse:separate; border-spacing:0; min-width:640px; }
+  .fin-grid th, .fin-grid td { border-bottom:1px solid #e2e8f0; padding:8px 6px; vertical-align:top; }
+  .fin-grid thead th { background:#0f172a; color:#fff; font-size:11px; font-weight:800; position:sticky; top:0; z-index:2; }
+  .fin-grid th.fin-nom, .fin-grid td.fin-nom { position:sticky; left:0; background:#fff; z-index:1; min-width:160px; max-width:200px; }
+  .fin-grid thead th.fin-nom { background:#0f172a; z-index:3; }
+  .fin-grid .fin-caps { font-size:10px; font-weight:600; color:#cbd5e1; margin-top:4px; line-height:1.3; }
+  .fin-grid td .fin-caps { color:#64748b; }
+  .fin-cell { display:flex; flex-direction:column; align-items:center; gap:4px; min-width:92px; }
+  .fin-cell input { width:3.6rem; text-align:center; font-weight:800; border:1.5px solid #cbd5e1; border-radius:10px; padding:6px 4px; font-size:16px; }
+  .fin-cell input[readonly] { background:#f1f5f9; color:#334155; }
   .asis-chip {
     display:inline-flex; align-items:center; justify-content:center;
     min-width:2rem; height:2rem; border-radius:8px; font-size:12px; font-weight:900;
@@ -259,16 +270,12 @@
           <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
           <div class="text-sm font-bold" id="lblFinCtx">—</div>
           <p class="text-[11px] text-slate-500 mt-1">
-            Para docentes que cierran el bimestre <b>sin evidencias</b>.
-            Si ya hay sesiones calificadas en una competencia, el promedio de esas evidencias <b>manda</b> (aquí se muestra solo lectura).
+            Grilla del aula: alumno × competencia. Debajo de cada competencia se ven las <b>capacidades</b> ya calificadas.
+            Si hay evidencias, esa columna es solo lectura. Si no, escribe 0–20 (18–20 AD · 14–17 A · 11–13 B · 0–10 C).
           </p>
         </div>
-        <div>
-          <label class="text-[10px] font-bold text-slate-500">Competencia</label>
-          <select id="selFinComp" onchange="renderFinales()"></select>
-        </div>
         <div class="flex flex-wrap gap-2 text-[11px] font-bold" id="finResumen"></div>
-        <div id="finLista"></div>
+        <div id="finLista" class="fin-wrap"></div>
         <button type="button" class="btn btn-primary w-full text-sm" onclick="guardarFinales(); toast('Promedios guardados')">Guardar promedios</button>
       </div>
     </div>
@@ -353,7 +360,9 @@
         <span class="px-2 py-1 rounded-lg bg-lime-50 text-lime-700">A <span id="cA">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
-      <button type="button" class="btn btn-primary text-xs !py-2" onclick="guardarTodo(); toast('Guardado')">Guardar</button>
+      <button type="button" class="btn btn-ghost text-xs !py-2" onclick="bajarRegistroNube()">Nube ↓</button>
+      <button type="button" class="btn btn-ghost text-xs !py-2" onclick="subirRegistroNube()">Nube ↑</button>
+      <button type="button" class="btn btn-primary text-xs !py-2" onclick="guardarTodo(); toast('Guardado local')">Guardar</button>
     </div>
   </div>
 </div>
@@ -433,6 +442,133 @@ function loadStore() {
 function saveStore() {
   store._ts = Date.now();
   localStorage.setItem(NOTAS_KEY, JSON.stringify(store));
+}
+
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
+function cloudClaveReg() {
+  const c = ctxBase();
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
+}
+function prefijoReg() {
+  return cloudClaveReg() + '||';
+}
+function sliceRegistroArea() {
+  const pref = prefijoReg();
+  const c = ctxBase();
+  const sessions = (store.sessions || []).filter(s =>
+    s.nivel === c.nivel && s.bim === c.bim && Number(s.grado) === Number(c.grado) &&
+    String(s.seccion) === String(c.seccion) && s.area === c.area
+  );
+  const grades = {};
+  Object.keys(store.grades || {}).forEach(k => { if (k.indexOf(pref) === 0) grades[k] = store.grades[k]; });
+  const finales = {};
+  Object.keys(store.finales || {}).forEach(k => { if (k.indexOf(pref) === 0) finales[k] = store.finales[k]; });
+  const asisPref = [c.nivel, c.bim, c.grado, c.seccion].join('||');
+  const asistencia = {};
+  Object.keys(store.asistencia || {}).forEach(k => { if (k.indexOf(asisPref) === 0) asistencia[k] = store.asistencia[k]; });
+  return {
+    ts: Date.now(),
+    sessions: sessions,
+    grades: grades,
+    finales: finales,
+    asistencia: asistencia,
+    meta: (store.meta && store.meta[cloudClaveReg()]) || {}
+  };
+}
+function tsDe(obj) {
+  if (!obj) return 0;
+  if (typeof obj === 'object' && obj.ts) return Number(obj.ts) || 0;
+  return 0;
+}
+function mergeRegistroPayload(p) {
+  if (!p) return 0;
+  let n = 0;
+  (p.sessions || []).forEach(s => {
+    const id = sessionId(s);
+    const idx = (store.sessions || []).findIndex(x => sessionId(x) === id);
+    if (idx < 0) { store.sessions.push(s); n++; }
+    else if ((s.ts || 0) >= (store.sessions[idx].ts || 0)) { store.sessions[idx] = s; n++; }
+  });
+  Object.keys(p.grades || {}).forEach(k => {
+    const incoming = p.grades[k];
+    const prev = store.grades[k];
+    if (!prev || tsDe(incoming) >= tsDe(prev)) { store.grades[k] = incoming; n++; }
+  });
+  if (!store.finales) store.finales = {};
+  Object.keys(p.finales || {}).forEach(k => {
+    const incoming = p.finales[k];
+    const prev = store.finales[k];
+    if (!prev || tsDe(incoming) >= tsDe(prev)) { store.finales[k] = incoming; n++; }
+  });
+  if (!store.asistencia) store.asistencia = {};
+  Object.keys(p.asistencia || {}).forEach(k => {
+    store.asistencia[k] = p.asistencia[k];
+    n++;
+  });
+  if (p.meta) store.meta[cloudClaveReg()] = Object.assign({}, store.meta[cloudClaveReg()] || {}, p.meta);
+  return n;
+}
+async function subirRegistroNube() {
+  if (!nivel || !areaActual) { toast('Elija área primero'); return; }
+  guardarTodo();
+  const c = ctxBase();
+  const payload = sliceRegistroArea();
+  toast('Subiendo…');
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'savereg',
+        clave: cloudClaveReg(),
+        nivel: c.nivel,
+        bimestre: c.bim,
+        grado: c.grado,
+        seccion: c.seccion,
+        area: c.area,
+        docente: (document.getElementById('inpDocente') || {}).value || '',
+        ts: payload.ts,
+        payload: payload
+      })
+    });
+    const data = JSON.parse(await res.text());
+    toast(data.ok ? 'Notas en la nube (' + c.area + ')' : (data.error || 'Error al subir'));
+  } catch (e) {
+    toast('No se pudo subir. Actualice el Apps Script.');
+  }
+}
+async function bajarRegistroNube() {
+  if (!nivel) { toast('Elija nivel'); return; }
+  toast('Bajando…');
+  try {
+    const url = CLOUD_API_URL + '?action=loadreg&nivel=' + encodeURIComponent(nivel);
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = JSON.parse(await res.text());
+    if (!data.ok) throw new Error(data.error || 'Error');
+    const c = ctxBase();
+    const items = (data.items || []).filter(it => {
+      if (areaActual && String(it.area) !== String(areaActual)) return false;
+      if (c.bim && String(it.bimestre) !== String(c.bim)) return false;
+      if (c.grado && String(it.grado) !== String(c.grado)) return false;
+      if (c.seccion && String(it.seccion) !== String(c.seccion)) return false;
+      return true;
+    });
+    let n = 0;
+    items.forEach(it => { n += mergeRegistroPayload(it.payload || {}); });
+    saveStore();
+    notas = {};
+    if (sesionActiva) {
+      estudiantes().forEach(al => {
+        const k = gradeKey(al.nombre);
+        if (k && store.grades[k]) notas[al.nombre] = JSON.parse(JSON.stringify(store.grades[k]));
+      });
+    }
+    try { renderSesiones(); } catch (e) {}
+    try { renderStudents(); } catch (e) {}
+    toast(items.length ? ('Nube: ' + items.length + ' bloque(s)') : 'Nube: no hay notas de este aula/área');
+  } catch (e) {
+    toast('No se pudo bajar. Actualice el Apps Script.');
+  }
 }
 
 function estructura() { return nivel === 'primaria' ? EST_PRIM : EST_SEC; }
@@ -1365,6 +1501,37 @@ function bimCerradoDocente() {
   return !bimestreHabilitado(bim) && !esAdmin;
 }
 
+function capsDeComp(comp) {
+  const c = ctxBase();
+  const seen = {};
+  const out = [];
+  (store.sessions || []).forEach(s => {
+    if (s.nivel!==c.nivel || s.bim!==c.bim || String(s.grado)!==String(c.grado) ||
+        s.seccion!==c.seccion || s.area!==c.area || s.comp!==comp) return;
+    const cap = (s.capacidad || '').trim();
+    if (!cap || seen[cap]) return;
+    seen[cap] = 1;
+    out.push({ capacidad: cap, fecha: s.fecha || '' });
+  });
+  return out;
+}
+function notaDesdeSesiones(comp, nombre) {
+  const c = ctxBase();
+  const sess = (store.sessions||[]).filter(s =>
+    s.nivel===c.nivel && s.bim===c.bim && String(s.grado)===String(c.grado) &&
+    s.seccion===c.seccion && s.area===c.area && s.comp===comp
+  );
+  const nums = [];
+  sess.forEach(s => {
+    const gk = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,nombre].join('||');
+    const g = store.grades[gk];
+    if (!g) return;
+    if (g.nota20!=='' && g.nota20!=null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
+    else if (g.nivel) { const m = letterToNum(g.nivel); if (m!=='') nums.push(Number(m)); }
+  });
+  const prom = promedioNums(nums);
+  return { nota: prom==null?'':prom, letra: prom==null?'':numToLetter(prom) };
+}
 function renderFinales() {
   loadStore();
   const c = ctxBase();
@@ -1372,73 +1539,62 @@ function renderFinales() {
     (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + ' · Bim ' + c.bim + ' · ' + (c.area||'');
 
   const comps = competencias();
-  const sel = document.getElementById('selFinComp');
-  const prev = sel.value;
-  sel.innerHTML = comps.map(x => '<option value="'+x.replace(/"/g,'&quot;')+'">'+x+'</option>').join('') || '<option value="">Sin competencias</option>';
-  if (prev && comps.includes(prev)) sel.value = prev;
-  const comp = sel.value;
   const box = document.getElementById('finLista');
   const res = document.getElementById('finResumen');
-  if (!comp) { box.innerHTML = ''; res.innerHTML = ''; return; }
-
   const bloqueado = bimCerradoDocente();
-  const desdeSesiones = compTieneSesiones(comp);
   const alumnos = estudiantes();
+  if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; return; }
 
-  if (desdeSesiones) {
-    res.innerHTML = '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">Esta competencia ya tiene evidencias. El promedio se calcula en Calificar / Ver avance (aquí no se edita).</span>';
-  } else if (bloqueado) {
-    res.innerHTML = '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>';
-  } else {
-    res.innerHTML = '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">Edición directa · 0–20 (18–20 AD · 14–17 A · 11–13 B · 0–10 C)</span>';
-  }
+  const capsPor = {};
+  comps.forEach(cp => { capsPor[cp] = capsDeComp(cp); });
 
-  let cAD=0,cA=0,cB=0,cC=0,cV=0;
-  box.innerHTML = alumnos.map((al, i) => {
-    const k = finalKey(comp, al.nombre);
-    let nota = '', letra = '', conc = '';
-    if (desdeSesiones) {
-      // mostrar promedio calculado
-      const sess = (store.sessions||[]).filter(s =>
-        s.nivel===c.nivel && s.bim===c.bim && s.grado===c.grado &&
-        s.seccion===c.seccion && s.area===c.area && s.comp===comp
-      );
-      const nums = [];
-      sess.forEach(s => {
-        const gk = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,al.nombre].join('||');
-        const g = store.grades[gk];
-        if (!g) return;
-        if (g.nota20!=='' && g.nota20!=null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
-        else if (g.nivel) { const m = letterToNum(g.nivel); if (m!=='') nums.push(Number(m)); }
-      });
-      const prom = promedioNums(nums);
-      if (prom != null) { nota = prom; letra = numToLetter(prom); }
-    } else {
-      const f = store.finales[k];
-      if (f) {
-        nota = (f.nota20!=='' && f.nota20!=null) ? f.nota20 : '';
-        letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
-        conc = f.conclusion || '';
+  res.innerHTML = (bloqueado
+    ? '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>'
+    : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">0–20 · columna con evidencias = solo lectura</span>');
+
+  let cAD=0,cA=0,cB=0,cC=0,cV=0,cTot=0;
+  let head = '<th class="fin-nom">Estudiante</th>';
+  comps.forEach((cp, idx) => {
+    const caps = capsPor[cp];
+    const capsTxt = caps.length
+      ? caps.map(x => (x.fecha?x.fecha.slice(5)+' · ':'') + x.capacidad).join('<br>')
+      : 'Sin capacidades aún';
+    head += '<th>C'+(idx+1)+'<div class="fin-caps">'+cp+'<br>'+capsTxt+'</div></th>';
+  });
+
+  const rows = alumnos.map((al, i) => {
+    let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
+    comps.forEach(cp => {
+      const lock = bloqueado || compTieneSesiones(cp);
+      let nota='', letra='', conc='';
+      if (compTieneSesiones(cp)) {
+        const d = notaDesdeSesiones(cp, al.nombre);
+        nota = d.nota; letra = d.letra;
+      } else {
+        const f = store.finales[finalKey(cp, al.nombre)];
+        if (f) {
+          nota = (f.nota20!=='' && f.nota20!=null) ? f.nota20 : '';
+          letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
+          conc = f.conclusion || '';
+        }
       }
-    }
-    if (letra==='AD') cAD++; else if (letra==='A') cA++; else if (letra==='B') cB++; else if (letra==='C') cC++;
-    if (letra) cV++;
-    const enc = encodeURIComponent(al.nombre);
-    const ro = (bloqueado || desdeSesiones) ? 'readonly' : '';
-    const dis = (bloqueado || desdeSesiones) ? 'disabled' : '';
-    return '<div class="stu-row" data-fin="'+enc+'">' +
-      '<div class="flex gap-2 items-center flex-wrap">' +
-      '<div class="text-xs font-bold text-slate-400 w-6">'+(i+1)+'</div>' +
-      '<div class="flex-1 min-w-0 font-bold text-sm truncate">'+al.nombre+'</div>' +
-      '<input type="number" min="0" max="20" step="1" class="num-input fin-nota" '+ro+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—" style="width:4.2rem">' +
-      '<span class="eq-letter '+(letra?eqClass(letra):'eq-none')+'">'+(letra||'—')+'</span>' +
-      '</div>' +
-      (desdeSesiones ? '' : '<input type="text" class="fin-conc mt-1" '+dis+' placeholder="Conclusión (opcional; obligatoria al procesar si C)" value="'+(conc||'').replace(/"/g,'&quot;')+'">') +
-      '</div>';
+      if (letra==='AD') cAD++; else if (letra==='A') cA++; else if (letra==='B') cB++; else if (letra==='C') cC++;
+      if (letra) cV++;
+      cTot++;
+      const encN = encodeURIComponent(al.nombre);
+      const encC = encodeURIComponent(cp);
+      tds += '<td><div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
+        '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
+        '<span class="eq-letter '+(letra?eqClass(letra):'eq-none')+'">'+(letra||'—')+'</span>' +
+        (lock ? '' : '<input type="text" class="fin-conc" placeholder="Conclusión" value="'+(conc||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:11px;border:1px solid #e2e8f0;border-radius:8px;padding:4px 6px">') +
+        '</div></td>';
+    });
+    return '<tr>'+tds+'</tr>';
   }).join('');
 
+  box.innerHTML = '<table class="fin-grid"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table>';
   res.innerHTML += '<div class="w-full flex flex-wrap gap-2 mt-1">' +
-    '<span class="px-2 py-1 rounded-lg bg-slate-50">Con nota '+cV+'/'+alumnos.length+'</span>' +
+    '<span class="px-2 py-1 rounded-lg bg-slate-50">Celdas '+cV+'/'+cTot+'</span>' +
     '<span class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800">AD '+cAD+'</span>' +
     '<span class="px-2 py-1 rounded-lg bg-green-50 text-green-800">A '+cA+'</span>' +
     '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">B '+cB+'</span>' +
@@ -1446,23 +1602,24 @@ function renderFinales() {
 
   box.querySelectorAll('.fin-nota').forEach(inp => {
     inp.addEventListener('change', function() {
-      if (bloqueado || desdeSesiones) return;
-      const row = inp.closest('[data-fin]');
-      const nombre = decodeURIComponent(row.dataset.fin);
+      const cell = inp.closest('[data-fin]');
+      if (!cell || inp.readOnly) return;
+      const nombre = decodeURIComponent(cell.dataset.fin);
+      const comp = decodeURIComponent(cell.dataset.comp);
       let n = inp.value === '' ? '' : Number(inp.value);
       if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); inp.value = ''; n = ''; }
       if (n !== '') n = Math.round(n);
       const letra = n === '' ? '' : numToLetter(n);
-      const badge = row.querySelector('.eq-letter');
+      const badge = cell.querySelector('.eq-letter');
       if (badge) {
         badge.textContent = letra || '—';
         badge.className = 'eq-letter ' + (letra ? eqClass(letra) : 'eq-none');
       }
       if (n !== '') inp.value = pad2(n);
-      const conc = (row.querySelector('.fin-conc') || {}).value || '';
+      const conc = (cell.querySelector('.fin-conc') || {}).value || '';
       const k = finalKey(comp, nombre);
-      if (n === '') delete store.finales[k];
-      else store.finales[k] = { nota20: n, nivel: letra, conclusion: conc.trim(), ts: Date.now() };
+      if (n === '' && !conc) delete store.finales[k];
+      else store.finales[k] = { nota20: n===''?'':n, nivel: letra, conclusion: conc.trim(), ts: Date.now() };
       saveStore();
     });
   });
@@ -1470,14 +1627,13 @@ function renderFinales() {
 
 function guardarFinales() {
   if (bimCerradoDocente()) { alert('Bimestre cerrado por administración'); return; }
-  const comp = document.getElementById('selFinComp').value;
-  if (!comp || compTieneSesiones(comp)) { saveStore(); return; }
-  document.querySelectorAll('#finLista [data-fin]').forEach(row => {
-    const nombre = decodeURIComponent(row.dataset.fin);
-    const inp = row.querySelector('.fin-nota');
-    const concEl = row.querySelector('.fin-conc');
-    const nraw = inp && inp.value !== '' ? Number(inp.value) : '';
-    const conc = concEl ? concEl.value.trim() : '';
+  document.querySelectorAll('#finLista [data-fin][data-comp]').forEach(cell => {
+    const inp = cell.querySelector('.fin-nota');
+    if (!inp || inp.readOnly) return;
+    const nombre = decodeURIComponent(cell.dataset.fin);
+    const comp = decodeURIComponent(cell.dataset.comp);
+    const conc = ((cell.querySelector('.fin-conc') || {}).value || '').trim();
+    const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(comp, nombre);
     if (nraw === '' || isNaN(nraw)) {
       if (!conc) delete store.finales[k];
