@@ -223,42 +223,6 @@
       <div id="areaBtns" class="flex flex-wrap gap-1.5"></div>
     </div>
 
-    <!-- Sesión: fecha + competencia + capacidad manual -->
-    <div class="card p-3 space-y-2">
-      <div class="text-[10px] font-bold text-slate-500">SESIÓN DE EVALUACIÓN</div>
-      <p class="text-[11px] text-slate-500">Elige la competencia y una <b>capacidad oficial</b>. Si no está en la lista, usa <b>Otra (escribir)</b>.</p>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-        <div>
-          <label class="text-[10px] font-bold text-slate-500">Fecha</label>
-          <input type="date" id="inpFecha" onchange="onSesionChange()">
-        </div>
-        <div>
-          <label class="text-[10px] font-bold text-slate-500">Unidad (opc.)</label>
-          <select id="selUnidad" onchange="onSesionChange()">
-            <option value="">—</option>
-            <option value="1">1ª unidad</option>
-            <option value="2">2ª unidad</option>
-            <option value="3">3ª unidad</option>
-            <option value="4">4ª unidad</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Competencia</label>
-        <select id="selComp" onchange="onCompChange()"></select>
-      </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Capacidades (CNEB)</label>
-        <select id="selCap" onchange="onCapSel()"></select>
-      </div>
-      <div id="wrapCapOtra" class="hidden">
-        <label class="text-[10px] font-bold text-slate-500">Capacidad personalizada</label>
-        <input type="text" id="inpCapacidad" placeholder="Escribe la capacidad o evidencia…" onchange="onSesionChange()" onblur="onSesionChange()">
-      </div>
-      <button type="button" class="btn btn-primary w-full text-sm" onclick="activarSesion()">Listo · Calificar esta capacidad</button>
-    </div>
-
-    <!-- Tabs Calificar / Avance -->
     <div class="flex gap-2 flex-wrap">
       <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
       <button type="button" id="tabFin" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('fin')">Promedios</button>
@@ -332,6 +296,39 @@
 
     <!-- Sesiones previas del contexto -->
     <div class="panel-cal on" id="panelCalificar">
+    <div class="card p-3 space-y-2 mb-3">
+      <div class="text-[10px] font-bold text-slate-500">SESIÓN DE EVALUACIÓN</div>
+      <p class="text-[11px] text-slate-500">Elige la competencia y una capacidad oficial. Si no está en la lista, usa <b>Otra (escribir)</b>.</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div>
+          <label class="text-[10px] font-bold text-slate-500">Fecha</label>
+          <input type="date" id="inpFecha" onchange="onSesionChange()">
+        </div>
+        <div>
+          <label class="text-[10px] font-bold text-slate-500">Unidad (opc.)</label>
+          <select id="selUnidad" onchange="onSesionChange()">
+            <option value="">—</option>
+            <option value="1">1ª unidad</option>
+            <option value="2">2ª unidad</option>
+            <option value="3">3ª unidad</option>
+            <option value="4">4ª unidad</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Competencia</label>
+        <select id="selComp" onchange="onCompChange()"></select>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">Capacidad / evidencia a evaluar</label>
+        <select id="selCap" onchange="onCapSel()"></select>
+      </div>
+      <div id="wrapCapOtra" class="hidden">
+        <label class="text-[10px] font-bold text-slate-500">Capacidad personalizada</label>
+        <input type="text" id="inpCapacidad" placeholder="Escribe la capacidad o evidencia…" onchange="onSesionChange()" onblur="onSesionChange()">
+      </div>
+      <button type="button" class="btn btn-primary w-full text-sm" onclick="activarSesion()">Listo · Calificar esta capacidad</button>
+    </div>
     <div class="card p-3" id="wrapSesiones">
       <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS (este bimestre / área)</div>
       <div id="listaSesiones" class="flex flex-wrap gap-1"></div>
