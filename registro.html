@@ -320,11 +320,12 @@
         <select id="selComp" onchange="onCompChange()"></select>
       </div>
       <div>
-        <label class="text-[10px] font-bold text-slate-500">Capacidad / evidencia a evaluar</label>
+        <label class="text-[10px] font-bold text-slate-500">Capacidades (CNEB)</label>
         <select id="selCap" onchange="onCapSel()"></select>
+        <p class="text-[10px] text-slate-400 mt-1" id="lblNCaps"></p>
       </div>
       <div id="wrapCapOtra" class="hidden">
-        <label class="text-[10px] font-bold text-slate-500">Capacidad personalizada</label>
+        <label class="text-[10px] font-bold text-slate-500">Capacidad / evidencia a evaluar</label>
         <input type="text" id="inpCapacidad" placeholder="Escribe la capacidad o evidencia…" onchange="onSesionChange()" onblur="onSesionChange()">
       </div>
       <button type="button" class="btn btn-primary w-full text-sm" onclick="activarSesion()">Listo · Calificar esta capacidad</button>
@@ -948,6 +949,8 @@ function fillCaps() {
   sel.innerHTML = '<option value="">Elige la capacidad…</option>' +
     caps.map(c => '<option value="'+c.replace(/"/g,'&quot;')+'">'+c+'</option>').join('') +
     '<option value="__otra__">Otra (escribir)</option>';
+  const hint = document.getElementById('lblNCaps');
+  if (hint) hint.textContent = caps.length ? (caps.length + ' capacidades oficiales de esta competencia') : 'Sin listado oficial; use Otra (escribir)';
   const wrap = document.getElementById('wrapCapOtra');
   if (wrap) wrap.classList.add('hidden');
   const inp = document.getElementById('inpCapacidad');
