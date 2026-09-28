@@ -2059,7 +2059,7 @@ function renderAsistencia() {
 function promedioNums(arr) {
   const v = arr.filter(x => x !== '' && x != null && !isNaN(Number(x))).map(Number);
   if (!v.length) return null;
-  return Math.round((v.reduce((a,b)=>a+b,0) / v.length) * 10) / 10;
+  return Math.round(v.reduce((a,b)=>a+b,0) / v.length);
 }
 
 let fuenteResumen = (function(){ try { return localStorage.getItem('ie22375_fuente_resumen') || 'auto'; } catch(e){ return 'auto'; } })();
