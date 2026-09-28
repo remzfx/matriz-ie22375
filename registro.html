@@ -321,7 +321,7 @@
           </div>
           <button type="button" class="btn btn-ghost text-xs !py-1.5" onclick="renderAvance()">Actualizar</button>
         </div>
-        <p class="text-[11px] text-slate-500 mb-2">Grilla de lectura: alumno × competencia. Debajo de cada columna, las capacidades. No se edita aquí.</p>
+        <p class="text-[11px] text-slate-500 mb-2">Grilla de lectura + <b>promedio de promedios</b>. Si ese promedio es <b>C</b>, se habilita la conclusión descriptiva (única casilla editable).</p>
         <div id="avanceBox"></div>
       </div>
     </div>
@@ -437,7 +437,8 @@ function loadStore() {
   if (!store.meta) store.meta = {};
   if (!store.asistencia) store.asistencia = {}; // key ctx||fecha||nombre -> 'P'|'F'|'T'|'J'|''
   if (!store.asisFechas) store.asisFechas = {}; // key ctx -> [fechas]
-  if (!store.finales) store.finales = {}; // key nivel||bim||grado||seccion||area||comp||nombre -> {nota20,nivel,conclusion,ts}
+  if (!store.finales) store.finales = {}; // key nivel||bim||grado||seccion||area||comp||nombre -> {nota20,nivel,ts}
+  if (!store.concArea) store.concArea = {}; // key nivel||bim||grado||seccion||area||nombre -> {texto,ts}
 }
 function saveStore() {
   store._ts = Date.now();
@@ -463,6 +464,8 @@ function sliceRegistroArea() {
   Object.keys(store.grades || {}).forEach(k => { if (k.indexOf(pref) === 0) grades[k] = store.grades[k]; });
   const finales = {};
   Object.keys(store.finales || {}).forEach(k => { if (k.indexOf(pref) === 0) finales[k] = store.finales[k]; });
+  const concArea = {};
+  Object.keys(store.concArea || {}).forEach(k => { if (k.indexOf(pref) === 0) concArea[k] = store.concArea[k]; });
   const asisPref = [c.nivel, c.bim, c.grado, c.seccion].join('||');
   const asistencia = {};
   Object.keys(store.asistencia || {}).forEach(k => { if (k.indexOf(asisPref) === 0) asistencia[k] = store.asistencia[k]; });
@@ -471,6 +474,7 @@ function sliceRegistroArea() {
     sessions: sessions,
     grades: grades,
     finales: finales,
+    concArea: concArea,
     asistencia: asistencia,
     meta: (store.meta && store.meta[cloudClaveReg()]) || {}
   };
@@ -499,6 +503,12 @@ function mergeRegistroPayload(p) {
     const incoming = p.finales[k];
     const prev = store.finales[k];
     if (!prev || tsDe(incoming) >= tsDe(prev)) { store.finales[k] = incoming; n++; }
+  });
+  if (!store.concArea) store.concArea = {};
+  Object.keys(p.concArea || {}).forEach(k => {
+    const incoming = p.concArea[k];
+    const prev = store.concArea[k];
+    if (!prev || tsDe(incoming) >= tsDe(prev)) { store.concArea[k] = incoming; n++; }
   });
   if (!store.asistencia) store.asistencia = {};
   Object.keys(p.asistencia || {}).forEach(k => {
@@ -1251,42 +1261,13 @@ function actualizarContadores() {
 }
 
 function validarConclusionesOficial(c, alumnos, sess) {
-  /* Devuelve lista de strings "Alumno · Competencia · Letra" sin conclusión
-     cuando el promedio de evidencias exige conclusión:
-     - Siempre si letra = C
-     - En primaria también si letra = B
-  */
-  const byComp = {};
-  sess.forEach(s => {
-    if (!byComp[s.comp]) byComp[s.comp] = [];
-    byComp[s.comp].push(s);
-  });
+  const comps = competencias();
   const faltan = [];
-  Object.keys(byComp).forEach(comp => {
-    const evidencias = byComp[comp];
-    alumnos.forEach(al => {
-      const nums = [];
-      let conclusion = '';
-      evidencias.forEach(s => {
-        const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,al.nombre].join('||');
-        const g = store.grades[k];
-        if (!g) return;
-        if (g.conclusion && g.conclusion.trim()) conclusion = g.conclusion.trim();
-        if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
-        else if (g.nivel) {
-          const m = letterToNum(g.nivel);
-          if (m !== '') nums.push(Number(m));
-        }
-      });
-      if (!nums.length) return;
-      const prom = promedioNums(nums);
-      if (prom == null) return;
-      const letra = numToLetter(prom);
-      const exige = (letra === 'C') || (c.nivel === 'primaria' && letra === 'B');
-      if (exige && !conclusion) {
-        faltan.push(al.nombre + ' · ' + comp.slice(0, 40) + ' · ' + letra + ' (' + prom + ')');
-      }
-    });
+  alumnos.forEach(al => {
+    const g = promGeneralAlumno(al.nombre, comps);
+    if (g.letra !== 'C') return;
+    const txt = ((store.concArea||{})[concAreaKey(al.nombre)]||{}).texto || '';
+    if (!txt.trim()) faltan.push(al.nombre + ' · Promedio ' + g.prom + ' (C)');
   });
   return faltan;
 }
@@ -1316,8 +1297,8 @@ function prepararImpresion() {
       'AVISO — Registro oficial (SIAGIE)\n\n' +
       'Falta conclusión descriptiva en promedios que la requieren:\n\n' +
       lista + extra +
-      '\n\nRegla: promedio C (Inicio) siempre; en PRIMARIA también promedio B.\n' +
-      'En el día a día no es obligatoria; sí al procesar/imprimir el registro oficial.\n\n' +
+      '\n\nRegla: conclusión obligatoria si el promedio general del área es C.\n' +
+      'Escríbala en Ver avance.\n\n' +
       '¿Desea imprimir de todas formas?'
     );
     if (!ok) return;
@@ -1485,6 +1466,27 @@ function finalKey(comp, nombre) {
   const c = ctxBase();
   return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, nombre].join('||');
 }
+function concAreaKey(nombre) {
+  const c = ctxBase();
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area, nombre].join('||');
+}
+function notaCompAlumno(comp, nombre) {
+  if (compTieneSesiones(comp)) return notaDesdeSesiones(comp, nombre);
+  const f = store.finales[finalKey(comp, nombre)];
+  if (!f) return { nota:'', letra:'' };
+  const nota = (f.nota20!=='' && f.nota20!=null && !isNaN(Number(f.nota20))) ? Number(f.nota20) : '';
+  const letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
+  return { nota, letra };
+}
+function promGeneralAlumno(nombre, comps) {
+  const nums = [];
+  (comps||competencias()).forEach(cp => {
+    const d = notaCompAlumno(cp, nombre);
+    if (d.nota!=='' && d.nota!=null && !isNaN(Number(d.nota))) nums.push(Number(d.nota));
+  });
+  const prom = promedioNums(nums);
+  return { prom: prom==null?'':prom, letra: prom==null?'':numToLetter(prom), n: nums.length };
+}
 
 function compTieneSesiones(comp) {
   const c = ctxBase();
@@ -1586,7 +1588,6 @@ function renderFinales() {
       tds += '<td><div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
         '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
         '<span class="eq-letter '+(letra?eqClass(letra):'eq-none')+'">'+(letra||'—')+'</span>' +
-        (lock ? '' : '<input type="text" class="fin-conc" placeholder="Conclusión" value="'+(conc||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:11px;border:1px solid #e2e8f0;border-radius:8px;padding:4px 6px">') +
         '</div></td>';
     });
     return '<tr>'+tds+'</tr>';
@@ -1616,10 +1617,9 @@ function renderFinales() {
         badge.className = 'eq-letter ' + (letra ? eqClass(letra) : 'eq-none');
       }
       if (n !== '') inp.value = pad2(n);
-      const conc = (cell.querySelector('.fin-conc') || {}).value || '';
       const k = finalKey(comp, nombre);
-      if (n === '' && !conc) delete store.finales[k];
-      else store.finales[k] = { nota20: n===''?'':n, nivel: letra, conclusion: conc.trim(), ts: Date.now() };
+      if (n === '') delete store.finales[k];
+      else store.finales[k] = { nota20: n, nivel: letra, ts: Date.now() };
       saveStore();
     });
   });
@@ -1632,15 +1632,11 @@ function guardarFinales() {
     if (!inp || inp.readOnly) return;
     const nombre = decodeURIComponent(cell.dataset.fin);
     const comp = decodeURIComponent(cell.dataset.comp);
-    const conc = ((cell.querySelector('.fin-conc') || {}).value || '').trim();
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(comp, nombre);
-    if (nraw === '' || isNaN(nraw)) {
-      if (!conc) delete store.finales[k];
-      return;
-    }
+    if (nraw === '' || isNaN(nraw)) { delete store.finales[k]; return; }
     const n = Math.round(nraw);
-    store.finales[k] = { nota20: n, nivel: numToLetter(n), conclusion: conc, ts: Date.now() };
+    store.finales[k] = { nota20: n, nivel: numToLetter(n), ts: Date.now() };
   });
   saveStore();
 }
@@ -1930,19 +1926,47 @@ function renderAvance() {
     const cl = cp!=null ? numToLetter(cp) : '';
     head += '<th>C'+(idx+1)+(cl?' · '+cl:'')+'<div class="fin-caps">'+comp+'<br>'+capsTxt+'</div></th>';
   });
+  head += '<th>Promedio<div class="fin-caps">Promedio de competencias</div></th>';
+  head += '<th>Conclusión<div class="fin-caps">Obligatoria solo si el promedio es C</div></th>';
 
   const rows = alumnos.map((al, i) => {
     let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
+    const nums = [];
     order.forEach(comp => {
       const r = data[comp][i];
+      if (r.prom!=null && r.prom!=='') nums.push(Number(r.prom));
       tds += '<td><div class="fin-cell">' +
         (r.prom!=null ? '<div style="font-weight:800;font-size:16px">'+pad2(r.prom)+'</div>' : '<div class="text-slate-300">—</div>') +
         '<span class="eq-letter '+(r.letra?eqClass(r.letra):'eq-none')+'">'+(r.letra||'—')+'</span></div></td>';
     });
+    const pg = promedioNums(nums);
+    const lg = pg==null?'':numToLetter(pg);
+    const ck = concAreaKey(al.nombre);
+    const txt = ((store.concArea||{})[ck]||{}).texto || '';
+    const abre = lg==='C';
+    tds += '<td><div class="fin-cell">' +
+      (pg==null?'<div class="text-slate-300">—</div>':'<div style="font-weight:800;font-size:16px">'+pg+'</div>') +
+      '<span class="eq-letter '+(lg?eqClass(lg):'eq-none')+'">'+(lg||'—')+'</span></div></td>';
+    tds += '<td style="min-width:160px">' +
+      (abre
+        ? '<textarea class="av-conc" data-nom="'+encodeURIComponent(al.nombre)+'" placeholder="Conclusión descriptiva (obligatoria porque el promedio es C)" style="width:100%;min-height:54px;font-size:11px;border:1.5px solid #f87171;border-radius:8px;padding:6px">'+txt.replace(/</g,'&lt;')+'</textarea>'
+        : '<div class="text-[10px] text-slate-400">'+(txt?txt.slice(0,80):'—')+'</div>') +
+      '</td>';
     return '<tr>'+tds+'</tr>';
   }).join('');
 
   box.innerHTML = '<div class="fin-wrap"><table class="fin-grid"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  box.querySelectorAll('.av-conc').forEach(el => {
+    el.addEventListener('change', function() {
+      if (!store.concArea) store.concArea = {};
+      const nom = decodeURIComponent(el.dataset.nom);
+      const k = concAreaKey(nom);
+      const t = el.value.trim();
+      if (!t) delete store.concArea[k];
+      else store.concArea[k] = { texto: t, ts: Date.now() };
+      saveStore();
+    });
+  });
 }
 
 function volverHome() {
