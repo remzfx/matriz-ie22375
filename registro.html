@@ -328,7 +328,8 @@
         <label class="text-[10px] font-bold text-slate-500">Capacidad / evidencia a evaluar</label>
         <input type="text" id="inpCapacidad" placeholder="Escribe la capacidad o evidencia…" onchange="onSesionChange()" onblur="onSesionChange()">
       </div>
-      <button type="button" class="btn btn-primary w-full text-sm" onclick="activarSesion()">Listo · Calificar esta capacidad</button>
+      <button type="button" class="btn btn-primary w-full text-sm" onclick="activarSesion()">Agregar a la grilla</button>
+      <div id="chipsCaps" class="flex flex-wrap gap-1"></div>
     </div>
     <div class="card p-3" id="wrapSesiones">
       <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS (este bimestre / área)</div>
@@ -472,8 +473,9 @@ function loadStore() {
   if (!store.meta) store.meta = {};
   if (!store.asistencia) store.asistencia = {}; // key ctx||fecha||nombre -> 'P'|'F'|'T'|'J'|''
   if (!store.asisFechas) store.asisFechas = {}; // key ctx -> [fechas]
-  if (!store.finales) store.finales = {}; // key nivel||bim||grado||seccion||area||comp||nombre -> {nota20,nivel,ts}
-  if (!store.concArea) store.concArea = {}; // key nivel||bim||grado||seccion||area||nombre -> {texto,ts}
+  if (!store.finales) store.finales = {};
+  if (!store.concArea) store.concArea = {};
+  if (!store.capsSel) store.capsSel = {};
 }
 function saveStore() {
   store._ts = Date.now();
@@ -892,10 +894,12 @@ function onContexto() {
   aplicarDocenteSesion();
   // Al cambiar contexto: limpiar capacidad (fecha la elige el docente)
   fillCaps();
+  loadCapsElegidas();
+  renderChipsCaps();
   sesionActiva = null;
   notas = {};
   markClean();
-  document.getElementById('lblSesionActiva').textContent = 'Define fecha, competencia y capacidad arriba';
+  document.getElementById('lblSesionActiva').textContent = 'Agrega las capacidades que evaluarás hoy';
   updateHdr();
   renderSesiones();
   renderStudents();
@@ -1003,9 +1007,11 @@ function onCompChange() {
     }
   }
   fillCaps();
+  loadCapsElegidas();
+  renderChipsCaps();
   sesionActiva = null;
   notas = {};
-  document.getElementById('lblSesionActiva').textContent = 'Define fecha, competencia y capacidad arriba';
+  document.getElementById('lblSesionActiva').textContent = 'Agrega las capacidades que evaluarás hoy';
   renderSesiones();
   renderStudents();
 }
@@ -1031,6 +1037,8 @@ function pad2(n) {
 }
 
 function onSesionChange() {
+  loadCapsElegidas();
+  renderChipsCaps();
   renderStudents();
 }
 
@@ -1061,25 +1069,21 @@ function activarSesion() {
     }
   }
 
-  sesionActiva = { fecha, unidad, comp, capacidad };
-  // register session in store if new
-  const id = sessionId(sesionActiva);
-  if (!store.sessions.find(s => sessionId(s) === id)) {
-    store.sessions.push({
-      ...ctxBase(),
-      ...sesionActiva,
-      docente: document.getElementById('inpDocente').value.trim(),
-      ts: Date.now()
-    });
-    saveStore();
+  loadCapsElegidas();
+  if (capsElegidas.indexOf(capacidad) >= 0) {
+    toast('Esa capacidad ya está en la grilla');
+    renderChipsCaps();
+    renderStudents();
+    return;
   }
-  loadNotasSesion();
+  capsElegidas.push(capacidad);
+  saveCapsElegidas();
+  sesionActiva = { fecha, unidad, comp, capacidad };
+  upsertSesionCap(comp, capacidad);
+  renderChipsCaps();
   renderSesiones();
   renderStudents();
-  document.getElementById('lblSesionActiva').textContent =
-    fecha + ' · ' + capacidad + (unidad ? ' · U' + unidad : '');
-  toast('Sesión lista');
-  document.getElementById('wrapCalificar').scrollIntoView({ behavior:'smooth', block:'start' });
+  toast('Capacidad agregada');
 }
 
 function loadNotasSesion() {
@@ -1265,15 +1269,42 @@ function cerrarModal(ok) {
   renderStudents();
 }
 
-function colsCalificar() {
+let capsElegidas = [];
+function keyCapsHoy() {
+  const c = ctxBase();
   const comp = (document.getElementById('selComp')||{}).value || '';
-  const ofic = capsOficiales(comp);
-  const extra = capsDeComp(comp).map(x => x.capacidad).filter(c => ofic.indexOf(c) < 0);
-  const otra = capacidadElegida();
-  const cols = ofic.slice();
-  extra.forEach(c => { if (c && cols.indexOf(c) < 0) cols.push(c); });
-  if (otra && cols.indexOf(otra) < 0) cols.push(otra);
-  return cols;
+  const fecha = (document.getElementById('inpFecha')||{}).value || '';
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, fecha].join('||');
+}
+function loadCapsElegidas() {
+  if (!store.capsSel) store.capsSel = {};
+  capsElegidas = (store.capsSel[keyCapsHoy()] || []).slice();
+}
+function saveCapsElegidas() {
+  if (!store.capsSel) store.capsSel = {};
+  store.capsSel[keyCapsHoy()] = capsElegidas.slice();
+  saveStore();
+}
+function renderChipsCaps() {
+  const box = document.getElementById('chipsCaps');
+  if (!box) return;
+  if (!capsElegidas.length) {
+    box.innerHTML = '<span class="text-[11px] text-slate-400">Aún no hay columnas. Elige una capacidad y pulsa Agregar.</span>';
+    return;
+  }
+  box.innerHTML = capsElegidas.map((c,i) =>
+    '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-sky-50 text-sky-800 text-[11px] font-bold">C'+(i+1)+' · '+c.slice(0,42)+(c.length>42?'…':'')+
+    ' <button type="button" class="text-sky-500" onclick="quitarCapGrilla('+i+')">✕</button></span>'
+  ).join('');
+}
+function quitarCapGrilla(i) {
+  capsElegidas.splice(i,1);
+  saveCapsElegidas();
+  renderChipsCaps();
+  renderStudents();
+}
+function colsCalificar() {
+  return capsElegidas.slice();
 }
 function capKeyHoy(comp, cap, nombre) {
   const c = ctxBase();
@@ -1296,7 +1327,7 @@ function renderStudents() {
   const fecha = (document.getElementById('inpFecha')||{}).value || '';
   const comp = (document.getElementById('selComp')||{}).value || '';
   if (!fecha || !comp) {
-    box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Elige <b>fecha</b> y <b>competencia</b>. La grilla muestra las capacidades oficiales; escribe 0–20 en la columna del día.</p>';
+    box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Elige fecha y competencia. Luego agrega 1 o 2 capacidades del día.</p>';
     actualizarContadores();
     return;
   }
@@ -1306,6 +1337,11 @@ function renderStudents() {
     return;
   }
   const cols = colsCalificar();
+  if (!cols.length) {
+    box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">No hay columnas. Elige una capacidad CNEB (o Otra) y pulsa <b>Agregar a la grilla</b>.</p>';
+    actualizarContadores();
+    return;
+  }
   const activa = capacidadElegida();
   const bloqueado = bimCerradoDocente();
   const lbl = document.getElementById('lblSesionActiva');
