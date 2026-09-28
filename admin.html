@@ -462,9 +462,9 @@ function doLogin() {
 
 function logout() {
   sessionStorage.removeItem('ie22375_admin_ok');
-  document.getElementById('screenApp').classList.remove('active');
-  document.getElementById('screenLogin').classList.add('active');
-  document.getElementById('loginPass').value = '';
+  sessionStorage.removeItem('ie22375_session_v1');
+  localStorage.removeItem('ie22375_session_v1');
+  location.replace('index.html');
 }
 
 function showTab(id) {
