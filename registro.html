@@ -1046,11 +1046,10 @@ function onSesionChange() {
   loadCapsElegidas();
   const c = ctxBase();
   const fecha = (document.getElementById('inpFecha')||{}).value || '';
-  const comp = (document.getElementById('selComp')||{}).value || '';
   (store.sessions||[]).forEach(s => {
     if (s.nivel===c.nivel && s.bim===c.bim && String(s.grado)===String(c.grado) &&
-        s.seccion===c.seccion && s.area===c.area && s.comp===comp && s.fecha===fecha && s.capacidad) {
-      if (capsElegidas.indexOf(s.capacidad) < 0) capsElegidas.push(s.capacidad);
+        s.seccion===c.seccion && s.area===c.area && s.fecha===fecha && s.capacidad) {
+      if (!tieneCapSel(s.comp, s.capacidad)) capsElegidas.push({ comp: s.comp, cap: s.capacidad });
     }
   });
   saveCapsElegidas();
@@ -1086,13 +1085,13 @@ function activarSesion() {
   }
 
   loadCapsElegidas();
-  if (capsElegidas.indexOf(capacidad) >= 0) {
+  if (tieneCapSel(comp, capacidad)) {
     toast('Esa capacidad ya está en la grilla');
     renderChipsCaps();
     renderStudents();
     return;
   }
-  capsElegidas.push(capacidad);
+  capsElegidas.push({ comp: comp, cap: capacidad });
   saveCapsElegidas();
   sesionActiva = { fecha, unidad, comp, capacidad };
   upsertSesionCap(comp, capacidad);
@@ -1114,11 +1113,11 @@ function loadNotasSesion() {
 
 function recolectarPantalla() {
   try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
-  const comp = (document.getElementById('selComp')||{}).value || '';
   document.querySelectorAll('.cal-nota').forEach(inp => {
     if (inp.readOnly) return;
     const nombre = decodeURIComponent(inp.dataset.nom || '');
     const cap = decodeURIComponent(inp.dataset.cap || '');
+    const comp = decodeURIComponent(inp.dataset.comp || '') || ((document.getElementById('selComp')||{}).value || '');
     if (!nombre || !cap || !comp) return;
     let n = inp.value === '' ? '' : Number(inp.value);
     if (n !== '' && (isNaN(n) || n < 0 || n > 20)) return;
@@ -1219,8 +1218,8 @@ function renderSesiones() {
     fillCaps();
     setCapacidadUI(s.capacidad || '');
     loadCapsElegidas();
-    if (s.capacidad && capsElegidas.indexOf(s.capacidad) < 0) {
-      capsElegidas.push(s.capacidad);
+    if (s.capacidad && !tieneCapSel(s.comp, s.capacidad)) {
+      capsElegidas.push({ comp: s.comp, cap: s.capacidad });
       saveCapsElegidas();
     }
     sesionActiva = { fecha: s.fecha, unidad: s.unidad || '', comp: s.comp, capacidad: s.capacidad };
@@ -1337,13 +1336,22 @@ function cerrarModal(ok) {
 let capsElegidas = [];
 function keyCapsHoy() {
   const c = ctxBase();
-  const comp = (document.getElementById('selComp')||{}).value || '';
   const fecha = (document.getElementById('inpFecha')||{}).value || '';
-  return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, fecha].join('||');
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area, fecha].join('||');
+}
+function normCapItem(x, fallbackComp) {
+  if (!x) return null;
+  if (typeof x === 'string') return { comp: fallbackComp || '', cap: x };
+  if (x.cap) return { comp: x.comp || fallbackComp || '', cap: x.cap };
+  return null;
+}
+function tieneCapSel(comp, cap) {
+  return capsElegidas.some(x => x.comp === comp && x.cap === cap);
 }
 function loadCapsElegidas() {
   if (!store.capsSel) store.capsSel = {};
-  capsElegidas = (store.capsSel[keyCapsHoy()] || []).slice();
+  const fb = (document.getElementById('selComp')||{}).value || '';
+  capsElegidas = (store.capsSel[keyCapsHoy()] || []).map(x => normCapItem(x, fb)).filter(Boolean);
 }
 function saveCapsElegidas() {
   if (!store.capsSel) store.capsSel = {};
@@ -1354,13 +1362,15 @@ function renderChipsCaps() {
   const box = document.getElementById('chipsCaps');
   if (!box) return;
   if (!capsElegidas.length) {
-    box.innerHTML = '<span class="text-[11px] text-slate-400">Aún no hay columnas. Elige una capacidad y pulsa Agregar.</span>';
+    box.innerHTML = '<span class="text-[11px] text-slate-400">Aún no hay columnas. Puedes agregar capacidades de 1, 2 o 3 competencias el mismo día.</span>';
     return;
   }
-  box.innerHTML = capsElegidas.map((c,i) =>
-    '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-sky-50 text-sky-800 text-[11px] font-bold">C'+(i+1)+' · '+c.slice(0,42)+(c.length>42?'…':'')+
-    ' <button type="button" class="text-sky-500" onclick="quitarCapGrilla('+i+')">✕</button></span>'
-  ).join('');
+  box.innerHTML = capsElegidas.map((c,i) => {
+    const t = (c.cap || '').slice(0,36) + ((c.cap||'').length>36?'…':'');
+    const short = (c.comp || '').split(' ').slice(0,3).join(' ');
+    return '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-sky-50 text-sky-800 text-[11px] font-bold">'+short+' · '+t+
+    ' <button type="button" class="text-sky-500" onclick="quitarCapGrilla('+i+')">✕</button></span>';
+  }).join('');
 }
 function quitarCapGrilla(i) {
   capsElegidas.splice(i,1);
@@ -1391,8 +1401,8 @@ function renderStudents() {
   const box = document.getElementById('stuList');
   const fecha = (document.getElementById('inpFecha')||{}).value || '';
   const comp = (document.getElementById('selComp')||{}).value || '';
-  if (!fecha || !comp) {
-    box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Elige fecha y competencia. Luego agrega 1 o 2 capacidades del día.</p>';
+  if (!fecha) {
+    box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Elige la fecha. Luego agrega las capacidades del día (pueden ser de varias competencias).</p>';
     actualizarContadores();
     return;
   }
@@ -1407,30 +1417,29 @@ function renderStudents() {
     actualizarContadores();
     return;
   }
-  const activa = capacidadElegida();
   const bloqueado = bimCerradoDocente();
   const lbl = document.getElementById('lblSesionActiva');
-  if (lbl) lbl.textContent = fecha + ' · ' + comp + (activa ? ' · ' + activa : '');
+  if (lbl) lbl.textContent = fecha + ' · ' + cols.length + ' capacidad(es)';
 
   let head = '<th class="fin-nom">Estudiante</th>';
-  cols.forEach((cap, i) => {
-    const on = activa && cap === activa;
-    head += '<th'+(on?' style="background:#0369a1"':'')+'>C'+(i+1)+'<div class="fin-caps">'+cap+'</div></th>';
+  cols.forEach((col, i) => {
+    head += '<th>C'+(i+1)+'<div class="fin-caps">'+(col.comp||'')+'<br>'+(col.cap||'')+'</div></th>';
   });
 
   let cAD=0,cA=0,cB=0,cC=0;
   const rows = list.map((al, i) => {
     let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
-    cols.forEach(cap => {
-      const k = capKeyHoy(comp, cap, al.nombre);
+    cols.forEach(col => {
+      const k = capKeyHoy(col.comp, col.cap, al.nombre);
       const g = store.grades[k] || {};
       let nota = (g.nota20!=='' && g.nota20!=null) ? g.nota20 : '';
       let letra = g.nivel || (nota!=='' ? numToLetter(nota) : '');
       if (letra==='AD') cAD++; else if (letra==='A') cA++; else if (letra==='B') cB++; else if (letra==='C') cC++;
       const encN = encodeURIComponent(al.nombre);
-      const encC = encodeURIComponent(cap);
+      const encC = encodeURIComponent(col.cap);
+      const encP = encodeURIComponent(col.comp);
       tds += '<td><div class="fin-cell">' +
-        '<input type="number" min="0" max="20" step="1" class="cal-nota" '+(bloqueado?'readonly':'')+' data-nom="'+encN+'" data-cap="'+encC+'" value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
+        '<input type="number" min="0" max="20" step="1" class="cal-nota" '+(bloqueado?'readonly':'')+' data-nom="'+encN+'" data-cap="'+encC+'" data-comp="'+encP+'" value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
         '<span class="eq-letter '+(letra?eqClass(letra):'eq-none')+'">'+(letra||'—')+'</span></div></td>';
     });
     return '<tr>'+tds+'</tr>';
@@ -1448,6 +1457,7 @@ function renderStudents() {
       if (inp.readOnly) return;
       const nombre = decodeURIComponent(inp.dataset.nom);
       const cap = decodeURIComponent(inp.dataset.cap);
+      const cp = decodeURIComponent(inp.dataset.comp || '') || ((document.getElementById('selComp')||{}).value || '');
       let n = inp.value === '' ? '' : Number(inp.value);
       if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); inp.value = ''; n = ''; }
       if (n !== '') n = Math.round(n);
@@ -1458,8 +1468,8 @@ function renderStudents() {
         badge.className = 'eq-letter ' + (letra ? eqClass(letra) : 'eq-none');
       }
       if (n !== '') inp.value = pad2(n);
-      upsertSesionCap(comp, cap);
-      const k = capKeyHoy(comp, cap, nombre);
+      upsertSesionCap(cp, cap);
+      const k = capKeyHoy(cp, cap, nombre);
       if (n === '') delete store.grades[k];
       else store.grades[k] = { nota20: n, nivel: letra, ts: Date.now() };
       saveStore();
