@@ -258,8 +258,8 @@
     <div class="flex gap-2 flex-wrap">
       <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
       <button type="button" id="tabFin" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('fin')">Promedios</button>
+      <button type="button" id="tabAv" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('av')">Resumen</button>
       <button type="button" id="tabAs" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('as')">Asistencia</button>
-      <button type="button" id="tabAv" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('av')">Ver avance</button>
       <button type="button" class="btn btn-ghost flex-1 text-sm" onclick="prepararImpresion()">🖨 Imprimir / PDF</button>
     </div>
 
@@ -316,7 +316,7 @@
       <div class="card p-3">
         <div class="flex items-center justify-between gap-2 mb-2">
           <div>
-            <div class="text-[10px] font-bold text-slate-500">AVANCE DEL BIMESTRE</div>
+            <div class="text-[10px] font-bold text-slate-500">RESUMEN DEL BIMESTRE</div>
             <div class="text-sm font-bold" id="lblAvanceCtx">—</div>
           </div>
           <button type="button" class="btn btn-ghost text-xs !py-1.5" onclick="renderAvance()">Actualizar</button>
@@ -1298,7 +1298,7 @@ function prepararImpresion() {
       'Falta conclusión descriptiva en promedios que la requieren:\n\n' +
       lista + extra +
       '\n\nRegla: conclusión obligatoria si el promedio general del área es C.\n' +
-      'Escríbala en Ver avance.\n\n' +
+      'Escríbala en Resumen.\n\n' +
       '¿Desea imprimir de todas formas?'
     );
     if (!ok) return;
