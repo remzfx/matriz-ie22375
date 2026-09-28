@@ -289,13 +289,7 @@
           </div>
           <button type="button" class="btn btn-ghost text-xs !py-1.5" onclick="renderAvance()">Actualizar</button>
         </div>
-        <div class="flex flex-wrap gap-1 mb-2" id="fuenteResumenBtns">
-          <button type="button" class="btn btn-ghost text-[11px] !py-1 !px-2" data-fr="auto" onclick="setFuenteResumen('auto')">Automático</button>
-          <button type="button" class="btn btn-ghost text-[11px] !py-1 !px-2" data-fr="cal" onclick="setFuenteResumen('cal')">Calificar</button>
-          <button type="button" class="btn btn-ghost text-[11px] !py-1 !px-2" data-fr="fin" onclick="setFuenteResumen('fin')">Promedios</button>
-          <button type="button" class="btn btn-ghost text-[11px] !py-1 !px-2" data-fr="ambos" onclick="setFuenteResumen('ambos')">Ambos</button>
-        </div>
-        <p class="text-[11px] text-slate-500 mb-2">Automático: si hay evidencias en Calificar, esas mandan; si no, usa Promedios. La conclusión C usa el promedio oficial (Automático).</p>
+        <p class="text-[11px] text-slate-500 mb-2">Promedio general del área. Conclusión solo si ese promedio es C.</p>
         <div id="avanceBox"></div>
       </div>
     </div>
@@ -1695,13 +1689,19 @@ function concAreaKey(nombre) {
   const c = ctxBase();
   return [c.nivel, c.bim, c.grado, c.seccion, c.area, nombre].join('||');
 }
-function notaCompAlumno(comp, nombre) {
-  if (compTieneSesiones(comp)) return notaDesdeSesiones(comp, nombre);
+function notaDirectaAlumno(comp, nombre) {
   const f = store.finales[finalKey(comp, nombre)];
   if (!f) return { nota:'', letra:'' };
   const nota = (f.nota20!=='' && f.nota20!=null && !isNaN(Number(f.nota20))) ? Number(f.nota20) : '';
   const letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
   return { nota, letra };
+}
+function notaCompAlumno(comp, nombre) {
+  const dir = notaDirectaAlumno(comp, nombre);
+  if (dir.nota !== '' && dir.nota != null) return { nota: dir.nota, letra: dir.letra, src: 'P' };
+  const ev = notaDesdeSesiones(comp, nombre);
+  if (ev.nota !== '' && ev.nota != null) return { nota: ev.nota, letra: ev.letra, src: 'C' };
+  return { nota:'', letra:'', src:'' };
 }
 function promGeneralAlumno(nombre, comps) {
   const nums = [];
@@ -1792,27 +1792,21 @@ function renderFinales() {
   const rows = alumnos.map((al, i) => {
     let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
     comps.forEach(cp => {
-      const lock = bloqueado || compTieneSesiones(cp);
-      let nota='', letra='', conc='';
-      if (compTieneSesiones(cp)) {
-        const d = notaDesdeSesiones(cp, al.nombre);
-        nota = d.nota; letra = d.letra;
-      } else {
-        const f = store.finales[finalKey(cp, al.nombre)];
-        if (f) {
-          nota = (f.nota20!=='' && f.nota20!=null) ? f.nota20 : '';
-          letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
-          conc = f.conclusion || '';
-        }
-      }
-      if (letra==='AD') cAD++; else if (letra==='A') cA++; else if (letra==='B') cB++; else if (letra==='C') cC++;
-      if (letra) cV++;
+      const lock = bloqueado;
+      const dir = notaDirectaAlumno(cp, al.nombre);
+      const ev = notaDesdeSesiones(cp, al.nombre);
+      const ofi = notaCompAlumno(cp, al.nombre);
+      let nota='', letra='';
+      if (dir.nota !== '' && dir.nota != null) { nota = dir.nota; letra = dir.letra; }
+      if (ofi.letra==='AD') cAD++; else if (ofi.letra==='A') cA++; else if (ofi.letra==='B') cB++; else if (ofi.letra==='C') cC++;
+      if (ofi.letra) cV++;
       cTot++;
       const encN = encodeURIComponent(al.nombre);
       const encC = encodeURIComponent(cp);
       tds += '<td><div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
         '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
-        '<span class="eq-letter '+(letra?eqClass(letra):'eq-none')+'">'+(letra||'—')+'</span>' +
+        '<span class="eq-letter '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'">'+(letra||ofi.letra||'—')+'</span>' +
+        (dir.nota==='' && ev.nota!=='' ? '<div class="text-[10px] text-slate-400">Cal '+pad2(ev.nota)+'</div>' : '') +
         '</div></td>';
     });
     return '<tr>'+tds+'</tr>';
@@ -2062,33 +2056,12 @@ function promedioNums(arr) {
   return Math.round(v.reduce((a,b)=>a+b,0) / v.length);
 }
 
-let fuenteResumen = (function(){ try { return localStorage.getItem('ie22375_fuente_resumen') || 'auto'; } catch(e){ return 'auto'; } })();
-function setFuenteResumen(v) {
-  fuenteResumen = v;
-  try { localStorage.setItem('ie22375_fuente_resumen', v); } catch(e) {}
-  renderAvance();
-}
-function notaDirectaComp(comp, nombre) {
-  const f = store.finales[finalKey(comp, nombre)];
-  if (!f) return { prom:null, letra:'' };
-  if (f.nota20!=='' && f.nota20!=null && !isNaN(Number(f.nota20))) {
-    const prom = Number(f.nota20);
-    return { prom, letra: f.nivel || numToLetter(prom) };
-  }
-  if (f.nivel) {
-    const mid = letterToNum(f.nivel);
-    return { prom: mid===''?null:Number(mid), letra: f.nivel };
-  }
-  return { prom:null, letra:'' };
-}
 function renderAvance() {
   const box = document.getElementById('avanceBox');
   const c = ctxBase();
   document.getElementById('lblAvanceCtx').textContent =
     (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + ' · Bim ' + c.bim + ' · ' + (c.area||'');
-  document.querySelectorAll('#fuenteResumenBtns [data-fr]').forEach(b => {
-    b.className = 'btn text-[11px] !py-1 !px-2 ' + (b.dataset.fr === fuenteResumen ? 'btn-primary' : 'btn-ghost');
-  });
+  /* resumen por alumno: Promedios si hay, si no Calificar */
 
   const comps = competencias();
   const alumnos = estudiantes();
@@ -2138,21 +2111,8 @@ function renderAvance() {
           if (mid !== '') nums.push(Number(mid));
         }
       });
-      const evProm = promedioNums(nums);
-      const evLet = evProm != null ? numToLetter(evProm) : '';
-      const dir = notaDirectaComp(comp, al.nombre);
-      let prom = null, letra = '', extra = '';
-      if (fuenteResumen === 'cal') { prom = evProm; letra = evLet; }
-      else if (fuenteResumen === 'fin') { prom = dir.prom; letra = dir.letra; }
-      else if (fuenteResumen === 'ambos') {
-        prom = evProm != null ? evProm : dir.prom;
-        letra = evLet || dir.letra;
-        extra = (evProm!=null?'Ev '+evProm:'Ev —') + ' · ' + (dir.prom!=null?'Pr '+dir.prom:'Pr —');
-      } else {
-        if (evProm != null) { prom = evProm; letra = evLet; }
-        else { prom = dir.prom; letra = dir.letra; }
-      }
-      return { prom, letra, extra };
+      const ofi = notaCompAlumno(comp, al.nombre);
+      return { prom: ofi.nota===''?null:Number(ofi.nota), letra: ofi.letra };
     });
     aula[comp] = {
       caps: evidencias,
@@ -2181,9 +2141,7 @@ function renderAvance() {
       if (r.prom!=null && r.prom!=='') nums.push(Number(r.prom));
       tds += '<td><div class="fin-cell">' +
         (r.prom!=null ? '<div style="font-weight:800;font-size:16px">'+pad2(r.prom)+'</div>' : '<div class="text-slate-300">—</div>') +
-        '<span class="eq-letter '+(r.letra?eqClass(r.letra):'eq-none')+'">'+(r.letra||'—')+'</span>' +
-        (r.extra ? '<div class="text-[10px] text-slate-500 text-center leading-tight">'+r.extra+'</div>' : '') +
-        '</div></td>';
+        '<span class="eq-letter '+(r.letra?eqClass(r.letra):'eq-none')+'">'+(r.letra||'—')+'</span></div></td>';
     });
     const pg = promedioNums(nums);
     const lg = pg==null?'':numToLetter(pg);
