@@ -288,18 +288,9 @@
     <!-- PANEL AVANCE -->
     <div class="panel-av" id="panelAvance">
       <div class="card p-3">
-        <div class="flex items-center justify-between gap-2 mb-2">
-          <div>
-            <div class="text-[10px] font-bold text-slate-500">RESUMEN DEL BIMESTRE</div>
-            <div class="text-sm font-bold" id="lblAvanceCtx">—</div>
-          </div>
-          <div class="flex items-center gap-2">
-            <div class="mode-toggle" style="min-width:180px">
-              <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
-              <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
-            </div>
-            <button type="button" class="btn btn-ghost text-xs !py-1.5" onclick="renderAvance()">Actualizar</button>
-          </div>
+        <div class="mb-2">
+          <div class="text-[10px] font-bold text-slate-500">RESUMEN DEL BIMESTRE</div>
+          <div class="text-sm font-bold" id="lblAvanceCtx">—</div>
         </div>
         <p class="text-[11px] text-slate-500 mb-2" id="lblReglaConc">Promedio general del área. Conclusión: primaria B o C · secundaria solo C.</p>
         <div id="avanceBox"></div>
