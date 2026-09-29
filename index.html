@@ -101,26 +101,36 @@ function loadDocentesLocal() {
 function loadDocentes() {
   return loadDocentesLocal();
 }
+async function fetchConTiempo(url, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+    return r;
+  } finally { clearTimeout(t); }
+}
 async function asegurarDocentesRemotos() {
   try {
-    const r = await fetch(CLOUD_API_URL + '?action=loaddoc&t=' + Date.now(), { cache: 'no-store' });
-    if (r.ok) {
+    const r = await fetchConTiempo(CLOUD_API_URL + '?action=loaddoc&t=' + Date.now(), 2800);
+    if (r && r.ok) {
       const data = await r.json();
       const list = (data && data.ok && Array.isArray(data.docentes)) ? data.docentes : [];
       if (list.length) {
         localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
-        return;
+        return true;
       }
     }
   } catch (e) {}
-  if (loadDocentesLocal().length) return;
+  if (loadDocentesLocal().length) return true;
   try {
-    const r = await fetch('docentes.json?t=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) return;
+    const r = await fetchConTiempo('docentes.json?t=' + Date.now(), 2000);
+    if (!r || !r.ok) return false;
     const data = await r.json();
     const list = Array.isArray(data) ? data : (data.docentes || []);
     if (list.length) localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
+    return list.length > 0;
   } catch(e) {}
+  return false;
 }
 const SESSION_MS = 12 * 60 * 60 * 1000;
 function leerSesionCruda() {
@@ -162,7 +172,6 @@ function onTipoChange() {
 async function intentarLogin() {
   const err = document.getElementById('loginErr');
   err.classList.add('hidden');
-  await asegurarDocentesRemotos();
   const tipo = document.getElementById('inpTipo').value;
   const pass = (document.getElementById('inpPass').value || '').trim();
   if (!pass) {
@@ -173,7 +182,7 @@ async function intentarLogin() {
   if (tipo === 'admin') {
     const custom = localStorage.getItem('ie22375_admin_pass');
     if (pass !== (custom || ADMIN_PASS)) {
-      err.textContent = 'Contraseña de administrador incorrecta.';
+      err.textContent = 'La contraseña no es correcta.';
       err.classList.remove('hidden');
       return;
     }
@@ -185,7 +194,7 @@ async function intentarLogin() {
   }
   if (tipo === 'auxiliar') {
     if (pass !== 'aux22375') {
-      err.textContent = 'Contraseña de auxiliar incorrecta.';
+      err.textContent = 'La contraseña no es correcta.';
       err.classList.remove('hidden');
       return;
     }
@@ -197,7 +206,7 @@ async function intentarLogin() {
   }
   if (tipo === 'pip') {
     if (pass !== 'pip22375') {
-      err.textContent = 'Contraseña de PIP incorrecta.';
+      err.textContent = 'La contraseña no es correcta.';
       err.classList.remove('hidden');
       return;
     }
@@ -209,12 +218,21 @@ async function intentarLogin() {
   }
   const docUser = document.getElementById('inpDocUser').value.trim().toLowerCase();
   if (!docUser) { err.textContent = 'Ingrese su usuario de docente.'; err.classList.remove('hidden'); return; }
-  const d = loadDocentes().find(x => x.user === docUser && x.pass === pass);
+  let d = loadDocentes().find(x => String(x.user||'').toLowerCase() === docUser && x.pass === pass);
   if (!d) {
-    err.textContent = 'Usuario o contraseña incorrectos. Solicite acceso al administrador.';
+    err.textContent = 'Comprobando usuarios…';
+    err.classList.remove('hidden');
+    await asegurarDocentesRemotos();
+    d = loadDocentes().find(x => String(x.user||'').toLowerCase() === docUser && x.pass === pass);
+  } else {
+    asegurarDocentesRemotos();
+  }
+  if (!d) {
+    err.textContent = 'La contraseña no es correcta.';
     err.classList.remove('hidden');
     return;
   }
+  err.classList.add('hidden');
   setSession({
     user: d.user, label: d.nombre || d.user, nivel: d.nivel, role: 'docente',
     grados: d.nivel === 'primaria' ? (d.grados || []) : null,
