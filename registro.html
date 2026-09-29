@@ -295,10 +295,9 @@
         <p class="text-[11px] text-slate-500 mb-2" id="lblReglaConc">Promedio general del área. Conclusión: primaria B o C · secundaria solo C.</p>
         <div id="avanceBox"></div>
         <div class="mt-3 space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
-          <div class="text-[11px] font-bold text-slate-600">Excel oficial SIAGIE</div>
-          <p class="text-[11px] text-slate-500">Aquí se sube el archivo <b>RegNotas_….xlsx</b> que bajaste de SIAGIE (no el CSV).</p>
-          <input type="file" id="inpSiagieXlsPanel" accept=".xlsx,.xls" class="text-xs w-full">
-          <button type="button" class="btn btn-primary w-full text-sm" onclick="procesarSiagie()">Validar y rellenar</button>
+          <div class="text-sm font-black text-slate-700">Cierre de área</div>
+          <p class="text-[11px] text-slate-500">Usted solo <b>Guarda</b> y da <b>Nube ↑</b>. El director vacía al SIAGIE desde Admin cuando el aula esté completa.</p>
+          <button type="button" class="btn btn-ghost w-full text-sm" onclick="procesarSiagie()">Revisar si falta algo en mi área</button>
         </div>
       </div>
     </div>
@@ -932,6 +931,7 @@ function onContexto() {
   if (fin && fin.classList.contains('on')) renderFinales();
   else if (av && av.classList.contains('on')) renderAvance();
   else if (asis && asis.classList.contains('on')) renderAsistencia();
+  consultarEstadoSiagie();
 }
 
 function guardarMeta() {
@@ -1595,6 +1595,37 @@ function validarConclusionesOficial(c, alumnos, sess) {
   return faltan;
 }
 
+let siagieHabilitado = false;
+let siagieTplMeta = null;
+async function consultarEstadoSiagie() {
+  const lbl = document.getElementById('lblSiagieEstado');
+  const btn = document.getElementById('btnSiagieProc');
+  siagieHabilitado = false;
+  siagieTplMeta = null;
+  if (lbl) { lbl.textContent = 'SIAGIE: comprobando…'; lbl.className = 'text-sm font-black text-slate-500'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Aún no se puede procesar al SIAGIE'; }
+  const c = ctxBase();
+  if (!c.nivel || !c.bim || !c.grado) return;
+  try {
+    const url = CLOUD_API_URL + '?action=loadtplstatus&nivel=' + encodeURIComponent(c.nivel) +
+      '&bimestre=' + encodeURIComponent(c.bim) + '&grado=' + encodeURIComponent(c.grado) +
+      '&seccion=' + encodeURIComponent(c.seccion) + '&t=' + Date.now();
+    const r = await fetch(url, { cache:'no-store' });
+    const data = JSON.parse(await r.text());
+    const items = (data && data.items) || [];
+    const hit = items.find(it => String(it.grado)===String(c.grado) && String(it.seccion)===String(c.seccion) && String(it.bimestre)===String(c.bim));
+    if (hit) {
+      siagieHabilitado = true;
+      siagieTplMeta = hit;
+      if (lbl) { lbl.textContent = 'Habilitado para SIAGIE · ' + (hit.filename||'RegNotas'); lbl.className = 'text-sm font-black text-emerald-700'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Validar y procesar a SIAGIE'; }
+    } else {
+      if (lbl) { lbl.textContent = 'Aún no se puede procesar al SIAGIE'; lbl.className = 'text-sm font-black text-amber-700'; }
+    }
+  } catch (e) {
+    if (lbl) { lbl.textContent = 'Aún no se puede procesar al SIAGIE'; lbl.className = 'text-sm font-black text-amber-700'; }
+  }
+}
 function informeSiagie() {
   guardarTodo();
   const c = ctxBase();
@@ -1628,8 +1659,7 @@ function procesarSiagie() {
   document.getElementById('siagieCtx').textContent = ctx;
   let html = '';
   if (inf.ok) {
-    html += '<div class="rounded-lg bg-emerald-50 text-emerald-800 p-3 font-bold">Listo para SIAGIE. No hay vacíos ni conclusiones pendientes.</div>';
-    html += '<p class="text-[12px] text-slate-500">Cargue el Excel que bajó de SIAGIE. El sistema escribirá las letras y conclusiones <b>sin cambiar ID, código ni nombre de archivo</b>.</p>';
+    html += '<div class="rounded-lg bg-emerald-50 text-emerald-800 p-3 font-bold">Área completa. Suba a la nube (Nube ↑) para que el director la vacíe a SIAGIE.</div>';
   } else {
     html += '<div class="rounded-lg bg-red-50 text-red-800 p-3 font-bold">No se puede procesar todavía.</div>';
     if (inf.faltanNota.length) {
@@ -1646,14 +1676,10 @@ function procesarSiagie() {
     }
   }
   document.getElementById('siagieBody').innerHTML = html;
-  document.getElementById('btnSiagieOk').classList.toggle('hidden', !inf.ok);
+  const okb = document.getElementById('btnSiagieOk');
+  if (okb) okb.classList.add('hidden');
   const up = document.getElementById('siagieUpload');
-  if (up) up.classList.toggle('hidden', !inf.ok);
-  const ya = document.getElementById('inpSiagieXlsPanel');
-  if (inf.ok && ya && ya.files && ya.files[0]) {
-    rellenarSiagieExcel();
-    return;
-  }
+  if (up) up.classList.add('hidden');
   document.getElementById('modalSiagie').classList.remove('hidden');
 }
 function cerrarSiagie() {
@@ -1719,17 +1745,30 @@ function compsDeArea(area) {
 async function rellenarSiagieExcel() {
   const inf = informeSiagie();
   if (!inf.ok) { procesarSiagie(); return; }
-  const inp = document.getElementById('inpSiagieXlsPanel') || document.getElementById('inpSiagieXls');
-  if (!inp || !inp.files || !inp.files[0]) {
-    alert('En Resumen, elija el Excel oficial RegNotas_….xlsx que descargó de SIAGIE.');
-    return;
-  }
   if (typeof XLSX === 'undefined') {
     alert('No se cargó la librería Excel. Revise internet e intente de nuevo.');
     return;
   }
-  const file = inp.files[0];
-  const buf = await file.arrayBuffer();
+  toast('Bajando plantilla oficial…');
+  const c0 = ctxBase();
+  const url = CLOUD_API_URL + '?action=loadtpl&nivel=' + encodeURIComponent(c0.nivel) +
+    '&bimestre=' + encodeURIComponent(c0.bim) + '&grado=' + encodeURIComponent(c0.grado) +
+    '&seccion=' + encodeURIComponent(c0.seccion) + '&t=' + Date.now();
+  let filename = (siagieTplMeta && siagieTplMeta.filename) || 'RegNotas.xlsx';
+  let buf;
+  try {
+    const res = await fetch(url, { cache:'no-store' });
+    const data = JSON.parse(await res.text());
+    if (!data.ok || !data.b64) { alert('No hay plantilla oficial para este grado/sección.'); return; }
+    filename = data.filename || filename;
+    const raw = atob(data.b64);
+    const u8 = new Uint8Array(raw.length);
+    for (let i=0;i<raw.length;i++) u8[i] = raw.charCodeAt(i);
+    buf = u8.buffer;
+  } catch (e) {
+    alert('No se pudo bajar la plantilla. Publique el Apps Script nuevo.');
+    return;
+  }
   const wb = XLSX.read(buf, { type:'array', cellDates:true });
   const c = ctxBase();
   let escritos = 0, sinMatch = 0, hojas = 0;
@@ -1779,7 +1818,7 @@ async function rellenarSiagieExcel() {
   const blob = new Blob([out], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = file.name;
+  a.download = filename;
   a.click();
   toast('Excel SIAGIE listo · '+escritos+' notas');
   if (sinMatch) console.log('SIAGIE sin match de nombre:', sinMatch);

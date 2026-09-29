@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#0f172a">
 <title>Admin · Registro auxiliar · IE 22375</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
   .card { background:#fff; border-radius:16px; box-shadow:0 8px 28px rgba(15,23,42,.12); }
@@ -99,6 +100,7 @@
       <button class="navbtn chip chip-on" data-tab="menu" onclick="showTab('menu')">Menú</button>
       <button class="navbtn chip chip-off" data-tab="bd" onclick="showTab('bd')">Estudiantes</button>
       <button class="navbtn chip chip-off" data-tab="periodos" onclick="showTab('periodos')">Bimestres</button>
+      <button class="navbtn chip chip-off" data-tab="siagie" onclick="showTab('siagie')">SIAGIE</button>
       <button class="navbtn chip chip-off" data-tab="horario" onclick="showTab('horario')">Horario ingreso</button>
       <button class="navbtn chip chip-off" data-tab="import" onclick="showTab('import')">Importar</button>
       <button class="navbtn chip chip-off" data-tab="docentes" onclick="showTab('docentes')">Docentes</button>
@@ -244,6 +246,38 @@
         <div class="space-y-2" id="listaBimestres"></div>
         <p class="text-xs text-slate-500 mt-3">Al <b>cerrar</b> un bimestre, los docentes no deberían editar notas de ese periodo (se aplicará en el registro auxiliar).</p>
         <button class="btn btn-primary text-sm mt-3" onclick="savePeriodos()">Guardar periodos</button>
+      </div>
+    </section>
+
+    <section id="tab-siagie" class="tab hidden">
+      <div class="card p-4 space-y-3">
+        <h2 class="font-black text-lg">Registro oficial SIAGIE</h2>
+        <p class="text-sm text-slate-600">1) Suba el Excel <b>RegNotas</b> del aula. 2) Revise qué áreas ya están en la nube. 3) Vacíe todas al registro oficial. Los docentes no procesan SIAGIE.</p>
+        <div class="grid sm:grid-cols-2 gap-2">
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Nivel</label>
+            <select id="tplNivel"><option value="primaria">Primaria</option><option value="secundaria">Secundaria</option></select>
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Bimestre</label>
+            <select id="tplBim"><option>I</option><option>II</option><option selected>III</option><option>IV</option></select>
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Grado</label>
+            <input id="tplGrado" placeholder="1">
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500">Sección</label>
+            <input id="tplSec" placeholder="A, B o Única">
+          </div>
+        </div>
+        <input type="file" id="tplFile" accept=".xlsx,.xls">
+        <button class="btn btn-ghost w-full" onclick="subirPlantillaSiagie()">1. Guardar plantilla oficial</button>
+        <button class="btn btn-ghost w-full" onclick="verCargaSiagie()">2. Ver carga de docentes</button>
+        <button class="btn btn-primary w-full" onclick="vaciarSiagieOficial()">3. Vaciar al registro oficial</button>
+        <p id="tplMsg" class="text-sm text-slate-500"></p>
+        <div id="tplLista" class="text-sm"></div>
+        <div id="tplCarga" class="text-sm"></div>
       </div>
     </section>
 
@@ -480,6 +514,7 @@ function showTab(id) {
   if (id === 'periodos') initPeriodosUI();
   if (id === 'horario') initHorarioUI();
   if (id === 'menu') actualizarResumen();
+  if (id === 'siagie') listarPlantillasSiagie();
 }
 
 function estudiantesDe(nivel) {
@@ -841,7 +876,206 @@ function savePeriodos() {
 
 const DOCENTES_KEY = 'ie22375_docentes_v1';
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
+
+async function listarPlantillasSiagie() {
+  const box = document.getElementById('tplLista');
+  if (!box) return;
+  box.textContent = 'Consultando…';
+  try {
+    const r = await fetch(CLOUD_API_URL + '?action=loadtplstatus&t=' + Date.now(), { cache:'no-store' });
+    const data = JSON.parse(await r.text());
+    const items = (data && data.items) || [];
+    if (!items.length) { box.innerHTML = '<p class="text-slate-400">Aún no hay plantillas habilitadas.</p>'; return; }
+    box.innerHTML = '<b>Habilitados</b><ul class="list-disc pl-5 mt-1">' + items.map(it =>
+      '<li>'+it.nivel+' · Bim '+it.bimestre+' · '+it.grado+'° '+it.seccion+' · '+it.filename+'</li>'
+    ).join('') + '</ul>';
+  } catch(e) { box.textContent = 'No se pudo leer la nube (publique la nueva versión del Apps Script).'; }
+}
+async function subirPlantillaSiagie() {
+  const msg = document.getElementById('tplMsg');
+  const f = (document.getElementById('tplFile')||{}).files;
+  if (!f || !f[0]) { msg.textContent = 'Elija el Excel oficial RegNotas.'; return; }
+  const nivel = document.getElementById('tplNivel').value;
+  const bim = document.getElementById('tplBim').value;
+  const grado = document.getElementById('tplGrado').value.trim();
+  const seccion = document.getElementById('tplSec').value.trim() || (nivel==='primaria'?'Única':'A');
+  if (!grado) { msg.textContent = 'Indique el grado.'; return; }
+  msg.textContent = 'Subiendo plantilla…';
+  const buf = await f[0].arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+  const b64 = btoa(bin);
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action:'savetpl', nivel, bimestre:bim, grado, seccion, filename:f[0].name, b64, ts:Date.now() })
+    });
+    const data = JSON.parse(await res.text());
+    msg.textContent = data.ok ? ('Habilitado: '+f[0].name) : (data.error || 'Error al subir');
+    listarPlantillasSiagie();
+  } catch(e) {
+    msg.textContent = 'No se pudo subir. Publique la nueva versión del Apps Script.';
+  }
+}
+const AREAS_PRI_LIST = ["Personal Social","Educación Física","Comunicación","Arte y Cultura","Matemática","Ciencia y Tecnología","Educación Religiosa","Competencias Transversales"];
 const AREAS_SEC_LIST = ["Desarrollo Personal, Ciudadanía y Cívica", "Ciencias Sociales", "Educación para el Trabajo (EPT)", "Educación Física", "Comunicación", "Arte y Cultura", "Inglés", "Matemática", "Ciencia y Tecnología", "Educación Religiosa", "Competencias Transversales"];
+const COMPS_SIAGIE = {
+  "Personal Social":["Construye su Identidad","Convive y participa democráticamente","Construye interpretaciones históricas","Gestiona responsablemente el espacio y el ambiente","Gestiona responsablemente los recursos económicos"],
+  "Educación Física":["Se desenvuelve de manera autónoma a través de su motricidad","Asume una vida saludable","Interactúa a través de sus habilidades sociomotrices"],
+  "Comunicación":["Se comunica oralmente en su lengua materna","Lee diversos tipos de textos escritos en su lengua materna","Escribe diversos tipos de textos en su lengua materna"],
+  "Arte y Cultura":["Aprecia de manera crítica manifestaciones artístico-culturales","Crea proyectos artísticos desde los lenguajes artísticos"],
+  "Matemática":["Resuelve problemas de cantidad","Resuelve problemas de regularidad, equivalencia y cambio","Resuelve problemas de forma, movimiento y localización","Resuelve problemas de gestión de datos e incertidumbre"],
+  "Ciencia y Tecnología":["Indaga mediante métodos científicos para construir sus conocimientos","Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo","Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"],
+  "Educación Religiosa":["Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas","Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"],
+  "Competencias Transversales":["Se desenvuelven en entornos virtuales generados por las TIC","Gestiona su aprendizaje de manera autónoma"],
+  "Desarrollo Personal, Ciudadanía y Cívica":["Construye su identidad","Convive y participa democráticamente en la búsqueda del bien común"],
+  "Ciencias Sociales":["Construye interpretaciones históricas","Gestiona responsablemente el espacio y el ambiente","Gestiona responsablemente los recursos económicos"],
+  "Educación para el Trabajo (EPT)":["Gestiona proyectos de emprendimiento económico o social"],
+  "Inglés":["Se comunica oralmente en inglés como lengua extranjera","Lee diversos tipos de texto en inglés como lengua extranjera","Escribe diversos tipos de textos en inglés como lengua extranjera"]
+};
+function areasDeNivel(n){ return n==='primaria' ? AREAS_PRI_LIST : AREAS_SEC_LIST; }
+function numToLetterAdm(n){ n=Number(n); if(isNaN(n)) return ''; if(n>=18) return 'AD'; if(n>=14) return 'A'; if(n>=11) return 'B'; return 'C'; }
+function letterToNumAdm(L){ return ({AD:19,A:15,B:12,C:8})[L]||''; }
+function promedioAdm(arr){ const v=arr.filter(x=>x!==''&&x!=null&&!isNaN(Number(x))).map(Number); if(!v.length) return null; return Math.round(v.reduce((a,b)=>a+b,0)/v.length); }
+function normNomAdm(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/,/g,' ').replace(/\s+/g,' ').trim(); }
+function areaDeHojaAdm(name){
+  const u=String(name||'').toUpperCase();
+  const pairs=[['ART Y CULT','Arte y Cultura'],['CIENC TEC','Ciencia y Tecnología'],['DESARR PCC','Desarrollo Personal, Ciudadanía y Cívica'],['CCSS','Ciencias Sociales'],['COMU','Comunicación'],['EFIS','Educación Física'],['ETRA','Educación para el Trabajo (EPT)'],['EREL','Educación Religiosa'],['INGL','Inglés'],['MATE','Matemática'],['PERSONAL SOCIAL','Personal Social']];
+  for (const [k,area] of pairs){ if(u.indexOf(k)>=0) return {area, only:null}; }
+  if (u.indexOf('DESEN TIC')>=0) return {area:'Competencias Transversales', only:0};
+  if (u.indexOf('GEST AUTO')>=0) return {area:'Competencias Transversales', only:1};
+  return null;
+}
+function letraDesdePayload(p, ctx, area, comp, nombre){
+  if (!p) return '';
+  const fk=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,comp,nombre].join('||');
+  const f=(p.finales||{})[fk];
+  if (f){
+    const nota=(f.nota20!==''&&f.nota20!=null&&!isNaN(Number(f.nota20)))?Number(f.nota20):'';
+    const letra=f.nivel||(nota!==''?numToLetterAdm(nota):'');
+    if (letra) return letra;
+  }
+  const nums=[];
+  (p.sessions||[]).forEach(s=>{
+    if (!(s.area===area && s.comp===comp && String(s.bim)===String(ctx.bim))) return;
+    const gk=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,s.comp,s.capacidad,s.fecha,nombre].join('||');
+    const g=(p.grades||{})[gk];
+    if (!g) return;
+    if (g.nota20!==''&&g.nota20!=null&&!isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
+    else if (g.nivel){ const m=letterToNumAdm(g.nivel); if(m!=='') nums.push(Number(m)); }
+  });
+  const pr=promedioAdm(nums);
+  return pr==null?'':numToLetterAdm(pr);
+}
+function concDesdePayload(p, ctx, area, nombre){
+  const k=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,nombre].join('||');
+  return ((((p||{}).concArea)||{})[k]||{}).texto||'';
+}
+async function fetchRegAula(ctx){
+  const r=await fetch(CLOUD_API_URL+'?action=loadreg&nivel='+encodeURIComponent(ctx.nivel)+'&t='+Date.now(),{cache:'no-store'});
+  const data=JSON.parse(await r.text());
+  return ((data&&data.items)||[]).filter(it=>
+    String(it.bimestre)===String(ctx.bim) && String(it.grado)===String(ctx.grado) && String(it.seccion)===String(ctx.seccion)
+  );
+}
+function ctxTpl(){
+  return {
+    nivel: document.getElementById('tplNivel').value,
+    bim: document.getElementById('tplBim').value,
+    grado: document.getElementById('tplGrado').value.trim(),
+    seccion: (document.getElementById('tplSec').value.trim()|| (document.getElementById('tplNivel').value==='primaria'?'Única':'A'))
+  };
+}
+async function verCargaSiagie(){
+  const box=document.getElementById('tplCarga');
+  const ctx=ctxTpl();
+  if(!ctx.grado){ box.textContent='Indique grado y sección.'; return; }
+  box.textContent='Consultando nube…';
+  try{
+    const items=await fetchRegAula(ctx);
+    const areas=areasDeNivel(ctx.nivel);
+    const by={};
+    items.forEach(it=>{ by[it.area]=it; });
+    const alu=(estudiantesDe(ctx.nivel)||[]).filter(a=>String(a.grado)===String(ctx.grado)&&String(a.seccion)===String(ctx.seccion));
+    let html='<div class="font-bold mb-1">Carga · '+ctx.nivel+' '+ctx.grado+'° '+ctx.seccion+' · Bim '+ctx.bim+' · '+alu.length+' alumnos</div><ul class="space-y-1">';
+    let ok=0;
+    areas.forEach(ar=>{
+      const it=by[ar];
+      if(it){ ok++; html+='<li class="text-emerald-700">✓ '+ar+(it.docente?' · '+it.docente:'')+'</li>'; }
+      else html+='<li class="text-amber-700">✗ '+ar+' · sin nube</li>';
+    });
+    html+='</ul><p class="mt-2 text-slate-500">'+ok+' / '+areas.length+' áreas en la nube.</p>';
+    box.innerHTML=html;
+  }catch(e){ box.textContent='No se pudo leer RegistroNotas de la nube.'; }
+}
+async function vaciarSiagieOficial(){
+  const msg=document.getElementById('tplMsg');
+  const ctx=ctxTpl();
+  if(!ctx.grado){ msg.textContent='Indique grado y sección.'; return; }
+  if(typeof XLSX==='undefined'){ alert('No cargó Excel.'); return; }
+  let items=[];
+  try{ items=await fetchRegAula(ctx); }
+  catch(e){ alert('No hay notas en la nube de este aula.'); return; }
+  const areas=areasDeNivel(ctx.nivel);
+  const faltan=areas.filter(ar=>!items.some(it=>it.area===ar));
+  if(faltan.length){
+    if(!confirm('Faltan en la nube:\n- '+faltan.join('\n- ')+'\n\n¿Vaciar igual las áreas que sí están?')) return;
+  }
+  msg.textContent='Bajando plantilla oficial…';
+  let filename='RegNotas.xlsx', buf;
+  try{
+    const url=CLOUD_API_URL+'?action=loadtpl&nivel='+encodeURIComponent(ctx.nivel)+'&bimestre='+encodeURIComponent(ctx.bim)+'&grado='+encodeURIComponent(ctx.grado)+'&seccion='+encodeURIComponent(ctx.seccion)+'&t='+Date.now();
+    const res=await fetch(url,{cache:'no-store'});
+    const data=JSON.parse(await res.text());
+    if(!data.ok||!data.b64){ alert('Primero guarde la plantilla oficial de este aula.'); return; }
+    filename=data.filename||filename;
+    const raw=atob(data.b64);
+    const u8=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++) u8[i]=raw.charCodeAt(i);
+    buf=u8.buffer;
+  }catch(e){ alert('No se pudo bajar la plantilla. Publique el Apps Script.'); return; }
+  const by={};
+  items.forEach(it=>{ by[it.area]=it.payload||{}; });
+  const alumnos=(estudiantesDe(ctx.nivel)||[]).filter(a=>String(a.grado)===String(ctx.grado)&&String(a.seccion)===String(ctx.seccion));
+  const idx={}; alumnos.forEach(al=>{ idx[normNomAdm(al.nombre)]=al.nombre; });
+  const wb=XLSX.read(buf,{type:'array',cellDates:true});
+  let escritos=0;
+  wb.SheetNames.forEach(sn=>{
+    const map=areaDeHojaAdm(sn);
+    if(!map||!by[map.area]) return;
+    const ws=wb.Sheets[sn];
+    if(!ws||!ws['!ref']) return;
+    const range=XLSX.utils.decode_range(ws['!ref']);
+    const comps=COMPS_SIAGIE[map.area]||[];
+    const use=map.only==null?comps:[comps[map.only]].filter(Boolean);
+    const p=by[map.area];
+    for(let r=range.s.r+2;r<=range.e.r;r++){
+      const cell=ws[XLSX.utils.encode_cell({r:r,c:2})];
+      const nomX=cell?cell.v:'';
+      const nombre=idx[normNomAdm(nomX)];
+      if(!nombre) continue;
+      use.forEach((cp,i)=>{
+        const letra=letraDesdePayload(p,ctx,map.area,cp,nombre);
+        if(!letra) return;
+        ws[XLSX.utils.encode_cell({r:r,c:3+i*2})]={t:'s',v:letra};
+        escritos++;
+        const need=ctx.nivel==='primaria'?(letra==='B'||letra==='C'):(letra==='C');
+        if(need){
+          const txt=concDesdePayload(p,ctx,map.area,nombre);
+          if(txt) ws[XLSX.utils.encode_cell({r:r,c:4+i*2})]={t:'s',v:txt};
+        }
+      });
+    }
+  });
+  const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download=filename;
+  a.click();
+  msg.textContent='Registro oficial listo · '+escritos+' notas. Suba este archivo a SIAGIE.';
+}
 
 function loadDocentes() {
   try {
