@@ -293,6 +293,7 @@
         </div>
         <p class="text-[11px] text-slate-500 mb-2" id="lblReglaConc">Promedio general del área. Conclusión: primaria B o C · secundaria solo C.</p>
         <div id="avanceBox"></div>
+        <button type="button" class="btn btn-primary w-full text-sm mt-3" onclick="procesarSiagie()">Validar y procesar a SIAGIE</button>
       </div>
     </div>
 
@@ -385,6 +386,17 @@
   </div>
 </div>
 
+<div id="modalSiagie" class="hidden fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-3">
+  <div class="card w-full max-w-lg p-4 max-h-[85vh] overflow-auto">
+    <div class="font-black mb-1">Procesar a SIAGIE</div>
+    <div class="text-xs text-slate-500 mb-2" id="siagieCtx">—</div>
+    <div id="siagieBody" class="text-sm space-y-2"></div>
+    <div class="flex gap-2 mt-3">
+      <button type="button" class="btn btn-ghost flex-1" onclick="cerrarSiagie()">Cerrar</button>
+      <button type="button" id="btnSiagieOk" class="btn btn-primary flex-1 hidden" onclick="exportarSiagieCsv()">Descargar letras</button>
+    </div>
+  </div>
+</div>
 <div id="toast" class="hidden fixed left-1/2 -translate-x-1/2 bottom-24 z-50 bg-slate-900 text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg"></div>
 
 <div id="printArea"></div>
@@ -1573,6 +1585,79 @@ function validarConclusionesOficial(c, alumnos, sess) {
   return faltan;
 }
 
+function informeSiagie() {
+  guardarTodo();
+  const c = ctxBase();
+  const comps = competencias();
+  const alumnos = estudiantes();
+  const faltanNota = [];
+  const faltanConc = [];
+  const filas = [];
+  alumnos.forEach((al, i) => {
+    const row = { n: i+1, nombre: al.nombre, letras: {}, prom:'', letra:'', conc:'' };
+    comps.forEach(cp => {
+      const d = notaCompAlumno(cp, al.nombre);
+      row.letras[cp] = d.letra || '';
+      if (!d.letra) faltanNota.push(al.nombre + ' · ' + cp);
+    });
+    const g = promGeneralAlumno(al.nombre, comps);
+    row.prom = g.prom;
+    row.letra = g.letra;
+    row.conc = ((store.concArea||{})[concAreaKey(al.nombre)]||{}).texto || '';
+    if (requiereConclusion(g.letra) && !row.conc.trim()) {
+      faltanConc.push(al.nombre + ' · Prom. ' + (g.prom||'—') + ' (' + g.letra + ')');
+    }
+    filas.push(row);
+  });
+  return { c, comps, alumnos, faltanNota, faltanConc, filas, ok: !faltanNota.length && !faltanConc.length };
+}
+function procesarSiagie() {
+  if (!nivel || !areaActual) { toast('Elija área'); return; }
+  const inf = informeSiagie();
+  const ctx = (inf.c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + inf.c.grado + '° ' + inf.c.seccion + ' · Bim ' + inf.c.bim + ' · ' + (inf.c.area||'');
+  document.getElementById('siagieCtx').textContent = ctx;
+  let html = '';
+  if (inf.ok) {
+    html += '<div class="rounded-lg bg-emerald-50 text-emerald-800 p-3 font-bold">Listo para SIAGIE. No hay vacíos ni conclusiones pendientes.</div>';
+    html += '<p class="text-[12px] text-slate-500">Se descargará un CSV con letras oficiales (AD/A/B/C) de este aula y área. El Excel del SIAGIE se rellena en un siguiente paso, sin cambiar códigos del archivo MINEDU.</p>';
+  } else {
+    html += '<div class="rounded-lg bg-red-50 text-red-800 p-3 font-bold">No se puede procesar todavía.</div>';
+    if (inf.faltanNota.length) {
+      html += '<div><b>Notas en blanco ('+inf.faltanNota.length+')</b><ul class="text-[12px] mt-1 list-disc pl-4 max-h-40 overflow-auto">' +
+        inf.faltanNota.slice(0,40).map(x=>'<li>'+x+'</li>').join('') +
+        (inf.faltanNota.length>40?'<li>… y '+(inf.faltanNota.length-40)+' más</li>':'') +
+        '</ul></div>';
+    }
+    if (inf.faltanConc.length) {
+      html += '<div><b>Conclusión descriptiva faltante ('+inf.faltanConc.length+')</b><p class="text-[11px] text-slate-500">'+(nivel==='primaria'?'Primaria: obligatoria si B o C.':'Secundaria: obligatoria solo si C.')+'</p><ul class="text-[12px] mt-1 list-disc pl-4 max-h-40 overflow-auto">' +
+        inf.faltanConc.slice(0,40).map(x=>'<li>'+x+'</li>').join('') +
+        (inf.faltanConc.length>40?'<li>… y '+(inf.faltanConc.length-40)+' más</li>':'') +
+        '</ul></div>';
+    }
+  }
+  document.getElementById('siagieBody').innerHTML = html;
+  document.getElementById('btnSiagieOk').classList.toggle('hidden', !inf.ok);
+  document.getElementById('modalSiagie').classList.remove('hidden');
+}
+function cerrarSiagie() {
+  document.getElementById('modalSiagie').classList.add('hidden');
+}
+function exportarSiagieCsv() {
+  const inf = informeSiagie();
+  if (!inf.ok) { procesarSiagie(); return; }
+  const esc = v => '"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const head = ['N','Estudiante'].concat(inf.comps.map((_,i)=>'C'+(i+1))).concat(['Promedio','Letra','Conclusion']);
+  const lines = [head.map(esc).join(',')];
+  inf.filas.forEach(r => {
+    lines.push([r.n, r.nombre].concat(inf.comps.map(cp=>r.letras[cp]||'')).concat([r.prom, r.letra, r.conc]).map(esc).join(','));
+  });
+  const blob = new Blob(['\ufeff'+lines.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'SIAGIE_'+inf.c.nivel+'_'+inf.c.grado+inf.c.seccion+'_B'+inf.c.bim+'_'+(inf.c.area||'').replace(/\s+/g,'_')+'.csv';
+  a.click();
+  toast('CSV de letras descargado');
+}
 function prepararImpresion() {
   loadStore();
   const c = ctxBase();
