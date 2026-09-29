@@ -14,6 +14,7 @@
   .btn-ghost { background:#e2e8f0; color:#0f172a; }
   .btn-danger { background:#fee2e2; color:#b91c1c; }
   .chip { display:inline-flex; align-items:center; justify-content:center; min-width:2.4rem; padding:.4rem .65rem; border-radius:999px; font-size:13px; font-weight:800; border:2px solid transparent; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .fin-cell .chip { min-width:1.7rem; padding:.2rem .32rem; font-size:11px; margin:1px; }
   .nivel-c { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
   .nivel-c.on { background:#dc2626; color:#fff; border-color:#dc2626; }
   .nivel-b { background:#fffbeb; color:#a16207; border-color:#fde68a; }
@@ -235,12 +236,17 @@
     <div class="panel-fin" id="panelFinales">
       <div class="card p-3 space-y-3">
         <div>
-          <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
-          <div class="text-sm font-bold" id="lblFinCtx">—</div>
-          <p class="text-[11px] text-slate-500 mt-1">
-            Grilla del aula: alumno × competencia. Debajo de cada competencia se ven las <b>capacidades</b> ya calificadas.
-            Si hay evidencias, esa columna es solo lectura. Si no, escribe 0–20 (18–20 AD · 14–17 A · 11–13 B · 0–10 C).
-          </p>
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
+              <div class="text-sm font-bold" id="lblFinCtx">—</div>
+            </div>
+            <div class="mode-toggle" style="min-width:180px">
+              <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
+              <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">Por alumno: si escribes aquí, esta nota manda. Si no, se usa Calificar.</p>
         </div>
         <div class="flex flex-wrap gap-2 text-[11px] font-bold" id="finResumen"></div>
         <div id="finLista" class="fin-wrap"></div>
@@ -287,7 +293,13 @@
             <div class="text-[10px] font-bold text-slate-500">RESUMEN DEL BIMESTRE</div>
             <div class="text-sm font-bold" id="lblAvanceCtx">—</div>
           </div>
-          <button type="button" class="btn btn-ghost text-xs !py-1.5" onclick="renderAvance()">Actualizar</button>
+          <div class="flex items-center gap-2">
+            <div class="mode-toggle" style="min-width:180px">
+              <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
+              <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
+            </div>
+            <button type="button" class="btn btn-ghost text-xs !py-1.5" onclick="renderAvance()">Actualizar</button>
+          </div>
         </div>
         <p class="text-[11px] text-slate-500 mb-2" id="lblReglaConc">Promedio general del área. Conclusión: primaria B o C · secundaria solo C.</p>
         <div id="avanceBox"></div>
@@ -345,8 +357,8 @@
           <div class="text-sm font-bold text-slate-800" id="lblSesionActiva">Define fecha, competencia y capacidad arriba</div>
         </div>
         <div class="mode-toggle" style="min-width:200px">
-          <button type="button" id="btnModoLetra" onclick="setModoCalif('letra')">Letras</button>
-          <button type="button" id="btnModoNum" class="on" onclick="setModoCalif('num')">0–20</button>
+          <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
+          <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
         </div>
       </div>
       <p class="scale-hint" id="lblEscala">0–20 → letra: 18–20 AD · 14–17 A · 11–13 B · 0–10 C</p>
@@ -429,7 +441,7 @@ const CAPS_CNEB = {
 
 let nivel = null;
 let areaActual = null;
-let modoCalif = 'num'; // predeterminado: números 0–20
+let modoCalif = (function(){ try { return localStorage.getItem('ie22375_modo_calif') || 'num'; } catch(e){ return 'num'; } })();
 let dirty = false; // hay cambios sin guardar
 let sesionActiva = null; // { fecha, unidad, comp, capacidad }
 let notas = {}; // key alumno -> { nivel, nota20, conclusion }
@@ -845,15 +857,7 @@ function entrarNivel(n) {
   sesionActiva = null;
   notas = {};
   dirty = false;
-  modoCalif = 'num';
-  const bL = document.getElementById('btnModoLetra');
-  const bN = document.getElementById('btnModoNum');
-  if (bL && bN) {
-    bL.classList.remove('on');
-    bN.classList.add('on');
-  }
-  const esc = document.getElementById('lblEscala');
-  if (esc) esc.textContent = '0–20 → letra: 18–20 AD · 14–17 A · 11–13 B · 0–10 C';
+  syncModoBtns();
   updateHdr();
   renderSesiones();
   renderStudents();
@@ -1285,14 +1289,22 @@ function borrarSesion(id) {
   toast('Sesión borrada');
 }
 
-function setModoCalif(m) {
-  modoCalif = m;
-  document.getElementById('btnModoLetra').classList.toggle('on', m==='letra');
-  document.getElementById('btnModoNum').classList.toggle('on', m==='num');
-  document.getElementById('lblEscala').textContent = m==='num'
+function syncModoBtns() {
+  document.querySelectorAll('[data-modo]').forEach(b => {
+    b.classList.toggle('on', b.getAttribute('data-modo') === modoCalif);
+  });
+  const esc = document.getElementById('lblEscala');
+  if (esc) esc.textContent = modoCalif==='num'
     ? '0–20 → letra: 18–20 AD · 14–17 A · 11–13 B · 0–10 C'
     : 'Escala: AD destacado · A logrado · B proceso · C inicio';
+}
+function setModoCalif(m) {
+  modoCalif = m;
+  try { localStorage.setItem('ie22375_modo_calif', m); } catch(e) {}
+  syncModoBtns();
   renderStudents();
+  if (document.getElementById('panelFinales') && document.getElementById('panelFinales').classList.contains('on')) renderFinales();
+  if (document.getElementById('panelAvance') && document.getElementById('panelAvance').classList.contains('on')) renderAvance();
 }
 
 function setNivel(nombre, niv) {
@@ -1475,9 +1487,15 @@ function renderStudents() {
       const encN = encodeURIComponent(al.nombre);
       const encC = encodeURIComponent(col.cap);
       const encP = encodeURIComponent(col.comp);
-      tds += '<td><div class="fin-cell">' +
-        '<input type="number" min="0" max="20" step="1" class="cal-nota" '+(bloqueado?'readonly':'')+' data-nom="'+encN+'" data-cap="'+encC+'" data-comp="'+encP+'" value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
-        '<span class="eq-letter '+(letra?eqClass(letra):'eq-none')+'">'+(letra||'—')+'</span></div></td>';
+      if (modoCalif === 'letra') {
+        tds += '<td><div class="fin-cell" data-nom="'+encN+'" data-cap="'+encC+'" data-comp="'+encP+'">' +
+          ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(letra===v?' on':'')+'" data-val="'+v+'" '+(bloqueado?'disabled':'')+'>'+v+'</button>').join('') +
+          '</div></td>';
+      } else {
+        tds += '<td><div class="fin-cell">' +
+          '<input type="number" min="0" max="20" step="1" class="cal-nota" '+(bloqueado?'readonly':'')+' data-nom="'+encN+'" data-cap="'+encC+'" data-comp="'+encP+'" value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
+          '<span class="eq-letter '+(letra?eqClass(letra):'eq-none')+'">'+(letra||'—')+'</span></div></td>';
+      }
     });
     return '<tr>'+tds+'</tr>';
   }).join('');
@@ -1510,6 +1528,26 @@ function renderStudents() {
       if (n === '') delete store.grades[k];
       else store.grades[k] = { nota20: n, nivel: letra, ts: Date.now() };
       saveStore();
+    });
+  });
+  box.querySelectorAll('.fin-cell button[data-val]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      const cell = btn.closest('[data-nom]');
+      if (!cell) return;
+      const nombre = decodeURIComponent(cell.dataset.nom);
+      const cap = decodeURIComponent(cell.dataset.cap);
+      const cp = decodeURIComponent(cell.dataset.comp || '');
+      const val = btn.dataset.val;
+      const mismo = btn.classList.contains('on');
+      const letra = mismo ? '' : val;
+      const n = letra ? letterToNum(letra) : '';
+      upsertSesionCap(cp, cap);
+      const k = capKeyHoy(cp, cap, nombre);
+      if (!letra) delete store.grades[k];
+      else store.grades[k] = { nota20: n, nivel: letra, ts: Date.now() };
+      saveStore();
+      renderStudents();
     });
   });
 }
@@ -1855,11 +1893,19 @@ function renderFinales() {
       cTot++;
       const encN = encodeURIComponent(al.nombre);
       const encC = encodeURIComponent(cp);
-      tds += '<td><div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
-        '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
-        '<span class="eq-letter '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'">'+(letra||ofi.letra||'—')+'</span>' +
-        (dir.nota==='' && ev.nota!=='' ? '<div class="text-[10px] text-slate-400">Cal '+pad2(ev.nota)+'</div>' : '') +
-        '</div></td>';
+      if (modoCalif === 'letra') {
+        const L = letra || ofi.letra || '';
+        tds += '<td><div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
+          ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
+          (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+ev.letra+'</div>' : '') +
+          '</div></td>';
+      } else {
+        tds += '<td><div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
+          '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
+          '<span class="eq-letter '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'">'+(letra||ofi.letra||'—')+'</span>' +
+          (dir.nota==='' && ev.nota!=='' ? '<div class="text-[10px] text-slate-400">Cal '+pad2(ev.nota)+'</div>' : '') +
+          '</div></td>';
+      }
     });
     return '<tr>'+tds+'</tr>';
   }).join('');
@@ -1892,6 +1938,23 @@ function renderFinales() {
       if (n === '') delete store.finales[k];
       else store.finales[k] = { nota20: n, nivel: letra, ts: Date.now() };
       saveStore();
+    });
+  });
+  box.querySelectorAll('.fin-cell button[data-val]').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (btn.disabled) return;
+      const cell = btn.closest('[data-fin]');
+      if (!cell) return;
+      const nombre = decodeURIComponent(cell.dataset.fin);
+      const comp = decodeURIComponent(cell.dataset.comp);
+      const val = btn.dataset.val;
+      const mismo = btn.classList.contains('on');
+      const letra = mismo ? '' : val;
+      const k = finalKey(comp, nombre);
+      if (!letra) delete store.finales[k];
+      else store.finales[k] = { nota20: letterToNum(letra), nivel: letra, ts: Date.now() };
+      saveStore();
+      renderFinales();
     });
   });
 }
@@ -2192,7 +2255,7 @@ function renderAvance() {
       const r = data[comp][i];
       if (r.prom!=null && r.prom!=='') nums.push(Number(r.prom));
       tds += '<td><div class="fin-cell">' +
-        (r.prom!=null ? '<div style="font-weight:800;font-size:16px">'+pad2(r.prom)+'</div>' : '<div class="text-slate-300">—</div>') +
+        (modoCalif==='num' && r.prom!=null ? '<div style="font-weight:800;font-size:16px">'+pad2(r.prom)+'</div>' : '') +
         '<span class="eq-letter '+(r.letra?eqClass(r.letra):'eq-none')+'">'+(r.letra||'—')+'</span></div></td>';
     });
     const pg = promedioNums(nums);
@@ -2201,7 +2264,7 @@ function renderAvance() {
     const txt = ((store.concArea||{})[ck]||{}).texto || '';
     const abre = requiereConclusion(lg);
     tds += '<td><div class="fin-cell">' +
-      (pg==null?'<div class="text-slate-300">—</div>':'<div style="font-weight:800;font-size:16px">'+pg+'</div>') +
+      (modoCalif==='num' && pg!=null ? '<div style="font-weight:800;font-size:16px">'+pg+'</div>' : '') +
       '<span class="eq-letter '+(lg?eqClass(lg):'eq-none')+'">'+(lg||'—')+'</span></div></td>';
     tds += '<td style="min-width:160px">' +
       (abre
