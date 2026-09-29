@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#0f172a">
 <title>Registro auxiliar · IE 22375</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
   .card { background:#fff; border-radius:16px; box-shadow:0 6px 24px rgba(15,23,42,.08); }
@@ -293,7 +294,12 @@
         </div>
         <p class="text-[11px] text-slate-500 mb-2" id="lblReglaConc">Promedio general del área. Conclusión: primaria B o C · secundaria solo C.</p>
         <div id="avanceBox"></div>
-        <button type="button" class="btn btn-primary w-full text-sm mt-3" onclick="procesarSiagie()">Validar y procesar a SIAGIE</button>
+        <div class="mt-3 space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <div class="text-[11px] font-bold text-slate-600">Excel oficial SIAGIE</div>
+          <p class="text-[11px] text-slate-500">Aquí se sube el archivo <b>RegNotas_….xlsx</b> que bajaste de SIAGIE (no el CSV).</p>
+          <input type="file" id="inpSiagieXlsPanel" accept=".xlsx,.xls" class="text-xs w-full">
+          <button type="button" class="btn btn-primary w-full text-sm" onclick="procesarSiagie()">Validar y rellenar</button>
+        </div>
       </div>
     </div>
 
@@ -391,9 +397,13 @@
     <div class="font-black mb-1">Procesar a SIAGIE</div>
     <div class="text-xs text-slate-500 mb-2" id="siagieCtx">—</div>
     <div id="siagieBody" class="text-sm space-y-2"></div>
+    <div id="siagieUpload" class="hidden mt-3 space-y-2">
+      <label class="text-[11px] font-bold text-slate-500">Excel oficial SIAGIE (el que baja el director)</label>
+      <input type="file" id="inpSiagieXls" accept=".xlsx,.xls">
+    </div>
     <div class="flex gap-2 mt-3">
       <button type="button" class="btn btn-ghost flex-1" onclick="cerrarSiagie()">Cerrar</button>
-      <button type="button" id="btnSiagieOk" class="btn btn-primary flex-1 hidden" onclick="exportarSiagieCsv()">Descargar letras</button>
+      <button type="button" id="btnSiagieOk" class="btn btn-primary flex-1 hidden" onclick="rellenarSiagieExcel()">Rellenar Excel</button>
     </div>
   </div>
 </div>
@@ -1619,7 +1629,7 @@ function procesarSiagie() {
   let html = '';
   if (inf.ok) {
     html += '<div class="rounded-lg bg-emerald-50 text-emerald-800 p-3 font-bold">Listo para SIAGIE. No hay vacíos ni conclusiones pendientes.</div>';
-    html += '<p class="text-[12px] text-slate-500">Se descargará un CSV con letras oficiales (AD/A/B/C) de este aula y área. El Excel del SIAGIE se rellena en un siguiente paso, sin cambiar códigos del archivo MINEDU.</p>';
+    html += '<p class="text-[12px] text-slate-500">Cargue el Excel que bajó de SIAGIE. El sistema escribirá las letras y conclusiones <b>sin cambiar ID, código ni nombre de archivo</b>.</p>';
   } else {
     html += '<div class="rounded-lg bg-red-50 text-red-800 p-3 font-bold">No se puede procesar todavía.</div>';
     if (inf.faltanNota.length) {
@@ -1637,26 +1647,142 @@ function procesarSiagie() {
   }
   document.getElementById('siagieBody').innerHTML = html;
   document.getElementById('btnSiagieOk').classList.toggle('hidden', !inf.ok);
+  const up = document.getElementById('siagieUpload');
+  if (up) up.classList.toggle('hidden', !inf.ok);
+  const ya = document.getElementById('inpSiagieXlsPanel');
+  if (inf.ok && ya && ya.files && ya.files[0]) {
+    rellenarSiagieExcel();
+    return;
+  }
   document.getElementById('modalSiagie').classList.remove('hidden');
 }
 function cerrarSiagie() {
   document.getElementById('modalSiagie').classList.add('hidden');
 }
-function exportarSiagieCsv() {
+function normNomSiagie(s) {
+  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/,/g,' ').replace(/\s+/g,' ').trim();
+}
+function areaDeHojaSiagie(name) {
+  const u = String(name||'').toUpperCase();
+  const pairs = [
+    ['ART Y CULT','Arte y Cultura'],['ARTE Y CULTURA','Arte y Cultura'],
+    ['CIENC TEC','Ciencia y Tecnología'],['CIENCIA Y TEC','Ciencia y Tecnología'],
+    ['DESARR PCC','Desarrollo Personal, Ciudadanía y Cívica'],['DESARROLLO PERSONAL','Desarrollo Personal, Ciudadanía y Cívica'],
+    ['CCSS','Ciencias Sociales'],['CIENCIAS SOCIALES','Ciencias Sociales'],
+    ['COMU','Comunicación'],['COMUNICACION','Comunicación'],
+    ['EFIS','Educación Física'],['EDUCACION FISICA','Educación Física'],
+    ['ETRA','Educación para el Trabajo (EPT)'],['EDUCACION PARA EL TRABAJO','Educación para el Trabajo (EPT)'],
+    ['EREL','Educación Religiosa'],['EDUCACION RELIGIOSA','Educación Religiosa'],
+    ['INGL','Inglés'],['INGLES','Inglés'],
+    ['MATE','Matemática'],['MATEMATICA','Matemática'],
+    ['PERSONAL SOCIAL','Personal Social'],
+    ['CAST SEGNL','Comunicación']
+  ];
+  for (const [k, area] of pairs) { if (u.indexOf(k) >= 0) return { area, only: null }; }
+  if (u.indexOf('DESEN TIC')>=0 || u.indexOf('ENTORNOS VIRTUAL')>=0) return { area:'Competencias Transversales', only:0 };
+  if (u.indexOf('GEST AUTO')>=0 || u.indexOf('APRENDIZAJE DE MANERA')>=0) return { area:'Competencias Transversales', only:1 };
+  return null;
+}
+function letraEnArea(area, comp, nombre) {
+  const c = ctxBase();
+  const fk = [c.nivel,c.bim,c.grado,c.seccion,area,comp,nombre].join('||');
+  const f = (store.finales||{})[fk];
+  if (f) {
+    const nota = (f.nota20!=='' && f.nota20!=null && !isNaN(Number(f.nota20))) ? Number(f.nota20) : '';
+    const letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
+    if (letra) return letra;
+  }
+  const sess = (store.sessions||[]).filter(s =>
+    s.nivel===c.nivel && s.bim===c.bim && String(s.grado)===String(c.grado) &&
+    s.seccion===c.seccion && s.area===area && s.comp===comp
+  );
+  const nums = [];
+  sess.forEach(s => {
+    const gk = [c.nivel,c.bim,c.grado,c.seccion,area,s.comp,s.capacidad,s.fecha,nombre].join('||');
+    const g = store.grades[gk];
+    if (!g) return;
+    if (g.nota20!=='' && g.nota20!=null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
+    else if (g.nivel) { const m = letterToNum(g.nivel); if (m!=='') nums.push(Number(m)); }
+  });
+  const prom = promedioNums(nums);
+  return prom==null ? '' : numToLetter(prom);
+}
+function concEnArea(area, nombre) {
+  const c = ctxBase();
+  const k = [c.nivel,c.bim,c.grado,c.seccion,area,nombre].join('||');
+  return (((store.concArea||{})[k]||{}).texto || '').trim();
+}
+function compsDeArea(area) {
+  const est = estructura();
+  return (est[area] && est[area].competencias) ? est[area].competencias.slice() : [];
+}
+async function rellenarSiagieExcel() {
   const inf = informeSiagie();
   if (!inf.ok) { procesarSiagie(); return; }
-  const esc = v => '"'+String(v==null?'':v).replace(/"/g,'""')+'"';
-  const head = ['N','Estudiante'].concat(inf.comps.map((_,i)=>'C'+(i+1))).concat(['Promedio','Letra','Conclusion']);
-  const lines = [head.map(esc).join(',')];
-  inf.filas.forEach(r => {
-    lines.push([r.n, r.nombre].concat(inf.comps.map(cp=>r.letras[cp]||'')).concat([r.prom, r.letra, r.conc]).map(esc).join(','));
+  const inp = document.getElementById('inpSiagieXlsPanel') || document.getElementById('inpSiagieXls');
+  if (!inp || !inp.files || !inp.files[0]) {
+    alert('En Resumen, elija el Excel oficial RegNotas_….xlsx que descargó de SIAGIE.');
+    return;
+  }
+  if (typeof XLSX === 'undefined') {
+    alert('No se cargó la librería Excel. Revise internet e intente de nuevo.');
+    return;
+  }
+  const file = inp.files[0];
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type:'array', cellDates:true });
+  const c = ctxBase();
+  let escritos = 0, sinMatch = 0, hojas = 0;
+  wb.SheetNames.forEach(sn => {
+    const map = areaDeHojaSiagie(sn);
+    if (!map) return;
+    const sLogin = getLoginSession();
+    const esAdmin = sLogin && (sLogin.role==='admin' || sLogin.user==='admin');
+    if (!esAdmin && areaActual && map.area !== areaActual) return;
+    const ws = wb.Sheets[sn];
+    if (!ws || !ws['!ref']) return;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const comps = compsDeArea(map.area);
+    const useComps = map.only == null ? comps : [comps[map.only]].filter(Boolean);
+    if (!useComps.length) return;
+    hojas++;
+    const idxNom = {};
+    estudiantes().forEach(al => { idxNom[normNomSiagie(al.nombre)] = al.nombre; });
+    for (let r = range.s.r + 2; r <= range.e.r; r++) {
+      const cellNom = ws[XLSX.utils.encode_cell({r:r, c:2})];
+      const nomX = cellNom ? cellNom.v : '';
+      const key = normNomSiagie(nomX);
+      const nombre = idxNom[key];
+      if (!nombre) { if (nomX) sinMatch++; continue; }
+      useComps.forEach((cp, i) => {
+        const letra = letraEnArea(map.area, cp, nombre);
+        if (!letra) return;
+        const colNL = 3 + i*2;
+        const colCD = 4 + i*2;
+        const addrNL = XLSX.utils.encode_cell({r:r, c:colNL});
+        ws[addrNL] = { t:'s', v: letra };
+        escritos++;
+        const need = (nivel==='primaria') ? (letra==='B'||letra==='C') : (letra==='C');
+        const addrCD = XLSX.utils.encode_cell({r:r, c:colCD});
+        if (need) {
+          const txt = concEnArea(map.area, nombre);
+          if (txt) ws[addrCD] = { t:'s', v: txt };
+        }
+      });
+    }
   });
-  const blob = new Blob(['\ufeff'+lines.join('\n')], {type:'text/csv;charset=utf-8'});
+  if (!hojas) {
+    alert('Ese Excel no parece un registro SIAGIE de este nivel/área.');
+    return;
+  }
+  const out = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  const blob = new Blob([out], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'SIAGIE_'+inf.c.nivel+'_'+inf.c.grado+inf.c.seccion+'_B'+inf.c.bim+'_'+(inf.c.area||'').replace(/\s+/g,'_')+'.csv';
+  a.download = file.name;
   a.click();
-  toast('CSV de letras descargado');
+  toast('Excel SIAGIE listo · '+escritos+' notas');
+  if (sinMatch) console.log('SIAGIE sin match de nombre:', sinMatch);
 }
 function prepararImpresion() {
   loadStore();
