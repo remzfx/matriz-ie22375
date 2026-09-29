@@ -333,7 +333,7 @@
     </div>
     <div class="card p-3" id="wrapSesiones">
       <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS</div>
-      <p class="text-[11px] text-slate-500 mb-1">Para ver un día anterior: cambia la <b>fecha</b> arriba o toca una sesión. Las notas de ese día vuelven a la grilla.</p>
+      <p class="text-[11px] text-slate-500 mb-1">Un chip por día. Tócalo para abrir esa fecha.</p>
       <div id="listaSesiones" class="flex flex-wrap gap-1"></div>
       <p class="text-[11px] text-slate-400 mt-1" id="lblSinSesiones">Aún no hay sesiones guardadas.</p>
     </div>
@@ -1180,56 +1180,82 @@ function renderSesiones() {
     return;
   }
   empty.style.display = 'none';
-  box.innerHTML = list.map(s => {
-    const id = sessionId(s);
-    const on = sesionActiva && sessionId(sesionActiva) === id ? 'on' : '';
-    const label = (s.fecha || '') + ' · ' + (s.capacidad || '').slice(0,28);
+  const fechas = [];
+  const seen = {};
+  list.forEach(s => {
+    const f = s.fecha || '';
+    if (!f || seen[f]) return;
+    seen[f] = 1;
+    fechas.push(f);
+  });
+  const fechaAct = (document.getElementById('inpFecha')||{}).value || '';
+  box.innerHTML = fechas.map(f => {
+    const on = f === fechaAct ? 'on' : '';
     return `<span class="sess-chip ${on}" style="display:inline-flex;align-items:center;gap:4px">
-      <button type="button" data-sid="${encodeURIComponent(id)}" style="border:0;background:transparent;font:inherit;font-weight:700;cursor:pointer;padding:0;color:inherit">${label}</button>
-      <button type="button" title="Borrar esta sesión" data-del="${encodeURIComponent(id)}" style="border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0">×</button>
+      <button type="button" data-fecha="${f}" style="border:0;background:transparent;font:inherit;font-weight:700;cursor:pointer;padding:0;color:inherit">Sesión ${f}</button>
+      <button type="button" title="Borrar el día" data-delfecha="${f}" style="border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0">×</button>
     </span>`;
   }).join('');
   box.onclick = function(ev) {
-    const del = ev.target.closest('button[data-del]');
-    if (del) {
-      const id = decodeURIComponent(del.dataset.del);
-      borrarSesion(id);
-      return;
-    }
-    const b = ev.target.closest('button[data-sid]');
+    const del = ev.target.closest('button[data-delfecha]');
+    if (del) { borrarSesionFecha(del.dataset.delfecha); return; }
+    const b = ev.target.closest('button[data-fecha]');
     if (!b) return;
-    // preguntar guardar si hay otra sesión activa con notas
     if (sesionActiva && hayNotasPendientes()) {
-      const curId = sessionId(sesionActiva);
-      const id = decodeURIComponent(b.dataset.sid);
-      if (curId !== id) {
-        if (confirm('Hay notas en la sesión actual.\n¿Desea guardar antes de cambiar?')) {
-          guardarTodo();
-          toast('Guardado');
-        }
+      if (confirm('Hay notas en pantalla.\n¿Desea guardar antes de cambiar de fecha?')) {
+        guardarTodo();
+        toast('Guardado');
       }
     }
-    const id = decodeURIComponent(b.dataset.sid);
-    const s = store.sessions.find(x => sessionId(x) === id);
-    if (!s) return;
-    document.getElementById('inpFecha').value = s.fecha || hoyISO();
-    document.getElementById('selUnidad').value = s.unidad || '';
-    document.getElementById('selComp').value = s.comp || '';
-    fillCaps();
-    setCapacidadUI(s.capacidad || '');
-    loadCapsElegidas();
-    if (s.capacidad && !tieneCapSel(s.comp, s.capacidad)) {
-      capsElegidas.push({ comp: s.comp, cap: s.capacidad });
-      saveCapsElegidas();
-    }
-    sesionActiva = { fecha: s.fecha, unidad: s.unidad || '', comp: s.comp, capacidad: s.capacidad };
-    loadNotasSesion();
-    renderChipsCaps();
-    renderSesiones();
-    renderStudents();
-    document.getElementById('lblSesionActiva').textContent =
-      s.fecha + ' · ' + s.capacidad + (s.unidad ? ' · U' + s.unidad : '');
+    abrirSesionFecha(b.dataset.fecha);
   };
+}
+function abrirSesionFecha(fecha) {
+  const c = ctxBase();
+  const delDia = (store.sessions || []).filter(s =>
+    s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
+    s.seccion === c.seccion && s.area === c.area && s.fecha === fecha
+  );
+  document.getElementById('inpFecha').value = fecha;
+  if (delDia[0]) {
+    document.getElementById('selUnidad').value = delDia[0].unidad || '';
+    if (delDia[0].comp) {
+      document.getElementById('selComp').value = delDia[0].comp;
+      fillCaps();
+    }
+  }
+  loadCapsElegidas();
+  delDia.forEach(s => {
+    if (s.capacidad && !tieneCapSel(s.comp, s.capacidad)) capsElegidas.push({ comp: s.comp, cap: s.capacidad });
+  });
+  saveCapsElegidas();
+  sesionActiva = delDia[0] ? { fecha, unidad: delDia[0].unidad||'', comp: delDia[0].comp, capacidad: delDia[0].capacidad } : { fecha, unidad:'', comp:'', capacidad:'' };
+  renderChipsCaps();
+  renderSesiones();
+  renderStudents();
+}
+function borrarSesionFecha(fecha) {
+  const c = ctxBase();
+  const n = (store.sessions || []).filter(s =>
+    s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
+    s.seccion === c.seccion && s.area === c.area && s.fecha === fecha
+  ).length;
+  if (!confirm('¿Borrar la sesión del ' + fecha + ' y sus notas?\n(' + n + ' capacidad(es))\n\nNo se puede deshacer.')) return;
+  store.sessions = (store.sessions || []).filter(s =>
+    !(s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
+      s.seccion === c.seccion && s.area === c.area && s.fecha === fecha)
+  );
+  Object.keys(store.grades || {}).forEach(k => {
+    const p = k.split('||');
+    if (p[0]===c.nivel && p[1]===c.bim && String(p[2])===String(c.grado) && p[3]===c.seccion && p[4]===c.area && p[7]===fecha) delete store.grades[k];
+  });
+  if (store.capsSel) delete store.capsSel[keyCapsHoy()];
+  saveStore();
+  loadCapsElegidas();
+  renderChipsCaps();
+  renderSesiones();
+  renderStudents();
+  toast('Sesión del ' + fecha + ' eliminada');
 }
 
 function borrarSesion(id) {
@@ -1373,10 +1399,33 @@ function renderChipsCaps() {
   }).join('');
 }
 function quitarCapGrilla(i) {
+  const col = capsElegidas[i];
+  if (!col) return;
+  const fecha = (document.getElementById('inpFecha')||{}).value || '';
+  const ok = confirm(
+    '¿Quitar esta capacidad del ' + (fecha || 'día') + ' y borrar sus notas?\n\n' +
+    (col.comp || '') + '\n' + (col.cap || '') +
+    '\n\nLas demás capacidades del día se mantienen.'
+  );
+  if (!ok) return;
+  const c = ctxBase();
+  store.sessions = (store.sessions || []).filter(s =>
+    !(s.nivel===c.nivel && s.bim===c.bim && String(s.grado)===String(c.grado) &&
+      s.seccion===c.seccion && s.area===c.area && s.fecha===fecha &&
+      s.comp===col.comp && s.capacidad===col.cap)
+  );
+  Object.keys(store.grades || {}).forEach(k => {
+    const p = k.split('||');
+    if (p[0]===c.nivel && p[1]===c.bim && String(p[2])===String(c.grado) && p[3]===c.seccion && p[4]===c.area &&
+        p[5]===col.comp && p[6]===col.cap && p[7]===fecha) delete store.grades[k];
+  });
   capsElegidas.splice(i,1);
   saveCapsElegidas();
+  saveStore();
   renderChipsCaps();
+  renderSesiones();
   renderStudents();
+  toast('Capacidad eliminada');
 }
 function colsCalificar() {
   return capsElegidas.slice();
