@@ -329,7 +329,6 @@
         <input type="text" id="inpCapacidad" placeholder="Escribe la capacidad o evidencia…" onchange="onSesionChange()" onblur="onSesionChange()">
       </div>
       <button type="button" class="btn btn-primary w-full text-sm" onclick="activarSesion()">Agregar a la grilla</button>
-      <div id="chipsCaps" class="flex flex-wrap gap-1"></div>
     </div>
     <div class="card p-3" id="wrapSesiones">
       <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS</div>
@@ -1384,20 +1383,7 @@ function saveCapsElegidas() {
   store.capsSel[keyCapsHoy()] = capsElegidas.slice();
   saveStore();
 }
-function renderChipsCaps() {
-  const box = document.getElementById('chipsCaps');
-  if (!box) return;
-  if (!capsElegidas.length) {
-    box.innerHTML = '<span class="text-[11px] text-slate-400">Aún no hay columnas. Puedes agregar capacidades de 1, 2 o 3 competencias el mismo día.</span>';
-    return;
-  }
-  box.innerHTML = capsElegidas.map((c,i) => {
-    const t = (c.cap || '').slice(0,36) + ((c.cap||'').length>36?'…':'');
-    const short = (c.comp || '').split(' ').slice(0,3).join(' ');
-    return '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-sky-50 text-sky-800 text-[11px] font-bold">'+short+' · '+t+
-    ' <button type="button" class="text-sky-500" onclick="quitarCapGrilla('+i+')">✕</button></span>';
-  }).join('');
-}
+function renderChipsCaps() { /* las columnas de la grilla ya muestran competencia y capacidad */ }
 function quitarCapGrilla(i) {
   const col = capsElegidas[i];
   if (!col) return;
@@ -1472,7 +1458,9 @@ function renderStudents() {
 
   let head = '<th class="fin-nom">Estudiante</th>';
   cols.forEach((col, i) => {
-    head += '<th>C'+(i+1)+'<div class="fin-caps">'+(col.comp||'')+'<br>'+(col.cap||'')+'</div></th>';
+    head += '<th>C'+(i+1)+
+      ' <button type="button" title="Borrar esta capacidad" onclick="quitarCapGrilla('+i+')" style="border:0;background:#fecaca;color:#991b1b;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0;margin-left:4px">×</button>'+
+      '<div class="fin-caps">'+(col.comp||'')+'<br>'+(col.cap||'')+'</div></th>';
   });
 
   let cAD=0,cA=0,cB=0,cC=0;
