@@ -144,6 +144,11 @@
           <div class="font-black">Docentes y accesos</div>
           <div class="text-sm text-slate-500">Usuario, clave, grado (pri) o área (sec)</div>
         </button>
+        <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('siagie')">
+          <div class="text-2xl mb-1">📑</div>
+          <div class="font-black">Registro oficial SIAGIE</div>
+          <div class="text-sm text-slate-500">9 plantillas, carga de docentes y vaciado</div>
+        </button>
         <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('config')">
           <div class="text-2xl mb-1">⚙️</div>
           <div class="font-black">Configuración</div>
@@ -252,32 +257,19 @@
     <section id="tab-siagie" class="tab hidden">
       <div class="card p-4 space-y-3">
         <h2 class="font-black text-lg">Registro oficial SIAGIE</h2>
-        <p class="text-sm text-slate-600">1) Suba el Excel <b>RegNotas</b> del aula. 2) Revise qué áreas ya están en la nube. 3) Vacíe todas al registro oficial. Los docentes no procesan SIAGIE.</p>
+        <p class="text-sm text-slate-600">Un Excel <b>RegNotas</b> por aula (en secundaria son 9). Los docentes solo suben a la nube; aquí se vacía el registro oficial.</p>
         <div class="grid sm:grid-cols-2 gap-2">
           <div>
             <label class="text-[11px] font-bold text-slate-500">Nivel</label>
-            <select id="tplNivel"><option value="primaria">Primaria</option><option value="secundaria">Secundaria</option></select>
+            <select id="tplNivel" onchange="renderAulasSiagie()"><option value="secundaria">Secundaria</option><option value="primaria">Primaria</option></select>
           </div>
           <div>
             <label class="text-[11px] font-bold text-slate-500">Bimestre</label>
-            <select id="tplBim"><option>I</option><option>II</option><option selected>III</option><option>IV</option></select>
-          </div>
-          <div>
-            <label class="text-[11px] font-bold text-slate-500">Grado</label>
-            <input id="tplGrado" placeholder="1">
-          </div>
-          <div>
-            <label class="text-[11px] font-bold text-slate-500">Sección</label>
-            <input id="tplSec" placeholder="A, B o Única">
+            <select id="tplBim" onchange="renderAulasSiagie()"><option>I</option><option>II</option><option selected>III</option><option>IV</option></select>
           </div>
         </div>
-        <input type="file" id="tplFile" accept=".xlsx,.xls">
-        <button class="btn btn-ghost w-full" onclick="subirPlantillaSiagie()">1. Guardar plantilla oficial</button>
-        <button class="btn btn-ghost w-full" onclick="verCargaSiagie()">2. Ver carga de docentes</button>
-        <button class="btn btn-primary w-full" onclick="vaciarSiagieOficial()">3. Vaciar al registro oficial</button>
         <p id="tplMsg" class="text-sm text-slate-500"></p>
-        <div id="tplLista" class="text-sm"></div>
-        <div id="tplCarga" class="text-sm"></div>
+        <div id="tplAulas" class="space-y-2"></div>
       </div>
     </section>
 
@@ -514,7 +506,7 @@ function showTab(id) {
   if (id === 'periodos') initPeriodosUI();
   if (id === 'horario') initHorarioUI();
   if (id === 'menu') actualizarResumen();
-  if (id === 'siagie') listarPlantillasSiagie();
+  if (id === 'siagie') renderAulasSiagie();
 }
 
 function estudiantesDe(nivel) {
@@ -980,16 +972,83 @@ async function fetchRegAula(ctx){
     String(it.bimestre)===String(ctx.bim) && String(it.grado)===String(ctx.grado) && String(it.seccion)===String(ctx.seccion)
   );
 }
-function ctxTpl(){
+function aulasDelNivel(nivel){
+  const seen={};
+  (estudiantesDe(nivel)||[]).forEach(a=>{
+    const g=String(a.grado), s=String(a.seccion||'Única');
+    seen[g+'||'+s]={grado:g, seccion:s};
+  });
+  return Object.values(seen).sort((a,b)=>Number(a.grado)-Number(b.grado)||String(a.seccion).localeCompare(String(b.seccion)));
+}
+function ctxTpl(grado, seccion){
   return {
     nivel: document.getElementById('tplNivel').value,
     bim: document.getElementById('tplBim').value,
-    grado: document.getElementById('tplGrado').value.trim(),
-    seccion: (document.getElementById('tplSec').value.trim()|| (document.getElementById('tplNivel').value==='primaria'?'Única':'A'))
+    grado: String(grado!=null?grado:(window._tplGrado||'')),
+    seccion: String(seccion!=null?seccion:(window._tplSec||''))
   };
 }
+async function renderAulasSiagie(){
+  const box=document.getElementById('tplAulas');
+  if(!box) return;
+  const nivel=document.getElementById('tplNivel').value;
+  const bim=document.getElementById('tplBim').value;
+  const aulas=aulasDelNivel(nivel);
+  let status=[];
+  try{
+    const r=await fetch(CLOUD_API_URL+'?action=loadtplstatus&nivel='+encodeURIComponent(nivel)+'&bimestre='+encodeURIComponent(bim)+'&t='+Date.now(),{cache:'no-store'});
+    const data=JSON.parse(await r.text());
+    status=(data&&data.items)||[];
+  }catch(e){}
+  if(!aulas.length){ box.innerHTML='<p class="text-slate-400">No hay aulas en la BD.</p>'; return; }
+  box.innerHTML=aulas.map(a=>{
+    const hit=status.find(it=>String(it.grado)===String(a.grado)&&String(it.seccion)===String(a.seccion));
+    const id='tplFile_'+a.grado+'_'+String(a.seccion).replace(/\s/g,'_');
+    return '<div class="border border-slate-200 rounded-xl p-3 space-y-2">'+
+      '<div class="flex justify-between gap-2 items-center">'+
+        '<div class="font-black">'+a.grado+'° '+a.seccion+'</div>'+
+        '<div class="text-xs font-bold '+(hit?'text-emerald-700':'text-amber-700')+'">'+(hit?('Plantilla: '+hit.filename):'Sin plantilla')+'</div>'+
+      '</div>'+
+      '<input type="file" id="'+id+'" accept=".xlsx,.xls" class="text-xs w-full">'+
+      '<div class="flex flex-wrap gap-2">'+
+        '<button class="btn btn-ghost text-xs" onclick="subirPlantillaAula(\''+a.grado+'\',\''+a.seccion+'\',\''+id+'\')">Guardar plantilla</button>'+
+        '<button class="btn btn-ghost text-xs" onclick="verCargaAula(\''+a.grado+'\',\''+a.seccion+'\')">Ver carga</button>'+
+        '<button class="btn btn-primary text-xs" onclick="vaciarAula(\''+a.grado+'\',\''+a.seccion+'\')">Vaciar a SIAGIE</button>'+
+      '</div>'+
+      '<div id="msg_'+id+'" class="text-xs text-slate-500"></div>'+
+    '</div>';
+  }).join('');
+}
+async function subirPlantillaAula(grado, seccion, inputId){
+  const inp=document.getElementById(inputId);
+  const msg=document.getElementById('msg_'+inputId);
+  if(!inp||!inp.files||!inp.files[0]){ if(msg) msg.textContent='Elija el RegNotas de este aula.'; return; }
+  window._tplGrado=grado; window._tplSec=seccion;
+  const nivel=document.getElementById('tplNivel').value;
+  const bim=document.getElementById('tplBim').value;
+  if(msg) msg.textContent='Subiendo…';
+  const buf=await inp.files[0].arrayBuffer();
+  const bytes=new Uint8Array(buf);
+  let bin=''; for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+  try{
+    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'savetpl',nivel,bimestre:bim,grado,seccion,filename:inp.files[0].name,b64:btoa(bin),ts:Date.now()})});
+    const data=JSON.parse(await res.text());
+    if(msg) msg.textContent=data.ok?('Guardado: '+inp.files[0].name):(data.error||'Error');
+    renderAulasSiagie();
+  }catch(e){ if(msg) msg.textContent='Publique la nueva versión del Apps Script.'; }
+}
+async function verCargaAula(grado, seccion){
+  window._tplGrado=grado; window._tplSec=seccion;
+  const box=document.getElementById('tplMsg');
+  await verCargaSiagie();
+  if(box) box.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+async function vaciarAula(grado, seccion){
+  window._tplGrado=grado; window._tplSec=seccion;
+  await vaciarSiagieOficial();
+}
 async function verCargaSiagie(){
-  const box=document.getElementById('tplCarga');
+  const box=document.getElementById('tplMsg');
   const ctx=ctxTpl();
   if(!ctx.grado){ box.textContent='Indique grado y sección.'; return; }
   box.textContent='Consultando nube…';

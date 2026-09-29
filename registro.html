@@ -883,6 +883,7 @@ function entrarNivel(n) {
   notas = {};
   markClean();
   document.getElementById('lblSesionActiva').textContent = 'Define fecha, competencia y capacidad arriba';
+  aplicarModoAdminRegistro();
   setTimeout(fixHdrHeight, 50);
 }
 
@@ -1978,7 +1979,24 @@ function prepararImpresion() {
   }, 200);
 }
 
+function esVistaAdmin() {
+  const s = getLoginSession();
+  return !!(s && (s.role === 'admin' || s.user === 'admin'));
+}
+function aplicarModoAdminRegistro() {
+  if (!esVistaAdmin()) return;
+  ['tabCal','tabFin','tabAs'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+  const cal = document.getElementById('panelCalificar');
+  if (cal) cal.classList.remove('on');
+  const fin = document.getElementById('panelFinales');
+  if (fin) fin.classList.remove('on');
+  showPanel('av');
+}
 function showPanel(which) {
+  if (esVistaAdmin() && which !== 'av') which = 'av';
   const cal = document.getElementById('panelCalificar');
   const av = document.getElementById('panelAvance');
   const as = document.getElementById('panelAsistencia');
