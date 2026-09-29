@@ -289,7 +289,7 @@
           </div>
           <button type="button" class="btn btn-ghost text-xs !py-1.5" onclick="renderAvance()">Actualizar</button>
         </div>
-        <p class="text-[11px] text-slate-500 mb-2">Promedio general del área. Conclusión solo si ese promedio es C.</p>
+        <p class="text-[11px] text-slate-500 mb-2" id="lblReglaConc">Promedio general del área. Conclusión: primaria B o C · secundaria solo C.</p>
         <div id="avanceBox"></div>
       </div>
     </div>
@@ -1489,14 +1489,19 @@ function actualizarContadores() {
   document.getElementById('cAD').textContent = ad;
 }
 
+function requiereConclusion(letra) {
+  if (!letra) return false;
+  if (nivel === 'primaria') return letra === 'B' || letra === 'C';
+  return letra === 'C';
+}
 function validarConclusionesOficial(c, alumnos, sess) {
   const comps = competencias();
   const faltan = [];
   alumnos.forEach(al => {
     const g = promGeneralAlumno(al.nombre, comps);
-    if (g.letra !== 'C') return;
+    if (!requiereConclusion(g.letra)) return;
     const txt = ((store.concArea||{})[concAreaKey(al.nombre)]||{}).texto || '';
-    if (!txt.trim()) faltan.push(al.nombre + ' · Promedio ' + g.prom + ' (C)');
+    if (!txt.trim()) faltan.push(al.nombre + ' · Promedio ' + g.prom + ' (' + g.letra + ')');
   });
   return faltan;
 }
@@ -1526,7 +1531,7 @@ function prepararImpresion() {
       'AVISO — Registro oficial (SIAGIE)\n\n' +
       'Falta conclusión descriptiva en promedios que la requieren:\n\n' +
       lista + extra +
-      '\n\nRegla: conclusión obligatoria si el promedio general del área es C.\n' +
+      '\n\nRegla: primaria B o C · secundaria solo C.\n' +
       'Escríbala en Resumen.\n\n' +
       '¿Desea imprimir de todas formas?'
     );
@@ -2141,7 +2146,7 @@ function renderAvance() {
     head += '<th>C'+(idx+1)+(cl?' · '+cl:'')+'<div class="fin-caps">'+comp+'<br>'+capsTxt+'</div></th>';
   });
   head += '<th>Promedio<div class="fin-caps">Promedio de competencias</div></th>';
-  head += '<th>Conclusión<div class="fin-caps">Obligatoria solo si el promedio es C</div></th>';
+  head += '<th>Conclusión<div class="fin-caps">'+(nivel==='primaria'?'Obligatoria si B o C':'Obligatoria solo si C')+'</div></th>';
 
   const rows = alumnos.map((al, i) => {
     let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
@@ -2157,13 +2162,13 @@ function renderAvance() {
     const lg = pg==null?'':numToLetter(pg);
     const ck = concAreaKey(al.nombre);
     const txt = ((store.concArea||{})[ck]||{}).texto || '';
-    const abre = lg==='C';
+    const abre = requiereConclusion(lg);
     tds += '<td><div class="fin-cell">' +
       (pg==null?'<div class="text-slate-300">—</div>':'<div style="font-weight:800;font-size:16px">'+pg+'</div>') +
       '<span class="eq-letter '+(lg?eqClass(lg):'eq-none')+'">'+(lg||'—')+'</span></div></td>';
     tds += '<td style="min-width:160px">' +
       (abre
-        ? '<textarea class="av-conc" data-nom="'+encodeURIComponent(al.nombre)+'" placeholder="Conclusión descriptiva (obligatoria porque el promedio es C)" style="width:100%;min-height:54px;font-size:11px;border:1.5px solid #f87171;border-radius:8px;padding:6px">'+txt.replace(/</g,'&lt;')+'</textarea>'
+        ? '<textarea class="av-conc" data-nom="'+encodeURIComponent(al.nombre)+'" placeholder="Conclusión descriptiva (obligatoria: promedio '+lg+')" style="width:100%;min-height:54px;font-size:11px;border:1.5px solid #f87171;border-radius:8px;padding:6px">'+txt.replace(/</g,'&lt;')+'</textarea>'
         : '<div class="text-[10px] text-slate-400">'+(txt?txt.slice(0,80):'—')+'</div>') +
       '</td>';
     return '<tr>'+tds+'</tr>';
