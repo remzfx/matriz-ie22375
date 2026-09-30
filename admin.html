@@ -103,6 +103,7 @@
       <button class="navbtn chip chip-off" data-tab="siagie" onclick="showTab('siagie')">SIAGIE</button>
       <button class="navbtn chip chip-off" data-tab="horario" onclick="showTab('horario')">Horario ingreso</button>
       <button class="navbtn chip chip-off" data-tab="import" onclick="showTab('import')">Importar</button>
+      <button class="navbtn chip chip-off" data-tab="whatsapp" onclick="showTab('whatsapp')">WhatsApp</button>
       <button class="navbtn chip chip-off" data-tab="docentes" onclick="showTab('docentes')">Docentes</button>
       <button class="navbtn chip chip-off" data-tab="config" onclick="showTab('config')">Config</button>
     </nav>
@@ -143,6 +144,11 @@
           <div class="text-2xl mb-1">🔐</div>
           <div class="font-black">Docentes y accesos</div>
           <div class="text-sm text-slate-500">Usuario, clave, grado (pri) o área (sec)</div>
+        </button>
+        <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('whatsapp')">
+          <div class="text-2xl mb-1">💬</div>
+          <div class="font-black">Grupos WhatsApp</div>
+          <div class="text-sm text-slate-500">Un grupo por aula para enviar la lista</div>
         </button>
         <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('siagie')">
           <div class="text-2xl mb-1">📑</div>
@@ -329,8 +335,20 @@
       </div>
     </section>
 
-    <!-- CONFIG -->
-    <section 
+    <section id="tab-whatsapp" class="tab hidden">
+      <div class="card p-4 space-y-3">
+        <h2 class="font-black text-lg">Grupos WhatsApp por aula</h2>
+        <p class="text-sm text-slate-600">Ponga el <b>número del delegado o tutor</b> (con 51). WhatsApp no deja enviar solo al grupo; el auxiliar abre el chat con la lista lista para reenviar al grupo del salón.</p>
+        <div>
+          <label class="text-[11px] font-bold text-slate-500">Nivel</label>
+          <select id="waNivel" onchange="renderWaAulas()"><option value="primaria">Primaria</option><option value="secundaria">Secundaria</option></select>
+        </div>
+        <div id="waAulas" class="space-y-2"></div>
+        <button class="btn btn-primary w-full" onclick="guardarGruposWa()">Guardar grupos</button>
+        <p id="waMsg" class="text-sm text-slate-500"></p>
+      </div>
+    </section>
+
     <!-- DOCENTES / ACCESOS -->
     <section id="tab-docentes" class="tab hidden">
       <div class="card p-4 space-y-3">
@@ -507,6 +525,7 @@ function showTab(id) {
   if (id === 'horario') initHorarioUI();
   if (id === 'menu') actualizarResumen();
   if (id === 'siagie') renderAulasSiagie();
+  if (id === 'whatsapp') bajarGruposWa();
 }
 
 function estudiantesDe(nivel) {
@@ -910,6 +929,58 @@ async function subirPlantillaSiagie() {
   } catch(e) {
     msg.textContent = 'No se pudo subir. Publique la nueva versión del Apps Script.';
   }
+}
+const WA_KEY = 'ie22375_wa_grupos_v1';
+function loadGruposWa(){
+  try { const r=JSON.parse(localStorage.getItem(WA_KEY)||'[]'); if(Array.isArray(r)) return r; } catch(e){}
+  return [];
+}
+function saveGruposWaLocal(list){ localStorage.setItem(WA_KEY, JSON.stringify(list)); }
+function waClave(n,g,s){ return [n,g,s].join('||'); }
+function renderWaAulas(){
+  const box=document.getElementById('waAulas');
+  if(!box) return;
+  const nivel=document.getElementById('waNivel').value;
+  const aulas=aulasDelNivel(nivel);
+  const grupos=loadGruposWa();
+  if(!aulas.length){ box.innerHTML='<p class="text-slate-400">No hay aulas.</p>'; return; }
+  box.innerHTML=aulas.map(a=>{
+    const it=grupos.find(x=>String(x.nivel)===nivel&&String(x.grado)===String(a.grado)&&String(x.seccion)===String(a.seccion))||{};
+    const id=nivel+'_'+a.grado+'_'+String(a.seccion).replace(/\s/g,'_');
+    return '<div class="border border-slate-200 rounded-xl p-3 grid sm:grid-cols-2 gap-2">'+
+      '<div class="font-black sm:col-span-2">'+a.grado+'° '+a.seccion+'</div>'+
+      '<div><label class="text-[10px] font-bold text-slate-500">Nombre del grupo</label>'+
+      '<input id="waN_'+id+'" value="'+(it.nombre||('Grupo '+a.grado+'° '+a.seccion))+'"></div>'+
+      '<div><label class="text-[10px] font-bold text-slate-500">Celular (51…)</label>'+
+      '<input id="waC_'+id+'" value="'+(it.numero||'')+'" placeholder="51987654321"></div></div>';
+  }).join('');
+}
+async function guardarGruposWa(){
+  const nivel=document.getElementById('waNivel').value;
+  const aulas=aulasDelNivel(nivel);
+  let list=loadGruposWa().filter(x=>x.nivel!==nivel);
+  aulas.forEach(a=>{
+    const id=nivel+'_'+a.grado+'_'+String(a.seccion).replace(/\s/g,'_');
+    const nombre=(document.getElementById('waN_'+id)||{}).value||'';
+    const numero=String((document.getElementById('waC_'+id)||{}).value||'').replace(/\D/g,'');
+    list.push({nivel,grado:String(a.grado),seccion:String(a.seccion),nombre,numero});
+  });
+  saveGruposWaLocal(list);
+  const msg=document.getElementById('waMsg');
+  if(msg) msg.textContent='Guardado en este equipo. Subiendo a la nube…';
+  try{
+    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'savewa',grupos:list,ts:Date.now()})});
+    const data=JSON.parse(await res.text());
+    if(msg) msg.textContent=data.ok?('Guardado · '+list.length+' aulas'):(data.error||'Nube no disponible; quedó en este equipo.');
+  }catch(e){ if(msg) msg.textContent='Guardado local. Publique Apps Script para la nube.'; }
+}
+async function bajarGruposWa(){
+  try{
+    const r=await fetch(CLOUD_API_URL+'?action=loadwa&t='+Date.now(),{cache:'no-store'});
+    const data=JSON.parse(await r.text());
+    if(data&&Array.isArray(data.grupos)&&data.grupos.length){ saveGruposWaLocal(data.grupos); }
+  }catch(e){}
+  renderWaAulas();
 }
 const AREAS_PRI_LIST = ["Personal Social","Educación Física","Comunicación","Arte y Cultura","Matemática","Ciencia y Tecnología","Educación Religiosa","Competencias Transversales"];
 const AREAS_SEC_LIST = ["Desarrollo Personal, Ciudadanía y Cívica", "Ciencias Sociales", "Educación para el Trabajo (EPT)", "Educación Física", "Comunicación", "Arte y Cultura", "Inglés", "Matemática", "Ciencia y Tecnología", "Educación Religiosa", "Competencias Transversales"];

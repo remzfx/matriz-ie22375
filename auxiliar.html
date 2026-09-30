@@ -114,7 +114,8 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     <div class="actions">
       <button type="button" class="btn btn-primary" onclick="toggleScan()">📷 Escanear QR</button>
       <button type="button" class="btn btn-ghost" onclick="marcarTodos('P')">Todos presente</button>
-      <button type="button" class="btn btn-ghost" onclick="compartirWhatsApp()">WhatsApp</button>
+      <button type="button" class="btn btn-ghost" onclick="compartirWhatsApp()">WhatsApp este salón</button>
+      <button type="button" class="btn btn-primary" onclick="enviarGruposHoy()">WhatsApp grupos del día</button>
       <button type="button" class="btn btn-ghost" onclick="bajarNube()">Bajar asistencia de la nube</button>
       <button type="button" class="btn btn-ghost" onclick="subirTodoNube()">Subir asistencia a la nube</button>
     </div>
@@ -479,13 +480,22 @@ function marcarTodos(marca) {
   renderLista();
 }
 
-function compartirWhatsApp() {
-  const c = ctx();
-  const list = alumnosAula();
-  if (!list.length) { alert('No hay alumnos'); return; }
+const WA_KEY = 'ie22375_wa_grupos_v1';
+function loadGruposWa() {
+  try { const r = JSON.parse(localStorage.getItem(WA_KEY) || '[]'); if (Array.isArray(r)) return r; } catch (e) {}
+  return [];
+}
+async function bajarGruposWa() {
+  try {
+    const r = await fetch(CLOUD_API_URL + '?action=loadwa&t=' + Date.now(), { cache: 'no-store' });
+    const data = JSON.parse(await r.text());
+    if (data && Array.isArray(data.grupos)) localStorage.setItem(WA_KEY, JSON.stringify(data.grupos));
+  } catch (e) {}
+}
+function textoListaAula(nivel, grado, seccion, fecha) {
+  const list = (((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion));
   let cP=0,cF=0,cT=0,cJ=0;
-  const lineas = [];
-  const faltas = [];
+  const lineas = [], faltas = [];
   list.forEach((al, i) => {
     const rec = getRec(al);
     const m = rec.marca || '—';
@@ -494,13 +504,54 @@ function compartirWhatsApp() {
     const hora = (m==='P'||m==='T'||m==='J') && rec.hora ? '  ' + rec.hora : '';
     lineas.push((i+1)+'. '+al.nombre+'  '+m+hora);
   });
-  const txt =
-    'IE 22375 · Ingreso ' + c.fecha + '\n' +
-    (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + '\n' +
-    'P '+cP+' · F '+cF+' · T '+cT+' · J '+cJ + '\n\n' +
-    lineas.join('\n') +
-    (faltas.length ? '\n\nSin ingreso / faltas:\n- ' + faltas.join('\n- ') : '');
-  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  return {
+    list, cP, cF, cT, cJ,
+    txt: 'IE 22375 · Ingreso ' + fecha + '\n' +
+      (nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + grado + '° ' + seccion + '\n' +
+      'P '+cP+' · F '+cF+' · T '+cT+' · J '+cJ + '\n\n' +
+      lineas.join('\n') +
+      (faltas.length ? '\n\nSin ingreso / faltas:\n- ' + faltas.join('\n- ') : '')
+  };
+}
+function abrirWhatsApp(numero, txt) {
+  const n = String(numero || '').replace(/\D/g, '');
+  const url = n
+    ? ('https://wa.me/' + n + '?text=' + encodeURIComponent(txt))
+    : ('https://wa.me/?text=' + encodeURIComponent(txt));
+  window.open(url, '_blank');
+}
+function compartirWhatsApp() {
+  const c = ctx();
+  const pack = textoListaAula(c.nivel, c.grado, c.seccion, c.fecha);
+  if (!pack.list.length) { alert('No hay alumnos'); return; }
+  const g = loadGruposWa().find(x => x.nivel===c.nivel && String(x.grado)===String(c.grado) && String(x.seccion)===String(c.seccion));
+  abrirWhatsApp(g && g.numero, pack.txt);
+}
+async function enviarGruposHoy() {
+  await bajarGruposWa();
+  const c = ctx();
+  const grupos = loadGruposWa().filter(x => x.nivel === c.nivel);
+  if (!grupos.length) {
+    alert('No hay grupos configurados.\nEn Admin → WhatsApp cargue el número de cada aula.');
+    return;
+  }
+  const pendientes = grupos.filter(g => {
+    const pack = textoListaAula(g.nivel, g.grado, g.seccion, c.fecha);
+    return pack.list.some(al => { const m = getRec(al).marca; return m==='P'||m==='F'||m==='T'||m==='J'; });
+  });
+  const usar = pendientes.length ? pendientes : grupos;
+  let i = 0;
+  function siguiente() {
+    if (i >= usar.length) { alert('Listas listas. Ya se abrieron ' + usar.length + ' chats.'); return; }
+    const g = usar[i];
+    const pack = textoListaAula(g.nivel, g.grado, g.seccion, c.fecha);
+    const nom = g.nombre || (g.grado + '° ' + g.seccion);
+    if (!confirm('Enviar lista ' + (i+1) + ' de ' + usar.length + ':\n' + nom + '\n\nSe abrirá WhatsApp. Envíe y vuelva para el siguiente.')) return;
+    abrirWhatsApp(g.numero, pack.txt);
+    i++;
+    setTimeout(siguiente, 600);
+  }
+  siguiente();
 }
 
 /* ===== QR (iPhone + Android) ===== */
@@ -683,7 +734,7 @@ async function leerFotoQR(input) {
   }
 }
 
-Promise.all([ensureBD(), ensureHorario()]).then(() => {
+Promise.all([ensureBD(), ensureHorario(), bajarGruposWa()]).then(() => {
   document.getElementById('inpFecha').value = hoyISO();
   onNivel();
 });
