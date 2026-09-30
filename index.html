@@ -63,7 +63,7 @@
           <input type="password" id="inpPass" name="password" placeholder="••••••••" autocomplete="current-password" />
         </div>
         <label class="flex items-center gap-2 text-sm text-slate-600 font-semibold cursor-pointer">
-          <input type="checkbox" id="inpRecordar" class="w-4 h-4" />
+          <input type="checkbox" id="inpRecordar" class="w-4 h-4" checked />
           Recordar sesión en este equipo
         </label>
         <p id="loginErr" class="hidden text-sm text-red-600 font-semibold bg-red-50 rounded-lg px-3 py-2"></p>
@@ -132,7 +132,7 @@ async function asegurarDocentesRemotos() {
   } catch(e) {}
   return false;
 }
-const SESSION_MS = 12 * 60 * 60 * 1000;
+const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 function leerSesionCruda() {
   try {
     const a = sessionStorage.getItem(SESSION_KEY);
