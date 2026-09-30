@@ -50,8 +50,8 @@
           <select id="inpTipo" name="rol" onchange="onTipoChange()" autocomplete="off">
             <option value="docente">Docente</option>
             <option value="admin">Administrador</option>
-            <option value="auxiliar">Auxiliar del colegio</option>
-            <option value="pip">Profesor Innovación</option>
+            <option value="auxiliar">Auxiliar</option>
+            <option value="pip">Innovación</option>
           </select>
         </div>
         <div>
@@ -198,7 +198,7 @@ async function intentarLogin() {
       err.classList.remove('hidden');
       return;
     }
-    setSession({ user:'auxiliar', label:'Auxiliar del colegio', nivel:'colegio', role:'auxiliar',
+    setSession({ user:'auxiliar', label:'Auxiliar', nivel:'colegio', role:'auxiliar',
       grados:null, areas:null, mods:['auxiliar'], ts:Date.now(),
       recordar: !!(document.getElementById('inpRecordar')||{}).checked });
     mostrarHub();
@@ -210,7 +210,7 @@ async function intentarLogin() {
       err.classList.remove('hidden');
       return;
     }
-    setSession({ user:'pip', label:'Profesor Innovación', nivel:'colegio', role:'pip',
+    setSession({ user:'pip', label:'Innovación', nivel:'colegio', role:'pip',
       grados:null, areas:null, mods:['aip'], ts:Date.now(),
       recordar: !!(document.getElementById('inpRecordar')||{}).checked });
     mostrarHub();
@@ -281,7 +281,7 @@ function mostrarHub() {
     registro: { href:'registro.html', title:'Registro auxiliar', desc:'Notas, asistencia e impresión', badge:'REGISTRO' },
     admin_bd: { href:'admin.html', title:'Administración', desc:'BD, docentes y bimestres', badge:'ADMIN' },
     auxiliar: { href:'auxiliar.html', title:'Asistencia de ingreso', desc:'Puerta · QR · lista del aula para WhatsApp', badge:'AUXILIAR' },
-    aip: { href:'aula_innovacion.html', title:'Aula de innovación (AIP)', desc:'Horario mensual · competencia 28', badge:'Profesor Innovación' }
+    aip: { href:'aula_innovacion.html', title:'Aula de innovación (AIP)', desc:'Horario mensual · competencia 28', badge:'Innovación' }
   };
   const keys = modsDe(s).filter(m => catalog[m]);
   document.getElementById('modulos').innerHTML = keys.map(key => {
