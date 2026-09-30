@@ -116,6 +116,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <button type="button" class="btn btn-ghost" onclick="marcarTodos('P')">Todos presente</button>
       <button type="button" class="btn btn-ghost" onclick="compartirWhatsApp()">WhatsApp este salón</button>
       <button type="button" class="btn btn-primary" onclick="enviarGruposHoy()">WhatsApp grupos del día</button>
+      <button type="button" class="btn btn-ghost" onclick="cerrarAsistenciaAula()">Cerrar asistencia del aula</button>
       <button type="button" class="btn btn-ghost" onclick="bajarNube()">Bajar asistencia de la nube</button>
       <button type="button" class="btn btn-ghost" onclick="subirTodoNube()">Subir asistencia a la nube</button>
     </div>
@@ -337,15 +338,23 @@ function onGrado() {
 
 function getRec(al) {
   const rec = loadAsis()[asisKey(al)];
-  if (!rec) return { marca:'', hora:'' };
-  if (typeof rec === 'string') return { marca: rec, hora:'' };
-  return { marca: rec.marca || '', hora: rec.hora || '' };
+  if (!rec) return { marca:'', hora:'', motivo:'' };
+  if (typeof rec === 'string') return { marca: rec, hora:'', motivo:'' };
+  return { marca: rec.marca || '', hora: rec.hora || '', motivo: rec.motivo || '', via: rec.via || '', ts: rec.ts };
 }
-function setRec(al, marca, via) {
+function setRec(al, marca, via, motivo) {
   const all = loadAsis();
   const k = asisKey(al);
+  const prev = all[k] || {};
   if (!marca) delete all[k];
-  else all[k] = { marca, hora: horaAhora(), via: via || 'manual', ts: Date.now() };
+  else all[k] = {
+    marca,
+    hora: prev.hora || horaAhora(),
+    via: via || prev.via || 'manual',
+    ts: Date.now(),
+    motivo: marca === 'J' ? String(motivo != null ? motivo : (prev.motivo || '')) : ''
+  };
+  if (marca && !prev.hora) all[k].hora = horaAhora();
   saveAsis(all);
 }
 
@@ -354,7 +363,7 @@ function recToItem(clave, rec) {
   return {
     clave: clave,
     fecha: p[0], nivel: p[1], grado: p[2], seccion: p[3], nombre: p.slice(4).join('||'),
-    marca: rec.marca || '', hora: rec.hora || '', via: rec.via || '', ts: rec.ts || Date.now()
+    marca: rec.marca || '', hora: rec.hora || '', via: rec.via || '', ts: rec.ts || Date.now(), motivo: rec.motivo || ''
   };
 }
 async function subirUnoNube(al) {
@@ -388,7 +397,7 @@ async function subirTodoNube() {
   const faltas = completarFaltasAlSubir();
   if (faltas) renderLista();
   const all = loadAsis();
-  const items = Object.keys(all).map(k => recToItem(k, all[k]));
+  const items = Object.keys(all).map(k => recToItem(k, all[k])).filter(it => it.marca);
   if (!items.length) { toast('No hay marcas para subir'); return; }
   try {
     const res = await fetch(CLOUD_API_URL, {
@@ -414,7 +423,7 @@ async function bajarNube() {
       const prev = all[k];
       const ts = Number(it.ts) || 0;
       if (!prev || ts >= (prev.ts || 0)) {
-        all[k] = { marca: it.marca, hora: it.hora, via: it.via || 'nube', ts: ts };
+        all[k] = { marca: it.marca, hora: it.hora, via: it.via || 'nube', ts: ts, motivo: it.motivo || '' };
       }
     });
     saveAsis(all);
@@ -442,12 +451,16 @@ function renderLista() {
       if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++; else cS++;
       const hora = rec.hora ? '<span class="text-[10px] text-slate-500 font-bold">'+rec.hora+'</span>' : '';
       const enc = encodeURIComponent(al.nombre);
-      return '<div class="row flex gap-2 items-center">' +
+      const motivoBox = m==='J'
+        ? '<input class="mt-1 text-xs w-full" data-motivo="'+enc+'" placeholder="Motivo de la justificación" value="'+(rec.motivo||'').replace(/"/g,'&quot;')+'">'
+        : '';
+      return '<div class="row">' +
+        '<div class="flex gap-2 items-center">' +
         '<div class="text-xs font-bold text-slate-400 w-6">'+(i+1)+'</div>' +
         '<div class="flex-1 min-w-0 font-bold text-sm truncate">'+al.nombre+' '+hora+'</div>' +
         '<div class="flex gap-1">' +
         ['P','F','T','J'].map(v => '<button type="button" class="chip '+(m===v?v:'')+'" data-n="'+enc+'" data-v="'+v+'">'+v+'</button>').join('') +
-        '</div></div>';
+        '</div></div>'+motivoBox+'</div>';
     }).join('');
   }
   // recount all aula not just filtered
@@ -469,11 +482,39 @@ function renderLista() {
     const al = alumnosAula().find(x => x.nombre === nombre);
     if (!al) return;
     const cur = getRec(al).marca;
-    setRec(al, cur === b.dataset.v ? '' : b.dataset.v, 'manual');
+    const next = cur === b.dataset.v ? '' : b.dataset.v;
+    let motivo = getRec(al).motivo || '';
+    if (next === 'J') {
+      motivo = prompt('Motivo de la justificación de:\n' + al.nombre, motivo || '') || '';
+      if (!motivo.trim()) { toast('Escriba el motivo para justificar'); return; }
+    }
+    setRec(al, next, 'manual', motivo);
     renderLista();
+  };
+  box.onchange = function(ev) {
+    const inp = ev.target.closest('input[data-motivo]');
+    if (!inp) return;
+    const nombre = decodeURIComponent(inp.getAttribute('data-motivo'));
+    const al = alumnosAula().find(x => x.nombre === nombre);
+    if (!al || getRec(al).marca !== 'J') return;
+    setRec(al, 'J', 'manual', inp.value);
   };
 }
 
+function cerrarAsistenciaAula() {
+  const c = ctx();
+  const list = alumnosAula();
+  const sin = list.filter(al => !getRec(al).marca);
+  if (!list.length) { alert('No hay alumnos'); return; }
+  if (!sin.length) {
+    alert('Este aula ya está cerrada: todos tienen marca.');
+    return;
+  }
+  if (!confirm('Cerrar ' + c.grado + '° ' + c.seccion + '?\nLos ' + sin.length + ' sin marca pasarán a Falta (F).\nLos que ya tienen P, T o J no se tocan.')) return;
+  sin.forEach(al => setRec(al, 'F', 'cierre'));
+  renderLista();
+  toast('Aula cerrada · ' + sin.length + ' faltas');
+}
 function marcarTodos(marca) {
   if (!confirm('¿Marcar a todo el aula como ' + marca + '?')) return;
   alumnosAula().forEach(al => setRec(al, marca, 'manual'));
@@ -502,7 +543,8 @@ function textoListaAula(nivel, grado, seccion, fecha) {
     if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++;
     if (m==='F' || !rec.marca) faltas.push(al.nombre + (!rec.marca ? ' (sin marca)' : ''));
     const hora = (m==='P'||m==='T'||m==='J') && rec.hora ? '  ' + rec.hora : '';
-    lineas.push((i+1)+'. '+al.nombre+'  '+m+hora);
+    const mot = (m==='J' && rec.motivo) ? ' ('+rec.motivo+')' : '';
+    lineas.push((i+1)+'. '+al.nombre+'  '+m+hora+mot);
   });
   return {
     list, cP, cF, cT, cJ,
