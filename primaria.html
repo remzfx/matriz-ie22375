@@ -1046,9 +1046,43 @@ window.__IE_gradoOK = function(gradoVal) {
                 <h2 class="text-lg font-bold text-slate-700 flex items-center gap-2">
                     <i class="fas fa-th-large text-sky-600"></i> Áreas Curriculares
                 </h2>
-                <span class="text-xs text-slate-500 bg-white px-3 py-1 rounded-full shadow-sm">Haz clic en un área para editar</span>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="abrirComparativo()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
+                        <i class="fas fa-balance-scale mr-1"></i> Comparativo
+                    </button>
+                    <span class="text-xs text-slate-500 bg-white px-3 py-1 rounded-full shadow-sm">Haz clic en un área para editar</span>
+                </div>
             </div>
             <div id="areasContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+        </div>
+
+        <div id="vistaComparativo" class="hidden glass rounded-2xl shadow-lg p-5 no-print space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-black text-slate-800"><i class="fas fa-balance-scale text-indigo-600 mr-2"></i>Comparativo de grados</h2>
+                    <p class="text-xs text-slate-500">Mismo bimestre. Porcentaje según lo registrado (Previsto + Destacado = logro esperado).</p>
+                </div>
+                <button type="button" onclick="cerrarComparativo()" class="text-sm font-bold text-slate-500 hover:text-slate-800">Cerrar</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Grado A</label>
+                    <select id="cmpGradoA" onchange="renderComparativo()" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold"></select>
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Grado B</label>
+                    <select id="cmpGradoB" onchange="renderComparativo()" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold"></select>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl border border-slate-100 p-3" style="height:320px;position:relative">
+                <canvas id="chartComparativo"></canvas>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead id="cmpThead"></thead>
+                    <tbody id="cmpTbody"></tbody>
+                </table>
+            </div>
         </div>
 
         <!-- PANEL DE COMPETENCIAS -->
@@ -2219,6 +2253,97 @@ window.__IE_gradoOK = function(gradoVal) {
                 tot.destacado += d.destacado;
             });
             return tot;
+        }
+
+        const GRADOS_PRI = ['PRIMERO','SEGUNDO','TERCERO','CUARTO','QUINTO','SEXTO'];
+        const LABEL_GRADO = { PRIMERO:'1°', SEGUNDO:'2°', TERCERO:'3°', CUARTO:'4°', QUINTO:'5°', SEXTO:'6°' };
+        let chartComparativo = null;
+
+        function resumenAreaEnGrado(nombreArea, grado) {
+            const key = estado.bimestre + '|' + grado + '|UNICA';
+            const comps = ESTRUCTURA_AREAS[nombreArea].competencias;
+            const tot = { inicio: 0, proceso: 0, previsto: 0, destacado: 0 };
+            const bloque = ((estado.datos || {})[key] || {})[nombreArea] || {};
+            comps.forEach(comp => {
+                const d = bloque[comp] || {};
+                tot.inicio += Number(d.inicio) || 0;
+                tot.proceso += Number(d.proceso) || 0;
+                tot.previsto += Number(d.previsto) || 0;
+                tot.destacado += Number(d.destacado) || 0;
+            });
+            const sum = tot.inicio + tot.proceso + tot.previsto + tot.destacado;
+            const pct = (n) => sum > 0 ? Math.round((n / sum) * 100) : 0;
+            return {
+                tot, sum,
+                pI: pct(tot.inicio), pP: pct(tot.proceso), pPr: pct(tot.previsto), pD: pct(tot.destacado),
+                logro: pct(tot.previsto + tot.destacado)
+            };
+        }
+
+        function abrirComparativo() {
+            const box = document.getElementById('vistaComparativo');
+            if (!box) return;
+            document.getElementById('panelCompetencias').classList.add('hidden');
+            box.classList.remove('hidden');
+            const opts = GRADOS_PRI.map(g => '<option value="'+g+'">'+LABEL_GRADO[g]+'</option>').join('');
+            const a = document.getElementById('cmpGradoA');
+            const b = document.getElementById('cmpGradoB');
+            a.innerHTML = opts;
+            b.innerHTML = opts;
+            a.value = estado.grado || 'PRIMERO';
+            const idx = GRADOS_PRI.indexOf(a.value);
+            b.value = GRADOS_PRI[Math.min(idx + 1, GRADOS_PRI.length - 1)];
+            if (b.value === a.value && idx > 0) b.value = GRADOS_PRI[idx - 1];
+            renderComparativo();
+            box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        function cerrarComparativo() {
+            const box = document.getElementById('vistaComparativo');
+            if (box) box.classList.add('hidden');
+        }
+        function renderComparativo() {
+            const gA = document.getElementById('cmpGradoA').value;
+            const gB = document.getElementById('cmpGradoB').value;
+            const areas = Object.keys(ESTRUCTURA_AREAS).filter(function(n){ return !window.__IE_areasOK || window.__IE_areasOK(n); });
+            const filas = areas.map(n => ({
+                nombre: n, corto: abrevArea(n),
+                a: resumenAreaEnGrado(n, gA),
+                b: resumenAreaEnGrado(n, gB)
+            }));
+            document.getElementById('cmpThead').innerHTML =
+                '<tr class="text-left text-[11px] uppercase text-slate-500 border-b">'+
+                '<th class="py-2 pr-2">Área</th>'+
+                '<th class="py-2 px-2 text-center">'+LABEL_GRADO[gA]+' logro</th>'+
+                '<th class="py-2 px-2 text-center">'+LABEL_GRADO[gB]+' logro</th>'+
+                '<th class="py-2 px-2 text-center">Diferencia</th></tr>';
+            document.getElementById('cmpTbody').innerHTML = filas.map(f => {
+                const dif = f.a.logro - f.b.logro;
+                const col = Math.abs(dif) >= 10 ? 'text-amber-700 font-black' : 'text-slate-700 font-bold';
+                const signo = dif > 0 ? '+' : '';
+                return '<tr class="border-b border-slate-100">'+
+                    '<td class="py-2 pr-2 font-semibold text-slate-800">'+f.corto+'</td>'+
+                    '<td class="py-2 px-2 text-center font-bold">'+(f.a.sum ? f.a.logro+'%' : '—')+'</td>'+
+                    '<td class="py-2 px-2 text-center font-bold">'+(f.b.sum ? f.b.logro+'%' : '—')+'</td>'+
+                    '<td class="py-2 px-2 text-center '+col+'">'+(f.a.sum && f.b.sum ? signo+dif+' pts' : '—')+'</td></tr>';
+            }).join('');
+            const ctx = document.getElementById('chartComparativo');
+            if (!ctx || typeof Chart === 'undefined') return;
+            if (chartComparativo) chartComparativo.destroy();
+            chartComparativo = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: filas.map(f => f.corto),
+                    datasets: [
+                        { label: LABEL_GRADO[gA]+' logro %', data: filas.map(f => f.a.sum ? f.a.logro : 0), backgroundColor: '#4f46e5' },
+                        { label: LABEL_GRADO[gB]+' logro %', data: filas.map(f => f.b.sum ? f.b.logro : 0), backgroundColor: '#0ea5e9' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } } }
+                }
+            });
         }
 
         // ============================================
