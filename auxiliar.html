@@ -76,9 +76,13 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     </div>
     <a href="index.html" class="btn btn-ghost btn-inicio text-sm shrink-0">Inicio</a>
   </div>
+  <div class="max-w-lg mx-auto px-4 pb-3 flex gap-2">
+    <button type="button" id="menuAsis" class="btn btn-primary text-sm" onclick="verMenu('asis')">Asistencia</button>
+    <button type="button" id="menuGrupos" class="btn btn-ghost text-sm" onclick="verMenu('grupos')">Grupos del día</button>
+  </div>
 </header>
 
-<main class="max-w-lg mx-auto px-4 py-4 space-y-3">
+<main id="vistaAsis" class="max-w-lg mx-auto px-4 py-4 space-y-3">
   <div class="card p-3 space-y-3">
     <div id="scanBox" class="space-y-2">
       <div id="reader"></div>
@@ -115,13 +119,6 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <button type="button" class="btn btn-primary" onclick="toggleScan()">📷 Escanear QR</button>
       <button type="button" class="btn btn-ghost" onclick="marcarTodos('P')">Todos presente</button>
       <button type="button" class="btn btn-ghost" onclick="compartirWhatsApp()">WhatsApp este salón</button>
-      <button type="button" class="btn btn-primary" onclick="enviarGruposHoy()">WhatsApp grupos del día</button>
-      <div id="waCola" class="hidden space-y-2"></div>
-      <div id="waTextoBox" class="hidden space-y-2">
-        <p class="text-xs font-bold text-slate-600">Lista copiada. En el grupo de WhatsApp haga clic en la caja de escribir y pegue con Ctrl+V.</p>
-        <textarea id="waTexto" class="w-full text-xs border border-slate-200 rounded-lg p-2" rows="8" readonly></textarea>
-        <button type="button" class="btn btn-primary w-full" onclick="copiarListaVisible()">Copiar lista otra vez</button>
-      </div>
       <button type="button" class="btn btn-ghost" onclick="cerrarAsistenciaAula()">Cerrar asistencia del aula</button>
       <button type="button" class="btn btn-ghost" onclick="bajarNube()">Bajar asistencia de la nube</button>
       <button type="button" class="btn btn-ghost" onclick="subirTodoNube()">Subir asistencia a la nube</button>
@@ -143,6 +140,25 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
   <p class="text-[11px] text-center text-slate-400 pb-6">
     Primaria presente 07:30–08:15 · tardanza después. Secundaria presente 12:30–13:15 · tardanza después. J justificación manual. Al subir a la nube, sin marca = falta si ya cerró la jornada.
   </p>
+</main>
+
+<main id="vistaGrupos" class="hidden max-w-lg mx-auto px-4 py-4 space-y-3">
+  <div class="card p-3 space-y-3">
+    <h2 class="font-black">Grupos del día</h2>
+    <p class="text-xs text-slate-500">Aulas con asistencia marcada. Al tocar un salón se copia la lista y se abre su grupo.</p>
+    <div>
+      <label class="text-[10px] font-bold text-slate-500">Fecha</label>
+      <input type="date" id="inpFechaGrupos" onchange="enviarGruposHoy()">
+    </div>
+    <div>
+      <label class="text-[10px] font-bold text-slate-500">Nivel</label>
+      <select id="selNivelGrupos" onchange="enviarGruposHoy()">
+        <option value="primaria">Primaria</option>
+        <option value="secundaria">Secundaria</option>
+      </select>
+    </div>
+    <div id="waCola" class="space-y-2"></div>
+  </div>
 </main>
 <div id="toast" class="toast hidden"></div>
 
@@ -582,28 +598,29 @@ async function copiarTexto(txt) {
     return true;
   }
 }
-function mostrarListaWa(txt) {
-  const box = document.getElementById('waTextoBox');
-  const ta = document.getElementById('waTexto');
-  if (ta) ta.value = txt;
-  if (box) box.classList.remove('hidden');
-}
-async function copiarListaVisible() {
-  const ta = document.getElementById('waTexto');
-  if (!ta || !ta.value) return;
-  await copiarTexto(ta.value);
-  toast('Lista copiada. Pegue en el grupo con Ctrl+V.');
+function verMenu(cual) {
+  const asis = document.getElementById('vistaAsis');
+  const grupos = document.getElementById('vistaGrupos');
+  const bAsis = document.getElementById('menuAsis');
+  const bGrupos = document.getElementById('menuGrupos');
+  const esGrupos = cual === 'grupos';
+  if (asis) asis.classList.toggle('hidden', esGrupos);
+  if (grupos) grupos.classList.toggle('hidden', !esGrupos);
+  if (bAsis) bAsis.className = 'btn text-sm ' + (esGrupos ? 'btn-ghost' : 'btn-primary');
+  if (bGrupos) bGrupos.className = 'btn text-sm ' + (esGrupos ? 'btn-primary' : 'btn-ghost');
+  if (esGrupos) {
+    const f = document.getElementById('inpFechaGrupos');
+    if (f && !f.value) f.value = (document.getElementById('inpFecha') || {}).value || hoyISO();
+    enviarGruposHoy();
+  }
 }
 function abrirWhatsApp(txt, enlace) {
   const link = String(enlace || '').trim();
-  mostrarListaWa(txt);
   copiarTexto(txt).then(function() {
     if (/chat\.whatsapp\.com|whatsapp\.com\/invite/i.test(link)) {
-      toast('Lista copiada. En el grupo pegue con Ctrl+V.');
       window.open(link, '_blank');
       return;
     }
-    toast('Lista copiada. Elija el grupo y pegue con Ctrl+V.');
     const a = document.createElement('a');
     a.href = urlWhatsApp(txt);
     a.target = '_blank';
@@ -623,35 +640,32 @@ function compartirWhatsApp() {
 }
 async function enviarGruposHoy() {
   await bajarGruposWa();
-  const c = ctx();
-  const grupos = loadGruposWa().filter(x => x.nivel === c.nivel);
+  const fecha = (document.getElementById('inpFechaGrupos') || {}).value || hoyISO();
+  const nivel = (document.getElementById('selNivelGrupos') || {}).value || 'primaria';
+  const grupos = loadGruposWa().filter(x => x.nivel === nivel);
   const box = document.getElementById('waCola');
+  if (!box) return;
   if (!grupos.length) {
-    alert('No hay grupos configurados.\nEn Admin → WhatsApp ponga el nombre de cada grupo.');
+    box.innerHTML = '<p class="text-sm text-slate-500">No hay grupos. En Admin → WhatsApp pegue el enlace de cada aula.</p>';
     return;
   }
   const pendientes = grupos.filter(g => {
-    const pack = textoListaAula(g.nivel, g.grado, g.seccion, c.fecha);
+    const pack = textoListaAula(g.nivel, g.grado, g.seccion, fecha);
     return pack.list.some(al => { const m = getRec(al).marca; return m==='P'||m==='F'||m==='T'||m==='J'; });
   });
   const usar = pendientes.length ? pendientes : grupos;
-  if (box) {
-    box.classList.remove('hidden');
-    box.innerHTML = '<p class="text-xs font-bold text-slate-500">Toque cada salón. Se abre WhatsApp Web; elija el grupo y envíe.</p>' +
-      usar.map((g, i) => {
-        const nom = g.nombre || (g.grado + '° ' + g.seccion);
-        return '<a class="btn btn-ghost block text-center" data-wa="'+i+'" href="#">Abrir '+nom+'</a>';
-      }).join('');
-    box.onclick = function(ev) {
-      const a = ev.target.closest('a[data-wa]');
-      if (!a) return;
-      ev.preventDefault();
-      const g = usar[Number(a.getAttribute('data-wa'))];
-      const pack = textoListaAula(g.nivel, g.grado, g.seccion, c.fecha);
-      const nom = g.nombre || (g.grado + '° ' + g.seccion);
-      abrirWhatsApp(pack.txt, g.enlace);
-    };
-  }
+  box.innerHTML = usar.map((g, i) => {
+    const nom = g.nombre || (g.grado + '° ' + g.seccion);
+    return '<a class="btn btn-ghost block text-center" data-wa="'+i+'" href="#">Abrir '+nom+'</a>';
+  }).join('');
+  box.onclick = function(ev) {
+    const a = ev.target.closest('a[data-wa]');
+    if (!a) return;
+    ev.preventDefault();
+    const g = usar[Number(a.getAttribute('data-wa'))];
+    const pack = textoListaAula(g.nivel, g.grado, g.seccion, fecha);
+    abrirWhatsApp(pack.txt, g.enlace);
+  };
 }
 
 /* ===== QR (iPhone + Android) ===== */
@@ -837,6 +851,7 @@ async function leerFotoQR(input) {
 Promise.all([ensureBD(), ensureHorario(), bajarGruposWa()]).then(() => {
   document.getElementById('inpFecha').value = hoyISO();
   onNivel();
+  if (location.hash === '#grupos') verMenu('grupos');
 });
 </script>
 </body>
