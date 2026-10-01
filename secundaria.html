@@ -1132,6 +1132,9 @@ window.__IE_gradoOK = function(gradoVal) {
                     <i class="fas fa-th-large text-sky-600"></i> Áreas Curriculares
                 </h2>
                 <div class="flex items-center gap-2">
+                    <button type="button" onclick="traerDesdeRegistro()" class="bg-teal-600 hover:bg-teal-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
+                        Desde registro
+                    </button>
                     <button type="button" onclick="abrirComparativo()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
                         <i class="fas fa-balance-scale mr-1"></i> Comparativo
                     </button>
@@ -1151,7 +1154,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     <button type="button" onclick="abrirCmpPresentacion()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
                         <i class="fas fa-expand mr-1"></i> Presentar
                     </button>
-                    <button type="button" onclick="cerrarComparativo()" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-bold">← Volver</button>
+                    <button type="button" onclick="location.href='index.html'" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-bold">← Volver</button>
                 </div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1171,7 +1174,7 @@ window.__IE_gradoOK = function(gradoVal) {
                 </table>
             </div>
             <div class="pt-2">
-                <button type="button" onclick="cerrarComparativo()" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-bold">← Volver a áreas</button>
+                <button type="button" onclick="location.href='index.html'" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-bold">← Volver a áreas</button>
             </div>
         </div>
 
@@ -2484,6 +2487,81 @@ window.__IE_gradoOK = function(gradoVal) {
             const pct = (n) => sum > 0 ? Math.round((n / sum) * 100) : 0;
             return { sum, i, p, pr, ad, pI: pct(i), pP: pct(p), pPr: pct(pr), pD: pct(ad), logro: pct(pr + ad) };
         }
+        function gradoNumSec(g) { return parseInt(String(g).replace('°',''),10) || 1; }
+        function letraANivelMatriz(L) {
+            L = String(L||'').toUpperCase();
+            if (L==='AD') return 'destacado';
+            if (L==='A') return 'previsto';
+            if (L==='B') return 'proceso';
+            if (L==='C') return 'inicio';
+            return '';
+        }
+        function numToLetterMat(n) {
+            n = Number(n);
+            if (isNaN(n)) return '';
+            if (n>=18) return 'AD';
+            if (n>=14) return 'A';
+            if (n>=11) return 'B';
+            return 'C';
+        }
+        function traerDesdeRegistro() {
+            let store = {};
+            try { store = JSON.parse(localStorage.getItem('ie22375_registro_notas_v2') || '{}'); } catch(e) { store = {}; }
+            const finales = store.finales || {};
+            const grades = store.grades || {};
+            const sessions = store.sessions || [];
+            const gradoN = String(gradoNumSec(estado.grado));
+            const sec = (estado.seccion === 'ÚNICA' || estado.seccion === 'UNICA') ? 'Unica' : estado.seccion;
+            const bim = estado.bimestre;
+            const areas = Object.keys(ESTRUCTURA_AREAS).filter(n => !window.__IE_areasOK || window.__IE_areasOK(n));
+            const usar = estado.areaActual ? [estado.areaActual] : areas;
+            let llenas = 0;
+            usar.forEach(area => {
+                (ESTRUCTURA_AREAS[area].competencias || []).forEach(comp => {
+                    const conteo = { inicio:0, proceso:0, previsto:0, destacado:0 };
+                    const vistos = {};
+                    Object.keys(finales).forEach(k => {
+                        const p = k.split('||');
+                        if (p[0]!=='secundaria' || p[1]!==bim || String(p[2])!==gradoN) return;
+                        const secR = String(p[3]||'');
+                        if (sec === 'Unica') { if (secR.toLowerCase().indexOf('unic')<0) return; }
+                        else if (secR !== sec) return;
+                        if (p[4]!==area || p[5]!==comp) return;
+                        const f = finales[k] || {};
+                        const L = f.nivel || (f.nota20!=null && f.nota20!=='' ? numToLetterMat(f.nota20) : '');
+                        const nv = letraANivelMatriz(L);
+                        if (nv) { conteo[nv]++; vistos[p[6]] = 1; llenas++; }
+                    });
+                    sessions.forEach(s => {
+                        if (s.nivel!=='secundaria' || s.bim!==bim || String(s.grado)!==gradoN || s.area!==area || s.comp!==comp) return;
+                        Object.keys(grades).forEach(gk => {
+                            const p = gk.split('||');
+                            if (p[0]!=='secundaria' || p[5]!==comp || p[4]!==area) return;
+                            const nom = p[p.length-1];
+                            if (vistos[nom]) return;
+                            const g = grades[gk] || {};
+                            const L = g.nivel || (g.nota20!=null && g.nota20!=='' ? numToLetterMat(g.nota20) : '');
+                            const nv = letraANivelMatriz(L);
+                            if (nv) { conteo[nv]++; vistos[nom]=1; llenas++; }
+                        });
+                    });
+                    const dato = getDato(area, comp);
+                    dato.inicio = conteo.inicio;
+                    dato.proceso = conteo.proceso;
+                    dato.previsto = conteo.previsto;
+                    dato.destacado = conteo.destacado;
+                });
+            });
+            if (typeof guardarDatos === 'function') guardarDatos();
+            if (estado.areaActual) {
+                renderizarCompetencias();
+                if (typeof crearGraficos === 'function') crearGraficos();
+                if (typeof renderizarResumen === 'function') renderizarResumen();
+            }
+            if (typeof mostrarToast === 'function') mostrarToast(llenas ? 'Conteo traído del registro auxiliar' : 'No hay notas de este aula en el registro', llenas ? 'ok' : 'error');
+            else alert(llenas ? 'Conteo traído del registro auxiliar' : 'No hay notas de este aula en el registro');
+        }
+
         function abrirComparativo() {
             const box = document.getElementById('vistaComparativo');
             if (!box) return;
