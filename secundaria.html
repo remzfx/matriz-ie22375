@@ -1163,7 +1163,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     <p id="cmpGradoLbl" class="text-sm font-bold text-slate-600">Grado —</p>
                 </div>
             </div>
-            <div id="cmpCharts" class="grid grid-cols-2 lg:grid-cols-4 gap-2"></div>
+            <div id="cmpCharts" style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;width:100%"></div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead id="cmpThead"></thead>
@@ -1393,7 +1393,7 @@ window.__IE_gradoOK = function(gradoVal) {
             </div>
             <button type="button" onclick="cerrarCmpPresentacion()" class="bg-white/15 hover:bg-white/25 px-4 py-2 rounded-xl font-bold">Salir</button>
         </div>
-        <div id="cmpPresCharts" class="flex flex-wrap justify-center gap-3"></div>
+        <div id="cmpPresCharts" style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px"></div>
     </div>
 
     <!-- TOAST -->
@@ -2567,11 +2567,15 @@ window.__IE_gradoOK = function(gradoVal) {
             const bag = pres ? 'chartCmpPres' : 'chartComparativo';
             (window[bag] || []).forEach(ch => { try { ch.destroy(); } catch(e){} });
             window[bag] = [];
-            const w = pres ? 'min(280px,46vw)' : 'min(240px,100%)';
+            const w = pres ? '260px' : '230px';
             const h = pres ? '320px' : '200px';
-            const bg = pres ? 'background:#fff;color:#0f172a;' : '';
+            const bg = pres ? 'background:#fff;color:#0f172a;' : 'background:#fff;';
+            box.style.display = 'flex';
+            box.style.flexWrap = 'wrap';
+            box.style.justifyContent = 'center';
+            box.style.gap = '12px';
             box.innerHTML = filas.map(f =>
-                '<div class="rounded-xl border border-slate-200 p-2" style="width:'+w+';'+bg+'">'+
+                '<div style="flex:0 0 '+w+';width:'+w+';'+bg+'border:1px solid #e2e8f0;border-radius:12px;padding:8px">'+
                 '<div class="text-xs font-black">C'+f.i+'</div>'+
                 '<div class="text-[10px] text-slate-600 mb-1 leading-tight min-h-[32px]">'+f.nombre+'</div>'+
                 '<div style="height:'+h+';position:relative"><canvas id="'+prefix+f.i+'"></canvas></div></div>'
