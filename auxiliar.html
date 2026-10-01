@@ -71,7 +71,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
   <div class="max-w-lg mx-auto px-4 pb-3 flex items-start justify-between gap-3">
     <div class="min-w-0 flex-1 pr-2">
       <div class="text-[10px] font-bold tracking-widest text-teal-200">IE 22375 · AUXILIAR</div>
-      <div class="font-black leading-tight">Asistencia de ingreso</div>
+      <div class="font-black leading-tight" id="tituloModulo">Asistencia de ingreso</div>
       <div class="text-[11px] text-teal-100/80 leading-tight">Lector QR · iPhone y Android</div>
     </div>
     <a href="index.html" class="btn btn-ghost btn-inicio text-sm shrink-0">Inicio</a>
@@ -602,6 +602,8 @@ function verMenu(cual) {
   const esGrupos = cual === 'grupos';
   if (asis) asis.classList.toggle('hidden', esGrupos);
   if (grupos) grupos.classList.toggle('hidden', !esGrupos);
+  const tit = document.getElementById('tituloModulo');
+  if (tit) tit.textContent = esGrupos ? 'Envío masivo' : 'Asistencia de ingreso';
   if (bAsis) bAsis.className = 'btn text-sm ' + (esGrupos ? 'btn-ghost' : 'btn-primary');
   if (bGrupos) bGrupos.className = 'btn text-sm ' + (esGrupos ? 'btn-primary' : 'btn-ghost');
   if (esGrupos) {
@@ -847,15 +849,19 @@ async function leerFotoQR(input) {
   }
 }
 
+function esEnvioMasivo() {
+  return /vista=masivo/.test(location.search) || location.hash === '#grupos';
+}
 Promise.all([ensureBD(), ensureHorario(), bajarGruposWa()]).then(() => {
   onNivel();
-  if (location.hash === '#grupos') verMenu('grupos');
+  if (esEnvioMasivo()) verMenu('grupos');
 });
 (function pintarYa() {
   BD = fijarNiveles(loadBD()) || { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
   const f = document.getElementById('inpFecha');
   if (f) f.value = hoyISO();
-  onNivel();
+  if (esEnvioMasivo()) verMenu('grupos');
+  else onNivel();
 })();
 </script>
 </body>
