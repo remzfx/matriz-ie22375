@@ -1151,7 +1151,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     <button type="button" onclick="abrirCmpPresentacion()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
                         <i class="fas fa-expand mr-1"></i> Presentar
                     </button>
-                    <button type="button" onclick="cerrarComparativo()" class="text-sm font-bold text-slate-500 hover:text-slate-800">Cerrar</button>
+                    <button type="button" onclick="cerrarComparativo()" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-bold">← Volver</button>
                 </div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1169,6 +1169,9 @@ window.__IE_gradoOK = function(gradoVal) {
                     <thead id="cmpThead"></thead>
                     <tbody id="cmpTbody"></tbody>
                 </table>
+            </div>
+            <div class="pt-2">
+                <button type="button" onclick="cerrarComparativo()" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-bold">← Volver a áreas</button>
             </div>
         </div>
 
@@ -2498,6 +2501,9 @@ window.__IE_gradoOK = function(gradoVal) {
         function cerrarComparativo() {
             const box = document.getElementById('vistaComparativo');
             if (box) box.classList.add('hidden');
+            const areas = document.getElementById('areasContainer');
+            if (areas && areas.parentElement) areas.parentElement.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         let chartCmpPres = [];
         function abrirCmpPresentacion() {

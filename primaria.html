@@ -1063,7 +1063,9 @@ window.__IE_gradoOK = function(gradoVal) {
                     <p class="text-xs text-slate-500">Mismo grado y bimestre (sección única). Cada barra es el 100% del área: Inicio, Proceso, Previsto y Destacado.</p>
                     <p id="cmpGradoLbl" class="text-sm font-bold text-slate-600 mt-1"></p>
                 </div>
-                <button type="button" onclick="cerrarComparativo()" class="text-sm font-bold text-slate-500 hover:text-slate-800">Cerrar</button>
+                <button type="button" onclick="cerrarComparativo()" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-bold">
+                    ← Volver
+                </button>
             </div>
             <div class="bg-white rounded-xl border border-slate-100 p-3" style="height:360px;position:relative">
                 <canvas id="chartComparativo"></canvas>
@@ -1077,6 +1079,9 @@ window.__IE_gradoOK = function(gradoVal) {
             <div>
                 <h3 class="text-sm font-black text-slate-700 mb-2">Competencias que más destacan</h3>
                 <div id="cmpDestacan" class="text-sm text-slate-700"></div>
+            </div>
+            <div class="pt-2">
+                <button type="button" onclick="cerrarComparativo()" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-sm font-bold">← Volver a áreas</button>
             </div>
         </div>
 
@@ -2280,6 +2285,9 @@ window.__IE_gradoOK = function(gradoVal) {
         function cerrarComparativo() {
             const box = document.getElementById('vistaComparativo');
             if (box) box.classList.add('hidden');
+            const areas = document.getElementById('areasContainer');
+            if (areas && areas.parentElement) areas.parentElement.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         function renderComparativo() {
             const grado = estado.grado || 'PRIMERO';
