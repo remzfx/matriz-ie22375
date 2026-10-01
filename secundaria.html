@@ -1145,7 +1145,7 @@ window.__IE_gradoOK = function(gradoVal) {
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-black text-slate-800"><i class="fas fa-balance-scale text-indigo-600 mr-2"></i>Comparativo del grado</h2>
-                    <p class="text-xs text-slate-500">Un área. El grado elegido arriba y sus secciones (A y B). Logro = % Previsto + Destacado.</p>
+                    <p class="text-xs text-slate-500">Un área. El grado de arriba y sus secciones. Cada barra suma 100%: Inicio, Proceso, Previsto y Destacado.</p>
                 </div>
                 <button type="button" onclick="cerrarComparativo()" class="text-sm font-bold text-slate-500 hover:text-slate-800">Cerrar</button>
             </div>
@@ -2462,9 +2462,10 @@ window.__IE_gradoOK = function(gradoVal) {
             return { inicio: 0, proceso: 0, previsto: 0, destacado: 0 };
         }
         function logroDe(d) {
-            const sum = (Number(d.inicio)||0) + (Number(d.proceso)||0) + (Number(d.previsto)||0) + (Number(d.destacado)||0);
-            if (!sum) return { sum: 0, logro: 0 };
-            return { sum, logro: Math.round(((Number(d.previsto)||0) + (Number(d.destacado)||0)) / sum * 100) };
+            const i = Number(d.inicio)||0, p = Number(d.proceso)||0, pr = Number(d.previsto)||0, ad = Number(d.destacado)||0;
+            const sum = i + p + pr + ad;
+            const pct = (n) => sum > 0 ? Math.round((n / sum) * 100) : 0;
+            return { sum, i, p, pr, ad, pI: pct(i), pP: pct(p), pPr: pct(pr), pD: pct(ad), logro: pct(pr + ad) };
         }
         function abrirComparativo() {
             const box = document.getElementById('vistaComparativo');
@@ -2499,45 +2500,55 @@ window.__IE_gradoOK = function(gradoVal) {
                 const b = colB ? logroDe(datoCompAula(area, c, grado, colB)) : { sum: 0, logro: 0 };
                 return { i: i+1, nombre: c, a, b };
             });
-            const thB = colB ? '<th class="py-2 px-2 text-center">'+aulaLabel(grado,colB)+'</th><th class="py-2 px-2 text-center">Diferencia</th>' : '';
             document.getElementById('cmpThead').innerHTML =
                 '<tr class="text-left text-[11px] uppercase text-slate-500 border-b">'+
                 '<th class="py-2 pr-2">Competencia</th>'+
-                '<th class="py-2 px-2 text-center">'+aulaLabel(grado,colA)+'</th>'+thB+'</tr>';
+                '<th class="py-2 px-1 text-center">'+aulaLabel(grado,colA)+'<br><span class="font-normal">I / P / A / AD</span></th>'+
+                (colB ? '<th class="py-2 px-1 text-center">'+aulaLabel(grado,colB)+'<br><span class="font-normal">I / P / A / AD</span></th>' : '')+
+                '</tr>';
             document.getElementById('cmpTbody').innerHTML = filas.map(f => {
-                if (!colB) {
-                    return '<tr class="border-b border-slate-100"><td class="py-2 pr-2 font-semibold">'+f.i+'. '+f.nombre+'</td>'+
-                        '<td class="py-2 px-2 text-center font-bold">'+(f.a.sum ? f.a.logro+'%' : '—')+'</td></tr>';
+                function celda(x) {
+                    if (!x.sum) return '<td class="py-2 px-1 text-center text-slate-400">—</td>';
+                    return '<td class="py-2 px-1 text-center text-xs font-bold">'+
+                        '<span class="text-red-600">'+x.pI+'%</span> · '+
+                        '<span class="text-amber-600">'+x.pP+'%</span> · '+
+                        '<span class="text-lime-600">'+x.pPr+'%</span> · '+
+                        '<span class="text-emerald-700">'+x.pD+'%</span></td>';
                 }
-                const dif = f.a.logro - f.b.logro;
-                const col = Math.abs(dif) >= 10 ? 'text-amber-700 font-black' : 'text-slate-700 font-bold';
-                const signo = dif > 0 ? '+' : '';
-                return '<tr class="border-b border-slate-100">'+
-                    '<td class="py-2 pr-2 font-semibold text-slate-800">'+f.i+'. '+f.nombre+'</td>'+
-                    '<td class="py-2 px-2 text-center font-bold">'+(f.a.sum ? f.a.logro+'%' : '—')+'</td>'+
-                    '<td class="py-2 px-2 text-center font-bold">'+(f.b.sum ? f.b.logro+'%' : '—')+'</td>'+
-                    '<td class="py-2 px-2 text-center '+col+'">'+(f.a.sum && f.b.sum ? signo+dif+' pts' : '—')+'</td></tr>';
+                return '<tr class="border-b border-slate-100"><td class="py-2 pr-2 font-semibold text-slate-800">'+f.i+'. '+f.nombre+'</td>'+
+                    celda(f.a)+(colB ? celda(f.b) : '')+'</tr>';
             }).join('');
             const ctx = document.getElementById('chartComparativo');
             if (!ctx || typeof Chart === 'undefined') return;
             if (chartComparativo) chartComparativo.destroy();
-            const datasets = [{
-                label: aulaLabel(grado, colA) + ' logro %',
-                data: filas.map(f => f.a.sum ? f.a.logro : 0),
-                backgroundColor: '#4f46e5'
-            }];
-            if (colB) datasets.push({
-                label: aulaLabel(grado, colB) + ' logro %',
-                data: filas.map(f => f.b.sum ? f.b.logro : 0),
-                backgroundColor: '#0ea5e9'
+            const labels = [];
+            const di = [], dp = [], dpr = [], dd = [];
+            filas.forEach(f => {
+                labels.push('C'+f.i+' '+aulaLabel(grado,colA).replace(grado+' ',''));
+                di.push(f.a.sum ? f.a.pI : 0); dp.push(f.a.sum ? f.a.pP : 0); dpr.push(f.a.sum ? f.a.pPr : 0); dd.push(f.a.sum ? f.a.pD : 0);
+                if (colB) {
+                    labels.push('C'+f.i+' '+aulaLabel(grado,colB).replace(grado+' ',''));
+                    di.push(f.b.sum ? f.b.pI : 0); dp.push(f.b.sum ? f.b.pP : 0); dpr.push(f.b.sum ? f.b.pPr : 0); dd.push(f.b.sum ? f.b.pD : 0);
+                }
             });
             chartComparativo = new Chart(ctx, {
                 type: 'bar',
-                data: { labels: filas.map(f => 'C'+f.i), datasets },
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Inicio', data: di, backgroundColor: '#ef4444', stack: 'n' },
+                        { label: 'Proceso', data: dp, backgroundColor: '#eab308', stack: 'n' },
+                        { label: 'Previsto', data: dpr, backgroundColor: '#84cc16', stack: 'n' },
+                        { label: 'Destacado', data: dd, backgroundColor: '#16a34a', stack: 'n' }
+                    ]
+                },
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { position: 'top' } },
-                    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } } }
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } }
+                    }
                 }
             });
         }
