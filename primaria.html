@@ -1059,22 +1059,13 @@ window.__IE_gradoOK = function(gradoVal) {
         <div id="vistaComparativo" class="hidden glass rounded-2xl shadow-lg p-5 no-print space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-lg font-black text-slate-800"><i class="fas fa-balance-scale text-indigo-600 mr-2"></i>Comparativo de grados</h2>
-                    <p class="text-xs text-slate-500">Mismo bimestre. Porcentaje según lo registrado (Previsto + Destacado = logro esperado).</p>
+                    <h2 class="text-lg font-black text-slate-800"><i class="fas fa-balance-scale text-indigo-600 mr-2"></i>Comparativo de áreas</h2>
+                    <p class="text-xs text-slate-500">Mismo grado y bimestre (sección única). Cada barra es el 100% del área: Inicio, Proceso, Previsto y Destacado.</p>
+                    <p id="cmpGradoLbl" class="text-sm font-bold text-slate-600 mt-1"></p>
                 </div>
                 <button type="button" onclick="cerrarComparativo()" class="text-sm font-bold text-slate-500 hover:text-slate-800">Cerrar</button>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="text-[10px] font-bold text-slate-500 uppercase">Grado A</label>
-                    <select id="cmpGradoA" onchange="renderComparativo()" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold"></select>
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-500 uppercase">Grado B</label>
-                    <select id="cmpGradoB" onchange="renderComparativo()" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold"></select>
-                </div>
-            </div>
-            <div class="bg-white rounded-xl border border-slate-100 p-3" style="height:320px;position:relative">
+            <div class="bg-white rounded-xl border border-slate-100 p-3" style="height:360px;position:relative">
                 <canvas id="chartComparativo"></canvas>
             </div>
             <div class="overflow-x-auto">
@@ -1082,6 +1073,10 @@ window.__IE_gradoOK = function(gradoVal) {
                     <thead id="cmpThead"></thead>
                     <tbody id="cmpTbody"></tbody>
                 </table>
+            </div>
+            <div>
+                <h3 class="text-sm font-black text-slate-700 mb-2">Competencias que más destacan</h3>
+                <div id="cmpDestacan" class="text-sm text-slate-700"></div>
             </div>
         </div>
 
@@ -2255,12 +2250,11 @@ window.__IE_gradoOK = function(gradoVal) {
             return tot;
         }
 
-        const GRADOS_PRI = ['PRIMERO','SEGUNDO','TERCERO','CUARTO','QUINTO','SEXTO'];
         const LABEL_GRADO = { PRIMERO:'1°', SEGUNDO:'2°', TERCERO:'3°', CUARTO:'4°', QUINTO:'5°', SEXTO:'6°' };
         let chartComparativo = null;
 
         function resumenAreaEnGrado(nombreArea, grado) {
-            const key = estado.bimestre + '|' + grado + '|UNICA';
+            const key = estado.bimestre + '|' + grado + '|' + (estado.seccion || 'UNICA');
             const comps = ESTRUCTURA_AREAS[nombreArea].competencias;
             const tot = { inicio: 0, proceso: 0, previsto: 0, destacado: 0 };
             const bloque = ((estado.datos || {})[key] || {})[nombreArea] || {};
@@ -2273,27 +2267,13 @@ window.__IE_gradoOK = function(gradoVal) {
             });
             const sum = tot.inicio + tot.proceso + tot.previsto + tot.destacado;
             const pct = (n) => sum > 0 ? Math.round((n / sum) * 100) : 0;
-            return {
-                tot, sum,
-                pI: pct(tot.inicio), pP: pct(tot.proceso), pPr: pct(tot.previsto), pD: pct(tot.destacado),
-                logro: pct(tot.previsto + tot.destacado)
-            };
+            return { tot, sum, pI: pct(tot.inicio), pP: pct(tot.proceso), pPr: pct(tot.previsto), pD: pct(tot.destacado), logro: pct(tot.previsto + tot.destacado) };
         }
-
         function abrirComparativo() {
             const box = document.getElementById('vistaComparativo');
             if (!box) return;
             document.getElementById('panelCompetencias').classList.add('hidden');
             box.classList.remove('hidden');
-            const opts = GRADOS_PRI.map(g => '<option value="'+g+'">'+LABEL_GRADO[g]+'</option>').join('');
-            const a = document.getElementById('cmpGradoA');
-            const b = document.getElementById('cmpGradoB');
-            a.innerHTML = opts;
-            b.innerHTML = opts;
-            a.value = estado.grado || 'PRIMERO';
-            const idx = GRADOS_PRI.indexOf(a.value);
-            b.value = GRADOS_PRI[Math.min(idx + 1, GRADOS_PRI.length - 1)];
-            if (b.value === a.value && idx > 0) b.value = GRADOS_PRI[idx - 1];
             renderComparativo();
             box.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -2302,30 +2282,45 @@ window.__IE_gradoOK = function(gradoVal) {
             if (box) box.classList.add('hidden');
         }
         function renderComparativo() {
-            const gA = document.getElementById('cmpGradoA').value;
-            const gB = document.getElementById('cmpGradoB').value;
+            const grado = estado.grado || 'PRIMERO';
+            const lbl = document.getElementById('cmpGradoLbl');
+            if (lbl) lbl.textContent = 'Bimestre ' + estado.bimestre + ' · ' + (LABEL_GRADO[grado] || grado);
             const areas = Object.keys(ESTRUCTURA_AREAS).filter(function(n){ return !window.__IE_areasOK || window.__IE_areasOK(n); });
-            const filas = areas.map(n => ({
-                nombre: n, corto: abrevArea(n),
-                a: resumenAreaEnGrado(n, gA),
-                b: resumenAreaEnGrado(n, gB)
-            }));
+            const filas = areas.map(n => ({ nombre: n, corto: abrevArea(n), r: resumenAreaEnGrado(n, grado) }))
+                .sort((a,b) => (b.r.sum?b.r.logro:-1) - (a.r.sum?a.r.logro:-1));
             document.getElementById('cmpThead').innerHTML =
                 '<tr class="text-left text-[11px] uppercase text-slate-500 border-b">'+
-                '<th class="py-2 pr-2">Área</th>'+
-                '<th class="py-2 px-2 text-center">'+LABEL_GRADO[gA]+' logro</th>'+
-                '<th class="py-2 px-2 text-center">'+LABEL_GRADO[gB]+' logro</th>'+
-                '<th class="py-2 px-2 text-center">Diferencia</th></tr>';
+                '<th class="py-2 pr-2">Área</th><th class="py-2 px-1 text-center">Inicio</th><th class="py-2 px-1 text-center">Proceso</th>'+
+                '<th class="py-2 px-1 text-center">Previsto</th><th class="py-2 px-1 text-center">Destacado</th><th class="py-2 px-1 text-center">Logro A+AD</th></tr>';
             document.getElementById('cmpTbody').innerHTML = filas.map(f => {
-                const dif = f.a.logro - f.b.logro;
-                const col = Math.abs(dif) >= 10 ? 'text-amber-700 font-black' : 'text-slate-700 font-bold';
-                const signo = dif > 0 ? '+' : '';
+                if (!f.r.sum) return '<tr class="border-b border-slate-100"><td class="py-2 font-semibold">'+f.corto+'</td><td colspan="5" class="text-center text-slate-400">—</td></tr>';
                 return '<tr class="border-b border-slate-100">'+
                     '<td class="py-2 pr-2 font-semibold text-slate-800">'+f.corto+'</td>'+
-                    '<td class="py-2 px-2 text-center font-bold">'+(f.a.sum ? f.a.logro+'%' : '—')+'</td>'+
-                    '<td class="py-2 px-2 text-center font-bold">'+(f.b.sum ? f.b.logro+'%' : '—')+'</td>'+
-                    '<td class="py-2 px-2 text-center '+col+'">'+(f.a.sum && f.b.sum ? signo+dif+' pts' : '—')+'</td></tr>';
+                    '<td class="text-center font-bold text-red-600">'+f.r.pI+'%</td>'+
+                    '<td class="text-center font-bold text-amber-600">'+f.r.pP+'%</td>'+
+                    '<td class="text-center font-bold text-lime-600">'+f.r.pPr+'%</td>'+
+                    '<td class="text-center font-bold text-emerald-700">'+f.r.pD+'%</td>'+
+                    '<td class="text-center font-black">'+f.r.logro+'%</td></tr>';
             }).join('');
+            const dest = document.getElementById('cmpDestacan');
+            if (dest) {
+                const top = filas.filter(f => f.r.sum).slice(0, 3);
+                const comps = [];
+                areas.forEach(n => {
+                    const key = estado.bimestre + '|' + grado + '|' + (estado.seccion || 'UNICA');
+                    const bloque = ((estado.datos || {})[key] || {})[n] || {};
+                    (ESTRUCTURA_AREAS[n].competencias || []).forEach(c => {
+                        const d = bloque[c] || {};
+                        const sum = (d.inicio||0)+(d.proceso||0)+(d.previsto||0)+(d.destacado||0);
+                        if (!sum) return;
+                        const logro = Math.round((((d.previsto||0)+(d.destacado||0))/sum)*100);
+                        comps.push({ area: abrevArea(n), comp: c, logro, sum });
+                    });
+                });
+                comps.sort((a,b) => b.logro - a.logro);
+                dest.innerHTML = (top.length ? ('<p class="mb-2"><strong>Áreas con más logro:</strong> '+top.map(t => t.corto+' ('+t.r.logro+'%)').join(' · ')+'</p>' : '<p class="text-slate-400">Aún no hay datos en este grado.</p>') +
+                    (comps.length ? '<p><strong>Competencias que más destacan:</strong></p><ul class="list-disc pl-5 mt-1">'+comps.slice(0,5).map(c => '<li>'+c.area+' — '+c.comp+' <b>'+c.logro+'%</b></li>').join('')+'</ul>' : '');
+            }
             const ctx = document.getElementById('chartComparativo');
             if (!ctx || typeof Chart === 'undefined') return;
             if (chartComparativo) chartComparativo.destroy();
@@ -2334,14 +2329,19 @@ window.__IE_gradoOK = function(gradoVal) {
                 data: {
                     labels: filas.map(f => f.corto),
                     datasets: [
-                        { label: LABEL_GRADO[gA]+' logro %', data: filas.map(f => f.a.sum ? f.a.logro : 0), backgroundColor: '#4f46e5' },
-                        { label: LABEL_GRADO[gB]+' logro %', data: filas.map(f => f.b.sum ? f.b.logro : 0), backgroundColor: '#0ea5e9' }
+                        { label: 'Inicio', data: filas.map(f => f.r.sum ? f.r.pI : 0), backgroundColor: '#ef4444', stack: 'n' },
+                        { label: 'Proceso', data: filas.map(f => f.r.sum ? f.r.pP : 0), backgroundColor: '#eab308', stack: 'n' },
+                        { label: 'Previsto', data: filas.map(f => f.r.sum ? f.r.pPr : 0), backgroundColor: '#84cc16', stack: 'n' },
+                        { label: 'Destacado', data: filas.map(f => f.r.sum ? f.r.pD : 0), backgroundColor: '#16a34a', stack: 'n' }
                     ]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { position: 'top' } },
-                    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } } }
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } }
+                    }
                 }
             });
         }
