@@ -1158,9 +1158,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     <p id="cmpGradoLbl" class="text-sm font-bold text-slate-600">Grado —</p>
                 </div>
             </div>
-            <div class="bg-white rounded-xl border border-slate-100 p-3" style="height:320px;position:relative">
-                <canvas id="chartComparativo"></canvas>
-            </div>
+            <div id="cmpCharts" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead id="cmpThead"></thead>
@@ -2441,7 +2439,7 @@ window.__IE_gradoOK = function(gradoVal) {
             return tot;
         }
 
-        let chartComparativo = null;
+        let chartComparativo = [];
         function seccionesDelGrado(grado) {
             if (grado === '5°') return ['ÚNICA'];
             return ['A', 'B'];
@@ -2518,38 +2516,45 @@ window.__IE_gradoOK = function(gradoVal) {
                 return '<tr class="border-b border-slate-100"><td class="py-2 pr-2 font-semibold text-slate-800">'+f.i+'. '+f.nombre+'</td>'+
                     celda(f.a)+(colB ? celda(f.b) : '')+'</tr>';
             }).join('');
-            const ctx = document.getElementById('chartComparativo');
-            if (!ctx || typeof Chart === 'undefined') return;
-            if (chartComparativo) chartComparativo.destroy();
-            const labels = [];
-            const di = [], dp = [], dpr = [], dd = [];
+            const box = document.getElementById('cmpCharts');
+            if (!box || typeof Chart === 'undefined') return;
+            (chartComparativo || []).forEach(ch => { try { ch.destroy(); } catch(e){} });
+            chartComparativo = [];
+            box.innerHTML = filas.map(f =>
+                '<div class="bg-white rounded-xl border-2 border-slate-200 p-3">'+
+                '<div class="text-sm font-black text-slate-800 mb-1">C'+f.i+'</div>'+
+                '<div class="text-xs text-slate-600 mb-2 leading-snug">'+f.nombre+'</div>'+
+                '<div style="height:220px;position:relative"><canvas id="cmpC'+f.i+'"></canvas></div></div>'
+            ).join('');
             filas.forEach(f => {
-                labels.push('C'+f.i+' '+aulaLabel(grado,colA).replace(grado+' ',''));
-                di.push(f.a.sum ? f.a.pI : 0); dp.push(f.a.sum ? f.a.pP : 0); dpr.push(f.a.sum ? f.a.pPr : 0); dd.push(f.a.sum ? f.a.pD : 0);
+                const el = document.getElementById('cmpC'+f.i);
+                if (!el) return;
+                const labels = [aulaLabel(grado, colA)];
+                const di = [f.a.sum ? f.a.pI : 0], dp = [f.a.sum ? f.a.pP : 0], dpr = [f.a.sum ? f.a.pPr : 0], dd = [f.a.sum ? f.a.pD : 0];
                 if (colB) {
-                    labels.push('C'+f.i+' '+aulaLabel(grado,colB).replace(grado+' ',''));
+                    labels.push(aulaLabel(grado, colB));
                     di.push(f.b.sum ? f.b.pI : 0); dp.push(f.b.sum ? f.b.pP : 0); dpr.push(f.b.sum ? f.b.pPr : 0); dd.push(f.b.sum ? f.b.pD : 0);
                 }
-            });
-            chartComparativo = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels,
-                    datasets: [
-                        { label: 'Inicio', data: di, backgroundColor: '#ef4444', stack: 'n' },
-                        { label: 'Proceso', data: dp, backgroundColor: '#eab308', stack: 'n' },
-                        { label: 'Previsto', data: dpr, backgroundColor: '#84cc16', stack: 'n' },
-                        { label: 'Destacado', data: dd, backgroundColor: '#16a34a', stack: 'n' }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top' } },
-                    scales: {
-                        x: { stacked: true },
-                        y: { stacked: true, beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } }
+                chartComparativo.push(new Chart(el, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [
+                            { label: 'Inicio', data: di, backgroundColor: '#ef4444', stack: 'n' },
+                            { label: 'Proceso', data: dp, backgroundColor: '#eab308', stack: 'n' },
+                            { label: 'Previsto', data: dpr, backgroundColor: '#84cc16', stack: 'n' },
+                            { label: 'Destacado', data: dd, backgroundColor: '#16a34a', stack: 'n' }
+                        ]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: f.i === 1, position: 'top', labels: { boxWidth: 12 } } },
+                        scales: {
+                            x: { stacked: true },
+                            y: { stacked: true, beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } }
+                        }
                     }
-                }
+                }));
             });
         }
 
