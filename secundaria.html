@@ -1144,19 +1144,18 @@ window.__IE_gradoOK = function(gradoVal) {
         <div id="vistaComparativo" class="hidden glass rounded-2xl shadow-lg p-5 no-print space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-lg font-black text-slate-800"><i class="fas fa-balance-scale text-indigo-600 mr-2"></i>Comparativo de aulas</h2>
-                    <p class="text-xs text-slate-500">Mismo bimestre. Logro = % Previsto + Destacado de lo registrado.</p>
+                    <h2 class="text-lg font-black text-slate-800"><i class="fas fa-balance-scale text-indigo-600 mr-2"></i>Comparativo del grado</h2>
+                    <p class="text-xs text-slate-500">Un área. El grado elegido arriba y sus secciones (A y B). Logro = % Previsto + Destacado.</p>
                 </div>
                 <button type="button" onclick="cerrarComparativo()" class="text-sm font-bold text-slate-500 hover:text-slate-800">Cerrar</button>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <label class="text-[10px] font-bold text-slate-500 uppercase">Aula A</label>
-                    <select id="cmpGradoA" onchange="renderComparativo()" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold"></select>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Área</label>
+                    <select id="cmpArea" onchange="renderComparativo()" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold"></select>
                 </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-500 uppercase">Aula B</label>
-                    <select id="cmpGradoB" onchange="renderComparativo()" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold"></select>
+                <div class="flex items-end">
+                    <p id="cmpGradoLbl" class="text-sm font-bold text-slate-600">Grado —</p>
                 </div>
             </div>
             <div class="bg-white rounded-xl border border-slate-100 p-3" style="height:320px;position:relative">
@@ -1692,6 +1691,9 @@ window.__IE_gradoOK = function(gradoVal) {
             estado.seccion = seccion;
             estado.areaActual = null;
             syncInputTotalEstudiantes();
+            if (document.getElementById('vistaComparativo') && !document.getElementById('vistaComparativo').classList.contains('hidden')) {
+                renderComparativo();
+            }
             
             document.getElementById('panelCompetencias').classList.add('hidden');
             document.getElementById('vistaTabla').classList.add('hidden');
@@ -2439,53 +2441,42 @@ window.__IE_gradoOK = function(gradoVal) {
             return tot;
         }
 
-        const AULAS_SEC = [
-            ['PRIMERO','A'],['PRIMERO','B'],
-            ['SEGUNDO','A'],['SEGUNDO','B'],
-            ['TERCERO','A'],['TERCERO','B'],
-            ['CUARTO','A'],['CUARTO','B'],
-            ['QUINTO','ÚNICA']
-        ];
-        const LABEL_GRADO_SEC = { PRIMERO:'1°', SEGUNDO:'2°', TERCERO:'3°', CUARTO:'4°', QUINTO:'5°' };
         let chartComparativo = null;
-        function aulaKey(g,s){ return g+'|'+s; }
-        function aulaLabel(g,s){
-            const sec = (s === 'ÚNICA' || s === 'UNICA') ? 'Única' : s;
-            return (LABEL_GRADO_SEC[g] || g) + ' ' + sec;
+        function seccionesDelGrado(grado) {
+            if (grado === '5°') return ['ÚNICA'];
+            return ['A', 'B'];
         }
-        function resumenAreaEnAula(nombreArea, grado, seccion) {
-            const key = estado.bimestre + '|' + grado + '|' + seccion;
-            const key2 = estado.bimestre + '|' + grado + '|' + (seccion === 'ÚNICA' ? 'UNICA' : seccion);
-            const comps = ESTRUCTURA_AREAS[nombreArea].competencias;
-            const tot = { inicio: 0, proceso: 0, previsto: 0, destacado: 0 };
-            const bloque = ((estado.datos || {})[key] || (estado.datos || {})[key2] || {})[nombreArea] || {};
-            comps.forEach(comp => {
-                const d = bloque[comp] || {};
-                tot.inicio += Number(d.inicio) || 0;
-                tot.proceso += Number(d.proceso) || 0;
-                tot.previsto += Number(d.previsto) || 0;
-                tot.destacado += Number(d.destacado) || 0;
-            });
-            const sum = tot.inicio + tot.proceso + tot.previsto + tot.destacado;
-            const pct = (n) => sum > 0 ? Math.round((n / sum) * 100) : 0;
-            return { tot, sum, logro: pct(tot.previsto + tot.destacado) };
+        function aulaLabel(g, s) {
+            const sec = (s === 'ÚNICA' || s === 'UNICA') ? 'Única' : s;
+            return (g || '') + ' ' + sec;
+        }
+        function datoCompAula(area, comp, grado, seccion) {
+            const keys = [
+                estado.bimestre + '|' + grado + '|' + seccion,
+                estado.bimestre + '|' + grado + '|' + (seccion === 'ÚNICA' ? 'UNICA' : seccion)
+            ];
+            for (let i = 0; i < keys.length; i++) {
+                const bloque = ((estado.datos || {})[keys[i]] || {})[area] || {};
+                if (bloque[comp]) return bloque[comp];
+            }
+            return { inicio: 0, proceso: 0, previsto: 0, destacado: 0 };
+        }
+        function logroDe(d) {
+            const sum = (Number(d.inicio)||0) + (Number(d.proceso)||0) + (Number(d.previsto)||0) + (Number(d.destacado)||0);
+            if (!sum) return { sum: 0, logro: 0 };
+            return { sum, logro: Math.round(((Number(d.previsto)||0) + (Number(d.destacado)||0)) / sum * 100) };
         }
         function abrirComparativo() {
             const box = document.getElementById('vistaComparativo');
             if (!box) return;
             document.getElementById('panelCompetencias').classList.add('hidden');
             box.classList.remove('hidden');
-            const opts = AULAS_SEC.map(p => '<option value="'+aulaKey(p[0],p[1])+'">'+aulaLabel(p[0],p[1])+'</option>').join('');
-            const a = document.getElementById('cmpGradoA');
-            const b = document.getElementById('cmpGradoB');
-            a.innerHTML = opts;
-            b.innerHTML = opts;
-            const actual = aulaKey(estado.grado, estado.seccion || 'A');
-            a.value = AULAS_SEC.some(p => aulaKey(p[0],p[1])===actual) ? actual : aulaKey('PRIMERO','A');
-            const idx = AULAS_SEC.findIndex(p => aulaKey(p[0],p[1]) === a.value);
-            const next = AULAS_SEC[Math.min(idx + 1, AULAS_SEC.length - 1)];
-            b.value = aulaKey(next[0], next[1]);
-            if (b.value === a.value && idx > 0) b.value = aulaKey(AULAS_SEC[idx-1][0], AULAS_SEC[idx-1][1]);
+            const areas = Object.keys(ESTRUCTURA_AREAS).filter(function(n){ return !window.__IE_areasOK || window.__IE_areasOK(n); });
+            const sel = document.getElementById('cmpArea');
+            if (sel) {
+                sel.innerHTML = areas.map(n => '<option value="'+n.replace(/"/g,'"')+'">'+n+'</option>').join('');
+                if (estado.areaActual && areas.indexOf(estado.areaActual) >= 0) sel.value = estado.areaActual;
+            }
             renderComparativo();
             box.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -2494,28 +2485,35 @@ window.__IE_gradoOK = function(gradoVal) {
             if (box) box.classList.add('hidden');
         }
         function renderComparativo() {
-            const pA = document.getElementById('cmpGradoA').value.split('|');
-            const pB = document.getElementById('cmpGradoB').value.split('|');
-            const gA = pA[0], sA = pA[1];
-            const gB = pB[0], sB = pB[1];
-            const areas = Object.keys(ESTRUCTURA_AREAS).filter(function(n){ return !window.__IE_areasOK || window.__IE_areasOK(n); });
-            const filas = areas.map(n => ({
-                nombre: n, corto: (typeof abrevArea === 'function' ? abrevArea(n) : n),
-                a: resumenAreaEnAula(n, gA, sA),
-                b: resumenAreaEnAula(n, gB, sB)
-            }));
+            const area = ((document.getElementById('cmpArea') || {}).value) || estado.areaActual;
+            if (!area || !ESTRUCTURA_AREAS[area]) return;
+            const grado = estado.grado || '1°';
+            const secs = seccionesDelGrado(grado);
+            const lbl = document.getElementById('cmpGradoLbl');
+            if (lbl) lbl.textContent = 'Bimestre ' + estado.bimestre + ' · ' + grado + ' · ' + secs.map(s => s === 'ÚNICA' ? 'Única' : s).join(' y ');
+            const comps = ESTRUCTURA_AREAS[area].competencias;
+            const colA = secs[0];
+            const colB = secs[1] || null;
+            const filas = comps.map((c, i) => {
+                const a = logroDe(datoCompAula(area, c, grado, colA));
+                const b = colB ? logroDe(datoCompAula(area, c, grado, colB)) : { sum: 0, logro: 0 };
+                return { i: i+1, nombre: c, a, b };
+            });
+            const thB = colB ? '<th class="py-2 px-2 text-center">'+aulaLabel(grado,colB)+'</th><th class="py-2 px-2 text-center">Diferencia</th>' : '';
             document.getElementById('cmpThead').innerHTML =
                 '<tr class="text-left text-[11px] uppercase text-slate-500 border-b">'+
-                '<th class="py-2 pr-2">Área</th>'+
-                '<th class="py-2 px-2 text-center">'+aulaLabel(gA,sA)+'</th>'+
-                '<th class="py-2 px-2 text-center">'+aulaLabel(gB,sB)+'</th>'+
-                '<th class="py-2 px-2 text-center">Diferencia</th></tr>';
+                '<th class="py-2 pr-2">Competencia</th>'+
+                '<th class="py-2 px-2 text-center">'+aulaLabel(grado,colA)+'</th>'+thB+'</tr>';
             document.getElementById('cmpTbody').innerHTML = filas.map(f => {
+                if (!colB) {
+                    return '<tr class="border-b border-slate-100"><td class="py-2 pr-2 font-semibold">'+f.i+'. '+f.nombre+'</td>'+
+                        '<td class="py-2 px-2 text-center font-bold">'+(f.a.sum ? f.a.logro+'%' : '—')+'</td></tr>';
+                }
                 const dif = f.a.logro - f.b.logro;
                 const col = Math.abs(dif) >= 10 ? 'text-amber-700 font-black' : 'text-slate-700 font-bold';
                 const signo = dif > 0 ? '+' : '';
                 return '<tr class="border-b border-slate-100">'+
-                    '<td class="py-2 pr-2 font-semibold text-slate-800">'+f.corto+'</td>'+
+                    '<td class="py-2 pr-2 font-semibold text-slate-800">'+f.i+'. '+f.nombre+'</td>'+
                     '<td class="py-2 px-2 text-center font-bold">'+(f.a.sum ? f.a.logro+'%' : '—')+'</td>'+
                     '<td class="py-2 px-2 text-center font-bold">'+(f.b.sum ? f.b.logro+'%' : '—')+'</td>'+
                     '<td class="py-2 px-2 text-center '+col+'">'+(f.a.sum && f.b.sum ? signo+dif+' pts' : '—')+'</td></tr>';
@@ -2523,15 +2521,19 @@ window.__IE_gradoOK = function(gradoVal) {
             const ctx = document.getElementById('chartComparativo');
             if (!ctx || typeof Chart === 'undefined') return;
             if (chartComparativo) chartComparativo.destroy();
+            const datasets = [{
+                label: aulaLabel(grado, colA) + ' logro %',
+                data: filas.map(f => f.a.sum ? f.a.logro : 0),
+                backgroundColor: '#4f46e5'
+            }];
+            if (colB) datasets.push({
+                label: aulaLabel(grado, colB) + ' logro %',
+                data: filas.map(f => f.b.sum ? f.b.logro : 0),
+                backgroundColor: '#0ea5e9'
+            });
             chartComparativo = new Chart(ctx, {
                 type: 'bar',
-                data: {
-                    labels: filas.map(f => f.corto),
-                    datasets: [
-                        { label: aulaLabel(gA,sA)+' logro %', data: filas.map(f => f.a.sum ? f.a.logro : 0), backgroundColor: '#4f46e5' },
-                        { label: aulaLabel(gB,sB)+' logro %', data: filas.map(f => f.b.sum ? f.b.logro : 0), backgroundColor: '#0ea5e9' }
-                    ]
-                },
+                data: { labels: filas.map(f => 'C'+f.i), datasets },
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { position: 'top' } },
