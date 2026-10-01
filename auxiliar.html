@@ -563,14 +563,37 @@ function urlWhatsApp(txt) {
     ? ('https://wa.me/?text=' + q)
     : ('https://web.whatsapp.com/send?text=' + q);
 }
-function abrirWhatsApp(txt) {
-  const a = document.createElement('a');
-  a.href = urlWhatsApp(txt);
-  a.target = '_blank';
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+async function copiarTexto(txt) {
+  try {
+    await navigator.clipboard.writeText(txt);
+    return true;
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (err) {}
+    ta.remove();
+    return true;
+  }
+}
+function abrirWhatsApp(txt, enlace) {
+  const link = String(enlace || '').trim();
+  copiarTexto(txt).then(function() {
+    if (/chat\.whatsapp\.com|whatsapp\.com\/invite/i.test(link)) {
+      toast('Lista copiada. Pegue en el grupo (Ctrl+V) y envíe.');
+      window.open(link, '_blank');
+      return;
+    }
+    toast('Sin enlace de grupo: elija el chat y pegue si no sale el texto.');
+    const a = document.createElement('a');
+    a.href = urlWhatsApp(txt);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
 }
 function compartirWhatsApp() {
   const c = ctx();
@@ -578,7 +601,7 @@ function compartirWhatsApp() {
   if (!pack.list.length) { alert('No hay alumnos'); return; }
   const g = loadGruposWa().find(x => x.nivel===c.nivel && String(x.grado)===String(c.grado) && String(x.seccion)===String(c.seccion));
   const nom = (g && g.nombre) ? g.nombre : ((c.grado + '° ' + c.seccion));
-  abrirWhatsApp('Para el grupo: ' + nom + '\n\n' + pack.txt);
+  abrirWhatsApp(pack.txt, g && g.enlace);
 }
 async function enviarGruposHoy() {
   await bajarGruposWa();
@@ -608,7 +631,7 @@ async function enviarGruposHoy() {
       const g = usar[Number(a.getAttribute('data-wa'))];
       const pack = textoListaAula(g.nivel, g.grado, g.seccion, c.fecha);
       const nom = g.nombre || (g.grado + '° ' + g.seccion);
-      abrirWhatsApp('Para el grupo: ' + nom + '\n\n' + pack.txt);
+      abrirWhatsApp(pack.txt, g.enlace);
     };
   }
 }

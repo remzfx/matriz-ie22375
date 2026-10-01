@@ -338,7 +338,7 @@
     <section id="tab-whatsapp" class="tab hidden">
       <div class="card p-4 space-y-3">
         <h2 class="font-black text-lg">Grupos WhatsApp por aula</h2>
-        <p class="text-sm text-slate-600">El <b>grupo no tiene número</b>. En “Nombre del grupo” copie el título de WhatsApp (ej. Cuarto B secundaria I E. 22375). Al enviar, WhatsApp abre con la lista escrita y usted elige ese grupo. El celular no hace falta.</p>
+        <p class="text-sm text-slate-600">Pegue el <b>enlace de invitación</b> del grupo (<b>chat.whatsapp.com/…</b>). Ese enlace no manda el texto solo: abre el grupo y la lista queda copiada para pegar (Ctrl+V) y enviar.</p>
         <div>
           <label class="text-[11px] font-bold text-slate-500">Nivel</label>
           <select id="waNivel" onchange="renderWaAulas()"><option value="primaria">Primaria</option><option value="secundaria">Secundaria</option></select>
@@ -951,8 +951,8 @@ function renderWaAulas(){
       '<div class="font-black sm:col-span-2">'+a.grado+'° '+a.seccion+'</div>'+
       '<div><label class="text-[10px] font-bold text-slate-500">Nombre del grupo</label>'+
       '<input id="waN_'+id+'" value="'+(it.nombre||('Grupo '+a.grado+'° '+a.seccion))+'"></div>'+
-      '<div><label class="text-[10px] font-bold text-slate-500">Celular (51…)</label>'+
-      '<input id="waC_'+id+'" value="'+(it.numero||'')+'" placeholder="51987654321"></div></div>';
+      '<div><label class="text-[10px] font-bold text-slate-500">Enlace de invitación</label>'+
+      '<input id="waL_'+id+'" value="'+(it.enlace||'')+'" placeholder="https://chat.whatsapp.com/..."></div></div>';
   }).join('');
 }
 async function guardarGruposWa(){
@@ -962,8 +962,8 @@ async function guardarGruposWa(){
   aulas.forEach(a=>{
     const id=nivel+'_'+a.grado+'_'+String(a.seccion).replace(/\s/g,'_');
     const nombre=(document.getElementById('waN_'+id)||{}).value||'';
-    const numero=String((document.getElementById('waC_'+id)||{}).value||'').replace(/\D/g,'');
-    list.push({nivel,grado:String(a.grado),seccion:String(a.seccion),nombre,numero});
+    const enlace=String((document.getElementById('waL_'+id)||{}).value||'').trim();
+    list.push({nivel,grado:String(a.grado),seccion:String(a.seccion),nombre,enlace});
   });
   saveGruposWaLocal(list);
   const msg=document.getElementById('waMsg');
