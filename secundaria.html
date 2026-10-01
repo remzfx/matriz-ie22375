@@ -1158,7 +1158,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     <p id="cmpGradoLbl" class="text-sm font-bold text-slate-600">Grado —</p>
                 </div>
             </div>
-            <div id="cmpCharts" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            <div id="cmpCharts" class="grid grid-cols-2 lg:grid-cols-4 gap-2"></div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead id="cmpThead"></thead>
@@ -2521,10 +2521,10 @@ window.__IE_gradoOK = function(gradoVal) {
             (chartComparativo || []).forEach(ch => { try { ch.destroy(); } catch(e){} });
             chartComparativo = [];
             box.innerHTML = filas.map(f =>
-                '<div class="bg-white rounded-xl border-2 border-slate-200 p-3">'+
-                '<div class="text-sm font-black text-slate-800 mb-1">C'+f.i+'</div>'+
-                '<div class="text-xs text-slate-600 mb-2 leading-snug">'+f.nombre+'</div>'+
-                '<div style="height:220px;position:relative"><canvas id="cmpC'+f.i+'"></canvas></div></div>'
+                '<div class="bg-white rounded-xl border border-slate-200 p-2">'+
+                '<div class="text-xs font-black text-slate-800">C'+f.i+'</div>'+
+                '<div class="text-[10px] text-slate-500 mb-1 leading-tight min-h-[32px]">'+f.nombre+'</div>'+
+                '<div style="height:200px;position:relative"><canvas id="cmpC'+f.i+'"></canvas></div></div>'
             ).join('');
             filas.forEach(f => {
                 const el = document.getElementById('cmpC'+f.i);
@@ -2548,10 +2548,11 @@ window.__IE_gradoOK = function(gradoVal) {
                     },
                     options: {
                         responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { display: f.i === 1, position: 'top', labels: { boxWidth: 12 } } },
+                        plugins: { legend: { display: f.i === 1, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } },
+                        datasets: { bar: { maxBarThickness: 28 } },
                         scales: {
-                            x: { stacked: true },
-                            y: { stacked: true, beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } }
+                            x: { stacked: true, ticks: { font: { size: 10 } } },
+                            y: { stacked: true, beginAtZero: true, max: 100, ticks: { callback: v => v+'%', font: { size: 9 } } }
                         }
                     }
                 }));
