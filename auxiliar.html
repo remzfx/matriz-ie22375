@@ -76,10 +76,6 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     </div>
     <a href="index.html" class="btn btn-ghost btn-inicio text-sm shrink-0">Inicio</a>
   </div>
-  <div class="max-w-lg mx-auto px-4 pb-3 flex gap-2">
-    <button type="button" id="menuAsis" class="btn btn-primary text-sm" onclick="verMenu('asis')">Asistencia</button>
-    <button type="button" id="menuGrupos" class="btn btn-ghost text-sm" onclick="verMenu('grupos')">Grupos del día</button>
-  </div>
 </header>
 
 <main id="vistaAsis" class="max-w-lg mx-auto px-4 py-4 space-y-3">
@@ -144,7 +140,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
 
 <main id="vistaGrupos" class="hidden max-w-lg mx-auto px-4 py-4 space-y-3">
   <div class="card p-3 space-y-3">
-    <h2 class="font-black">Grupos del día</h2>
+    <h2 class="font-black">Envío masivo</h2>
     <p class="text-xs text-slate-500">Aulas con asistencia marcada. Al tocar un salón se copia la lista y se abre su grupo.</p>
     <div>
       <label class="text-[10px] font-bold text-slate-500">Fecha</label>
@@ -639,33 +635,36 @@ function compartirWhatsApp() {
   abrirWhatsApp(pack.txt, g && g.enlace);
 }
 async function enviarGruposHoy() {
-  await bajarGruposWa();
   const fecha = (document.getElementById('inpFechaGrupos') || {}).value || hoyISO();
   const nivel = (document.getElementById('selNivelGrupos') || {}).value || 'primaria';
-  const grupos = loadGruposWa().filter(x => x.nivel === nivel);
   const box = document.getElementById('waCola');
   if (!box) return;
-  if (!grupos.length) {
-    box.innerHTML = '<p class="text-sm text-slate-500">No hay grupos. En Admin → WhatsApp pegue el enlace de cada aula.</p>';
-    return;
+  function pintar() {
+    const grupos = loadGruposWa().filter(x => x.nivel === nivel);
+    if (!grupos.length) {
+      box.innerHTML = '<p class="text-sm text-slate-500">No hay grupos. En Admin → WhatsApp pegue el enlace de cada aula.</p>';
+      return;
+    }
+    const pendientes = grupos.filter(g => {
+      const pack = textoListaAula(g.nivel, g.grado, g.seccion, fecha);
+      return pack.list.some(al => { const m = getRec(al).marca; return m==='P'||m==='F'||m==='T'||m==='J'; });
+    });
+    const usar = pendientes.length ? pendientes : grupos;
+    box.innerHTML = usar.map((g, i) => {
+      const nom = g.nombre || (g.grado + '° ' + g.seccion);
+      return '<a class="btn btn-ghost block text-center" data-wa="'+i+'" href="#">Abrir '+nom+'</a>';
+    }).join('');
+    box.onclick = function(ev) {
+      const a = ev.target.closest('a[data-wa]');
+      if (!a) return;
+      ev.preventDefault();
+      const g = usar[Number(a.getAttribute('data-wa'))];
+      const pack = textoListaAula(g.nivel, g.grado, g.seccion, fecha);
+      abrirWhatsApp(pack.txt, g.enlace);
+    };
   }
-  const pendientes = grupos.filter(g => {
-    const pack = textoListaAula(g.nivel, g.grado, g.seccion, fecha);
-    return pack.list.some(al => { const m = getRec(al).marca; return m==='P'||m==='F'||m==='T'||m==='J'; });
-  });
-  const usar = pendientes.length ? pendientes : grupos;
-  box.innerHTML = usar.map((g, i) => {
-    const nom = g.nombre || (g.grado + '° ' + g.seccion);
-    return '<a class="btn btn-ghost block text-center" data-wa="'+i+'" href="#">Abrir '+nom+'</a>';
-  }).join('');
-  box.onclick = function(ev) {
-    const a = ev.target.closest('a[data-wa]');
-    if (!a) return;
-    ev.preventDefault();
-    const g = usar[Number(a.getAttribute('data-wa'))];
-    const pack = textoListaAula(g.nivel, g.grado, g.seccion, fecha);
-    abrirWhatsApp(pack.txt, g.enlace);
-  };
+  pintar();
+  bajarGruposWa().then(pintar);
 }
 
 /* ===== QR (iPhone + Android) ===== */
@@ -849,10 +848,15 @@ async function leerFotoQR(input) {
 }
 
 Promise.all([ensureBD(), ensureHorario(), bajarGruposWa()]).then(() => {
-  document.getElementById('inpFecha').value = hoyISO();
   onNivel();
   if (location.hash === '#grupos') verMenu('grupos');
 });
+(function pintarYa() {
+  BD = fijarNiveles(loadBD()) || { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
+  const f = document.getElementById('inpFecha');
+  if (f) f.value = hoyISO();
+  onNivel();
+})();
 </script>
 </body>
 </html>
