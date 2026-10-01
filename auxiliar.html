@@ -15,9 +15,14 @@
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#f1f5f9; color:#0f172a; }
     .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); }
-    .btn { border:0; border-radius:12px; font-weight:800; padding:.7rem 1rem; cursor:pointer; font-size:14px; touch-action:manipulation; }
-    .btn-primary { background:#0284c7; color:#fff; }
+    .btn { border:0; border-radius:12px; font-weight:800; padding:.75rem 1rem; cursor:pointer; font-size:14px; touch-action:manipulation; display:inline-flex; align-items:center; justify-content:center; gap:.45rem; }
+    .btn-primary { background:#0369a1; color:#fff; }
     .btn-ghost { background:#e2e8f0; color:#0f172a; }
+    .btn-wa { background:#dcfce7; color:#166534; border:1px solid #86efac; }
+    .btn-ok { background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; }
+    .btn-warn { background:#fff7ed; color:#c2410c; border:1px solid #fdba74; }
+    .btn-down { background:#e0f2fe; color:#075985; border:1px solid #7dd3fc; }
+    .btn-up { background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; }
     .btn-danger { background:#fee2e2; color:#991b1b; }
     select, input[type=date], input[type=search] {
       width:100%; border:1.5px solid #cbd5e1; border-radius:12px; padding:.65rem .75rem; font-size:16px; min-height:48px; background:#fff;
@@ -112,12 +117,12 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     </div>
     <input type="search" id="inpBuscar" placeholder="Buscar alumno…" oninput="renderLista()">
     <div class="actions">
-      <button type="button" class="btn btn-primary" onclick="toggleScan()">📷 Escanear QR</button>
-      <button type="button" class="btn btn-ghost" onclick="marcarTodos('P')">Todos presente</button>
-      <button type="button" class="btn btn-ghost" onclick="compartirWhatsApp()">WhatsApp este salón</button>
-      <button type="button" class="btn btn-ghost" onclick="cerrarAsistenciaAula()">Cerrar asistencia del aula</button>
-      <button type="button" class="btn btn-ghost" onclick="bajarNube()">Bajar asistencia de la nube</button>
-      <button type="button" class="btn btn-ghost" onclick="subirTodoNube()">Subir asistencia a la nube</button>
+      <button type="button" class="btn btn-primary" onclick="toggleScan()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>Escanear QR</button>
+      <button type="button" class="btn btn-ok" onclick="marcarTodos('P')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>Todos presente</button>
+      <button type="button" class="btn btn-warn" onclick="cerrarAsistenciaAula()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Cerrar asistencia del aula</button>
+      <button type="button" class="btn btn-wa" onclick="compartirWhatsApp()"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.7-1.2A9 9 0 1 0 12 3zm5 12.2c-.2.6-1.2 1.1-1.6 1.1-.4 0-.9.2-3.1-.7-2.6-1.1-4.2-3.7-4.3-3.9-.1-.2-1-1.3-1-2.5s.6-1.8.9-2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5.2.6.8 2 .8 2.1.1.1 0 .3-.1.4l-.4.5c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.5-.6c.1-.2.3-.1.5-.1l2 .9c.2.1.4.2.4.3 0 .2 0 .8-.2 1.1z"/></svg>WhatsApp este salón</button>
+      <button type="button" class="btn btn-down" onclick="bajarNube()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Bajar asistencia de la nube</button>
+      <button type="button" class="btn btn-up" onclick="subirTodoNube()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20V9M7 13l5-5 5 5M5 4h14"/></svg>Subir asistencia a la nube</button>
     </div>
   </div>
 
