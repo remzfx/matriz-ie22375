@@ -555,26 +555,23 @@ function textoListaAula(nivel, grado, seccion, fecha) {
       (faltas.length ? '\n\nSin ingreso / faltas:\n- ' + faltas.join('\n- ') : '')
   };
 }
-function abrirWhatsApp(numero, txt) {
-  const n = String(numero || '').replace(/\D/g, '');
-  const url = n
-    ? ('https://wa.me/' + n + '?text=' + encodeURIComponent(txt))
-    : ('https://wa.me/?text=' + encodeURIComponent(txt));
-  window.open(url, '_blank');
+function abrirWhatsApp(txt) {
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
 }
 function compartirWhatsApp() {
   const c = ctx();
   const pack = textoListaAula(c.nivel, c.grado, c.seccion, c.fecha);
   if (!pack.list.length) { alert('No hay alumnos'); return; }
   const g = loadGruposWa().find(x => x.nivel===c.nivel && String(x.grado)===String(c.grado) && String(x.seccion)===String(c.seccion));
-  abrirWhatsApp(g && g.numero, pack.txt);
+  const nom = (g && g.nombre) ? g.nombre : ((c.grado + '° ' + c.seccion));
+  abrirWhatsApp('Para el grupo: ' + nom + '\n\n' + pack.txt);
 }
 async function enviarGruposHoy() {
   await bajarGruposWa();
   const c = ctx();
   const grupos = loadGruposWa().filter(x => x.nivel === c.nivel);
   if (!grupos.length) {
-    alert('No hay grupos configurados.\nEn Admin → WhatsApp cargue el número de cada aula.');
+    alert('No hay grupos configurados.\nEn Admin → WhatsApp ponga el nombre de cada grupo.');
     return;
   }
   const pendientes = grupos.filter(g => {
@@ -588,8 +585,8 @@ async function enviarGruposHoy() {
     const g = usar[i];
     const pack = textoListaAula(g.nivel, g.grado, g.seccion, c.fecha);
     const nom = g.nombre || (g.grado + '° ' + g.seccion);
-    if (!confirm('Enviar lista ' + (i+1) + ' de ' + usar.length + ':\n' + nom + '\n\nSe abrirá WhatsApp. Envíe y vuelva para el siguiente.')) return;
-    abrirWhatsApp(g.numero, pack.txt);
+    if (!confirm('Lista ' + (i+1) + ' de ' + usar.length + ':\n' + nom + '\n\nSe abre WhatsApp. Elige ese grupo y envía. Luego vuelve para el siguiente.')) return;
+    abrirWhatsApp('Para el grupo: ' + nom + '\n\n' + pack.txt);
     i++;
     setTimeout(siguiente, 600);
   }
