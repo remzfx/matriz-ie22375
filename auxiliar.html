@@ -117,6 +117,11 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <button type="button" class="btn btn-ghost" onclick="compartirWhatsApp()">WhatsApp este salón</button>
       <button type="button" class="btn btn-primary" onclick="enviarGruposHoy()">WhatsApp grupos del día</button>
       <div id="waCola" class="hidden space-y-2"></div>
+      <div id="waTextoBox" class="hidden space-y-2">
+        <p class="text-xs font-bold text-slate-600">Lista copiada. En el grupo de WhatsApp haga clic en la caja de escribir y pegue con Ctrl+V.</p>
+        <textarea id="waTexto" class="w-full text-xs border border-slate-200 rounded-lg p-2" rows="8" readonly></textarea>
+        <button type="button" class="btn btn-primary w-full" onclick="copiarListaVisible()">Copiar lista otra vez</button>
+      </div>
       <button type="button" class="btn btn-ghost" onclick="cerrarAsistenciaAula()">Cerrar asistencia del aula</button>
       <button type="button" class="btn btn-ghost" onclick="bajarNube()">Bajar asistencia de la nube</button>
       <button type="button" class="btn btn-ghost" onclick="subirTodoNube()">Subir asistencia a la nube</button>
@@ -577,15 +582,28 @@ async function copiarTexto(txt) {
     return true;
   }
 }
+function mostrarListaWa(txt) {
+  const box = document.getElementById('waTextoBox');
+  const ta = document.getElementById('waTexto');
+  if (ta) ta.value = txt;
+  if (box) box.classList.remove('hidden');
+}
+async function copiarListaVisible() {
+  const ta = document.getElementById('waTexto');
+  if (!ta || !ta.value) return;
+  await copiarTexto(ta.value);
+  toast('Lista copiada. Pegue en el grupo con Ctrl+V.');
+}
 function abrirWhatsApp(txt, enlace) {
   const link = String(enlace || '').trim();
+  mostrarListaWa(txt);
   copiarTexto(txt).then(function() {
     if (/chat\.whatsapp\.com|whatsapp\.com\/invite/i.test(link)) {
-      toast('Lista copiada. Pegue en el grupo (Ctrl+V) y envíe.');
+      toast('Lista copiada. En el grupo pegue con Ctrl+V.');
       window.open(link, '_blank');
       return;
     }
-    toast('Sin enlace de grupo: elija el chat y pegue si no sale el texto.');
+    toast('Lista copiada. Elija el grupo y pegue con Ctrl+V.');
     const a = document.createElement('a');
     a.href = urlWhatsApp(txt);
     a.target = '_blank';
