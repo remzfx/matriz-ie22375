@@ -2326,7 +2326,9 @@ window.__IE_gradoOK = function(gradoVal) {
                     });
                 });
                 comps.sort((a,b) => b.logro - a.logro);
-                dest.innerHTML = (top.length ? ('<p class="mb-2"><strong>Áreas con más logro:</strong> '+top.map(t => t.corto+' ('+t.r.logro+'%)').join(' · ')+'</p>' : '<p class="text-slate-400">Aún no hay datos en este grado.</p>') +
+                dest.innerHTML = (top.length
+                    ? ('<p class="mb-2"><strong>Áreas con más logro:</strong> '+top.map(t => t.corto+' ('+t.r.logro+'%)').join(' · ')+'</p>')
+                    : '<p class="text-slate-400">Aún no hay datos en este grado.</p>') +
                     (comps.length ? '<p><strong>Competencias que más destacan:</strong></p><ul class="list-disc pl-5 mt-1">'+comps.slice(0,5).map(c => '<li>'+c.area+' — '+c.comp+' <b>'+c.logro+'%</b></li>').join('')+'</ul>' : '');
             }
             const ctx = document.getElementById('chartComparativo');
