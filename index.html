@@ -321,6 +321,7 @@ async function intentarLogin() {
     grados: d.nivel === 'primaria' ? (d.grados || []) : null,
     areas: d.nivel === 'secundaria' ? (d.areas || []) : null,
     aulas: d.nivel === 'secundaria' ? (d.aulas || []) : null,
+    asignaciones: d.nivel === 'secundaria' ? (d.asignaciones || null) : null,
     mods: d.nivel === 'primaria' ? ['registro','matriz_pri'] : ['registro','matriz_sec'],
     ts: Date.now(),
     recordar: !!(document.getElementById('inpRecordar')||{}).checked
