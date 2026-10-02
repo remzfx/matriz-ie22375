@@ -93,6 +93,8 @@
 const ADMIN_PASS = 'admin22375';
 const SESSION_KEY = 'ie22375_session_v1';
 const DOCENTES_KEY = 'ie22375_docentes_v1';
+const DOCENTES_CACHE_TS_KEY = 'ie22375_docentes_cache_ts_v1';
+const DOCENTES_CACHE_MS = 30 * 60 * 1000;
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
 function loadDocentesLocal() {
   try { const raw = localStorage.getItem(DOCENTES_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
@@ -100,6 +102,40 @@ function loadDocentesLocal() {
 }
 function loadDocentes() {
   return loadDocentesLocal();
+}
+
+function docentesCacheVigente() {
+  const ts = Number(localStorage.getItem(DOCENTES_CACHE_TS_KEY) || 0);
+  return !!ts && (Date.now() - ts < DOCENTES_CACHE_MS) && loadDocentesLocal().length > 0;
+}
+function guardarDocentesCache(list) {
+  localStorage.setItem(DOCENTES_KEY, JSON.stringify(list || []));
+  localStorage.setItem(DOCENTES_CACHE_TS_KEY, String(Date.now()));
+}
+function cargarDocentesJsonp(timeoutMs) {
+  return new Promise(function(resolve, reject) {
+    const cb = '__ieDocCb_' + Date.now() + '_' + Math.floor(Math.random()*100000);
+    const sc = document.createElement('script');
+    const timer = setTimeout(function() {
+      cleanup();
+      reject(new Error('Tiempo agotado al consultar docentes'));
+    }, timeoutMs || 10000);
+    function cleanup() {
+      clearTimeout(timer);
+      try { delete window[cb]; } catch(e) { window[cb] = undefined; }
+      if (sc.parentNode) sc.parentNode.removeChild(sc);
+    }
+    window[cb] = function(data) {
+      cleanup();
+      resolve(data);
+    };
+    sc.onerror = function() {
+      cleanup();
+      reject(new Error('No se pudo consultar docentes'));
+    };
+    sc.src = CLOUD_API_URL + '?action=loaddoc&callback=' + encodeURIComponent(cb) + '&t=' + Date.now();
+    document.head.appendChild(sc);
+  });
 }
 async function fetchConTiempo(url, ms) {
   const ctrl = new AbortController();
@@ -109,19 +145,33 @@ async function fetchConTiempo(url, ms) {
     return r;
   } finally { clearTimeout(t); }
 }
-async function asegurarDocentesRemotos() {
+async function asegurarDocentesRemotos(forzar) {
+  if (!forzar && docentesCacheVigente()) {
+    return { ok:true, fuente:'cache', total:loadDocentesLocal().length };
+  }
+
   let errorNube = '';
   try {
-    const r = await fetchConTiempo(CLOUD_API_URL + '?action=loaddoc&t=' + Date.now(), 10000);
+    const r = await fetchConTiempo(CLOUD_API_URL + '?action=loaddoc&t=' + Date.now(), 8000);
     if (!r || !r.ok) throw new Error('Respuesta HTTP ' + (r ? r.status : 'sin respuesta'));
-    const txt = await r.text();
-    const data = JSON.parse(txt);
+    const data = JSON.parse(await r.text());
     const list = (data && data.ok && Array.isArray(data.docentes)) ? data.docentes : [];
     if (!list.length) throw new Error((data && data.error) || 'La nube no devolvió docentes');
-    localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
+    guardarDocentesCache(list);
     return { ok:true, fuente:'nube', total:list.length };
   } catch (e) {
-    errorNube = (e && e.name === 'AbortError') ? 'La nube demoró demasiado' : String((e && e.message) || e || 'Error de nube');
+    errorNube = String((e && e.message) || e || 'Error de nube');
+  }
+
+  // Segundo intento compatible con navegadores móviles/Safari.
+  try {
+    const data = await cargarDocentesJsonp(10000);
+    const list = (data && data.ok && Array.isArray(data.docentes)) ? data.docentes : [];
+    if (!list.length) throw new Error((data && data.error) || 'La nube no devolvió docentes');
+    guardarDocentesCache(list);
+    return { ok:true, fuente:'jsonp', total:list.length };
+  } catch(e) {
+    errorNube += ' · ' + String((e && e.message) || e || 'JSONP falló');
   }
 
   const local = loadDocentesLocal();
@@ -133,7 +183,7 @@ async function asegurarDocentesRemotos() {
     const data = await r.json();
     const list = Array.isArray(data) ? data : (data.docentes || []);
     if (list.length) {
-      localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
+      guardarDocentesCache(list);
       return { ok:false, fuente:'archivo', total:list.length, error:errorNube };
     }
   } catch(e) {}
@@ -244,14 +294,16 @@ async function intentarLogin() {
 
   const btnLogin = document.getElementById('btnLogin');
   if (btnLogin) { btnLogin.disabled = true; btnLogin.textContent = 'Verificando…'; }
-  err.textContent = 'Actualizando usuarios desde la nube…';
+
+  const cacheOk = docentesCacheVigente();
+  err.textContent = cacheOk ? 'Verificando datos guardados…' : 'Actualizando usuarios desde la nube…';
   err.classList.remove('hidden');
 
-  const sync = await asegurarDocentesRemotos();
+  const sync = await asegurarDocentesRemotos(false);
   let d = buscarDocenteLogin(docUser, pass);
 
-  if (!d && sync.fuente !== 'nube') {
-    err.textContent = 'No se pudo actualizar la lista de docentes desde la nube. Revisa tu conexión e inténtalo nuevamente.';
+  if (!d && sync.fuente !== 'nube' && sync.fuente !== 'jsonp' && sync.fuente !== 'cache') {
+    err.textContent = 'No se pudo actualizar la lista de docentes. Revisa tu conexión e inténtalo nuevamente.';
     if (btnLogin) { btnLogin.disabled = false; btnLogin.textContent = 'Ingresar'; }
     return;
   }
