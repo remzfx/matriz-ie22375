@@ -539,6 +539,7 @@ function cerrarNotebookPanel(){
   const p=document.getElementById('panelNotebook');
   if(p) p.classList.add('hidden');
 }
+function autorizarClassroom(){
   window.open(CLOUD_API_URL+'?action=classroom','_blank');
   clsNota('Acepta el permiso de Google en la pestaña. Luego vuelve y pulsa Ver mis cursos.');
 }
