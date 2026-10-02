@@ -225,28 +225,32 @@
       <div id="areaBtns" class="flex flex-wrap gap-1.5"></div>
     </div>
 
-    <div class="card p-3 space-y-2 hidden" id="panelNotebook">
+    <div class="card p-3 space-y-3 hidden" id="panelNotebook">
       <div class="flex items-center justify-between">
-        <div class="text-[10px] font-bold text-slate-500">NOTEBOOK Y CLASSROOM</div>
+        <div>
+          <div class="text-[10px] font-bold text-slate-500">CLASSROOM Y NOTEBOOKLM</div>
+          <div class="text-sm font-black text-slate-800">Recursos del aula</div>
+        </div>
         <button type="button" class="btn btn-ghost text-xs !py-1" onclick="cerrarNotebookPanel()">Cerrar</button>
       </div>
-      <p class="text-[11px] text-slate-500">No carga el registro. Elige el curso, escribe la tarea y envíala. El cuaderno se abre aparte.</p>
+      <p class="text-[11px] text-slate-500">Los cursos se detectan automáticamente. Elige el curso, escribe la tarea y envíala. NotebookLM se abre aparte.</p>
       <div class="flex flex-wrap gap-2">
-        <button type="button" class="btn btn-primary text-xs" onclick="cargarClassroom()">Ver mis cursos</button>
+        <button type="button" id="btnCursosClassroom" class="btn btn-primary text-xs" onclick="cargarClassroom()">Actualizar cursos</button>
         <button type="button" class="btn btn-ghost text-xs" onclick="autorizarClassroom()">Autorizar Classroom</button>
-        <button type="button" class="btn btn-ghost text-xs" onclick="enviarSesionClassroom()">Enviar sesión a Classroom</button>
-        <button type="button" class="btn btn-ghost text-xs" onclick="abrirNotebook()">Abrir cuaderno</button>
+        <button type="button" id="btnEnviarClassroom" class="btn btn-ghost text-xs" onclick="enviarSesionClassroom()">Crear tarea en Classroom</button>
+        <button type="button" class="btn btn-ghost text-xs" onclick="abrirNotebook()">Abrir NotebookLM</button>
       </div>
-      <select id="selCurso" class="w-full" onchange="guardarCursoCls()"></select>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500">CURSO DE CLASSROOM</label>
+        <select id="selCurso" class="w-full" onchange="guardarCursoCls()"></select>
+      </div>
       <input id="clsTitulo" placeholder="Título de la tarea. Si lo dejas vacío, usa el área y el bimestre">
       <textarea id="clsTexto" rows="3" placeholder="Texto de la tarea que verán los estudiantes en Classroom" style="min-height:72px"></textarea>
-      <textarea id="clsPega" rows="2" placeholder="Solo la primera vez: pega el texto negro y pulsa Cargar pegado" style="min-height:52px"></textarea>
-      <button type="button" class="btn btn-ghost text-xs" onclick="cargarPegado()">Cargar pegado</button>
       <input id="inpNotebook" placeholder="Pega aquí el enlace de NotebookLM de esta área" onchange="guardarNotebook()">
       <div id="clsMsg" class="text-[11px] text-slate-500"></div>
     </div>
 
-    <div class="flex gap-2 flex-wrap">
+    <div id="registroAccionesAcademicas" class="flex gap-2 flex-wrap">
       <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
       <button type="button" id="tabFin" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('fin')">Promedios</button>
       <button type="button" id="tabAv" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('av')">Resumen</button>
@@ -529,20 +533,56 @@ function saveStore() {
 
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
 function clsNota(t){ const el=document.getElementById('clsMsg'); if(el) el.textContent=t; }
+let panelAntesNotebook = 'cal';
+
+function panelAcademicoActivo(){
+  const av=document.getElementById('panelAvance');
+  const as=document.getElementById('panelAsistencia');
+  const fin=document.getElementById('panelFinales');
+  if(av && av.classList.contains('on')) return 'av';
+  if(as && as.classList.contains('on')) return 'as';
+  if(fin && fin.classList.contains('on')) return 'fin';
+  return 'cal';
+}
+function modoNotebookUI(activo){
+  const acciones=document.getElementById('registroAccionesAcademicas');
+  const ids=['panelCalificar','panelFinales','panelAvance','panelAsistencia'];
+  if(activo){
+    panelAntesNotebook=panelAcademicoActivo();
+    if(acciones) acciones.classList.add('hidden');
+    ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); });
+  }else{
+    if(acciones) acciones.classList.remove('hidden');
+    ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('hidden'); });
+    showPanel(panelAntesNotebook || 'cal');
+  }
+}
 function abrirNotebookPanel(){
   const p=document.getElementById('panelNotebook');
   if(p) p.classList.remove('hidden');
+  modoNotebookUI(true);
   restaurarCursos();
+  cargarNotebookCampo();
+  cargarClassroom(true);
   p && p.scrollIntoView({behavior:'smooth', block:'start'});
 }
 function cerrarNotebookPanel(){
   const p=document.getElementById('panelNotebook');
   if(p) p.classList.add('hidden');
+  modoNotebookUI(false);
 }
 function autorizarClassroom(){
-  window.open(CLOUD_API_URL+'?action=classroom','_blank');
-  clsNota('Acepta el permiso de Google en la pestaña. Luego vuelve y pulsa Ver mis cursos.');
+  window.__clsEsperandoAuth=true;
+  const w=window.open(CLOUD_API_URL+'?action=classroom','_blank');
+  if(!w) clsNota('El navegador bloqueó la pestaña de autorización. Habilita ventanas emergentes para este sitio.');
+  else clsNota('Autoriza Classroom en la pestaña nueva. Al volver, los cursos se actualizarán automáticamente.');
 }
+window.addEventListener('focus', function(){
+  if(window.__clsEsperandoAuth){
+    window.__clsEsperandoAuth=false;
+    setTimeout(function(){ cargarClassroom(true); }, 500);
+  }
+});
 function guardarNotebook(){
   const c=ctxBase();
   const k='nb|'+(c.nivel||'')+'|'+(c.area||'');
@@ -560,24 +600,53 @@ function abrirNotebook(){
   if(!url){ clsNota('Pega el enlace de NotebookLM de esta área.'); return; }
   window.open(url,'_blank');
 }
-function cargarPegado(){
-  const raw=(document.getElementById('clsPega').value||'').trim();
-  if(!raw){ clsNota('Pega el texto de la pestaña negra.'); return; }
-  try { pintarCursos(JSON.parse(raw)); }
-  catch(e){ clsNota('Ese texto no es la lista. Copia desde { hasta }'); }
+function normCls(v){
+  return String(v||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ').trim();
+}
+function puntuacionCursoClassroom(curso){
+  const c=ctxBase();
+  const nom=normCls(curso.name);
+  const sec=normCls(curso.section);
+  const area=normCls(c.area);
+  const grado=String(c.grado||'').replace(/\D/g,'');
+  const seccion=normCls(c.seccion);
+  let score=0;
+  if(area && nom.indexOf(area)>=0) score+=10;
+  if(grado && (sec.indexOf(grado)>=0 || nom.indexOf(grado)>=0)) score+=4;
+  if(seccion){
+    const u=(seccion.indexOf('unic')>=0);
+    if(u && (sec.indexOf('u')>=0 || sec.indexOf('unic')>=0 || nom.indexOf('unic')>=0)) score+=4;
+    else if(!u && (sec===seccion || sec.indexOf(seccion)>=0)) score+=4;
+  }
+  return score;
 }
 function pintarCursos(data){
   const sel=document.getElementById('selCurso');
   if(!sel) return;
   sel.innerHTML='';
   if(!data || !data.ok){ clsNota((data&&data.error)||'No se pudo leer Classroom'); return; }
-  (data.cursos||[]).forEach(c=>{
+  const cursos=Array.isArray(data.cursos)?data.cursos:[];
+  cursos.forEach(c=>{
     const o=document.createElement('option');
     o.value=c.id;
     o.textContent=(c.name||'Curso')+(c.section?' · '+c.section:'');
     sel.appendChild(o);
   });
-  clsNota((data.total||0)+' curso(s). Elige uno y envía la sesión.');
+  const guardado=localStorage.getItem('ie22375_cls_curso')||'';
+  if(guardado && cursos.some(c=>String(c.id)===String(guardado))){
+    sel.value=guardado;
+  }else if(cursos.length){
+    let best=cursos[0], bestScore=-1;
+    cursos.forEach(c=>{
+      const sc=puntuacionCursoClassroom(c);
+      if(sc>bestScore){ best=c; bestScore=sc; }
+    });
+    sel.value=best.id;
+    guardarCursoCls();
+  }
+  clsNota(cursos.length ? (cursos.length+' curso(s) detectado(s).') : 'No se encontraron cursos activos en esta cuenta.');
   try { localStorage.setItem('ie22375_cls_cursos', JSON.stringify(data)); } catch(e) {}
 }
 function guardarCursoCls(){
@@ -588,38 +657,77 @@ function restaurarCursos(){
   try {
     const raw=localStorage.getItem('ie22375_cls_cursos');
     if(raw) pintarCursos(JSON.parse(raw));
-    const id=localStorage.getItem('ie22375_cls_curso');
-    if(id && document.getElementById('selCurso')) document.getElementById('selCurso').value=id;
   } catch(e) {}
 }
-function cargarClassroom(){
-  clsNota('Buscando cursos…');
-  window.clsCursos=function(data){ pintarCursos(data); };
-  const s=document.createElement('script');
-  s.src=CLOUD_API_URL+'?action=classroom&callback=clsCursos';
-  s.onerror=function(){
-    clsNota('Primero autoriza. Acepta en la pestaña y vuelve a pulsar Ver mis cursos.');
-    window.open(CLOUD_API_URL+'?action=classroom','_blank');
-  };
-  document.body.appendChild(s);
+async function cargarClassroom(silencioso){
+  const btn=document.getElementById('btnCursosClassroom');
+  if(btn){ btn.disabled=true; btn.textContent='Buscando…'; }
+  if(!silencioso) clsNota('Buscando cursos…');
+  try{
+    const res=await fetch(CLOUD_API_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'classroomcursos'})
+    });
+    const data=JSON.parse(await res.text());
+    if(!data.ok) throw new Error(data.error||'No se pudo leer Classroom');
+    pintarCursos(data);
+  }catch(err){
+    // Compatibilidad temporal con la versión anterior del Apps Script.
+    try{
+      await new Promise(function(resolve,reject){
+        const cb='clsCursos_'+Date.now();
+        window[cb]=function(data){
+          try{ pintarCursos(data); }finally{
+            try{ delete window[cb]; }catch(e){}
+            resolve();
+          }
+        };
+        const sc=document.createElement('script');
+        sc.src=CLOUD_API_URL+'?action=classroom&callback='+encodeURIComponent(cb)+'&_t='+Date.now();
+        sc.onerror=function(){ reject(new Error('No se pudo conectar')); };
+        document.body.appendChild(sc);
+        setTimeout(function(){ reject(new Error('Tiempo de espera agotado')); },12000);
+      });
+    }catch(e2){
+      clsNota('No se pudieron detectar los cursos. Pulsa Autorizar Classroom una sola vez y vuelve.');
+    }
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='Actualizar cursos'; }
+  }
 }
 async function enviarSesionClassroom(){
-  const courseId=(document.getElementById('selCurso').value||'');
-  if(!courseId){ clsNota('Primero pulsa Ver mis cursos.'); return; }
+  const sel=document.getElementById('selCurso');
+  const courseId=(sel && sel.value)||'';
+  if(!courseId){ clsNota('No hay curso seleccionado. Actualiza tus cursos primero.'); return; }
   const c=ctxBase();
   const tituloEl=(document.getElementById('clsTitulo').value||'').trim();
   const texto=(document.getElementById('clsTexto').value||'').trim() || 'Sesión enviada desde el registro auxiliar IE 22375.';
-  const titulo=encodeURIComponent(tituloEl || ((c.area||'Área')+' · Bim '+c.bim+' · '+c.grado+'° '+(c.seccion||'')));
-  const link=encodeURIComponent(location.href);
+  const titulo=tituloEl || ((c.area||'Área')+' · Bim '+c.bim+' · '+c.grado+'° '+(c.seccion||''));
+  const btn=document.getElementById('btnEnviarClassroom');
+  if(btn){ btn.disabled=true; btn.textContent='Creando…'; }
   clsNota('Creando tarea…');
-  window.clsTarea=function(data){
-    if(!data || !data.ok){ clsNota((data&&data.error)||'No se creó la tarea'); return; }
-    clsNota('Tarea creada en Classroom.');
-    if(data.alternateLink) window.open(data.alternateLink,'_blank');
-  };
-  const s=document.createElement('script');
-  s.src=CLOUD_API_URL+'?action=creartarea&callback=clsTarea&courseId='+encodeURIComponent(courseId)+'&titulo='+titulo+'&link='+link+'&descripcion='+encodeURIComponent(texto);
-  document.body.appendChild(s);
+  try{
+    const res=await fetch(CLOUD_API_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({
+        action:'classroomtarea',
+        courseId:courseId,
+        titulo:titulo,
+        descripcion:texto,
+        link:location.href
+      })
+    });
+    const data=JSON.parse(await res.text());
+    if(!data.ok) throw new Error(data.error||'No se creó la tarea');
+    clsNota('Tarea creada correctamente en Classroom ✓');
+    guardarCursoCls();
+  }catch(err){
+    clsNota('No se creó la tarea: '+(err.message||err));
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='Crear tarea en Classroom'; }
+  }
 }
 function cloudClaveReg() {
   const c = ctxBase();
