@@ -67,7 +67,7 @@
           Recordar sesión en este equipo
         </label>
         <p id="loginErr" class="hidden text-sm text-red-600 font-semibold bg-red-50 rounded-lg px-3 py-2"></p>
-        <button type="submit" class="btn btn-primary">Ingresar</button>
+        <button type="submit" id="btnLogin" class="btn btn-primary">Ingresar</button>
         <p class="text-[11px] text-slate-400 text-center">El navegador puede ofrecer guardar la contraseña al ingresar.</p>
       </form>
       <p class="text-[10px] text-center text-slate-400 mt-8">Desarrollo · Diseño e integración Mag. Efrain Ceopa Paredes</p>
@@ -110,27 +110,46 @@ async function fetchConTiempo(url, ms) {
   } finally { clearTimeout(t); }
 }
 async function asegurarDocentesRemotos() {
+  let errorNube = '';
   try {
-    const r = await fetchConTiempo(CLOUD_API_URL + '?action=loaddoc&t=' + Date.now(), 2800);
-    if (r && r.ok) {
-      const data = await r.json();
-      const list = (data && data.ok && Array.isArray(data.docentes)) ? data.docentes : [];
-      if (list.length) {
-        localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
-        return true;
-      }
-    }
-  } catch (e) {}
-  if (loadDocentesLocal().length) return true;
+    const r = await fetchConTiempo(CLOUD_API_URL + '?action=loaddoc&t=' + Date.now(), 10000);
+    if (!r || !r.ok) throw new Error('Respuesta HTTP ' + (r ? r.status : 'sin respuesta'));
+    const txt = await r.text();
+    const data = JSON.parse(txt);
+    const list = (data && data.ok && Array.isArray(data.docentes)) ? data.docentes : [];
+    if (!list.length) throw new Error((data && data.error) || 'La nube no devolvió docentes');
+    localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
+    return { ok:true, fuente:'nube', total:list.length };
+  } catch (e) {
+    errorNube = (e && e.name === 'AbortError') ? 'La nube demoró demasiado' : String((e && e.message) || e || 'Error de nube');
+  }
+
+  const local = loadDocentesLocal();
+  if (local.length) return { ok:false, fuente:'local', total:local.length, error:errorNube };
+
   try {
-    const r = await fetchConTiempo('docentes.json?t=' + Date.now(), 2000);
-    if (!r || !r.ok) return false;
+    const r = await fetchConTiempo('docentes.json?t=' + Date.now(), 4000);
+    if (!r || !r.ok) throw new Error('No disponible');
     const data = await r.json();
     const list = Array.isArray(data) ? data : (data.docentes || []);
-    if (list.length) localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
-    return list.length > 0;
+    if (list.length) {
+      localStorage.setItem(DOCENTES_KEY, JSON.stringify(list));
+      return { ok:false, fuente:'archivo', total:list.length, error:errorNube };
+    }
   } catch(e) {}
-  return false;
+
+  return { ok:false, fuente:'ninguna', total:0, error:errorNube };
+}
+function normalizarUsuarioDocente(v) {
+  return String(v || '').trim().toLowerCase().replace(/^@+/, '');
+}
+function buscarDocenteLogin(user, pass) {
+  const u = normalizarUsuarioDocente(user);
+  const p = String(pass || '').trim();
+  return loadDocentes().find(x =>
+    normalizarUsuarioDocente(x.user) === u &&
+    String(x.pass == null ? '' : x.pass).trim() === p
+  ) || null;
 }
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 function leerSesionCruda() {
@@ -216,22 +235,34 @@ async function intentarLogin() {
     mostrarHub();
     return;
   }
-  const docUser = document.getElementById('inpDocUser').value.trim().toLowerCase();
-  if (!docUser) { err.textContent = 'Ingrese su usuario de docente.'; err.classList.remove('hidden'); return; }
-  let d = loadDocentes().find(x => String(x.user||'').toLowerCase() === docUser && x.pass === pass);
-  if (!d) {
-    err.textContent = 'Comprobando usuarios…';
-    err.classList.remove('hidden');
-    await asegurarDocentesRemotos();
-    d = loadDocentes().find(x => String(x.user||'').toLowerCase() === docUser && x.pass === pass);
-  } else {
-    asegurarDocentesRemotos();
-  }
-  if (!d) {
-    err.textContent = 'La contraseña no es correcta.';
+  const docUser = normalizarUsuarioDocente(document.getElementById('inpDocUser').value);
+  if (!docUser) {
+    err.textContent = 'Ingrese su usuario o DNI de docente.';
     err.classList.remove('hidden');
     return;
   }
+
+  const btnLogin = document.getElementById('btnLogin');
+  if (btnLogin) { btnLogin.disabled = true; btnLogin.textContent = 'Verificando…'; }
+  err.textContent = 'Actualizando usuarios desde la nube…';
+  err.classList.remove('hidden');
+
+  const sync = await asegurarDocentesRemotos();
+  let d = buscarDocenteLogin(docUser, pass);
+
+  if (!d && sync.fuente !== 'nube') {
+    err.textContent = 'No se pudo actualizar la lista de docentes desde la nube. Revisa tu conexión e inténtalo nuevamente.';
+    if (btnLogin) { btnLogin.disabled = false; btnLogin.textContent = 'Ingresar'; }
+    return;
+  }
+
+  if (!d) {
+    err.textContent = 'Usuario/DNI o contraseña incorrectos.';
+    if (btnLogin) { btnLogin.disabled = false; btnLogin.textContent = 'Ingresar'; }
+    return;
+  }
+
+  if (btnLogin) { btnLogin.disabled = false; btnLogin.textContent = 'Ingresar'; }
   err.classList.add('hidden');
   setSession({
     user: d.user, label: d.nombre || d.user, nivel: d.nivel, role: 'docente',
