@@ -233,9 +233,11 @@
         <button type="button" class="btn btn-ghost text-xs" onclick="enviarSesionClassroom()">Enviar sesión a Classroom</button>
         <button type="button" class="btn btn-ghost text-xs" onclick="abrirNotebook()">Abrir cuaderno</button>
       </div>
-      <select id="selCurso" class="w-full"></select>
-      <textarea id="clsPega" rows="3" placeholder="Pega aquí el texto negro de la pestaña, desde { hasta }" style="min-height:72px"></textarea>
-      <button type="button" class="btn btn-primary text-xs" onclick="cargarPegado()">Cargar pegado</button>
+      <select id="selCurso" class="w-full" onchange="guardarCursoCls()"></select>
+      <input id="clsTitulo" placeholder="Título de la tarea. Si lo dejas vacío, usa el área y el bimestre">
+      <textarea id="clsTexto" rows="3" placeholder="Texto de la tarea que verán los estudiantes en Classroom" style="min-height:72px"></textarea>
+      <textarea id="clsPega" rows="2" placeholder="Solo la primera vez: pega el texto negro y pulsa Cargar pegado" style="min-height:52px"></textarea>
+      <button type="button" class="btn btn-ghost text-xs" onclick="cargarPegado()">Cargar pegado</button>
       <input id="inpNotebook" placeholder="Pega aquí el enlace de NotebookLM de esta área" onchange="guardarNotebook()">
       <div id="clsMsg" class="text-[11px] text-slate-500"></div>
     </div>
@@ -562,6 +564,19 @@ function pintarCursos(data){
     sel.appendChild(o);
   });
   clsNota((data.total||0)+' curso(s). Elige uno y envía la sesión.');
+  try { localStorage.setItem('ie22375_cls_cursos', JSON.stringify(data)); } catch(e) {}
+}
+function guardarCursoCls(){
+  const sel=document.getElementById('selCurso');
+  if(sel) localStorage.setItem('ie22375_cls_curso', sel.value||'');
+}
+function restaurarCursos(){
+  try {
+    const raw=localStorage.getItem('ie22375_cls_cursos');
+    if(raw) pintarCursos(JSON.parse(raw));
+    const id=localStorage.getItem('ie22375_cls_curso');
+    if(id && document.getElementById('selCurso')) document.getElementById('selCurso').value=id;
+  } catch(e) {}
 }
 function cargarClassroom(){
   clsNota('Buscando cursos…');
@@ -578,7 +593,9 @@ async function enviarSesionClassroom(){
   const courseId=(document.getElementById('selCurso').value||'');
   if(!courseId){ clsNota('Primero pulsa Ver mis cursos.'); return; }
   const c=ctxBase();
-  const titulo=encodeURIComponent((c.area||'Área')+' · Bim '+c.bim+' · '+c.grado+'° '+(c.seccion||''));
+  const tituloEl=(document.getElementById('clsTitulo').value||'').trim();
+  const texto=(document.getElementById('clsTexto').value||'').trim() || 'Sesión enviada desde el registro auxiliar IE 22375.';
+  const titulo=encodeURIComponent(tituloEl || ((c.area||'Área')+' · Bim '+c.bim+' · '+c.grado+'° '+(c.seccion||'')));
   const link=encodeURIComponent(location.href);
   clsNota('Creando tarea…');
   window.clsTarea=function(data){
@@ -587,7 +604,7 @@ async function enviarSesionClassroom(){
     if(data.alternateLink) window.open(data.alternateLink,'_blank');
   };
   const s=document.createElement('script');
-  s.src=CLOUD_API_URL+'?action=creartarea&callback=clsTarea&courseId='+encodeURIComponent(courseId)+'&titulo='+titulo+'&link='+link+'&descripcion='+encodeURIComponent('Sesión enviada desde el registro auxiliar IE 22375.');
+  s.src=CLOUD_API_URL+'?action=creartarea&callback=clsTarea&courseId='+encodeURIComponent(courseId)+'&titulo='+titulo+'&link='+link+'&descripcion='+encodeURIComponent(texto);
   document.body.appendChild(s);
 }
 function cloudClaveReg() {
@@ -2651,6 +2668,7 @@ window.addEventListener('resize', fixHdrHeight);
 // Al cargar: separar primaria / secundaria según sesión de login
 document.addEventListener('DOMContentLoaded', function() {
   aplicarRestriccionNivel();
+  restaurarCursos();
 });
 // Por si el script corre después de DOMContentLoaded
 if (document.readyState !== 'loading') {
