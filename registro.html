@@ -389,7 +389,7 @@
     </div><!-- /panelCalificar -->
   </main>
 
-  <div class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
+  <div id="registroBarraInferior" class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
     <div class="max-w-3xl mx-auto px-3 py-2 flex flex-wrap gap-2 items-center justify-between text-xs font-bold">
       <div class="flex gap-1.5 flex-wrap">
         <span class="px-2 py-1 rounded-lg bg-red-50 text-red-700">C <span id="cC">0</span></span>
@@ -544,16 +544,29 @@ function panelAcademicoActivo(){
   if(fin && fin.classList.contains('on')) return 'fin';
   return 'cal';
 }
+function ocultarNotebookEl(id, ocultar){
+  const el=document.getElementById(id);
+  if(!el) return;
+  if(ocultar){
+    el.style.setProperty('display','none','important');
+  }else{
+    el.style.removeProperty('display');
+  }
+}
 function modoNotebookUI(activo){
-  const acciones=document.getElementById('registroAccionesAcademicas');
-  const ids=['panelCalificar','panelFinales','panelAvance','panelAsistencia'];
+  const ids=[
+    'registroAccionesAcademicas',
+    'panelCalificar',
+    'panelFinales',
+    'panelAvance',
+    'panelAsistencia',
+    'registroBarraInferior'
+  ];
   if(activo){
     panelAntesNotebook=panelAcademicoActivo();
-    if(acciones) acciones.classList.add('hidden');
-    ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.add('hidden'); });
+    ids.forEach(id=>ocultarNotebookEl(id,true));
   }else{
-    if(acciones) acciones.classList.remove('hidden');
-    ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.remove('hidden'); });
+    ids.forEach(id=>ocultarNotebookEl(id,false));
     showPanel(panelAntesNotebook || 'cal');
   }
 }
@@ -659,39 +672,50 @@ function restaurarCursos(){
     if(raw) pintarCursos(JSON.parse(raw));
   } catch(e) {}
 }
+function jsonpClassroom(params, timeoutMs){
+  return new Promise(function(resolve,reject){
+    const cb='ieCls_'+Date.now()+'_'+Math.floor(Math.random()*10000);
+    let terminado=false;
+    const sc=document.createElement('script');
+    const limpia=function(){
+      try{ delete window[cb]; }catch(e){}
+      try{ sc.remove(); }catch(e){}
+    };
+    const timer=setTimeout(function(){
+      if(terminado) return;
+      terminado=true;
+      limpia();
+      reject(new Error('Tiempo de espera agotado'));
+    }, timeoutMs || 15000);
+    window[cb]=function(data){
+      if(terminado) return;
+      terminado=true;
+      clearTimeout(timer);
+      limpia();
+      resolve(data);
+    };
+    const q=new URLSearchParams(Object.assign({},params,{callback:cb,_t:Date.now()}));
+    sc.src=CLOUD_API_URL+'?'+q.toString();
+    sc.onerror=function(){
+      if(terminado) return;
+      terminado=true;
+      clearTimeout(timer);
+      limpia();
+      reject(new Error('No se pudo conectar con Classroom'));
+    };
+    document.body.appendChild(sc);
+  });
+}
 async function cargarClassroom(silencioso){
   const btn=document.getElementById('btnCursosClassroom');
   if(btn){ btn.disabled=true; btn.textContent='Buscando…'; }
-  if(!silencioso) clsNota('Buscando cursos…');
+  if(!silencioso) clsNota('Buscando cursos de Classroom…');
   try{
-    const res=await fetch(CLOUD_API_URL,{
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'classroomcursos'})
-    });
-    const data=JSON.parse(await res.text());
-    if(!data.ok) throw new Error(data.error||'No se pudo leer Classroom');
+    const data=await jsonpClassroom({action:'classroom'},15000);
+    if(!data || !data.ok) throw new Error((data&&data.error)||'No se pudo leer Classroom');
     pintarCursos(data);
   }catch(err){
-    // Compatibilidad temporal con la versión anterior del Apps Script.
-    try{
-      await new Promise(function(resolve,reject){
-        const cb='clsCursos_'+Date.now();
-        window[cb]=function(data){
-          try{ pintarCursos(data); }finally{
-            try{ delete window[cb]; }catch(e){}
-            resolve();
-          }
-        };
-        const sc=document.createElement('script');
-        sc.src=CLOUD_API_URL+'?action=classroom&callback='+encodeURIComponent(cb)+'&_t='+Date.now();
-        sc.onerror=function(){ reject(new Error('No se pudo conectar')); };
-        document.body.appendChild(sc);
-        setTimeout(function(){ reject(new Error('Tiempo de espera agotado')); },12000);
-      });
-    }catch(e2){
-      clsNota('No se pudieron detectar los cursos. Pulsa Autorizar Classroom una sola vez y vuelve.');
-    }
+    clsNota('No se pudieron detectar los cursos. Pulsa Autorizar Classroom y vuelve a intentarlo. '+(err.message||''));
   }finally{
     if(btn){ btn.disabled=false; btn.textContent='Actualizar cursos'; }
   }
@@ -708,21 +732,40 @@ async function enviarSesionClassroom(){
   if(btn){ btn.disabled=true; btn.textContent='Creando…'; }
   clsNota('Creando tarea…');
   try{
-    const res=await fetch(CLOUD_API_URL,{
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({
-        action:'classroomtarea',
+    let data=null;
+    try{
+      const ctl=new AbortController();
+      const tm=setTimeout(function(){ ctl.abort(); },12000);
+      const res=await fetch(CLOUD_API_URL,{
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({
+          action:'classroomtarea',
+          courseId:courseId,
+          titulo:titulo,
+          descripcion:texto,
+          link:location.href
+        }),
+        signal:ctl.signal
+      });
+      clearTimeout(tm);
+      data=JSON.parse(await res.text());
+    }catch(postErr){
+      data=await jsonpClassroom({
+        action:'creartarea',
         courseId:courseId,
         titulo:titulo,
         descripcion:texto,
         link:location.href
-      })
-    });
-    const data=JSON.parse(await res.text());
-    if(!data.ok) throw new Error(data.error||'No se creó la tarea');
+      },20000);
+    }
+    if(!data || !data.ok) throw new Error((data&&data.error)||'No se creó la tarea');
     clsNota('Tarea creada correctamente en Classroom ✓');
     guardarCursoCls();
+    if(data.alternateLink){
+      const abrir=confirm('Tarea creada correctamente. ¿Deseas abrirla en Classroom?');
+      if(abrir) window.open(data.alternateLink,'_blank');
+    }
   }catch(err){
     clsNota('No se creó la tarea: '+(err.message||err));
   }finally{
