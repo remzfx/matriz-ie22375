@@ -732,7 +732,7 @@ function loadPeriodosAdmin() {
     const raw = localStorage.getItem('ie22375_admin_periodos');
     if (raw) return JSON.parse(raw);
   } catch(e) {}
-  return { anio: 2026, bimestres: { I: 'abierto', II: 'abierto', III: 'abierto', IV: 'abierto' } };
+  return { anio: 2026, bimestres: { I: 'cerrado', II: 'cerrado', III: 'abierto', IV: 'bloqueado' } };
 }
 async function sincronizarPeriodosNube() {
   try {
@@ -803,8 +803,17 @@ function aplicarRestriccionNivel() {
   var btnP = document.getElementById('btnHomePri');
   var btnS = document.getElementById('btnHomeSec');
   var lbl = document.getElementById('lblNivelBloqueo');
-  if (!btnP || !btnS) return;
   var s = getLoginSession();
+
+  // Los docentes ya tienen su nivel definido: no mostrar selector intermedio.
+  if (s && s.role === 'docente' && (perm === 'primaria' || perm === 'secundaria')) {
+    document.getElementById('viewHome').classList.add('hidden');
+    document.getElementById('viewApp').classList.remove('hidden');
+    entrarNivel(perm);
+    return;
+  }
+
+  if (!btnP || !btnS) return;
   var extra = '';
   if (s && s.role === 'docente') {
     if (s.grados && s.grados.length) extra = ' · Grado ' + s.grados.map(function(g){return g+'°';}).join(', ');
@@ -877,9 +886,13 @@ async function entrarNivel(n) {
 
   nivel = n;
   loadStore();
-  await sincronizarPeriodosNube();
+
+  // Docente con nivel definido: entrar visualmente de inmediato, sin pantalla intermedia.
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
+
+  // Actualiza los periodos desde la nube; si falla, se usa el respaldo local seguro.
+  await sincronizarPeriodosNube();
   const sLogin = getLoginSession();
   const esAdmin = sLogin && (sLogin.role === 'admin' || sLogin.user === 'admin');
   document.getElementById('selBim').innerHTML = ['I','II','III','IV'].map(b => {
