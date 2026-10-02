@@ -30,8 +30,9 @@
     }
     .app-header { padding-top: calc(12px + env(safe-area-inset-top, 28px)); }
     .app-header .btn-inicio {
-      min-height: 44px; min-width: 72px; display:inline-flex; align-items:center; justify-content:center;
-      text-decoration:none; z-index:30; position:relative;
+      min-height:44px; min-width:72px; display:inline-flex; align-items:center; justify-content:center;
+      text-decoration:none; z-index:40; position:relative; touch-action:manipulation;
+      -webkit-tap-highlight-color:rgba(255,255,255,.18);
     }
     .actions { display:flex; flex-direction:column; gap:8px; }
     .actions .btn { width:100%; }
