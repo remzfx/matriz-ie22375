@@ -733,10 +733,10 @@ function loadPeriodosAdmin() {
     const raw = localStorage.getItem('ie22375_admin_periodos');
     if (raw) return JSON.parse(raw);
   } catch(e) {}
-  return { anio: 2026, bimestres: { I: 'cerrado', II: 'cerrado', III: 'abierto', IV: 'bloqueado' } };
+  return { anio: 2026, bimestres: { I: 'cerrado', II: 'cerrado', III: 'abierto', IV: 'abierto' } };
 }
 async function sincronizarPeriodosNube() {
-  const respaldo = { anio: 2026, bimestres: { I:'cerrado', II:'cerrado', III:'abierto', IV:'bloqueado' } };
+  const respaldo = { anio: 2026, bimestres: { I: 'cerrado', II: 'cerrado', III: 'abierto', IV: 'abierto' } };
   try {
     const r = await fetch(CLOUD_API_URL + '?action=loadperiodos&t=' + Date.now(), { cache:'no-store' });
     const data = JSON.parse(await r.text());
