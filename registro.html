@@ -675,10 +675,31 @@ async function bajarRegistroNube() {
 function estructura() { return nivel === 'primaria' ? EST_PRIM : EST_SEC; }
 function areas() {
   let all = Object.keys(estructura());
-  const ap = areasPermitidas();
-  if (ap && ap.length) {
-    all = all.filter(a => ap.includes(a));
+  const ses = getLoginSession();
+
+  if (ses && ses.role === 'docente' && nivel === 'secundaria') {
+    const gEl = document.getElementById('selGrado');
+    const sEl = document.getElementById('selSeccion');
+    const grado = gEl ? gEl.value : '';
+    const seccion = sEl ? sEl.value : '';
+    const actual = aulaKey(grado, seccion);
+
+    // Nuevo esquema: Admin define exactamente qué aulas corresponden a cada área.
+    if (ses.asignaciones && typeof ses.asignaciones === 'object' && Object.keys(ses.asignaciones).length) {
+      all = all.filter(function(area) {
+        const aulasArea = Array.isArray(ses.asignaciones[area]) ? ses.asignaciones[area] : [];
+        return aulasArea.some(function(k) {
+          const p = String(k).split('|');
+          return aulaKey(p[0], p[1]) === actual;
+        });
+      });
+      return all;
+    }
   }
+
+  // Compatibilidad con cuentas antiguas.
+  const ap = areasPermitidas();
+  if (ap && ap.length) all = all.filter(a => ap.includes(a));
   return all;
 }
 function competencias() {
@@ -982,6 +1003,13 @@ function onGrado() {
 }
 
 function onContexto() {
+  const permitidasAhora = areas();
+  if (!areaActual || !permitidasAhora.includes(areaActual)) {
+    areaActual = permitidasAhora[0] || null;
+    renderAreas();
+    fillComps();
+  }
+
   const c = ctxBase();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
   const s = getLoginSession();
@@ -1029,14 +1057,19 @@ function updateHdr() {
 }
 
 function renderAreas() {
-  document.getElementById('areaBtns').innerHTML = areas().map(a => {
+  const lista = areas();
+  document.getElementById('areaBtns').innerHTML = lista.length ? lista.map(a => {
     const on = a === areaActual ? 'on' : '';
     const short = a.length > 24 ? a.slice(0,22)+'…' : a;
     return `<button type="button" class="area-btn ${on}" data-a="${encodeURIComponent(a)}" onclick="setArea(decodeURIComponent(this.dataset.a))">${short}</button>`;
-  }).join('');
+  }).join('') : '<span class="text-xs text-slate-400">Sin áreas asignadas para esta aula.</span>';
 }
 
 function setArea(a) {
+  if (!areas().includes(a)) {
+    toast('Esta área no está asignada al docente en el aula seleccionada');
+    return;
+  }
   areaActual = a;
   renderAreas();
   fillComps();
