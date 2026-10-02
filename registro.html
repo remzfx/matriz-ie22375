@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f172a">
 <title>Registro auxiliar · IE 22375</title>
+<meta name="app-version" content="2026.10.02.registro-fast-v1">
 <meta name="app-version" content="2026.10.02.1130">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
@@ -781,6 +782,36 @@ function bimestreHabilitado(b) {
   const st = per.bimestres[b] || 'bloqueado';
   return st === 'abierto';
 }
+
+function pintarBimestresRegistro(cfg) {
+  const selBim = document.getElementById('selBim');
+  if (!selBim) return false;
+
+  const sLogin = getLoginSession();
+  const esAdmin = sLogin && (sLogin.role === 'admin' || sLogin.user === 'admin');
+  const anterior = selBim.value || '';
+
+  if (!cfg || !cfg.bimestres) {
+    selBim.innerHTML = '<option value="">Cargando bimestres…</option>';
+    selBim.disabled = true;
+    return anterior !== '';
+  }
+
+  selBim.disabled = false;
+  selBim.innerHTML = ['I','II','III','IV'].map(function(b) {
+    const st = cfg.bimestres[b] || 'bloqueado';
+    const ok = st === 'abierto';
+    if (!esAdmin && !ok) return '';
+    const label = 'Bimestre ' + b + (ok ? '' : ' (' + st + ')');
+    return '<option value="' + b + '"' + (ok ? '' : ' disabled') + '>' + label + '</option>';
+  }).join('') || '<option value="">Sin bimestres abiertos</option>';
+
+  const valores = Array.from(selBim.options).filter(function(o){ return !o.disabled && o.value; }).map(function(o){ return o.value; });
+  if (anterior && valores.indexOf(anterior) >= 0) selBim.value = anterior;
+  else if (valores.length) selBim.value = valores[0];
+
+  return anterior !== selBim.value;
+}
 function getLoginSession() {
   try {
     var KEY = 'ie22375_session_v1';
@@ -904,7 +935,7 @@ function aplicarDocenteSesion() {
   }
 }
 
-async function entrarNivel(n) {
+function entrarNivel(n) {
   // Bloquear cruce de nivel si la sesión no lo permite
   var perm = nivelPermitido();
   if (perm === 'primaria' && n !== 'primaria') {
@@ -919,60 +950,54 @@ async function entrarNivel(n) {
   nivel = n;
   loadStore();
 
-  // Docente con nivel definido: entrar visualmente de inmediato, sin pantalla intermedia.
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
 
-  // Actualiza los periodos desde la nube; si falla, se usa el respaldo local seguro.
-  await sincronizarPeriodosNube();
-  const sLogin = getLoginSession();
-  const esAdmin = sLogin && (sLogin.role === 'admin' || sLogin.user === 'admin');
-  const selBim = document.getElementById('selBim');
-  const cfgPeriodos = loadPeriodosAdmin();
+  // 1) Pintar INMEDIATAMENTE con datos locales/embebidos.
+  // La BD de estudiantes ya viene dentro del HTML y no necesita esperar a Apps Script.
+  pintarBimestresRegistro(loadPeriodosAdmin());
 
-  if (!cfgPeriodos || !cfgPeriodos.bimestres) {
-    selBim.innerHTML = '<option value="">Configuración de bimestres no disponible</option>';
-    selBim.disabled = true;
-  } else {
-    selBim.disabled = false;
-    selBim.innerHTML = ['I','II','III','IV'].map(function(b) {
-      const st = cfgPeriodos.bimestres[b] || 'bloqueado';
-      const ok = st === 'abierto';
-      if (!esAdmin && !ok) return '';
-      const label = 'Bimestre ' + b + (ok ? '' : ' (' + st + ')');
-      return '<option value="' + b + '"' + (ok ? '' : ' disabled') + '>' + label + '</option>';
-    }).join('') || '<option value="">Sin bimestres abiertos</option>';
-  }
   const bd = loadBD();
   const list = (bd[n] && bd[n].estudiantes) || [];
   let grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
+
   const gp = gradosPermitidos();
   if (gp && gp.length) grados = grados.filter(g => gp.includes(g));
+
   const apAulas = aulasPermitidas();
   if (apAulas && apAulas.length) {
     const gs = new Set(apAulas.map(a => parseInt(String(a).split('|')[0],10)));
     grados = grados.filter(g => gs.has(Number(g)));
   }
-  document.getElementById('selGrado').innerHTML = grados.map(g => `<option value="${g}">${g}°</option>`).join('');
+
+  const selGrado = document.getElementById('selGrado');
+  selGrado.innerHTML = grados.map(g => `<option value="${g}">${g}°</option>`).join('');
+
   if (!grados.length) {
     alert('No hay grados/secciones asignados a su usuario. Contacte al administrador.');
   }
+
   document.getElementById('inpFecha').value = hoyISO();
+
+  // Docente visible desde el primer render, sin esperar la nube.
+  aplicarDocenteSesion();
+
   onGrado();
-  areaActual = areas()[0];
+  areaActual = areas()[0] || null;
   renderAreas();
   fillComps();
+
   sesionActiva = null;
   notas = {};
   dirty = false;
   modoCalif = 'num';
   try { localStorage.setItem('ie22375_modo_calif', 'num'); } catch(e) {}
   syncModoBtns();
+
   updateHdr();
   renderSesiones();
   renderStudents();
-  aplicarDocenteSesion();
-  // Fecha de hoy por defecto; capacidad vacía
+
   document.getElementById('inpFecha').value = hoyISO();
   fillCaps();
   document.getElementById('selUnidad').value = '';
@@ -981,7 +1006,20 @@ async function entrarNivel(n) {
   markClean();
   document.getElementById('lblSesionActiva').textContent = 'Define fecha, competencia y capacidad arriba';
   aplicarModoAdminRegistro();
-  setTimeout(fixHdrHeight, 50);
+  setTimeout(fixHdrHeight, 0);
+
+  // 2) Actualizar bimestres EN SEGUNDO PLANO.
+  // Esto ya no bloquea grado, sección, estudiantes, docente ni áreas.
+  sincronizarPeriodosNube().then(function() {
+    const cambio = pintarBimestresRegistro(loadPeriodosAdmin());
+    if (cambio) {
+      onContexto();
+    } else {
+      updateHdr();
+    }
+  }).catch(function(e) {
+    console.warn('No se pudo refrescar periodos en segundo plano', e);
+  });
 }
 
 function onGrado() {
