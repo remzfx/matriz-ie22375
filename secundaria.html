@@ -1161,13 +1161,16 @@ window.__IE_gradoOK = function(gradoVal) {
                     </div>
                 </div>
                 
-                <!-- N° ESTUDIANTES -->
+                <!-- ESTUDIANTES: dato automático desde BD oficial -->
                 <div class="xl:col-span-2">
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                        <i class="fas fa-user-graduate mr-1.5 text-sky-600"></i>N° Estudiantes
+                        <i class="fas fa-user-graduate mr-1.5 text-sky-600"></i>Estudiantes
                     </label>
-                    <input type="number" id="totalEstudiantes" min="1" max="60" value="" placeholder="—" onchange="actualizarTotalEstudiantes()" 
-                           class="w-full bg-white border-2 border-slate-200 rounded-xl px-3 py-3 text-center text-xl font-extrabold text-sky-700 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none">
+                    <div id="totalEstudiantesCard"
+                         class="w-full bg-sky-50 border-2 border-sky-200 rounded-xl px-3 py-2.5 text-center min-h-[68px] flex flex-col items-center justify-center">
+                        <div id="totalEstudiantes" class="text-2xl font-black text-sky-700 leading-none">—</div>
+                        <div id="totalEstudiantesFuente" class="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-wide">Base oficial</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1567,6 +1570,36 @@ window.__IE_gradoOK = function(gradoVal) {
             { key: "destacado", label: "Destacado (AD)", rango: "18-20", color: "#16a34a", bg: "nivel-destacado" }
         ];
 
+        let baseOficialEstudiantes = [];
+
+        async function cargarBaseOficialEstudiantes() {
+            try {
+                const r = await fetch('bd_oficial_2026.json?t=' + Date.now(), { cache:'no-store' });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const db = await r.json();
+                baseOficialEstudiantes = (db && db.secundaria && Array.isArray(db.secundaria.estudiantes))
+                    ? db.secundaria.estudiantes : [];
+            } catch(e) {
+                console.warn('No se pudo cargar bd_oficial_2026.json', e);
+                baseOficialEstudiantes = [];
+            }
+            return baseOficialEstudiantes;
+        }
+
+        function normalizarSeccionBD(v) {
+            const s = String(v || '').trim().toUpperCase();
+            return s.startsWith('UNIC') || s === 'ÚNICA' ? 'ÚNICA' : s;
+        }
+
+        function totalEstudiantesDesdeBD(grado, seccion) {
+            const g = parseInt(String(grado || '').replace(/\D/g,''), 10);
+            const sec = normalizarSeccionBD(seccion);
+            if (!g || !sec) return 0;
+            return baseOficialEstudiantes.filter(function(al) {
+                return Number(al.grado) === g && normalizarSeccionBD(al.seccion) === sec;
+            }).length;
+        }
+
         let estado = {
             bimestre: "I",
             grado: "1°",
@@ -1591,21 +1624,7 @@ window.__IE_gradoOK = function(gradoVal) {
             return `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
         }
         function getTotalEstudiantes() {
-            if (!estado.totalesPorAula) estado.totalesPorAula = {};
-            const k = claveAula();
-            if (Object.prototype.hasOwnProperty.call(estado.totalesPorAula, k)) {
-                const v = estado.totalesPorAula[k];
-                if (v != null && v !== '') {
-                    if (typeof v === 'object' && v !== null) {
-                        const n = Number(v.valor != null ? v.valor : v.n);
-                        return n > 0 ? n : 0;
-                    }
-                    const n = Number(v);
-                    return n > 0 ? n : 0;
-                }
-            }
-            // Sin dato para esta sección/grado → vacío (0 = no definido)
-            return 0;
+            return totalEstudiantesDesdeBD(estado.grado, estado.seccion);
         }
         function setTotalEstudiantes(val, ts) {
             if (!estado.totalesPorAula) estado.totalesPorAula = {};
@@ -1621,9 +1640,16 @@ window.__IE_gradoOK = function(gradoVal) {
         }
         function syncInputTotalEstudiantes() {
             const el = document.getElementById('totalEstudiantes');
+            const fuente = document.getElementById('totalEstudiantesFuente');
             if (!el) return;
             const n = getTotalEstudiantes();
-            el.value = n > 0 ? n : '';
+            el.textContent = n > 0 ? String(n) : '—';
+            if (fuente) {
+                const sec = estado.seccion === 'ÚNICA' ? 'Única' : estado.seccion;
+                fuente.textContent = n > 0
+                    ? (estado.grado + ' ' + sec + ' · Base oficial')
+                    : 'Sin estudiantes en base oficial';
+            }
         }
         function parseCloudTime(v) {
             if (v == null || v === '') return 0;
@@ -1744,12 +1770,6 @@ window.__IE_gradoOK = function(gradoVal) {
                 }
             }
 
-            const total = document.getElementById('totalEstudiantes');
-            if (total) {
-                total.disabled = locked;
-                total.classList.toggle('solo-lectura-control', locked);
-            }
-
             document.querySelectorAll(
                 '[onclick^="subirNube"],[onclick^="limpiarTodo"],[onclick^="traerDesdeRegistro"]'
             ).forEach(function(el){
@@ -1782,7 +1802,10 @@ window.__IE_gradoOK = function(gradoVal) {
             }
             
             cargarDatos();
-            await cargarPeriodosAdminMatriz();
+            await Promise.all([
+                cargarPeriodosAdminMatriz(),
+                cargarBaseOficialEstudiantes()
+            ]);
             normalizarAulaPermitidaSec();
             actualizarBotonesSeleccion();
             renderizarAreas();
@@ -3396,40 +3419,8 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function actualizarTotalEstudiantes() {
-            if (impedirEdicionPeriodo()) { syncInputTotalEstudiantes(); return; }
-            const raw = document.getElementById('totalEstudiantes').value;
-            if (raw === '' || raw == null) {
-                // Vaciar: quitar dato de ESTA aula
-                if (!estado.totalesPorAula) estado.totalesPorAula = {};
-                if (!estado.totalesPorAulaTs) estado.totalesPorAulaTs = {};
-                const k = claveAula();
-                delete estado.totalesPorAula[k];
-                delete estado.totalesPorAulaTs[k];
-                estado.totalEstudiantes = null;
-                document.getElementById('totalEstudiantes').value = '';
-                guardarDatos();
-                if (estado.areaActual) {
-                    renderizarCompetencias();
-                    renderizarAreaHeader();
-                }
-                renderizarResumen();
-                renderizarAreas();
-                mostrarToast('N° estudiantes vacío para este grado/sección', 'success');
-                return;
-            }
-            let val = parseInt(raw, 10);
-            if (isNaN(val) || val < 1) val = 1;
-            if (val > 60) val = 60;
-            val = setTotalEstudiantes(val);
-            document.getElementById('totalEstudiantes').value = val;
-            guardarDatos();
-            if (estado.areaActual) {
-                renderizarCompetencias();
-                renderizarAreaHeader();
-            }
-            renderizarResumen();
-            renderizarAreas();
-            mostrarToast('N° estudiantes de este grado/sección: ' + val, 'success');
+            // El total ya no se edita manualmente: siempre proviene de bd_oficial_2026.json.
+            syncInputTotalEstudiantes();
         }
 
         // ============================================
@@ -3933,7 +3924,6 @@ window.__IE_gradoOK = function(gradoVal) {
                     }
 
                 });
-                const totRes = aplicarTotalesDesdeNube(items);
                 syncInputTotalEstudiantes();
 
                 if (storageDisponible) {
