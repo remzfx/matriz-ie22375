@@ -224,6 +224,19 @@
       <div id="areaBtns" class="flex flex-wrap gap-1.5"></div>
     </div>
 
+    <div class="card p-3 space-y-2">
+      <div class="text-[10px] font-bold text-slate-500">CLASSROOM Y CUADERNO GEMINI</div>
+      <p class="text-[11px] text-slate-500">Prueba: lista los cursos de la cuenta Google del script y manda la sesión de hoy como tarea. El cuaderno se abre aparte.</p>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" class="btn btn-primary text-xs" onclick="cargarClassroom()">Ver mis cursos</button>
+        <button type="button" class="btn btn-ghost text-xs" onclick="enviarSesionClassroom()">Enviar sesión a Classroom</button>
+        <button type="button" class="btn btn-ghost text-xs" onclick="abrirNotebook()">Abrir cuaderno</button>
+      </div>
+      <select id="selCurso" class="w-full"></select>
+      <input id="inpNotebook" placeholder="Pega aquí el enlace de NotebookLM de esta área" onchange="guardarNotebook()">
+      <div id="clsMsg" class="text-[11px] text-slate-500"></div>
+    </div>
+
     <div class="flex gap-2 flex-wrap">
       <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
       <button type="button" id="tabFin" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('fin')">Promedios</button>
@@ -506,6 +519,59 @@ function saveStore() {
 }
 
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
+function clsNota(t){ const el=document.getElementById('clsMsg'); if(el) el.textContent=t; }
+function guardarNotebook(){
+  const c=ctxBase();
+  const k='nb|'+(c.nivel||'')+'|'+(c.area||'');
+  localStorage.setItem(k, document.getElementById('inpNotebook').value.trim());
+}
+function cargarNotebookCampo(){
+  const c=ctxBase();
+  const k='nb|'+(c.nivel||'')+'|'+(c.area||'');
+  const el=document.getElementById('inpNotebook');
+  if(el) el.value=localStorage.getItem(k)||'';
+}
+function abrirNotebook(){
+  cargarNotebookCampo();
+  const url=(document.getElementById('inpNotebook').value||'').trim();
+  if(!url){ clsNota('Pega el enlace de NotebookLM de esta área.'); return; }
+  window.open(url,'_blank');
+}
+async function cargarClassroom(){
+  clsNota('Buscando cursos…');
+  try{
+    const res=await fetch(CLOUD_API_URL+'?action=classroom');
+    const data=await res.json();
+    const sel=document.getElementById('selCurso');
+    sel.innerHTML='';
+    if(!data.ok){ clsNota(data.error||'No se pudo leer Classroom'); return; }
+    (data.cursos||[]).forEach(c=>{
+      const o=document.createElement('option');
+      o.value=c.id;
+      o.textContent=(c.name||'Curso')+(c.section?' · '+c.section:'');
+      sel.appendChild(o);
+    });
+    clsNota((data.total||0)+' curso(s). Elige uno y envía la sesión.');
+  }catch(e){ clsNota('Error de red. Publica la nueva versión del Apps Script.'); }
+}
+async function enviarSesionClassroom(){
+  const courseId=(document.getElementById('selCurso').value||'');
+  if(!courseId){ clsNota('Primero pulsa Ver mis cursos.'); return; }
+  const c=ctxBase();
+  const titulo=(c.area||'Área')+' · Bim '+c.bim+' · '+c.grado+'° '+(c.seccion||'');
+  clsNota('Creando tarea…');
+  try{
+    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
+      action:'classroomtarea', courseId:courseId, titulo:titulo,
+      descripcion:'Sesión enviada desde el registro auxiliar IE 22375.',
+      link: location.href
+    })});
+    const data=await res.json();
+    if(!data.ok){ clsNota(data.error||'No se creó la tarea'); return; }
+    clsNota('Tarea creada.');
+    if(data.alternateLink) window.open(data.alternateLink,'_blank');
+  }catch(e){ clsNota('No se pudo crear. Revisa el servicio Classroom en Apps Script.'); }
+}
 function cloudClaveReg() {
   const c = ctxBase();
   return [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
