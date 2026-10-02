@@ -586,9 +586,9 @@ function cerrarNotebookPanel(){
 }
 function autorizarClassroom(){
   window.__clsEsperandoAuth=true;
-  const w=window.open(CLOUD_API_URL+'?action=classroom','_blank');
+  const w=window.open(CLOUD_API_URL+'?action=autorizarclassroom','_blank');
   if(!w) clsNota('El navegador bloqueó la pestaña de autorización. Habilita ventanas emergentes para este sitio.');
-  else clsNota('Autoriza Classroom en la pestaña nueva. Al volver, los cursos se actualizarán automáticamente.');
+  else clsNota('Autoriza Classroom en la pestaña nueva. Al terminar, los cursos se actualizarán automáticamente.');
 }
 window.addEventListener('focus', function(){
   if(window.__clsEsperandoAuth){
