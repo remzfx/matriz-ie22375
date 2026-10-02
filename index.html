@@ -300,9 +300,9 @@ function mostrarHub() {
   document.getElementById('hubTitulo').textContent = s.label;
   let sub = s.role === 'admin' ? 'Acceso total' : (s.nivel || '');
   if (s.role === 'docente') {
-    if (s.grados && s.grados.length) sub += ' · Grado ' + s.grados.map(g => g + '°').join(', ');
+    // Encabezado limpio: mostramos nivel + área(s), sin enumerar aulas/secciones.
+    if (s.grados && s.grados.length && s.nivel === 'primaria') sub += ' · Grado ' + s.grados.map(g => g + '°').join(', ');
     if (s.areas && s.areas.length) sub += ' · ' + s.areas.join(', ');
-    if (s.aulas && s.aulas.length) sub += ' · ' + s.aulas.map(a => a.replace('|','° ')).join(', ');
   }
   document.getElementById('hubSub').textContent = sub;
   const catalog = {
