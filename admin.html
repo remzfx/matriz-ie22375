@@ -531,7 +531,7 @@ function showTab(id) {
   });
   if (id === 'docentes') { initDocentesUI(); }
   if (id === 'bd') { fillFiltros(); renderTabla(); }
-  if (id === 'periodos') initPeriodosUI();
+  if (id === 'periodos') { initPeriodosUI(); bajarPeriodosNube().then(function(p){ if(p) initPeriodosUI(); }); }
   if (id === 'horario') initHorarioUI();
   if (id === 'menu') actualizarResumen();
   if (id === 'siagie') renderAulasSiagie();
@@ -862,6 +862,18 @@ function loadPeriodos() {
   return defaultPeriodos();
 }
 
+async function bajarPeriodosNube() {
+  try {
+    const r = await fetch(CLOUD_API_URL + '?action=loadperiodos&t=' + Date.now(), { cache:'no-store' });
+    const data = JSON.parse(await r.text());
+    if (data && data.ok && data.periodos && data.periodos.bimestres) {
+      localStorage.setItem(LS_PER, JSON.stringify(data.periodos));
+      return data.periodos;
+    }
+  } catch(e) {}
+  return null;
+}
+
 function initPeriodosUI() {
   const per = loadPeriodos();
   document.getElementById('cfgAnio').value = per.anio || 2026;
@@ -882,7 +894,7 @@ function initPeriodosUI() {
   }).join('');
 }
 
-function savePeriodos() {
+async function savePeriodos() {
   const per = loadPeriodos();
   per.anio = parseInt(document.getElementById('cfgAnio').value, 10) || 2026;
   document.querySelectorAll('.bim-sel').forEach(sel => {
@@ -890,8 +902,20 @@ function savePeriodos() {
   });
   localStorage.setItem(LS_PER, JSON.stringify(per));
   if (estado) { estado.anio = per.anio; saveEstado(); }
-  alert('Periodos guardados.');
   initPeriodosUI();
+
+  try {
+    const r = await fetch(CLOUD_API_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({ action:'saveperiodos', periodos:per, ts:Date.now() })
+    });
+    const data = JSON.parse(await r.text());
+    if (!data.ok) throw new Error(data.error || 'Error de nube');
+    alert('Periodos guardados en este equipo y en la nube.');
+  } catch(e) {
+    alert('Periodos guardados en este equipo, pero no en la nube. Actualiza el Apps Script.');
+  }
 }
 
 
