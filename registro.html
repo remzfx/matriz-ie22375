@@ -635,18 +635,48 @@ function puntuacionCursoClassroom(curso){
   }
   return score;
 }
+function cursoCoincideContexto(curso){
+  const c=ctxBase();
+  const nom=normCls(curso.name);
+  const sec=normCls(curso.section);
+  const area=normCls(c.area);
+  const grado=String(c.grado||'').replace(/\D/g,'');
+  const seccion=normCls(c.seccion);
+  const areaOk=!area || nom.indexOf(area)>=0;
+  const gradoOk=!grado || sec.indexOf(grado)>=0 || nom.indexOf(grado)>=0;
+  let seccionOk=true;
+  if(seccion){
+    const unica=seccion.indexOf('unic')>=0;
+    if(unica){
+      seccionOk = sec.indexOf('5u')>=0 || sec.indexOf('u')>=0 || sec.indexOf('unic')>=0 ||
+                  nom.indexOf('5u')>=0 || nom.indexOf('unica')>=0 || nom.indexOf('unica')>=0;
+    }else{
+      seccionOk = sec===seccion || sec.indexOf(seccion)>=0;
+    }
+  }
+  return areaOk && gradoOk && seccionOk;
+}
 function pintarCursos(data){
   const sel=document.getElementById('selCurso');
   if(!sel) return;
   sel.innerHTML='';
   if(!data || !data.ok){ clsNota((data&&data.error)||'No se pudo leer Classroom'); return; }
-  const cursos=Array.isArray(data.cursos)?data.cursos:[];
+
+  const todos=Array.isArray(data.cursos)?data.cursos:[];
+  let cursos=todos.filter(cursoCoincideContexto);
+
+  // Si Classroom no usa una nomenclatura reconocible, no dejamos el selector vacío:
+  // mostramos todos y avisamos para que el docente elija manualmente.
+  const filtradoExacto=cursos.length>0;
+  if(!filtradoExacto) cursos=todos;
+
   cursos.forEach(c=>{
     const o=document.createElement('option');
     o.value=c.id;
     o.textContent=(c.name||'Curso')+(c.section?' · '+c.section:'');
     sel.appendChild(o);
   });
+
   const guardado=localStorage.getItem('ie22375_cls_curso')||'';
   if(guardado && cursos.some(c=>String(c.id)===String(guardado))){
     sel.value=guardado;
@@ -659,7 +689,17 @@ function pintarCursos(data){
     sel.value=best.id;
     guardarCursoCls();
   }
-  clsNota(cursos.length ? (cursos.length+' curso(s) detectado(s).') : 'No se encontraron cursos activos en esta cuenta.');
+
+  if(filtradoExacto){
+    clsNota(cursos.length===1
+      ? 'Curso detectado para este aula: '+(cursos[0].name||'Curso')+(cursos[0].section?' · '+cursos[0].section:'')
+      : (cursos.length+' curso(s) coinciden con este aula.'));
+  }else{
+    clsNota(todos.length
+      ? 'No pude identificar automáticamente el curso de este aula. Elige uno de la lista.'
+      : 'No se encontraron cursos activos en esta cuenta.');
+  }
+
   try { localStorage.setItem('ie22375_cls_cursos', JSON.stringify(data)); } catch(e) {}
 }
 function guardarCursoCls(){
