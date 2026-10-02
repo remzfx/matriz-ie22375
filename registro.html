@@ -181,8 +181,13 @@
         <div class="font-black leading-tight truncate" id="hdrTitulo">—</div>
         <div class="text-xs text-sky-100/90 truncate" id="hdrSub">—</div>
       </div>
-      <div class="flex gap-2 shrink-0">
-        <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="abrirNotebookPanel()">Notebook</button>
+      <div class="flex gap-1.5 shrink-0 flex-wrap justify-end">
+        <a href="https://classroom.google.com/" target="_blank" rel="noopener noreferrer"
+           class="btn btn-ghost text-xs !py-2 !px-3" title="Abrir Google Classroom">Classroom</a>
+        <a href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer"
+           class="btn btn-ghost text-xs !py-2 !px-3" title="Abrir Gemini">Gemini</a>
+        <a href="https://notebooklm.google.com/" target="_blank" rel="noopener noreferrer"
+           class="btn btn-ghost text-xs !py-2 !px-3" title="Abrir NotebookLM">NotebookLM</a>
         <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="guardarTodo(); toast('Guardado')">💾</button>
         <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="volverHome()">Salir</button>
       </div>
@@ -223,31 +228,6 @@
     <div class="card p-3">
       <div class="text-[10px] font-bold text-slate-500 mb-2">ÁREA</div>
       <div id="areaBtns" class="flex flex-wrap gap-1.5"></div>
-    </div>
-
-    <div class="card p-3 space-y-3 hidden" id="panelNotebook">
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="text-[10px] font-bold text-slate-500">CLASSROOM Y NOTEBOOKLM</div>
-          <div class="text-sm font-black text-slate-800">Recursos del aula</div>
-        </div>
-        <button type="button" class="btn btn-ghost text-xs !py-1" onclick="cerrarNotebookPanel()">Cerrar</button>
-      </div>
-      <p class="text-[11px] text-slate-500">Los cursos se detectan automáticamente. Elige el curso, escribe la tarea y envíala. NotebookLM se abre aparte.</p>
-      <div class="flex flex-wrap gap-2">
-        <button type="button" id="btnCursosClassroom" class="btn btn-primary text-xs" onclick="cargarClassroom()">Actualizar cursos</button>
-        <button type="button" class="btn btn-ghost text-xs" onclick="autorizarClassroom()">Autorizar Classroom</button>
-        <button type="button" id="btnEnviarClassroom" class="btn btn-ghost text-xs" onclick="enviarSesionClassroom()">Crear tarea en Classroom</button>
-        <button type="button" class="btn btn-ghost text-xs" onclick="abrirNotebook()">Abrir NotebookLM</button>
-      </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">CURSO DE CLASSROOM</label>
-        <select id="selCurso" class="w-full" onchange="guardarCursoCls()"></select>
-      </div>
-      <input id="clsTitulo" placeholder="Título de la tarea. Si lo dejas vacío, usa el área y el bimestre">
-      <textarea id="clsTexto" rows="3" placeholder="Texto de la tarea que verán los estudiantes en Classroom" style="min-height:72px"></textarea>
-      <input id="inpNotebook" placeholder="Pega aquí el enlace de NotebookLM de esta área" onchange="guardarNotebook()">
-      <div id="clsMsg" class="text-[11px] text-slate-500"></div>
     </div>
 
     <div id="registroAccionesAcademicas" class="flex gap-2 flex-wrap">
@@ -389,7 +369,7 @@
     </div><!-- /panelCalificar -->
   </main>
 
-  <div id="registroBarraInferior" class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
+  <div class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
     <div class="max-w-3xl mx-auto px-3 py-2 flex flex-wrap gap-2 items-center justify-between text-xs font-bold">
       <div class="flex gap-1.5 flex-wrap">
         <span class="px-2 py-1 rounded-lg bg-red-50 text-red-700">C <span id="cC">0</span></span>
@@ -532,286 +512,6 @@ function saveStore() {
 }
 
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
-function clsNota(t){ const el=document.getElementById('clsMsg'); if(el) el.textContent=t; }
-let panelAntesNotebook = 'cal';
-
-function panelAcademicoActivo(){
-  const av=document.getElementById('panelAvance');
-  const as=document.getElementById('panelAsistencia');
-  const fin=document.getElementById('panelFinales');
-  if(av && av.classList.contains('on')) return 'av';
-  if(as && as.classList.contains('on')) return 'as';
-  if(fin && fin.classList.contains('on')) return 'fin';
-  return 'cal';
-}
-function ocultarNotebookEl(id, ocultar){
-  const el=document.getElementById(id);
-  if(!el) return;
-  if(ocultar){
-    el.style.setProperty('display','none','important');
-  }else{
-    el.style.removeProperty('display');
-  }
-}
-function modoNotebookUI(activo){
-  const ids=[
-    'registroAccionesAcademicas',
-    'panelCalificar',
-    'panelFinales',
-    'panelAvance',
-    'panelAsistencia',
-    'registroBarraInferior'
-  ];
-  if(activo){
-    panelAntesNotebook=panelAcademicoActivo();
-    ids.forEach(id=>ocultarNotebookEl(id,true));
-  }else{
-    ids.forEach(id=>ocultarNotebookEl(id,false));
-    showPanel(panelAntesNotebook || 'cal');
-  }
-}
-function abrirNotebookPanel(){
-  const p=document.getElementById('panelNotebook');
-  if(p) p.classList.remove('hidden');
-  modoNotebookUI(true);
-  restaurarCursos();
-  cargarNotebookCampo();
-  cargarClassroom(true);
-  p && p.scrollIntoView({behavior:'smooth', block:'start'});
-}
-function cerrarNotebookPanel(){
-  const p=document.getElementById('panelNotebook');
-  if(p) p.classList.add('hidden');
-  modoNotebookUI(false);
-}
-function autorizarClassroom(){
-  window.__clsEsperandoAuth=true;
-  const w=window.open(CLOUD_API_URL+'?action=autorizarclassroom','_blank');
-  if(!w) clsNota('El navegador bloqueó la pestaña de autorización. Habilita ventanas emergentes para este sitio.');
-  else clsNota('Autoriza Classroom en la pestaña nueva. Al terminar, los cursos se actualizarán automáticamente.');
-}
-window.addEventListener('focus', function(){
-  if(window.__clsEsperandoAuth){
-    window.__clsEsperandoAuth=false;
-    setTimeout(function(){ cargarClassroom(true); }, 500);
-  }
-});
-function guardarNotebook(){
-  const c=ctxBase();
-  const k='nb|'+(c.nivel||'')+'|'+(c.area||'');
-  localStorage.setItem(k, document.getElementById('inpNotebook').value.trim());
-}
-function cargarNotebookCampo(){
-  const c=ctxBase();
-  const k='nb|'+(c.nivel||'')+'|'+(c.area||'');
-  const el=document.getElementById('inpNotebook');
-  if(el) el.value=localStorage.getItem(k)||'';
-}
-function abrirNotebook(){
-  cargarNotebookCampo();
-  const url=(document.getElementById('inpNotebook').value||'').trim();
-  if(!url){ clsNota('Pega el enlace de NotebookLM de esta área.'); return; }
-  window.open(url,'_blank');
-}
-function normCls(v){
-  return String(v||'').toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/[^a-z0-9]+/g,' ').trim();
-}
-function puntuacionCursoClassroom(curso){
-  const c=ctxBase();
-  const nom=normCls(curso.name);
-  const sec=normCls(curso.section);
-  const area=normCls(c.area);
-  const grado=String(c.grado||'').replace(/\D/g,'');
-  const seccion=normCls(c.seccion);
-  let score=0;
-  if(area && nom.indexOf(area)>=0) score+=10;
-  if(grado && (sec.indexOf(grado)>=0 || nom.indexOf(grado)>=0)) score+=4;
-  if(seccion){
-    const u=(seccion.indexOf('unic')>=0);
-    if(u && (sec.indexOf('u')>=0 || sec.indexOf('unic')>=0 || nom.indexOf('unic')>=0)) score+=4;
-    else if(!u && (sec===seccion || sec.indexOf(seccion)>=0)) score+=4;
-  }
-  return score;
-}
-function cursoCoincideContexto(curso){
-  const c=ctxBase();
-  const nom=normCls(curso.name);
-  const sec=normCls(curso.section);
-  const area=normCls(c.area);
-  const grado=String(c.grado||'').replace(/\D/g,'');
-  const seccion=normCls(c.seccion);
-  const areaOk=!area || nom.indexOf(area)>=0;
-  const gradoOk=!grado || sec.indexOf(grado)>=0 || nom.indexOf(grado)>=0;
-  let seccionOk=true;
-  if(seccion){
-    const unica=seccion.indexOf('unic')>=0;
-    if(unica){
-      seccionOk = sec.indexOf('5u')>=0 || sec.indexOf('u')>=0 || sec.indexOf('unic')>=0 ||
-                  nom.indexOf('5u')>=0 || nom.indexOf('unica')>=0 || nom.indexOf('unica')>=0;
-    }else{
-      seccionOk = sec===seccion || sec.indexOf(seccion)>=0;
-    }
-  }
-  return areaOk && gradoOk && seccionOk;
-}
-function pintarCursos(data){
-  const sel=document.getElementById('selCurso');
-  if(!sel) return;
-  sel.innerHTML='';
-  if(!data || !data.ok){ clsNota((data&&data.error)||'No se pudo leer Classroom'); return; }
-
-  const todos=Array.isArray(data.cursos)?data.cursos:[];
-  let cursos=todos.filter(cursoCoincideContexto);
-
-  // Si Classroom no usa una nomenclatura reconocible, no dejamos el selector vacío:
-  // mostramos todos y avisamos para que el docente elija manualmente.
-  const filtradoExacto=cursos.length>0;
-  if(!filtradoExacto) cursos=todos;
-
-  cursos.forEach(c=>{
-    const o=document.createElement('option');
-    o.value=c.id;
-    o.textContent=(c.name||'Curso')+(c.section?' · '+c.section:'');
-    sel.appendChild(o);
-  });
-
-  const guardado=localStorage.getItem('ie22375_cls_curso')||'';
-  if(guardado && cursos.some(c=>String(c.id)===String(guardado))){
-    sel.value=guardado;
-  }else if(cursos.length){
-    let best=cursos[0], bestScore=-1;
-    cursos.forEach(c=>{
-      const sc=puntuacionCursoClassroom(c);
-      if(sc>bestScore){ best=c; bestScore=sc; }
-    });
-    sel.value=best.id;
-    guardarCursoCls();
-  }
-
-  if(filtradoExacto){
-    clsNota(cursos.length===1
-      ? 'Curso detectado para este aula: '+(cursos[0].name||'Curso')+(cursos[0].section?' · '+cursos[0].section:'')
-      : (cursos.length+' curso(s) coinciden con este aula.'));
-  }else{
-    clsNota(todos.length
-      ? 'No pude identificar automáticamente el curso de este aula. Elige uno de la lista.'
-      : 'No se encontraron cursos activos en esta cuenta.');
-  }
-
-  try { localStorage.setItem('ie22375_cls_cursos', JSON.stringify(data)); } catch(e) {}
-}
-function guardarCursoCls(){
-  const sel=document.getElementById('selCurso');
-  if(sel) localStorage.setItem('ie22375_cls_curso', sel.value||'');
-}
-function restaurarCursos(){
-  try {
-    const raw=localStorage.getItem('ie22375_cls_cursos');
-    if(raw) pintarCursos(JSON.parse(raw));
-  } catch(e) {}
-}
-function jsonpClassroom(params, timeoutMs){
-  return new Promise(function(resolve,reject){
-    const cb='ieCls_'+Date.now()+'_'+Math.floor(Math.random()*10000);
-    let terminado=false;
-    const sc=document.createElement('script');
-    const limpia=function(){
-      try{ delete window[cb]; }catch(e){}
-      try{ sc.remove(); }catch(e){}
-    };
-    const timer=setTimeout(function(){
-      if(terminado) return;
-      terminado=true;
-      limpia();
-      reject(new Error('Tiempo de espera agotado'));
-    }, timeoutMs || 15000);
-    window[cb]=function(data){
-      if(terminado) return;
-      terminado=true;
-      clearTimeout(timer);
-      limpia();
-      resolve(data);
-    };
-    const q=new URLSearchParams(Object.assign({},params,{callback:cb,_t:Date.now()}));
-    sc.src=CLOUD_API_URL+'?'+q.toString();
-    sc.onerror=function(){
-      if(terminado) return;
-      terminado=true;
-      clearTimeout(timer);
-      limpia();
-      reject(new Error('No se pudo conectar con Classroom'));
-    };
-    document.body.appendChild(sc);
-  });
-}
-async function cargarClassroom(silencioso){
-  const btn=document.getElementById('btnCursosClassroom');
-  if(btn){ btn.disabled=true; btn.textContent='Buscando…'; }
-  if(!silencioso) clsNota('Buscando cursos de Classroom…');
-  try{
-    const data=await jsonpClassroom({action:'classroom'},15000);
-    if(!data || !data.ok) throw new Error((data&&data.error)||'No se pudo leer Classroom');
-    pintarCursos(data);
-  }catch(err){
-    clsNota('No se pudieron detectar los cursos. Pulsa Autorizar Classroom y vuelve a intentarlo. '+(err.message||''));
-  }finally{
-    if(btn){ btn.disabled=false; btn.textContent='Actualizar cursos'; }
-  }
-}
-async function enviarSesionClassroom(){
-  const sel=document.getElementById('selCurso');
-  const courseId=(sel && sel.value)||'';
-  if(!courseId){ clsNota('No hay curso seleccionado. Actualiza tus cursos primero.'); return; }
-  const c=ctxBase();
-  const tituloEl=(document.getElementById('clsTitulo').value||'').trim();
-  const texto=(document.getElementById('clsTexto').value||'').trim() || 'Sesión enviada desde el registro auxiliar IE 22375.';
-  const titulo=tituloEl || ((c.area||'Área')+' · Bim '+c.bim+' · '+c.grado+'° '+(c.seccion||''));
-  const btn=document.getElementById('btnEnviarClassroom');
-  if(btn){ btn.disabled=true; btn.textContent='Creando…'; }
-  clsNota('Creando tarea…');
-  try{
-    let data=null;
-    try{
-      const ctl=new AbortController();
-      const tm=setTimeout(function(){ ctl.abort(); },12000);
-      const res=await fetch(CLOUD_API_URL,{
-        method:'POST',
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify({
-          action:'classroomtarea',
-          courseId:courseId,
-          titulo:titulo,
-          descripcion:texto,
-          link:location.href
-        }),
-        signal:ctl.signal
-      });
-      clearTimeout(tm);
-      data=JSON.parse(await res.text());
-    }catch(postErr){
-      data=await jsonpClassroom({
-        action:'creartarea',
-        courseId:courseId,
-        titulo:titulo,
-        descripcion:texto,
-        link:location.href
-      },20000);
-    }
-    if(!data || !data.ok) throw new Error((data&&data.error)||'No se creó la tarea');
-    clsNota('Tarea creada correctamente en Classroom ✓');
-    guardarCursoCls();
-    if(data.alternateLink){
-      const abrir=confirm('Tarea creada correctamente. ¿Deseas abrirla en Classroom?');
-      if(abrir) window.open(data.alternateLink,'_blank');
-    }
-  }catch(err){
-    clsNota('No se creó la tarea: '+(err.message||err));
-  }finally{
-    if(btn){ btn.disabled=false; btn.textContent='Crear tarea en Classroom'; }
-  }
-}
 function cloudClaveReg() {
   const c = ctxBase();
   return [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
