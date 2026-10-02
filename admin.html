@@ -407,7 +407,7 @@
           <div class="mt-4">
             <label class="text-[11px] font-bold text-slate-500 block">Asignación por área y aula</label>
             <p class="text-[11px] text-sky-700 bg-sky-50 rounded-lg px-2 py-1 mt-1 mb-2">
-              Ejemplo: Matemática → 1° A, 1° B, 2° A, 2° B · Ciencia y Tecnología → 5° Única.
+              Cada área puede tener aulas distintas. Ej.: Matemática → 1° A, 1° B · CyT → 5° Única.
             </p>
             <div id="docAsignacionesBox" class="space-y-3"></div>
           </div>
@@ -1336,8 +1336,7 @@ function leerAsignacionesFormulario() {
   const out = {};
   document.querySelectorAll('#docAsignacionesBox [data-area-asig]').forEach(card => {
     const area = card.getAttribute('data-area-asig');
-    const vals = [...card.querySelectorAll('.doc-asig-aula:checked')].map(c => c.value);
-    out[area] = vals;
+    out[area] = [...card.querySelectorAll('.doc-asig-aula:checked')].map(c => c.value);
   });
   return out;
 }
@@ -1406,6 +1405,7 @@ function guardarDocente() {
   const pass = document.getElementById('docPass').value.trim();
   const nombre = document.getElementById('docNombre').value.trim();
   const nivel = document.getElementById('docNivel').value;
+
   if (!user || !pass) { alert('Usuario y contraseña son obligatorios'); return; }
   if (['admin','primaria','secundaria'].includes(user)) {
     alert('Ese nombre de usuario está reservado (admin / primaria / secundaria)');
@@ -1435,13 +1435,26 @@ function guardarDocente() {
   const list = loadDocentes();
   if (id) {
     const i = list.findIndex(d => d.id === id);
-    if (i >= 0) {
-      list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas, aulas, asignaciones, ts:Date.now() };
-    }
+    if (i >= 0) list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas, aulas, asignaciones, ts:Date.now() };
   } else {
-    if (list.some(d => d.user === user)) { alert('Ese usuafunction editarDocente(id) {
+    if (list.some(d => d.user === user)) { alert('Ese usuario ya existe'); return; }
+    list.push({
+      id: 'd' + Date.now(),
+      user, pass, nombre, nivel, grados, areas, aulas, asignaciones,
+      ts: Date.now()
+    });
+  }
+
+  saveDocentes(list);
+  limpiarFormDocente();
+  renderDocentes();
+  subirDocentesNube(true);
+}
+
+function editarDocente(id) {
   const d = loadDocentes().find(x => x.id === id);
   if (!d) return;
+
   document.getElementById('docEditId').value = d.id;
   document.getElementById('docUser').value = d.user;
   document.getElementById('docPass').value = d.pass;
@@ -1459,9 +1472,8 @@ function guardarDocente() {
   if (d.nivel === 'secundaria') {
     let mapa = d.asignaciones && typeof d.asignaciones === 'object' ? d.asignaciones : null;
     if (!mapa) {
-      // Compatibilidad con docentes antiguos: antes áreas y aulas se guardaban por separado.
       mapa = {};
-      (d.areas || []).forEach(a => { mapa[a] = (d.aulas || []).slice(); });
+      (d.areas || []).forEach(area => { mapa[area] = (d.aulas || []).slice(); });
     }
     renderAsignacionesDocente(mapa);
   }
