@@ -234,6 +234,8 @@
         <button type="button" class="btn btn-ghost text-xs" onclick="abrirNotebook()">Abrir cuaderno</button>
       </div>
       <select id="selCurso" class="w-full"></select>
+      <textarea id="clsPega" rows="3" placeholder="Pega aquí el texto negro de la pestaña, desde { hasta }" style="min-height:72px"></textarea>
+      <button type="button" class="btn btn-primary text-xs" onclick="cargarPegado()">Cargar pegado</button>
       <input id="inpNotebook" placeholder="Pega aquí el enlace de NotebookLM de esta área" onchange="guardarNotebook()">
       <div id="clsMsg" class="text-[11px] text-slate-500"></div>
     </div>
