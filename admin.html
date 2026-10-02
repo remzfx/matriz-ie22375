@@ -401,10 +401,16 @@
 
         <div id="docAreasWrap" class="hidden">
           <label class="text-[11px] font-bold text-slate-500">Áreas que enseña (secundaria)</label>
+          <p class="text-[11px] text-slate-400 mb-1">Primero marca las áreas. Luego asigna a cada área sus aulas exactas.</p>
           <div class="flex flex-wrap gap-2 mt-1" id="docAreasBox"></div>
-          <label class="text-[11px] font-bold text-slate-500 mt-3 block">Grados y secciones que enseña</label>
-          <p class="text-[11px] text-slate-400 mb-1">Marca solo las aulas reales del docente (ej. 1° A y 3° B).</p>
-          <div class="flex flex-wrap gap-2" id="docAulasBox"></div>
+
+          <div class="mt-4">
+            <label class="text-[11px] font-bold text-slate-500 block">Asignación por área y aula</label>
+            <p class="text-[11px] text-sky-700 bg-sky-50 rounded-lg px-2 py-1 mt-1 mb-2">
+              Cada área puede tener aulas distintas. Ej.: Matemática → 1° A, 1° B · CyT → 5° Única.
+            </p>
+            <div id="docAsignacionesBox" class="space-y-3"></div>
+          </div>
         </div>
 
         <input type="hidden" id="docEditId" value="">
@@ -1316,6 +1322,52 @@ function toggleDocFiltros() {
   const n = document.getElementById('docNivel').value;
   document.getElementById('docGradosWrap').classList.toggle('hidden', n !== 'primaria');
   document.getElementById('docAreasWrap').classList.toggle('hidden', n !== 'secundaria');
+  if (n === 'secundaria') renderAsignacionesDocente();
+}
+
+function aulasSecundariaDisponibles() {
+  const aulas = [];
+  [1,2,3,4].forEach(g => { aulas.push(g + '|A'); aulas.push(g + '|B'); });
+  aulas.push('5|ÚNICA');
+  return aulas;
+}
+
+function leerAsignacionesFormulario() {
+  const out = {};
+  document.querySelectorAll('#docAsignacionesBox [data-area-asig]').forEach(card => {
+    const area = card.getAttribute('data-area-asig');
+    out[area] = [...card.querySelectorAll('.doc-asig-aula:checked')].map(c => c.value);
+  });
+  return out;
+}
+
+function renderAsignacionesDocente(mapaInicial) {
+  const box = document.getElementById('docAsignacionesBox');
+  if (!box) return;
+  const seleccionadas = [...document.querySelectorAll('.doc-area:checked')].map(c => c.value);
+  const actual = mapaInicial || leerAsignacionesFormulario();
+  const aulas = aulasSecundariaDisponibles();
+
+  if (!seleccionadas.length) {
+    box.innerHTML = '<div class="text-xs text-slate-400 p-3 rounded-xl bg-slate-50">Marca al menos un área para asignar sus aulas.</div>';
+    return;
+  }
+
+  box.innerHTML = seleccionadas.map(area => {
+    const asignadas = Array.isArray(actual[area]) ? actual[area] : [];
+    return '<div class="border border-slate-200 rounded-xl p-3 bg-slate-50" data-area-asig="' + area.replace(/"/g,'&quot;') + '">' +
+      '<div class="font-bold text-sm text-slate-700 mb-2">' + area + '</div>' +
+      '<div class="flex flex-wrap gap-2">' +
+      aulas.map(v => {
+        const p = v.split('|');
+        const label = p[0] + '° ' + (p[1] === 'ÚNICA' ? 'Única' : p[1]);
+        const checked = asignadas.includes(v) ? ' checked' : '';
+        return '<label class="text-xs bg-white border border-slate-200 rounded-lg px-2 py-1">' +
+          '<input type="checkbox" class="doc-asig-aula" value="' + v + '"' + checked + '> ' + label +
+          '</label>';
+      }).join(' ') +
+      '</div></div>';
+  }).join('');
 }
 
 function initDocentesUI() {
@@ -1326,18 +1378,9 @@ function initDocentesUI() {
       '<input type="checkbox" class="doc-area" value="' + a.replace(/"/g,'&quot;') + '"> ' + a +
       '</label>'
     ).join(' ');
-  }
-  const aulasBox = document.getElementById('docAulasBox');
-  if (aulasBox && !aulasBox.children.length) {
-    const aulas = [];
-    [1,2,3,4].forEach(g => { aulas.push(g + '|A'); aulas.push(g + '|B'); });
-    aulas.push('5|ÚNICA');
-    aulasBox.innerHTML = aulas.map(v => {
-      const [g,s] = v.split('|');
-      const label = g + '° ' + s;
-      return '<label class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">' +
-        '<input type="checkbox" class="doc-aula" value="' + v + '"> ' + label + '</label>';
-    }).join(' ');
+    box.addEventListener('change', function(ev) {
+      if (ev.target && ev.target.classList.contains('doc-area')) renderAsignacionesDocente();
+    });
   }
   renderDocentes();
   toggleDocFiltros();
@@ -1351,7 +1394,8 @@ function limpiarFormDocente() {
   document.getElementById('docNivel').value = 'primaria';
   document.querySelectorAll('.doc-grado').forEach(c => c.checked = false);
   document.querySelectorAll('.doc-area').forEach(c => c.checked = false);
-  document.querySelectorAll('.doc-aula').forEach(c => c.checked = false);
+  const asigBox = document.getElementById('docAsignacionesBox');
+  if (asigBox) asigBox.innerHTML = '';
   toggleDocFiltros();
 }
 
@@ -1361,32 +1405,46 @@ function guardarDocente() {
   const pass = document.getElementById('docPass').value.trim();
   const nombre = document.getElementById('docNombre').value.trim();
   const nivel = document.getElementById('docNivel').value;
+
   if (!user || !pass) { alert('Usuario y contraseña son obligatorios'); return; }
   if (['admin','primaria','secundaria'].includes(user)) {
     alert('Ese nombre de usuario está reservado (admin / primaria / secundaria)');
     return;
   }
+
   const grados = [...document.querySelectorAll('.doc-grado:checked')].map(c => parseInt(c.value,10));
   const areas = [...document.querySelectorAll('.doc-area:checked')].map(c => c.value);
-  const aulas = [...document.querySelectorAll('.doc-aula:checked')].map(c => c.value);
+  const asignaciones = nivel === 'secundaria' ? leerAsignacionesFormulario() : {};
+
   if (nivel === 'primaria' && !grados.length) { alert('Marca al menos un grado'); return; }
   if (nivel === 'secundaria' && !areas.length) { alert('Marca al menos un área'); return; }
-  if (nivel === 'secundaria' && !aulas.length) { alert('Marca al menos un grado y sección (aula)'); return; }
+
+  if (nivel === 'secundaria') {
+    for (const area of areas) {
+      if (!Array.isArray(asignaciones[area]) || !asignaciones[area].length) {
+        alert('Asigna al menos un aula para: ' + area);
+        return;
+      }
+    }
+  }
+
+  const aulas = nivel === 'secundaria'
+    ? [...new Set(Object.values(asignaciones).flat())]
+    : [];
 
   const list = loadDocentes();
   if (id) {
     const i = list.findIndex(d => d.id === id);
-    if (i >= 0) {
-      list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas, aulas };
-    }
+    if (i >= 0) list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas, aulas, asignaciones, ts:Date.now() };
   } else {
     if (list.some(d => d.user === user)) { alert('Ese usuario ya existe'); return; }
     list.push({
       id: 'd' + Date.now(),
-      user, pass, nombre, nivel, grados, areas, aulas,
+      user, pass, nombre, nivel, grados, areas, aulas, asignaciones,
       ts: Date.now()
     });
   }
+
   saveDocentes(list);
   limpiarFormDocente();
   renderDocentes();
@@ -1396,21 +1454,30 @@ function guardarDocente() {
 function editarDocente(id) {
   const d = loadDocentes().find(x => x.id === id);
   if (!d) return;
+
   document.getElementById('docEditId').value = d.id;
   document.getElementById('docUser').value = d.user;
   document.getElementById('docPass').value = d.pass;
   document.getElementById('docNombre').value = d.nombre || '';
   document.getElementById('docNivel').value = d.nivel;
   toggleDocFiltros();
+
   document.querySelectorAll('.doc-grado').forEach(c => {
     c.checked = (d.grados || []).includes(parseInt(c.value,10));
   });
   document.querySelectorAll('.doc-area').forEach(c => {
     c.checked = (d.areas || []).includes(c.value);
   });
-  document.querySelectorAll('.doc-aula').forEach(c => {
-    c.checked = (d.aulas || []).includes(c.value);
-  });
+
+  if (d.nivel === 'secundaria') {
+    let mapa = d.asignaciones && typeof d.asignaciones === 'object' ? d.asignaciones : null;
+    if (!mapa) {
+      mapa = {};
+      (d.areas || []).forEach(area => { mapa[area] = (d.aulas || []).slice(); });
+    }
+    renderAsignacionesDocente(mapa);
+  }
+
   showTab('docentes');
   window.scrollTo(0,0);
 }
@@ -1433,8 +1500,12 @@ function renderDocentes() {
   box.innerHTML = list.map(d => {
     const filtro = d.nivel === 'primaria'
       ? ('Grados: ' + (d.grados||[]).map(g=>g+'°').join(', '))
-      : ('Áreas: ' + (d.areas||[]).join(' · ') +
-         ((d.aulas&&d.aulas.length) ? (' · Aulas: ' + d.aulas.map(a=>a.replace('|','° ')).join(', ')) : ''));
+      : (d.asignaciones && Object.keys(d.asignaciones).length
+          ? Object.keys(d.asignaciones).map(area =>
+              area + ' → ' + (d.asignaciones[area]||[]).map(a=>a.replace('|','° ')).join(', ')
+            ).join(' · ')
+          : ('Áreas: ' + (d.areas||[]).join(' · ') +
+             ((d.aulas&&d.aulas.length) ? (' · Aulas: ' + d.aulas.map(a=>a.replace('|','° ')).join(', ')) : '')));
     return '<div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2" data-doc-id="'+d.id+'">' +
       '<div><div class="font-bold">' + (d.nombre||d.user) + ' <span class="text-slate-400 font-normal">(@'+d.user+')</span></div>' +
       '<div class="text-xs text-slate-500">' + d.nivel + ' · ' + filtro + '</div>' +

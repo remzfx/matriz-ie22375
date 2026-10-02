@@ -1570,18 +1570,31 @@ window.__IE_gradoOK = function(gradoVal) {
             { key: "destacado", label: "Destacado (AD)", rango: "18-20", color: "#16a34a", bg: "nivel-destacado" }
         ];
 
+        const BD_SEC_CACHE_KEY = 'ie22375_bd_sec_cache_v1';
         let baseOficialEstudiantes = [];
+
+        function cargarBaseOficialCache() {
+            try {
+                const raw = localStorage.getItem(BD_SEC_CACHE_KEY);
+                const list = raw ? JSON.parse(raw) : [];
+                if (Array.isArray(list) && list.length) baseOficialEstudiantes = list;
+            } catch(e) {}
+            return baseOficialEstudiantes;
+        }
 
         async function cargarBaseOficialEstudiantes() {
             try {
                 const r = await fetch('bd_oficial_2026.json?t=' + Date.now(), { cache:'no-store' });
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 const db = await r.json();
-                baseOficialEstudiantes = (db && db.secundaria && Array.isArray(db.secundaria.estudiantes))
+                const list = (db && db.secundaria && Array.isArray(db.secundaria.estudiantes))
                     ? db.secundaria.estudiantes : [];
+                if (list.length) {
+                    baseOficialEstudiantes = list;
+                    try { localStorage.setItem(BD_SEC_CACHE_KEY, JSON.stringify(list)); } catch(e) {}
+                }
             } catch(e) {
-                console.warn('No se pudo cargar bd_oficial_2026.json', e);
-                baseOficialEstudiantes = [];
+                console.warn('No se pudo actualizar bd_oficial_2026.json', e);
             }
             return baseOficialEstudiantes;
         }
@@ -1787,32 +1800,54 @@ window.__IE_gradoOK = function(gradoVal) {
             });
         }
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            // Registrar plugin de etiquetas si está disponible
+        document.addEventListener('DOMContentLoaded', () => {
             if (typeof ChartDataLabels !== 'undefined') {
                 Chart.register(ChartDataLabels);
             }
-            
+
             storageDisponible = puedeUsarStorage();
-            
+
             if (!storageDisponible) {
                 const banner = document.getElementById('bannerSandbox');
                 banner.classList.remove('hidden');
                 banner.innerHTML = '⚠️ Vista previa restringida. Para guardar datos: <strong>descarga el archivo y ábrelo con doble clic</strong>.';
             }
-            
+
             cargarDatos();
-            await Promise.all([
-                cargarPeriodosAdminMatriz(),
-                cargarBaseOficialEstudiantes()
-            ]);
+
+            // Pintar inmediatamente con la última caché disponible.
+            cargarBaseOficialCache();
+            try {
+                const rawPer = localStorage.getItem(PERIODOS_CLOUD_KEY);
+                if (rawPer) {
+                    const cfg = JSON.parse(rawPer);
+                    if (cfg && cfg.bimestres) periodosAdminMatriz = cfg;
+                }
+            } catch(e) {}
+
             normalizarAulaPermitidaSec();
             actualizarBotonesSeleccion();
             renderizarAreas();
             renderizarResumen();
             syncDocenteTop();
-            
             syncInputTotalEstudiantes();
+            aplicarModoPeriodoActual();
+
+            // Refrescar nube y BD sin dejar la interfaz vacía mientras esperan.
+            Promise.all([
+                cargarPeriodosAdminMatriz(),
+                cargarBaseOficialEstudiantes()
+            ]).then(function() {
+                normalizarAulaPermitidaSec();
+                actualizarBotonesSeleccion();
+                renderizarAreas();
+                renderizarResumen();
+                syncDocenteTop();
+                syncInputTotalEstudiantes();
+                aplicarModoPeriodoActual();
+            }).catch(function(e) {
+                console.warn('Actualización en segundo plano incompleta', e);
+            });
         });
 
         // ============================================
@@ -1867,6 +1902,33 @@ window.__IE_gradoOK = function(gradoVal) {
             }
             if (estado.seccion !== sec) estado.seccion = sec;
             return false;
+        }
+
+        function normalizarClaveAulaSec(grado, seccion) {
+            const g = String(grado || '').replace(/[^0-9]/g,'');
+            let sec = String(seccion || '').trim().toUpperCase();
+            if (sec === 'UNICA' || sec === 'ÚNICA') sec = 'ÚNICA';
+            return g + '|' + sec;
+        }
+
+        function areaVisibleSesion(nombreArea) {
+            const ses = window.__IE_SES;
+            if (!ses || ses.role === 'admin' || ses.user === 'admin' || ses.role !== 'docente') return true;
+
+            // Nuevo esquema: cada área conoce exactamente sus aulas.
+            if (ses.asignaciones && typeof ses.asignaciones === 'object' && Object.keys(ses.asignaciones).length) {
+                const aulasArea = Array.isArray(ses.asignaciones[nombreArea]) ? ses.asignaciones[nombreArea] : [];
+                if (!aulasArea.length) return false;
+                const actual = normalizarClaveAulaSec(estado.grado, estado.seccion);
+                return aulasArea.some(function(k) {
+                    const p = String(k).split('|');
+                    return normalizarClaveAulaSec(p[0], p[1]) === actual;
+                });
+            }
+
+            // Compatibilidad con cuentas antiguas hasta que Admin las guarde con el nuevo esquema.
+            if (ses.areas && ses.areas.length) return ses.areas.indexOf(nombreArea) >= 0;
+            return true;
         }
 
         function renderBimestre() {
@@ -2008,7 +2070,7 @@ window.__IE_gradoOK = function(gradoVal) {
             const container = document.getElementById('areasContainer');
             container.innerHTML = '';
             
-            Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return !window.__IE_areasOK || window.__IE_areasOK(nombreArea); }).forEach(nombreArea => {
+            Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return areaVisibleSesion(nombreArea); }).forEach(nombreArea => {
                 const area = ESTRUCTURA_AREAS[nombreArea];
                 const progreso = calcularProgresoArea(nombreArea);
                 
@@ -2086,7 +2148,7 @@ window.__IE_gradoOK = function(gradoVal) {
             const cont = document.getElementById('navAreasExpoBtns');
             if (!cont) return;
             cont.innerHTML = '';
-            Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return !window.__IE_areasOK || window.__IE_areasOK(nombreArea); }).forEach(nombreArea => {
+            Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return areaVisibleSesion(nombreArea); }).forEach(nombreArea => {
                 const area = ESTRUCTURA_AREAS[nombreArea];
                 const btn = document.createElement('button');
                 btn.type = 'button';
@@ -2100,6 +2162,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function seleccionarAreaDesdeExpo(nombreArea) {
+            if (!areaVisibleSesion(nombreArea)) return;
             estado.areaActual = nombreArea;
             document.getElementById('mensajeInicial').classList.add('hidden');
             document.getElementById('panelCompetencias').classList.remove('hidden');
@@ -2185,7 +2248,7 @@ window.__IE_gradoOK = function(gradoVal) {
             const cont = document.getElementById('presNavAreas');
             if (cont) {
                 cont.innerHTML = '';
-                Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return !window.__IE_areasOK || window.__IE_areasOK(nombreArea); }).forEach(nombreArea => {
+                Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return areaVisibleSesion(nombreArea); }).forEach(nombreArea => {
                     const btn = document.createElement('button');
                     btn.type = 'button';
                     btn.textContent = typeof abrevArea === 'function' ? abrevArea(nombreArea) : nombreArea;
@@ -2563,6 +2626,10 @@ window.__IE_gradoOK = function(gradoVal) {
         // SELECCIONAR ÁREA
         // ============================================
         function seleccionarArea(nombreArea) {
+            if (!areaVisibleSesion(nombreArea)) {
+                mostrarToast('Esta área no está asignada al docente en el aula seleccionada', 'error');
+                return;
+            }
             estado.areaActual = nombreArea;
             document.getElementById('mensajeInicial').classList.add('hidden');
             document.getElementById('panelCompetencias').classList.remove('hidden');
@@ -2744,7 +2811,7 @@ window.__IE_gradoOK = function(gradoVal) {
             const gradoN = String(gradoNumSec(estado.grado));
             const sec = (estado.seccion === 'ÚNICA' || estado.seccion === 'UNICA') ? 'Unica' : estado.seccion;
             const bim = estado.bimestre;
-            const areas = Object.keys(ESTRUCTURA_AREAS).filter(n => !window.__IE_areasOK || window.__IE_areasOK(n));
+            const areas = Object.keys(ESTRUCTURA_AREAS).filter(n => areaVisibleSesion(n));
             const usar = estado.areaActual ? [estado.areaActual] : areas;
             let llenas = 0;
             usar.forEach(area => {
@@ -2798,7 +2865,7 @@ window.__IE_gradoOK = function(gradoVal) {
             if (!box) return;
             document.getElementById('panelCompetencias').classList.add('hidden');
             box.classList.remove('hidden');
-            const areas = Object.keys(ESTRUCTURA_AREAS).filter(function(n){ return !window.__IE_areasOK || window.__IE_areasOK(n); });
+            const areas = Object.keys(ESTRUCTURA_AREAS).filter(function(n){ return areaVisibleSesion(n); });
             const sel = document.getElementById('cmpArea');
             if (sel) {
                 sel.innerHTML = areas.map(n => '<option value="'+n.replace(/"/g,'"')+'">'+n+'</option>').join('');
@@ -3511,7 +3578,7 @@ window.__IE_gradoOK = function(gradoVal) {
             const totalEst = getTotalEstudiantes();
             const pct = (n) => totalEst > 0 ? Math.round((n / totalEst) * 100) : 0;
             
-            Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return !window.__IE_areasOK || window.__IE_areasOK(nombreArea); }).forEach(nombreArea => {
+            Object.keys(ESTRUCTURA_AREAS).filter(function(nombreArea){ return areaVisibleSesion(nombreArea); }).forEach(nombreArea => {
                 const area = ESTRUCTURA_AREAS[nombreArea];
                 
                 // Fila de área (header)
