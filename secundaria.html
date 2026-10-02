@@ -1007,6 +1007,29 @@
                 padding-bottom:2px;
             }
         }
+
+        .bim-card.periodo-cerrado .bim-btn-inner,
+        .bim-card.periodo-bloqueado .bim-btn-inner {
+            background:#e2e8f0 !important;
+            color:#64748b !important;
+            border-color:#cbd5e1 !important;
+            box-shadow:none !important;
+        }
+        .bim-card.periodo-cerrado.active-bim .bim-btn-inner,
+        .bim-card.periodo-bloqueado.active-bim .bim-btn-inner {
+            background:#475569 !important;
+            color:#fff !important;
+            border-color:#475569 !important;
+        }
+        .solo-lectura-control {
+            opacity:.72 !important;
+            cursor:not-allowed !important;
+        }
+        #periodReadOnlyBanner {
+            border:1px solid #f59e0b;
+            background:#fffbeb;
+            color:#92400e;
+        }
 </style>
 </head>
 <body class="text-slate-800">
@@ -1108,6 +1131,9 @@ window.__IE_gradoOK = function(gradoVal) {
 
     <!-- BANNER SANDBOX (se inserta por JS si es necesario) -->
     <div id="bannerSandbox" class="hidden bg-amber-500 text-white text-center text-sm font-medium py-2 px-4 no-print"></div>
+    <div id="periodReadOnlyBanner" class="hidden max-w-7xl mx-auto mt-4 px-4 py-3 rounded-xl text-sm font-bold no-print">
+        🔒 Bimestre cerrado por Administración · Solo lectura
+    </div>
 
     <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
         
@@ -1652,7 +1678,96 @@ window.__IE_gradoOK = function(gradoVal) {
             } catch(e) { return false; }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+
+        const PERIODOS_CLOUD_KEY = 'ie22375_periodos_cloud_v1';
+        let periodosAdminMatriz = null;
+
+        function estadoPeriodoAdmin(bim) {
+            if (!periodosAdminMatriz || !periodosAdminMatriz.bimestres) return 'desconocido';
+            return String(periodosAdminMatriz.bimestres[bim] || 'bloqueado').toLowerCase();
+        }
+
+        function periodoEditableActual() {
+            return estadoPeriodoAdmin(estado.bimestre) === 'abierto';
+        }
+
+        function periodoSoloLecturaActual() {
+            return !periodoEditableActual();
+        }
+
+        function impedirEdicionPeriodo(mostrar) {
+            if (!periodoSoloLecturaActual()) return false;
+            if (mostrar !== false && typeof mostrarToast === 'function') {
+                const st = estadoPeriodoAdmin(estado.bimestre);
+                mostrarToast('Bimestre ' + estado.bimestre + ' ' + (st === 'desconocido' ? 'sin configuración' : st) + ' · Solo lectura', 'error');
+            }
+            return true;
+        }
+
+        async function cargarPeriodosAdminMatriz() {
+            let cfg = null;
+            try {
+                const url = CLOUD_API_URL + '?action=loadperiodos&t=' + Date.now();
+                const r = await fetch(url, { cache:'no-store' });
+                const data = JSON.parse(await r.text());
+                if (data && data.ok && data.periodos && data.periodos.bimestres) {
+                    cfg = data.periodos;
+                    localStorage.setItem(PERIODOS_CLOUD_KEY, JSON.stringify(cfg));
+                }
+            } catch(e) {}
+
+            if (!cfg) {
+                try {
+                    const raw = localStorage.getItem(PERIODOS_CLOUD_KEY);
+                    if (raw) cfg = JSON.parse(raw);
+                } catch(e) {}
+            }
+
+            periodosAdminMatriz = (cfg && cfg.bimestres) ? cfg : null;
+            renderBimestre();
+            aplicarModoPeriodoActual();
+            return !!periodosAdminMatriz;
+        }
+
+        function aplicarModoPeriodoActual() {
+            const locked = periodoSoloLecturaActual();
+            const st = estadoPeriodoAdmin(estado.bimestre);
+            const banner = document.getElementById('periodReadOnlyBanner');
+            if (banner) {
+                if (locked) {
+                    banner.classList.remove('hidden');
+                    banner.textContent = '🔒 Bimestre ' + estado.bimestre + ' · ' +
+                        (st === 'desconocido' ? 'Configuración no disponible' : (st.charAt(0).toUpperCase()+st.slice(1))) +
+                        ' · Solo lectura';
+                } else {
+                    banner.classList.add('hidden');
+                }
+            }
+
+            const total = document.getElementById('totalEstudiantes');
+            if (total) {
+                total.disabled = locked;
+                total.classList.toggle('solo-lectura-control', locked);
+            }
+
+            document.querySelectorAll(
+                '[onclick^="subirNube"],[onclick^="limpiarTodo"],[onclick^="traerDesdeRegistro"]'
+            ).forEach(function(el){
+                el.disabled = locked;
+                el.classList.toggle('solo-lectura-control', locked);
+            });
+
+            document.querySelectorAll('input[type="file"]').forEach(function(el){
+                el.disabled = locked;
+            });
+
+            document.querySelectorAll('#competenciasContainer input, #docenteAreaInput').forEach(function(el){
+                el.disabled = locked;
+                el.classList.toggle('solo-lectura-control', locked);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
             // Registrar plugin de etiquetas si está disponible
             if (typeof ChartDataLabels !== 'undefined') {
                 Chart.register(ChartDataLabels);
@@ -1667,6 +1782,7 @@ window.__IE_gradoOK = function(gradoVal) {
             }
             
             cargarDatos();
+            await cargarPeriodosAdminMatriz();
             normalizarAulaPermitidaSec();
             actualizarBotonesSeleccion();
             renderizarAreas();
@@ -1736,10 +1852,15 @@ window.__IE_gradoOK = function(gradoVal) {
             const bims = ['I', 'II', 'III', 'IV'];
             cont.innerHTML = bims.map(b => {
                 const active = estado.bimestre === b;
+                const st = estadoPeriodoAdmin(b);
+                const locked = st !== 'abierto';
+                const cls = locked ? (' periodo-' + (st === 'cerrado' ? 'cerrado' : 'bloqueado')) : '';
+                const icon = locked ? ' <i class="fas fa-lock text-[10px] ml-1"></i>' : '';
+                const title = locked ? ('Bimestre ' + b + ' · ' + (st === 'desconocido' ? 'solo lectura' : st)) : ('Bimestre ' + b + ' · abierto');
                 return `
-                <div class="bim-card ${active ? 'active-bim' : ''}">
-                    <div class="bim-label">Bimestre</div>
-                    <button type="button" class="bim-btn-inner" onclick="setBimestre('${b}')">${b}</button>
+                <div class="bim-card ${active ? 'active-bim' : ''}${cls}">
+                    <div class="bim-label">Bimestre${icon}</div>
+                    <button type="button" class="bim-btn-inner" title="${title}" onclick="setBimestre('${b}')">${b}</button>
                 </div>`;
             }).join('');
         }
@@ -1830,7 +1951,11 @@ window.__IE_gradoOK = function(gradoVal) {
             renderizarAreas();
             renderizarResumen();
             syncDocenteTop();
-            mostrarToast(`Bimestre ${val} — datos independientes`, 'success');
+            aplicarModoPeriodoActual();
+            const st = estadoPeriodoAdmin(val);
+            mostrarToast(st === 'abierto'
+                ? `Bimestre ${val} — editable`
+                : `Bimestre ${val} — solo lectura`, st === 'abierto' ? 'success' : 'warning');
         }
 
         function setGrado(val) {
@@ -2425,6 +2550,7 @@ window.__IE_gradoOK = function(gradoVal) {
             renderizarCompetencias();
             renderizarResumen();
             syncDocenteTop();
+            aplicarModoPeriodoActual();
             
             document.getElementById('panelCompetencias').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
@@ -2442,6 +2568,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function setDocenteArea(area, nombre) {
+            if (impedirEdicionPeriodo()) { renderizarAreaHeader(); return; }
             if (!area) return;
             const k = claveActual();
             if (!estado.docentes) estado.docentes = {};
@@ -2515,7 +2642,8 @@ window.__IE_gradoOK = function(gradoVal) {
                                value="${docente.replace(/"/g, '&quot;')}"
                                placeholder="Escribe el nombre completo del docente..."
                                oninput="setDocenteArea(estado.areaActual, this.value)"
-                               class="w-full bg-white border-2 border-sky-200 rounded-xl px-5 py-4 text-lg font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none shadow-sm">
+                               ${periodoSoloLecturaActual() ? 'disabled' : ''}
+                               class="w-full bg-white border-2 border-sky-200 rounded-xl px-5 py-4 text-lg font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none shadow-sm ${periodoSoloLecturaActual() ? 'solo-lectura-control' : ''}">
                     </div>
                 </div>
             `;
@@ -2584,6 +2712,7 @@ window.__IE_gradoOK = function(gradoVal) {
             return 'C';
         }
         function traerDesdeRegistro() {
+            if (impedirEdicionPeriodo()) return;
             let store = {};
             try { store = JSON.parse(localStorage.getItem('ie22375_registro_notas_v2') || '{}'); } catch(e) { store = {}; }
             const finales = store.finales || {};
@@ -2825,7 +2954,8 @@ window.__IE_gradoOK = function(gradoVal) {
                                     <input type="number" min="0" max="${maxCampo}" value="${dato[nivel.key]}"
                                            data-area="${estado.areaActual}" data-comp="${nombreComp}" data-nivel="${nivel.key}"
                                            oninput="actualizarDato(this)"
-                                           class="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-center text-xl font-extrabold focus:ring-2 outline-none"
+                                           ${periodoSoloLecturaActual() ? 'disabled' : ''}
+                                           class="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-center text-xl font-extrabold focus:ring-2 outline-none ${periodoSoloLecturaActual() ? 'solo-lectura-control' : ''}"
                                            style="color:${nivel.color}">
                                     <div class="pct-label text-center text-sm font-bold mt-1.5" style="color:${nivel.color}">
                                         ${dato[nivel.key]} est. · ${pct(dato[nivel.key])}%
@@ -3171,6 +3301,7 @@ window.__IE_gradoOK = function(gradoVal) {
         let _debounceGraficos = null;
 
         function actualizarDato(input) {
+            if (impedirEdicionPeriodo()) { renderizarCompetencias(); return; }
             const area = input.dataset.area;
             const comp = input.dataset.comp;
             const nivel = input.dataset.nivel;
@@ -3265,6 +3396,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function actualizarTotalEstudiantes() {
+            if (impedirEdicionPeriodo()) { syncInputTotalEstudiantes(); return; }
             const raw = document.getElementById('totalEstudiantes').value;
             if (raw === '' || raw == null) {
                 // Vaciar: quitar dato de ESTA aula
@@ -3497,6 +3629,7 @@ window.__IE_gradoOK = function(gradoVal) {
         let datosImportadosTemp = null;
 
         function importarDatos(event) {
+            if (impedirEdicionPeriodo()) { event.target.value=''; return; }
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
@@ -3590,6 +3723,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function aplicarImportacion(modo) {
+            if (impedirEdicionPeriodo()) return;
             if (!datosImportadosTemp) return;
             
             const imported = datosImportadosTemp;
@@ -3675,6 +3809,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function limpiarTodo() {
+            if (impedirEdicionPeriodo()) return;
             if (confirm('¿Borrar TODOS los datos de esta matriz?\\n\\nEsta acción no se puede deshacer (exporta antes si es necesario).')) {
                 estado.datos = {};
                 estado.areaActual = null;
@@ -3706,6 +3841,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         async function subirNube() {
+            if (impedirEdicionPeriodo()) return;
             try {
                 const area = estado.areaActual;
                 if (!area) {
