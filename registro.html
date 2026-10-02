@@ -38,13 +38,20 @@
   .mobile-header-actions::-webkit-scrollbar { display:none; }
   .mobile-header-actions > a, .mobile-header-actions > button {
     min-height:44px; flex:0 0 auto; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18);
+    display:inline-flex; align-items:center; justify-content:center; text-align:center; line-height:1.15;
+  }
+  #registroAccionesAcademicas .btn {
+    display:flex; align-items:center; justify-content:center; text-align:center; min-height:54px; line-height:1.15;
   }
   @media (max-width:640px) {
+    #appHdr { position:static !important; top:auto !important; }
     #appHdr > div { flex-direction:column; align-items:stretch; gap:8px; }
     #appHdr .mobile-header-actions {
       width:100%; display:flex; flex-wrap:nowrap !important; overflow-x:auto;
       justify-content:flex-start !important; padding-bottom:2px;
     }
+    /* En móvil el panel de contexto debe desplazarse con la página para liberar espacio. */
+    .ctx-bar { position:static !important; top:auto !important; z-index:auto !important; padding-top:8px; }
   }
   .ctx-bar { position:sticky; top:var(--hdr,56px); z-index:35; background:#f1f5f9; padding:8px 0; border-bottom:1px solid #e2e8f0; }
   .mode-toggle { display:flex; gap:6px; background:#e2e8f0; border-radius:12px; padding:4px; }
@@ -727,6 +734,17 @@ function loadPeriodosAdmin() {
   } catch(e) {}
   return { anio: 2026, bimestres: { I: 'abierto', II: 'abierto', III: 'abierto', IV: 'abierto' } };
 }
+async function sincronizarPeriodosNube() {
+  try {
+    const r = await fetch(CLOUD_API_URL + '?action=loadperiodos&t=' + Date.now(), { cache:'no-store' });
+    const data = JSON.parse(await r.text());
+    if (data && data.ok && data.periodos && data.periodos.bimestres) {
+      localStorage.setItem('ie22375_admin_periodos', JSON.stringify(data.periodos));
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
 function bimestreHabilitado(b) {
   const per = loadPeriodosAdmin();
   const st = (per.bimestres && per.bimestres[b]) || 'abierto';
@@ -845,7 +863,7 @@ function aplicarDocenteSesion() {
   }
 }
 
-function entrarNivel(n) {
+async function entrarNivel(n) {
   // Bloquear cruce de nivel si la sesión no lo permite
   var perm = nivelPermitido();
   if (perm === 'primaria' && n !== 'primaria') {
@@ -859,6 +877,7 @@ function entrarNivel(n) {
 
   nivel = n;
   loadStore();
+  await sincronizarPeriodosNube();
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
   const sLogin = getLoginSession();
