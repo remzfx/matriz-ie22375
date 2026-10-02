@@ -467,6 +467,7 @@ const BD_EMPOTRADA = {"anio":2026,"ie":"IE 22375 Santa Rosa de los Molinos","pri
 const LS_KEY = 'ie22375_admin_bd_v1';
 const LS_PASS = 'ie22375_admin_pass';
 const LS_PER = 'ie22375_admin_periodos';
+const PERIODOS_CLOUD_KEY = 'ie22375_periodos_cloud_v1';
 const DEFAULT_PASS = 'admin22375';
 
 let estado = null;
@@ -868,6 +869,7 @@ async function bajarPeriodosNube() {
     const data = JSON.parse(await r.text());
     if (data && data.ok && data.periodos && data.periodos.bimestres) {
       localStorage.setItem(LS_PER, JSON.stringify(data.periodos));
+      localStorage.setItem(PERIODOS_CLOUD_KEY, JSON.stringify(data.periodos));
       return data.periodos;
     }
   } catch(e) {}
@@ -912,9 +914,10 @@ async function savePeriodos() {
     });
     const data = JSON.parse(await r.text());
     if (!data.ok) throw new Error(data.error || 'Error de nube');
-    alert('Periodos guardados en este equipo y en la nube.');
+    localStorage.setItem(PERIODOS_CLOUD_KEY, JSON.stringify(per));
+    alert('Periodos guardados en Admin y sincronizados con la nube.');
   } catch(e) {
-    alert('Periodos guardados en este equipo, pero no en la nube. Actualiza el Apps Script.');
+    alert('Los cambios quedaron solo en este Admin y NO están activos para docentes. Actualiza/publica el Apps Script y vuelve a Guardar periodos.');
   }
 }
 

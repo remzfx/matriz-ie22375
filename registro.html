@@ -728,32 +728,36 @@ function fixHdrHeight() {
   if (h) document.documentElement.style.setProperty('--hdr', h.offsetHeight + 'px');
 }
 
+const PERIODOS_CLOUD_KEY = 'ie22375_periodos_cloud_v1';
+
 function loadPeriodosAdmin() {
   try {
-    const raw = localStorage.getItem('ie22375_admin_periodos');
-    if (raw) return JSON.parse(raw);
+    const raw = localStorage.getItem(PERIODOS_CLOUD_KEY);
+    if (raw) {
+      const obj = JSON.parse(raw);
+      if (obj && obj.bimestres) return obj;
+    }
   } catch(e) {}
-  return { anio: 2026, bimestres: { I: 'cerrado', II: 'cerrado', III: 'abierto', IV: 'abierto' } };
+  return null;
 }
+
 async function sincronizarPeriodosNube() {
-  const respaldo = { anio: 2026, bimestres: { I: 'cerrado', II: 'cerrado', III: 'abierto', IV: 'abierto' } };
   try {
     const r = await fetch(CLOUD_API_URL + '?action=loadperiodos&t=' + Date.now(), { cache:'no-store' });
     const data = JSON.parse(await r.text());
     if (data && data.ok && data.periodos && data.periodos.bimestres) {
-      localStorage.setItem('ie22375_admin_periodos', JSON.stringify(data.periodos));
+      localStorage.setItem(PERIODOS_CLOUD_KEY, JSON.stringify(data.periodos));
       return true;
     }
   } catch(e) {}
-
-  // Si aún no está publicada la ruta de periodos, no reutilizar configuraciones viejas del celular.
-  localStorage.setItem('ie22375_admin_periodos', JSON.stringify(respaldo));
-  return false;
+  // No inventar periodos: conservar únicamente la última configuración válida bajada desde Admin/nube.
+  return !!loadPeriodosAdmin();
 }
+
 function bimestreHabilitado(b) {
   const per = loadPeriodosAdmin();
-  const st = (per.bimestres && per.bimestres[b]) || 'abierto';
-  // abierto = OK; cerrado / bloqueado = no
+  if (!per || !per.bimestres) return false;
+  const st = per.bimestres[b] || 'bloqueado';
   return st === 'abierto';
 }
 function getLoginSession() {
@@ -902,13 +906,22 @@ async function entrarNivel(n) {
   await sincronizarPeriodosNube();
   const sLogin = getLoginSession();
   const esAdmin = sLogin && (sLogin.role === 'admin' || sLogin.user === 'admin');
-  document.getElementById('selBim').innerHTML = ['I','II','III','IV'].map(b => {
-    const ok = bimestreHabilitado(b);
-    const label = 'Bimestre ' + b + (ok ? '' : ' (cerrado)');
-    // Docentes no pueden elegir cerrados; admin sí ve todos
-    if (!ok && !esAdmin) return '';
-    return `<option value="${b}" ${ok?'':'disabled'}>${label}</option>`;
-  }).join('') || '<option value="">Sin bimestres abiertos</option>';
+  const selBim = document.getElementById('selBim');
+  const cfgPeriodos = loadPeriodosAdmin();
+
+  if (!cfgPeriodos || !cfgPeriodos.bimestres) {
+    selBim.innerHTML = '<option value="">Configuración de bimestres no disponible</option>';
+    selBim.disabled = true;
+  } else {
+    selBim.disabled = false;
+    selBim.innerHTML = ['I','II','III','IV'].map(function(b) {
+      const st = cfgPeriodos.bimestres[b] || 'bloqueado';
+      const ok = st === 'abierto';
+      if (!esAdmin && !ok) return '';
+      const label = 'Bimestre ' + b + (ok ? '' : ' (' + st + ')');
+      return '<option value="' + b + '"' + (ok ? '' : ' disabled') + '>' + label + '</option>';
+    }).join('') || '<option value="">Sin bimestres abiertos</option>';
+  }
   const bd = loadBD();
   const list = (bd[n] && bd[n].estudiantes) || [];
   let grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
