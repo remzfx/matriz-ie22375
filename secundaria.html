@@ -1634,6 +1634,7 @@ window.__IE_gradoOK = function(gradoVal) {
             }
             
             cargarDatos();
+            normalizarAulaPermitidaSec();
             actualizarBotonesSeleccion();
             renderizarAreas();
             renderizarResumen();
@@ -1645,6 +1646,57 @@ window.__IE_gradoOK = function(gradoVal) {
         // ============================================
         // BOTONES DE SELECCIÓN (Bimestre / Grado)
         // ============================================
+        function aulasPermitidasSesionSec() {
+            const base = [
+                ['1°','A'], ['1°','B'],
+                ['2°','A'], ['2°','B'],
+                ['3°','A'], ['3°','B'],
+                ['4°','A'], ['4°','B'],
+                ['5°','ÚNICA']
+            ];
+            const ses = window.__IE_SES;
+            if (!ses || ses.role === 'admin' || ses.user === 'admin' || ses.role !== 'docente' || !ses.aulas || !ses.aulas.length) {
+                return base;
+            }
+            const permitidas = {};
+            ses.aulas.forEach(function(k) {
+                const p = String(k).split('|');
+                const g = String(p[0] || '').replace('°','') + '°';
+                let sec = String(p[1] || '').toUpperCase();
+                if (sec === 'UNICA') sec = 'ÚNICA';
+                permitidas[g + '|' + sec] = true;
+            });
+            return base.filter(function(a) { return !!permitidas[a[0] + '|' + a[1]]; });
+        }
+
+        function aulaPermitidaSesionSec(grado, seccion) {
+            const ses = window.__IE_SES;
+            if (!ses || ses.role === 'admin' || ses.user === 'admin' || ses.role !== 'docente' || !ses.aulas || !ses.aulas.length) return true;
+            let sec = String(seccion || '').toUpperCase();
+            if (sec === 'UNICA') sec = 'ÚNICA';
+            return aulasPermitidasSesionSec().some(function(a) {
+                return a[0] === grado && a[1] === sec;
+            });
+        }
+
+        function normalizarAulaPermitidaSec() {
+            const aulas = aulasPermitidasSesionSec();
+            if (!aulas.length) return false;
+            let sec = String(estado.seccion || '').toUpperCase();
+            if (sec === 'UNICA') sec = 'ÚNICA';
+            const ok = aulas.some(function(a) {
+                return a[0] === estado.grado && a[1] === sec;
+            });
+            if (!ok) {
+                estado.grado = aulas[0][0];
+                estado.seccion = aulas[0][1];
+                estado.areaActual = null;
+                return true;
+            }
+            if (estado.seccion !== sec) estado.seccion = sec;
+            return false;
+        }
+
         function renderBimestre() {
             const cont = document.getElementById('btnBimestre');
             if (!cont) return;
@@ -1662,41 +1714,27 @@ window.__IE_gradoOK = function(gradoVal) {
         function renderGradoSeccion() {
             const cont = document.getElementById('btnGradoSeccion');
             if (!cont) return;
-            // 1°–4°: solo A y B · 5° este año: solo ÚNICA
-            let grados = [
-                { g: '1°', secciones: ['A', 'B'] },
-                { g: '2°', secciones: ['A', 'B'] },
-                { g: '3°', secciones: ['A', 'B'] },
-                { g: '4°', secciones: ['A', 'B'] },
-                { g: '5°', secciones: ['ÚNICA'] }
-            ];
-            // Filtrar aulas si el docente tiene asignación
-            (function(){
-              var s = window.__IE_SES;
-              if (!s || s.role !== 'docente' || !s.aulas || !s.aulas.length) return;
-              var allow = {};
-              s.aulas.forEach(function(k){
-                var p = String(k).split('|');
-                var g = p[0] + '°';
-                var sec = p[1];
-                if (!allow[g]) allow[g] = [];
-                allow[g].push(sec);
-              });
-              grados = grados.map(function(item){
-                if (!allow[item.g]) return null;
-                return { g: item.g, secciones: item.secciones.filter(function(sec){ return allow[item.g].indexOf(sec) >= 0; }) };
-              }).filter(function(item){ return item && item.secciones.length; });
-            })();
+            normalizarAulaPermitidaSec();
+
+            const agrupadas = {};
+            aulasPermitidasSesionSec().forEach(function(a) {
+                if (!agrupadas[a[0]]) agrupadas[a[0]] = [];
+                if (agrupadas[a[0]].indexOf(a[1]) < 0) agrupadas[a[0]].push(a[1]);
+            });
+            const grados = ['1°','2°','3°','4°','5°']
+                .filter(function(g){ return agrupadas[g] && agrupadas[g].length; })
+                .map(function(g){ return { g:g, secciones:agrupadas[g] }; });
+
             cont.innerHTML = grados.map(({ g, secciones }) => {
                 const isThis = estado.grado === g;
                 return `
                 <div class="grado-card ${isThis ? 'active-grado' : ''}" data-grado="${g}">
                     <div class="grado-label">${g}</div>
                     <div class="sec-row">
-                        ${secciones.map(s => `
-                            <button type="button" title="${s}"
-                                class="sec-btn ${isThis && estado.seccion === s ? 'active' : ''}"
-                                onclick="setGradoSeccion('${g}','${s}')">${s === 'ÚNICA' ? 'Única' : s}</button>
+                        ${secciones.map(sec => `
+                            <button type="button" title="${sec}"
+                                class="sec-btn ${isThis && estado.seccion === sec ? 'active' : ''}"
+                                onclick="setGradoSeccion('${g}','${sec}')">${sec === 'ÚNICA' ? 'Única' : sec}</button>
                         `).join('')}
                     </div>
                 </div>`;
@@ -1704,6 +1742,10 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function setGradoSeccion(grado, seccion) {
+            if (!aulaPermitidaSesionSec(grado, seccion)) {
+                mostrarToast('Ese salón no está asignado a este docente', 'error');
+                return;
+            }
             estado.grado = grado;
             // Normalizar sección según grado (5° solo ÚNICA; 1°–4° solo A/B)
             if (grado === '5°') {
@@ -1993,24 +2035,19 @@ window.__IE_gradoOK = function(gradoVal) {
             const cont = document.getElementById('presNavGrados');
             if (!cont) return;
             cont.innerHTML = '';
-            // Secundaria: 1°–4° A/B · 5° Única
-            const aulas = [
-                ['1°','A'], ['1°','B'],
-                ['2°','A'], ['2°','B'],
-                ['3°','A'], ['3°','B'],
-                ['4°','A'], ['4°','B'],
-                ['5°','ÚNICA']
-            ];
-            aulas.forEach(([g, s]) => {
+            normalizarAulaPermitidaSec();
+            const aulas = aulasPermitidasSesionSec();
+            aulas.forEach(([g, sec]) => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                const label = s === 'ÚNICA' ? '5° Única' : (g + ' ' + s);
+                const label = sec === 'ÚNICA' ? (g + ' Única') : (g + ' ' + sec);
                 btn.textContent = label;
                 btn.title = label;
-                if (estado.grado === g && estado.seccion === s) btn.classList.add('active');
+                if (estado.grado === g && estado.seccion === sec) btn.classList.add('active');
                 btn.onclick = () => {
+                    if (!aulaPermitidaSesionSec(g, sec)) return;
                     estado.grado = g;
-                    estado.seccion = s;
+                    estado.seccion = sec;
                     if (typeof actualizarBotonesSeleccion === 'function') actualizarBotonesSeleccion();
                     if (typeof renderGradoSeccion === 'function') renderGradoSeccion();
                     if (typeof renderizarAreas === 'function') renderizarAreas();
@@ -2466,6 +2503,12 @@ window.__IE_gradoOK = function(gradoVal) {
 
         let chartComparativo = [];
         function seccionesDelGrado(grado) {
+            const permitidas = aulasPermitidasSesionSec()
+                .filter(function(a){ return a[0] === grado; })
+                .map(function(a){ return a[1]; });
+            if (permitidas.length) return permitidas;
+            const ses = window.__IE_SES;
+            if (ses && ses.role === 'docente' && ses.aulas && ses.aulas.length) return [];
             if (grado === '5°') return ['ÚNICA'];
             return ['A', 'B'];
         }
@@ -2590,11 +2633,13 @@ window.__IE_gradoOK = function(gradoVal) {
         function abrirCmpPresentacion() {
             const el = document.getElementById('modoCmpPresentacion');
             if (!el) return;
+            normalizarAulaPermitidaSec();
             if (document.getElementById('vistaComparativo').classList.contains('hidden')) abrirComparativo();
             const area = ((document.getElementById('cmpArea') || {}).value) || estado.areaActual;
             if (!area || !ESTRUCTURA_AREAS[area]) return;
             const grado = estado.grado || '1°';
             const secs = seccionesDelGrado(grado);
+            if (!secs.length) return;
             const colA = secs[0], colB = secs[1] || null;
             const filas = ESTRUCTURA_AREAS[area].competencias.map((c, i) => ({
                 i: i+1, nombre: c,
@@ -2614,10 +2659,12 @@ window.__IE_gradoOK = function(gradoVal) {
             chartCmpPres = [];
         }
         function renderComparativo() {
+            normalizarAulaPermitidaSec();
             const area = ((document.getElementById('cmpArea') || {}).value) || estado.areaActual;
             if (!area || !ESTRUCTURA_AREAS[area]) return;
             const grado = estado.grado || '1°';
             const secs = seccionesDelGrado(grado);
+            if (!secs.length) return;
             const lbl = document.getElementById('cmpGradoLbl');
             if (lbl) lbl.textContent = 'Bimestre ' + estado.bimestre + ' · ' + grado + ' · ' + secs.map(s => s === 'ÚNICA' ? 'Única' : s).join(' y ');
             const comps = ESTRUCTURA_AREAS[area].competencias;
