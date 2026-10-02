@@ -182,6 +182,7 @@
         <div class="text-xs text-sky-100/90 truncate" id="hdrSub">—</div>
       </div>
       <div class="flex gap-2 shrink-0">
+        <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="abrirNotebookPanel()">Notebook</button>
         <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="guardarTodo(); toast('Guardado')">💾</button>
         <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="volverHome()">Salir</button>
       </div>
@@ -224,9 +225,12 @@
       <div id="areaBtns" class="flex flex-wrap gap-1.5"></div>
     </div>
 
-    <div class="card p-3 space-y-2">
-      <div class="text-[10px] font-bold text-slate-500">CLASSROOM Y CUADERNO GEMINI</div>
-      <p class="text-[11px] text-slate-500">Prueba: lista los cursos de la cuenta Google del script y manda la sesión de hoy como tarea. El cuaderno se abre aparte.</p>
+    <div class="card p-3 space-y-2 hidden" id="panelNotebook">
+      <div class="flex items-center justify-between">
+        <div class="text-[10px] font-bold text-slate-500">NOTEBOOK Y CLASSROOM</div>
+        <button type="button" class="btn btn-ghost text-xs !py-1" onclick="cerrarNotebookPanel()">Cerrar</button>
+      </div>
+      <p class="text-[11px] text-slate-500">No carga el registro. Elige el curso, escribe la tarea y envíala. El cuaderno se abre aparte.</p>
       <div class="flex flex-wrap gap-2">
         <button type="button" class="btn btn-primary text-xs" onclick="cargarClassroom()">Ver mis cursos</button>
         <button type="button" class="btn btn-ghost text-xs" onclick="autorizarClassroom()">Autorizar Classroom</button>
@@ -525,7 +529,16 @@ function saveStore() {
 
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
 function clsNota(t){ const el=document.getElementById('clsMsg'); if(el) el.textContent=t; }
-function autorizarClassroom(){
+function abrirNotebookPanel(){
+  const p=document.getElementById('panelNotebook');
+  if(p) p.classList.remove('hidden');
+  restaurarCursos();
+  p && p.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function cerrarNotebookPanel(){
+  const p=document.getElementById('panelNotebook');
+  if(p) p.classList.add('hidden');
+}
   window.open(CLOUD_API_URL+'?action=classroom','_blank');
   clsNota('Acepta el permiso de Google en la pestaña. Luego vuelve y pulsa Ver mis cursos.');
 }

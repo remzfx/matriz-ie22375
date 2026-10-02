@@ -238,7 +238,7 @@ async function intentarLogin() {
     grados: d.nivel === 'primaria' ? (d.grados || []) : null,
     areas: d.nivel === 'secundaria' ? (d.areas || []) : null,
     aulas: d.nivel === 'secundaria' ? (d.aulas || []) : null,
-    mods: d.nivel === 'primaria' ? ['matriz_pri','registro'] : ['matriz_sec','registro'],
+    mods: d.nivel === 'primaria' ? ['registro','matriz_pri'] : ['registro','matriz_sec'],
     ts: Date.now(),
     recordar: !!(document.getElementById('inpRecordar')||{}).checked
   });
@@ -254,8 +254,8 @@ function modsDe(s) {
   if (s.role === 'admin' || s.user === 'admin') return ['admin_bd','registro','auxiliar','wa_grupos','matriz_pri','matriz_sec','aip'];
   if (s.role === 'auxiliar' || s.user === 'auxiliar') return ['auxiliar','wa_grupos'];
   if (s.role === 'pip' || s.user === 'pip') return ['aip'];
-  if (s.nivel === 'primaria') return ['matriz_pri','registro'];
-  if (s.nivel === 'secundaria') return ['matriz_sec','registro'];
+  if (s.nivel === 'primaria') return ['registro','matriz_pri'];
+  if (s.nivel === 'secundaria') return ['registro','matriz_sec'];
   return ['registro'];
 }
 function irModulo(href) {
