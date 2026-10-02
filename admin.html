@@ -37,6 +37,16 @@
   #screenApp.screen.active { display: block !important; }
   input, select, textarea { border:1px solid #cbd5e1; border-radius:10px; padding:.55rem .75rem; width:100%; }
   input:focus, select:focus, textarea:focus { outline:2px solid #7dd3fc; border-color:#0ea5e9; }
+  .mobile-safe-header { padding-top: env(safe-area-inset-top, 0px); }
+  .mobile-top-actions > a, .mobile-top-actions > button,
+  .mobile-nav-scroll > button { min-height:44px; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18); }
+  @media (max-width:640px) {
+    .mobile-top-row { align-items:flex-start !important; }
+    .mobile-top-actions { flex-wrap:nowrap !important; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+    .mobile-top-actions::-webkit-scrollbar, .mobile-nav-scroll::-webkit-scrollbar { display:none; }
+    .mobile-nav-scroll { flex-wrap:nowrap !important; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:.75rem; }
+    .mobile-nav-scroll > button { flex:0 0 auto; }
+  }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800">
@@ -84,19 +94,19 @@
 
 <!-- APP -->
 <div id="screenApp" class="screen">
-  <header class="bg-gradient-to-r from-slate-900 to-sky-900 text-white sticky top-0 z-20">
-    <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+  <header class="mobile-safe-header bg-gradient-to-r from-slate-900 to-sky-900 text-white sticky top-0 z-20">
+    <div class="mobile-top-row max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
       <div>
         <div class="text-[10px] font-bold tracking-widest text-sky-200">ADMIN · IE 22375</div>
         <div class="font-black text-lg leading-tight">Registro auxiliar</div>
         <div class="text-xs text-sky-100/80" id="hdrAnio">Año 2026</div>
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div class="mobile-top-actions flex flex-wrap gap-2">
         <a href="index.html" class="btn btn-ghost text-xs !py-1.5 !px-3">Inicio</a>
         <button class="btn btn-ghost text-xs !py-1.5 !px-3" onclick="logout()">Salir</button>
       </div>
     </div>
-    <nav class="max-w-5xl mx-auto px-4 pb-3 flex flex-wrap gap-2">
+    <nav class="mobile-nav-scroll max-w-5xl mx-auto px-4 pb-3 flex flex-wrap gap-2">
       <button class="navbtn chip chip-on" data-tab="menu" onclick="showTab('menu')">Menú</button>
       <button class="navbtn chip chip-off" data-tab="bd" onclick="showTab('bd')">Estudiantes</button>
       <button class="navbtn chip chip-off" data-tab="periodos" onclick="showTab('periodos')">Bimestres</button>
