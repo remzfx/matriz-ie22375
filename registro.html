@@ -539,8 +539,9 @@ function abrirNotebook(){
 }
 async function cargarClassroom(){
   clsNota('Buscando cursos…');
+  const url=CLOUD_API_URL+'?action=classroom';
   try{
-    const res=await fetch(CLOUD_API_URL+'?action=classroom');
+    const res=await fetch(url);
     const data=await res.json();
     const sel=document.getElementById('selCurso');
     sel.innerHTML='';
@@ -552,7 +553,10 @@ async function cargarClassroom(){
       sel.appendChild(o);
     });
     clsNota((data.total||0)+' curso(s). Elige uno y envía la sesión.');
-  }catch(e){ clsNota('Error de red. Publica la nueva versión del Apps Script.'); }
+  }catch(e){
+    clsNota('Google pide permiso. Acepta en la pestaña que se abrió y vuelve a pulsar Ver mis cursos.');
+    window.open(url,'_blank');
+  }
 }
 async function enviarSesionClassroom(){
   const courseId=(document.getElementById('selCurso').value||'');
