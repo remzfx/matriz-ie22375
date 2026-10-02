@@ -542,6 +542,12 @@ function abrirNotebook(){
   if(!url){ clsNota('Pega el enlace de NotebookLM de esta área.'); return; }
   window.open(url,'_blank');
 }
+function cargarPegado(){
+  const raw=(document.getElementById('clsPega').value||'').trim();
+  if(!raw){ clsNota('Pega el texto de la pestaña negra.'); return; }
+  try { pintarCursos(JSON.parse(raw)); }
+  catch(e){ clsNota('Ese texto no es la lista. Copia desde { hasta }'); }
+}
 function pintarCursos(data){
   const sel=document.getElementById('selCurso');
   if(!sel) return;
