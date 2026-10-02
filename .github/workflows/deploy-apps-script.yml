@@ -1,0 +1,70 @@
+name: Deploy Apps Script
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install clasp
+        run: npm install --global @google/clasp@latest
+
+      - name: Configure clasp credentials
+        shell: bash
+        run: |
+          if [ -z '${{ secrets.CLASPRC_JSON }}' ]; then
+            echo "Falta el secret CLASPRC_JSON"
+            exit 1
+          fi
+          if [ -z '${{ secrets.CLASP_JSON }}' ]; then
+            echo "Falta el secret CLASP_JSON"
+            exit 1
+          fi
+
+          printf '%s' '${{ secrets.CLASPRC_JSON }}' > "$HOME/.clasprc.json"
+          printf '%s' '${{ secrets.CLASP_JSON }}' > ".clasp.json"
+
+      - name: Validate Apps Script project files
+        shell: bash
+        run: |
+          if [ ! -f "apps-script/appsscript.json" ]; then
+            echo "Falta apps-script/appsscript.json."
+            echo "Sincroniza primero el manifiesto real del proyecto antes del primer despliegue."
+            exit 1
+          fi
+          if ! find apps-script -maxdepth 1 -type f \( -name '*.gs' -o -name '*.js' \) | grep -q .; then
+            echo "No hay código Apps Script en apps-script/."
+            exit 1
+          fi
+
+      - name: Show files that will be pushed
+        run: clasp show-file-status
+
+      - name: Push source to Apps Script
+        run: clasp push --force
+
+      - name: Redeploy existing Web App
+        shell: bash
+        run: |
+          if [ -z '${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}' ]; then
+            echo "Falta el secret APPS_SCRIPT_DEPLOYMENT_ID"
+            exit 1
+          fi
+
+          clasp create-deployment \
+            --deploymentId '${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}' \
+            --description "GitHub ${GITHUB_SHA::7}"

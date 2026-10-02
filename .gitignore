@@ -1,0 +1,7 @@
+# Google Apps Script / clasp credentials
+.clasprc.json
+.clasp.json
+
+# Local environment files
+.env
+.env.*
