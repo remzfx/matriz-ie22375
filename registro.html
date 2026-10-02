@@ -542,44 +542,45 @@ function abrirNotebook(){
   if(!url){ clsNota('Pega el enlace de NotebookLM de esta área.'); return; }
   window.open(url,'_blank');
 }
-async function cargarClassroom(){
+function pintarCursos(data){
+  const sel=document.getElementById('selCurso');
+  if(!sel) return;
+  sel.innerHTML='';
+  if(!data || !data.ok){ clsNota((data&&data.error)||'No se pudo leer Classroom'); return; }
+  (data.cursos||[]).forEach(c=>{
+    const o=document.createElement('option');
+    o.value=c.id;
+    o.textContent=(c.name||'Curso')+(c.section?' · '+c.section:'');
+    sel.appendChild(o);
+  });
+  clsNota((data.total||0)+' curso(s). Elige uno y envía la sesión.');
+}
+function cargarClassroom(){
   clsNota('Buscando cursos…');
-  const url=CLOUD_API_URL+'?action=classroom';
-  try{
-    const res=await fetch(url);
-    const data=await res.json();
-    const sel=document.getElementById('selCurso');
-    sel.innerHTML='';
-    if(!data.ok){ clsNota(data.error||'No se pudo leer Classroom'); return; }
-    (data.cursos||[]).forEach(c=>{
-      const o=document.createElement('option');
-      o.value=c.id;
-      o.textContent=(c.name||'Curso')+(c.section?' · '+c.section:'');
-      sel.appendChild(o);
-    });
-    clsNota((data.total||0)+' curso(s). Elige uno y envía la sesión.');
-  }catch(e){
-    clsNota('Google pide permiso. Acepta en la pestaña que se abrió y vuelve a pulsar Ver mis cursos.');
-    window.open(url,'_blank');
-  }
+  window.clsCursos=function(data){ pintarCursos(data); };
+  const s=document.createElement('script');
+  s.src=CLOUD_API_URL+'?action=classroom&callback=clsCursos';
+  s.onerror=function(){
+    clsNota('Primero autoriza. Acepta en la pestaña y vuelve a pulsar Ver mis cursos.');
+    window.open(CLOUD_API_URL+'?action=classroom','_blank');
+  };
+  document.body.appendChild(s);
 }
 async function enviarSesionClassroom(){
   const courseId=(document.getElementById('selCurso').value||'');
   if(!courseId){ clsNota('Primero pulsa Ver mis cursos.'); return; }
   const c=ctxBase();
-  const titulo=(c.area||'Área')+' · Bim '+c.bim+' · '+c.grado+'° '+(c.seccion||'');
+  const titulo=encodeURIComponent((c.area||'Área')+' · Bim '+c.bim+' · '+c.grado+'° '+(c.seccion||''));
+  const link=encodeURIComponent(location.href);
   clsNota('Creando tarea…');
-  try{
-    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({
-      action:'classroomtarea', courseId:courseId, titulo:titulo,
-      descripcion:'Sesión enviada desde el registro auxiliar IE 22375.',
-      link: location.href
-    })});
-    const data=await res.json();
-    if(!data.ok){ clsNota(data.error||'No se creó la tarea'); return; }
-    clsNota('Tarea creada.');
+  window.clsTarea=function(data){
+    if(!data || !data.ok){ clsNota((data&&data.error)||'No se creó la tarea'); return; }
+    clsNota('Tarea creada en Classroom.');
     if(data.alternateLink) window.open(data.alternateLink,'_blank');
-  }catch(e){ clsNota('No se pudo crear. Revisa el servicio Classroom en Apps Script.'); }
+  };
+  const s=document.createElement('script');
+  s.src=CLOUD_API_URL+'?action=creartarea&callback=clsTarea&courseId='+encodeURIComponent(courseId)+'&titulo='+titulo+'&link='+link+'&descripcion='+encodeURIComponent('Sesión enviada desde el registro auxiliar IE 22375.');
+  document.body.appendChild(s);
 }
 function cloudClaveReg() {
   const c = ctxBase();
