@@ -878,7 +878,28 @@
             }
         }
 
-    </style>
+    
+        .mobile-safe-header { padding-top: env(safe-area-inset-top, 0px); }
+        .mobile-header-actions { -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+        .mobile-header-actions::-webkit-scrollbar { display:none; }
+        .mobile-header-actions > a,
+        .mobile-header-actions > button,
+        .mobile-header-actions > label {
+            min-height:44px;
+            flex:0 0 auto;
+            touch-action:manipulation;
+            -webkit-tap-highlight-color:rgba(255,255,255,.18);
+        }
+        @media (max-width: 767px) {
+            .mobile-header-actions {
+                width:100%;
+                flex-wrap:nowrap !important;
+                overflow-x:auto;
+                justify-content:flex-start;
+                padding-bottom:2px;
+            }
+        }
+</style>
 </head>
 <body class="text-slate-800">
 <script>window.__IE_NEED_['primaria','admin']=['primaria','admin'];</script>
@@ -932,7 +953,7 @@ window.__IE_gradoOK = function(gradoVal) {
 
 
     <!-- HEADER -->
-    <header class="bg-gradient-to-r from-sky-700 via-sky-600 to-emerald-600 text-white shadow-xl no-print">
+    <header class="mobile-safe-header bg-gradient-to-r from-sky-700 via-sky-600 to-emerald-600 text-white shadow-xl no-print">
         <div class="max-w-7xl mx-auto px-4 py-4">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div class="flex items-center gap-4">
@@ -946,7 +967,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     </div>
                 </div>
                 
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="mobile-header-actions flex flex-wrap items-center gap-2">
                     <a href="index.html" class="bg-white text-sky-800 hover:bg-sky-50 px-3 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition">
                         ← Módulos
                     </a>

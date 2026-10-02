@@ -33,6 +33,19 @@
   .area-btn { font-size:12px; padding:.45rem .7rem; border-radius:10px; font-weight:800; background:#f1f5f9; color:#475569; border:0; cursor:pointer; }
   .area-btn.on { background:#0ea5e9; color:#fff; }
   .sticky-top { position:sticky; top:0; z-index:40; }
+  .mobile-safe-header { padding-top: env(safe-area-inset-top, 0px); }
+  .mobile-header-actions { -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .mobile-header-actions::-webkit-scrollbar { display:none; }
+  .mobile-header-actions > a, .mobile-header-actions > button {
+    min-height:44px; flex:0 0 auto; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18);
+  }
+  @media (max-width:640px) {
+    #appHdr > div { flex-direction:column; align-items:stretch; gap:8px; }
+    #appHdr .mobile-header-actions {
+      width:100%; display:flex; flex-wrap:nowrap !important; overflow-x:auto;
+      justify-content:flex-start !important; padding-bottom:2px;
+    }
+  }
   .ctx-bar { position:sticky; top:var(--hdr,56px); z-index:35; background:#f1f5f9; padding:8px 0; border-bottom:1px solid #e2e8f0; }
   .mode-toggle { display:flex; gap:6px; background:#e2e8f0; border-radius:12px; padding:4px; }
   .mode-toggle button { flex:1; border:0; border-radius:10px; padding:.45rem .5rem; font-size:12px; font-weight:800; background:transparent; color:#64748b; cursor:pointer; }
@@ -174,14 +187,14 @@
 </div>
 
 <div id="viewApp" class="hidden">
-  <header class="sticky-top bg-gradient-to-r from-slate-900 to-sky-900 text-white" id="appHdr">
+  <header class="sticky-top mobile-safe-header bg-gradient-to-r from-slate-900 to-sky-900 text-white" id="appHdr">
     <div class="max-w-3xl mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
       <div class="min-w-0">
         <div class="text-[10px] font-bold tracking-widest text-sky-200">REGISTRO AUXILIAR</div>
         <div class="font-black leading-tight truncate" id="hdrTitulo">—</div>
         <div class="text-xs text-sky-100/90 truncate" id="hdrSub">—</div>
       </div>
-      <div class="flex gap-1.5 shrink-0 flex-wrap justify-end">
+      <div class="mobile-header-actions flex gap-1.5 shrink-0 flex-wrap justify-end">
         <a href="https://classroom.google.com/" target="_blank" rel="noopener noreferrer"
            class="btn btn-ghost text-xs !py-2 !px-3" title="Abrir Google Classroom">Classroom</a>
         <a href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer"

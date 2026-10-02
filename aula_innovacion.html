@@ -26,6 +26,16 @@
   .c-vac { background:#fda4af; cursor:pointer; font-weight:800; }
   .c-rec { background:#fde68a; font-weight:700; }
   .sticky-top { position:sticky; top:0; z-index:20; }
+  .mobile-safe-header { padding-top: env(safe-area-inset-top, 0px); }
+  .mobile-header-actions { -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .mobile-header-actions::-webkit-scrollbar { display:none; }
+  .mobile-header-actions > a, .mobile-header-actions > button {
+    min-height:44px; flex:0 0 auto; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18);
+  }
+  @media (max-width:640px) {
+    .mobile-aip-row { flex-direction:column; align-items:stretch !important; gap:8px; }
+    .mobile-header-actions { width:100%; flex-wrap:nowrap !important; overflow-x:auto; justify-content:flex-start; padding-bottom:2px; }
+  }
   .aip-tab { border:0; border-radius:12px; font-weight:800; padding:.55rem 1rem; cursor:pointer; font-size:13px; background:#e2e8f0; color:#0f172a; }
   .aip-tab.on { background:#065f46; color:#fff; }
   .only-print { display:none; }
@@ -41,13 +51,13 @@
 </style>
 </head>
 <body>
-<header class="sticky-top bg-gradient-to-r from-slate-900 to-emerald-900 text-white no-print">
-  <div class="max-w-6xl mx-auto px-3 py-3 flex items-center justify-between gap-2">
+<header class="sticky-top mobile-safe-header bg-gradient-to-r from-slate-900 to-emerald-900 text-white no-print">
+  <div class="mobile-aip-row max-w-6xl mx-auto px-3 py-3 flex items-center justify-between gap-2">
     <div>
       <div class="text-[10px] font-bold tracking-widest text-emerald-200">IE 22375 · PIP</div>
       <div class="font-black">Aula de Innovación · Competencia 28</div>
     </div>
-    <div class="flex gap-2">
+    <div class="mobile-header-actions flex gap-2">
       <button class="btn btn-ok text-xs" type="button" onclick="subirAipNube()">Nube ↑</button>
       <button class="btn btn-ghost text-xs" type="button" onclick="bajarAipNube()">Nube ↓</button>
       <a href="index.html" class="btn btn-ghost text-xs">Inicio</a>
