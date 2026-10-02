@@ -154,12 +154,12 @@
     <p class="text-sm text-slate-500 mt-1">Sesión · Competencia · Capacidad · 2026</p>
   </div>
   <div class="grid gap-3">
-    <button id="btnHomePri" class="card p-5 text-left" onclick="entrarNivel('primaria')">
+    <button type="button" id="btnHomePri" class="card p-5 text-left w-full" style="cursor:pointer" onclick="entrarNivel('primaria')">
       <div class="text-xs font-bold text-sky-600">NIVEL</div>
       <div class="text-xl font-black">Primaria</div>
       <div class="text-sm text-slate-500">1°–6° · Sección única · Todas las áreas</div>
     </button>
-    <button id="btnHomeSec" class="card p-5 text-left" onclick="entrarNivel('secundaria')">
+    <button type="button" id="btnHomeSec" class="card p-5 text-left w-full" style="cursor:pointer" onclick="entrarNivel('secundaria')">
       <div class="text-xs font-bold text-emerald-600">NIVEL</div>
       <div class="text-xl font-black">Secundaria</div>
       <div class="text-sm text-slate-500">1°–5° · A/B o Única · Por área</div>
@@ -168,9 +168,9 @@
   <p id="lblNivelBloqueo" class="hidden text-center text-sm text-slate-500 mt-3"></p>
   <div class="mt-6 text-center space-x-3 text-sm">
     <a href="index.html" class="text-slate-500">← Inicio</a>
-    <a href="admin.html" class="text-slate-500">Admin BD</a>
+    <a id="lnkAdminBd" href="admin.html" class="text-slate-500">Admin BD</a>
   </div>
-  <p class="text-[11px] text-center text-slate-400 mt-8">Desarrollo · Diseño e integración Mag. Efrain Ceopa Paredes</p>
+  <p class="text-[11px] text-center text-slate-400 mt-8">v1.2 · Desarrollo · Diseño e integración Mag. Efrain Ceopa Paredes</p>
 </div>
 
 <div id="viewApp" class="hidden">
@@ -896,6 +896,8 @@ function aplicarRestriccionNivel() {
       lbl.classList.remove('hidden');
       lbl.textContent = 'Sesión Primaria' + extra;
     }
+    var adm = document.getElementById('lnkAdminBd');
+    if (adm) adm.style.display = 'none';
     entrarNivel('primaria');
   } else if (perm === 'secundaria') {
     btnP.style.display = 'none';
@@ -904,14 +906,18 @@ function aplicarRestriccionNivel() {
       lbl.classList.remove('hidden');
       lbl.textContent = 'Sesión Secundaria' + extra;
     }
+    var adm2 = document.getElementById('lnkAdminBd');
+    if (adm2) adm2.style.display = 'none';
     entrarNivel('secundaria');
-  } else {
+  } else if (perm === 'admin') {
     btnP.style.display = 'block';
     btnS.style.display = 'block';
     if (lbl) {
       lbl.classList.remove('hidden');
       lbl.textContent = 'Administrador · ambos niveles';
     }
+  } else {
+    location.replace('index.html');
   }
 }
 
