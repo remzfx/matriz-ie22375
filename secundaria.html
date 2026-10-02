@@ -1151,7 +1151,7 @@ window.__IE_gradoOK = function(gradoVal) {
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-black text-slate-800"><i class="fas fa-balance-scale text-indigo-600 mr-2"></i>Comparativo del grado</h2>
-                    <p class="text-xs text-slate-500">Un área. El grado de arriba y sus secciones. Cada barra suma 100%: Inicio, Proceso, Previsto y Destacado.</p>
+                    <p class="text-xs text-slate-500">Un área. El grado de arriba y sus secciones. Cada barra suma 100%: Inicio, Proceso, Logrado y Destacado.</p>
                 </div>
                 <div class="flex items-center gap-2">
                     <button type="button" onclick="abrirCmpPresentacion()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
@@ -1168,6 +1168,12 @@ window.__IE_gradoOK = function(gradoVal) {
                 <div class="flex items-end">
                     <p id="cmpGradoLbl" class="text-sm font-bold text-slate-600">Grado —</p>
                 </div>
+            </div>
+            <div id="cmpLeyenda" class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600">
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#ef4444"></span>Inicio</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#eab308"></span>Proceso</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#84cc16"></span>Logrado</span>
+                <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#16a34a"></span>Destacado</span>
             </div>
             <div id="cmpCharts" style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px;width:100%"></div>
             <div class="overflow-x-auto">
@@ -1290,7 +1296,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     <span class="font-semibold text-slate-600">NIVELES DE LOGRO:</span>
                     <span class="inline-flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-red-400"></span> Inicio (C) 0-10</span>
                     <span class="inline-flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-yellow-400"></span> En Proceso (B) 11-13</span>
-                    <span class="inline-flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-lime-400"></span> Previsto (A) 14-17</span>
+                    <span class="inline-flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-lime-400"></span> Logrado (A) 14-17</span>
                     <span class="inline-flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-green-500"></span> Destacado (AD) 18-20</span>
                     <div class="ml-auto no-print">
                         <button onclick="ocultarVistaTabla()" class="bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium">
@@ -1402,6 +1408,12 @@ window.__IE_gradoOK = function(gradoVal) {
             </div>
             <button type="button" onclick="cerrarCmpPresentacion()" class="bg-white/15 hover:bg-white/25 px-4 py-2 rounded-xl font-bold">Salir</button>
         </div>
+        <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-200 mb-4">
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#ef4444"></span>Inicio</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#eab308"></span>Proceso</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#84cc16"></span>Logrado</span>
+            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm" style="background:#16a34a"></span>Destacado</span>
+        </div>
         <div id="cmpPresCharts" style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px"></div>
     </div>
 
@@ -1504,7 +1516,7 @@ window.__IE_gradoOK = function(gradoVal) {
         const NIVELES = [
             { key: "inicio", label: "Inicio (C)", rango: "0-10", color: "#ef4444", bg: "nivel-inicio" },
             { key: "proceso", label: "En Proceso (B)", rango: "11-13", color: "#eab308", bg: "nivel-proceso" },
-            { key: "previsto", label: "Previsto (A)", rango: "14-17", color: "#84cc16", bg: "nivel-previsto" },
+            { key: "previsto", label: "Logrado (A)", rango: "14-17", color: "#84cc16", bg: "nivel-previsto" },
             { key: "destacado", label: "Destacado (AD)", rango: "18-20", color: "#16a34a", bg: "nivel-destacado" }
         ];
 
@@ -2132,7 +2144,7 @@ window.__IE_gradoOK = function(gradoVal) {
                         datasets: [
                             { label: 'Inicio (C)', data: inicio, backgroundColor: '#ef4444' },
                             { label: 'Proceso (B)', data: proceso, backgroundColor: '#eab308' },
-                            { label: 'Previsto (A)', data: previsto, backgroundColor: '#84cc16' },
+                            { label: 'Logrado (A)', data: previsto, backgroundColor: '#84cc16' },
                             { label: 'Destacado (AD)', data: destacado, backgroundColor: '#16a34a' }
                         ]
                     },
@@ -2183,7 +2195,7 @@ window.__IE_gradoOK = function(gradoVal) {
                                         },
                                         formatter: function(v, ctx) {
                                             if (!v || v <= 0) return '';
-                                            const full = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
+                                            const full = ['INICIO', 'PROCESO', 'LOGRADO', 'DESTACADO'];
                                             return full[ctx.datasetIndex] || '';
                                         }
                                     },
@@ -2234,7 +2246,7 @@ window.__IE_gradoOK = function(gradoVal) {
                 chartsPres.dona = new Chart(ctxD, {
                     type: 'doughnut',
                     data: {
-                        labels: ['Inicio (C)', 'Proceso (B)', 'Previsto (A)', 'Destacado (AD)'],
+                        labels: ['Inicio (C)', 'Proceso (B)', 'Logrado (A)', 'Destacado (AD)'],
                         datasets: [{
                             data: [tI, tP, tPr, tD],
                             backgroundColor: ['#ef4444', '#eab308', '#84cc16', '#16a34a']
@@ -2317,7 +2329,7 @@ window.__IE_gradoOK = function(gradoVal) {
                         <div style="background:#f7fee7;border-color:#bef264;color:#3f6212">
                             <div class="n">${d.previsto||0}</div>
                             <div class="p">${totalEst > 0 ? pct(d.previsto||0) + '%' : '—'}</div>
-                            <div class="l">Previsto</div>
+                            <div class="l">Logrado</div>
                         </div>
                         <div style="background:#ecfdf5;border-color:#6ee7b7;color:#047857">
                             <div class="n">${d.destacado||0}</div>
@@ -2332,7 +2344,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     chartsPres.minis[cid] = new Chart(canvas, {
                         type: 'doughnut',
                         data: {
-                            labels: ['Inicio', 'Proceso', 'Previsto', 'Destacado'],
+                            labels: ['Inicio', 'Proceso', 'Logrado', 'Destacado'],
                             datasets: [{
                                 data: tiene ? [d.inicio||0, d.proceso||0, d.previsto||0, d.destacado||0] : [1],
                                 backgroundColor: tiene ? ['#ef4444','#eab308','#84cc16','#16a34a'] : ['#e2e8f0'],
@@ -2462,7 +2474,7 @@ window.__IE_gradoOK = function(gradoVal) {
                             </div>
                             <div class="bg-lime-50 border border-lime-200 rounded-xl px-3 py-1.5 text-center min-w-[70px]">
                                 <div class="text-base font-bold text-lime-600">${resumen.previsto}</div>
-                                <div class="text-[10px] text-lime-600 font-medium">Previsto</div>
+                                <div class="text-[10px] text-lime-600 font-medium">Logrado</div>
                             </div>
                             <div class="bg-green-50 border border-green-200 rounded-xl px-3 py-1.5 text-center min-w-[70px]">
                                 <div class="text-base font-bold text-green-600">${resumen.destacado}</div>
@@ -2730,13 +2742,13 @@ window.__IE_gradoOK = function(gradoVal) {
                         datasets: [
                             { label: 'Inicio', data: di, backgroundColor: '#ef4444', stack: 'n' },
                             { label: 'Proceso', data: dp, backgroundColor: '#eab308', stack: 'n' },
-                            { label: 'Previsto', data: dpr, backgroundColor: '#84cc16', stack: 'n' },
+                            { label: 'Logrado', data: dpr, backgroundColor: '#84cc16', stack: 'n' },
                             { label: 'Destacado', data: dd, backgroundColor: '#16a34a', stack: 'n' }
                         ]
                     },
                     options: {
                         responsive: true, maintainAspectRatio: false,
-                        plugins: { legend: { display: f.i === 1, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } },
+                        plugins: { legend: { display: false } },
                         datasets: { bar: { maxBarThickness: 48 } },
                         scales: {
                             x: { stacked: true, ticks: { font: { size: 10 } } },
@@ -2853,18 +2865,18 @@ window.__IE_gradoOK = function(gradoVal) {
                 return `${i + 1}. ${corto}`;
             });
             
-            const dataInicio = [], dataProceso = [], dataPrevisto = [], dataDestacado = [];
-            let sumInicio = 0, sumProceso = 0, sumPrevisto = 0, sumDestacado = 0;
+            const dataInicio = [], dataProceso = [], dataLogrado = [], dataDestacado = [];
+            let sumInicio = 0, sumProceso = 0, sumLogrado = 0, sumDestacado = 0;
             
             area.competencias.forEach(comp => {
                 const d = getDato(estado.areaActual, comp);
                 dataInicio.push(d.inicio);
                 dataProceso.push(d.proceso);
-                dataPrevisto.push(d.previsto);
+                dataLogrado.push(d.previsto);
                 dataDestacado.push(d.destacado);
                 sumInicio += d.inicio;
                 sumProceso += d.proceso;
-                sumPrevisto += d.previsto;
+                sumLogrado += d.previsto;
                 sumDestacado += d.destacado;
             });
             
@@ -2878,7 +2890,7 @@ window.__IE_gradoOK = function(gradoVal) {
                         datasets: [
                             { label: 'Inicio (C)', data: dataInicio, backgroundColor: '#ef4444', borderRadius: 4 },
                             { label: 'En Proceso (B)', data: dataProceso, backgroundColor: '#eab308', borderRadius: 4 },
-                            { label: 'Previsto (A)', data: dataPrevisto, backgroundColor: '#84cc16', borderRadius: 4 },
+                            { label: 'Logrado (A)', data: dataLogrado, backgroundColor: '#84cc16', borderRadius: 4 },
                             { label: 'Destacado (AD)', data: dataDestacado, backgroundColor: '#16a34a', borderRadius: 4 }
                         ]
                     },
@@ -2923,7 +2935,7 @@ window.__IE_gradoOK = function(gradoVal) {
                                         },
                                         formatter: function(val, ctx) {
                                             if (!val || val <= 0) return '';
-                                            const full = ['INICIO', 'PROCESO', 'PREVISTO', 'DESTACADO'];
+                                            const full = ['INICIO', 'PROCESO', 'LOGRADO', 'DESTACADO'];
                                             return full[ctx.datasetIndex] || '';
                                         }
                                     },
@@ -2960,7 +2972,7 @@ window.__IE_gradoOK = function(gradoVal) {
             
             // ===== GRÁFICO DONA RESUMEN ÁREA =====
             const ctxDona = document.getElementById('chartDonaArea');
-            const totalArea = sumInicio + sumProceso + sumPrevisto + sumDestacado;
+            const totalArea = sumInicio + sumProceso + sumLogrado + sumDestacado;
             const tieneDatosArea = totalArea > 0;
             
             if (ctxDona) {
@@ -2968,16 +2980,16 @@ window.__IE_gradoOK = function(gradoVal) {
                     type: 'doughnut',
                     data: {
                         labels: (function() {
-                            const ps = tieneDatosArea ? porcentajesQueSuman100([sumInicio, sumProceso, sumPrevisto, sumDestacado]) : [0,0,0,0];
+                            const ps = tieneDatosArea ? porcentajesQueSuman100([sumInicio, sumProceso, sumLogrado, sumDestacado]) : [0,0,0,0];
                             return [
                                 `Inicio (C): ${ps[0]}%`,
                                 `En Proceso (B): ${ps[1]}%`,
-                                `Previsto (A): ${ps[2]}%`,
+                                `Logrado (A): ${ps[2]}%`,
                                 `Destacado (AD): ${ps[3]}%`
                             ];
                         })(),
                         datasets: [{
-                            data: tieneDatosArea ? [sumInicio, sumProceso, sumPrevisto, sumDestacado] : [1],
+                            data: tieneDatosArea ? [sumInicio, sumProceso, sumLogrado, sumDestacado] : [1],
                             backgroundColor: tieneDatosArea ? ['#ef4444', '#eab308', '#84cc16', '#16a34a'] : ['#e2e8f0'],
                             borderWidth: 3,
                             borderColor: '#fff',
@@ -3010,7 +3022,7 @@ window.__IE_gradoOK = function(gradoVal) {
                                 font: { weight: 'bold', size: 16 },
                                 formatter: (val, ctx) => {
                                     if (!tieneDatosArea || val === 0) return '';
-                                    const ps = porcentajesQueSuman100([sumInicio, sumProceso, sumPrevisto, sumDestacado]);
+                                    const ps = porcentajesQueSuman100([sumInicio, sumProceso, sumLogrado, sumDestacado]);
                                     const p = ps[ctx.dataIndex] || 0;
                                     return p > 0 ? (p + '%') : '';
                                 },
@@ -3054,7 +3066,7 @@ window.__IE_gradoOK = function(gradoVal) {
                             <div class="text-[11px] font-bold text-amber-700 mt-0.5">${pct(d.proceso)}%</div>
                         </div>
                         <div class="rounded-lg bg-lime-50 border border-lime-300 px-1 py-1.5">
-                            <div class="text-[9px] font-extrabold text-lime-700 uppercase tracking-wide leading-tight">Previsto</div>
+                            <div class="text-[9px] font-extrabold text-lime-700 uppercase tracking-wide leading-tight">Logrado</div>
                             <div class="text-base font-black text-lime-800 leading-none mt-0.5">${d.previsto}</div>
                             <div class="text-[11px] font-bold text-lime-700 mt-0.5">${pct(d.previsto)}%</div>
                         </div>
@@ -3073,7 +3085,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     charts[`mini-${idx}`] = new Chart(canvas, {
                         type: 'doughnut',
                         data: {
-                            labels: ['Inicio', 'Proceso', 'Previsto', 'Destacado'],
+                            labels: ['Inicio', 'Proceso', 'Logrado', 'Destacado'],
                             datasets: [{
                                 data: tiene ? [d.inicio, d.proceso, d.previsto, d.destacado] : [1],
                                 backgroundColor: tiene ? ['#ef4444', '#eab308', '#84cc16', '#16a34a'] : ['#e2e8f0'],
@@ -3272,7 +3284,7 @@ window.__IE_gradoOK = function(gradoVal) {
         // ============================================
         function renderizarResumen() {
             const container = document.getElementById('resumenRapido');
-            let totalInicio = 0, totalProceso = 0, totalPrevisto = 0, totalDestacado = 0;
+            let totalInicio = 0, totalProceso = 0, totalLogrado = 0, totalDestacado = 0;
             let competenciasLlenas = 0, totalCompetencias = 0;
             
             Object.keys(ESTRUCTURA_AREAS).forEach(area => {
@@ -3283,7 +3295,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     if (suma > 0) competenciasLlenas++;
                     totalInicio += d.inicio;
                     totalProceso += d.proceso;
-                    totalPrevisto += d.previsto;
+                    totalLogrado += d.previsto;
                     totalDestacado += d.destacado;
                 });
             });
@@ -3308,8 +3320,8 @@ window.__IE_gradoOK = function(gradoVal) {
                 </div>
                 <div class="glass rounded-2xl p-4 shadow-md border-l-4 border-green-500">
                     <div class="text-xs font-semibold text-slate-500 uppercase">Logrado (A+AD)</div>
-                    <div class="text-2xl font-bold text-green-600 mt-1">${totalPrevisto + totalDestacado}</div>
-                    <div class="text-xs text-slate-400 mt-1">Previsto + Destacado</div>
+                    <div class="text-2xl font-bold text-green-600 mt-1">${totalLogrado + totalDestacado}</div>
+                    <div class="text-xs text-slate-400 mt-1">Logrado + Destacado</div>
                 </div>
             `;
         }
