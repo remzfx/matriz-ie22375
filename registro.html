@@ -734,6 +734,17 @@ function loadPeriodosAdmin() {
   } catch(e) {}
   return { anio: 2026, bimestres: { I: 'abierto', II: 'abierto', III: 'abierto', IV: 'abierto' } };
 }
+async function sincronizarPeriodosNube() {
+  try {
+    const r = await fetch(CLOUD_API_URL + '?action=loadperiodos&t=' + Date.now(), { cache:'no-store' });
+    const data = JSON.parse(await r.text());
+    if (data && data.ok && data.periodos && data.periodos.bimestres) {
+      localStorage.setItem('ie22375_admin_periodos', JSON.stringify(data.periodos));
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
 function bimestreHabilitado(b) {
   const per = loadPeriodosAdmin();
   const st = (per.bimestres && per.bimestres[b]) || 'abierto';
@@ -852,7 +863,7 @@ function aplicarDocenteSesion() {
   }
 }
 
-function entrarNivel(n) {
+async function entrarNivel(n) {
   // Bloquear cruce de nivel si la sesión no lo permite
   var perm = nivelPermitido();
   if (perm === 'primaria' && n !== 'primaria') {
@@ -866,6 +877,7 @@ function entrarNivel(n) {
 
   nivel = n;
   loadStore();
+  await sincronizarPeriodosNube();
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
   const sLogin = getLoginSession();
