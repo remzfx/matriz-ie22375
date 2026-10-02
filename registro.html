@@ -229,6 +229,7 @@
       <p class="text-[11px] text-slate-500">Prueba: lista los cursos de la cuenta Google del script y manda la sesión de hoy como tarea. El cuaderno se abre aparte.</p>
       <div class="flex flex-wrap gap-2">
         <button type="button" class="btn btn-primary text-xs" onclick="cargarClassroom()">Ver mis cursos</button>
+        <button type="button" class="btn btn-ghost text-xs" onclick="autorizarClassroom()">Autorizar Classroom</button>
         <button type="button" class="btn btn-ghost text-xs" onclick="enviarSesionClassroom()">Enviar sesión a Classroom</button>
         <button type="button" class="btn btn-ghost text-xs" onclick="abrirNotebook()">Abrir cuaderno</button>
       </div>
@@ -520,6 +521,10 @@ function saveStore() {
 
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
 function clsNota(t){ const el=document.getElementById('clsMsg'); if(el) el.textContent=t; }
+function autorizarClassroom(){
+  window.open(CLOUD_API_URL+'?action=classroom','_blank');
+  clsNota('Acepta el permiso de Google en la pestaña. Luego vuelve y pulsa Ver mis cursos.');
+}
 function guardarNotebook(){
   const c=ctxBase();
   const k='nb|'+(c.nivel||'')+'|'+(c.area||'');
