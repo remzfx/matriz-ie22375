@@ -149,7 +149,8 @@ function onTipoChange() {
   const t = document.getElementById('inpTipo').value;
   const u = document.getElementById('inpDocUser');
   if (!u) return;
-  if (t === 'admin' && !u.value) u.value = 'admin';
+  u.readOnly = t === 'admin';
+  if (t === 'admin') u.value = 'admin';
   if (t === 'auxiliar' && !u.value) u.value = 'auxiliar';
   if (t === 'pip' && !u.value) u.value = 'pip';
   if (t === 'docente' && (u.value === 'admin' || u.value === 'auxiliar' || u.value === 'pip')) u.value = '';
