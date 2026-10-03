@@ -51,27 +51,33 @@ function asegurarDoc_() {
   return sh;
 }
 
+function leerDocentesConfigCache_() {
+  try {
+    const raw = CacheService.getScriptCache().get(DOCENTES_CACHE_KEY);
+    if (raw) {
+      const config = JSON.parse(raw);
+      if (config && Array.isArray(config.docentes) &&
+          typeof config.ts === 'number' && isFinite(config.ts)) return config;
+    }
+  } catch (err) { /* Caché no disponible o inválida: consultar Sheets. */ }
+  return null;
+}
+
 function obtenerDocentesConfig_() {
-  // El mismo bloqueo protege la lectura/caché y savedoc: evita repoblar datos antiguos.
+  let config = leerDocentesConfigCache_();
+  if (config) return config;
+  // Solo los misses comparten bloqueo con savedoc; los hits no se serializan.
   const lock = LockService.getScriptLock();
   lock.waitLock(5000);
   try {
-    let cache = null;
+    config = leerDocentesConfigCache_();
+    if (config) return config;
+    config = leerDocentesConfigSheets_();
     try {
-      cache = CacheService.getScriptCache();
-      const raw = cache.get(DOCENTES_CACHE_KEY);
-      if (raw) {
-        const config = JSON.parse(raw);
-        if (config && Array.isArray(config.docentes) &&
-            typeof config.ts === 'number' && isFinite(config.ts)) return config;
-      }
-    } catch (err) { /* Caché no disponible o inválida: consultar Sheets. */ }
-    const config = leerDocentesConfigSheets_();
-    if (cache) {
-      try {
-        cache.put(DOCENTES_CACHE_KEY, JSON.stringify(config), DOCENTES_CACHE_TTL_SECONDS);
-      } catch (err) { /* Si excede el límite de caché, Sheets sigue siendo la fuente. */ }
-    }
+      CacheService.getScriptCache().put(
+        DOCENTES_CACHE_KEY, JSON.stringify(config), DOCENTES_CACHE_TTL_SECONDS
+      );
+    } catch (err) { /* Si excede el límite de caché, Sheets sigue siendo la fuente. */ }
     return config;
   } finally {
     lock.releaseLock();
