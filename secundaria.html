@@ -2667,15 +2667,6 @@ window.__IE_gradoOK = function(gradoVal) {
             guardarDatos();
         }
 
-        // Campo de docente ARRIBA (junto a N° estudiantes)
-        function onDocenteTopInput(valor) {
-            if (!estado.areaActual) {
-                mostrarToast('Primero elige un área curricular', 'warning');
-                return;
-            }
-            setDocenteArea(estado.areaActual, valor);
-        }
-
         function syncDocenteTop() {
             // El campo de docente ahora está dentro del área (abajo).
             // Esta función se mantiene por compatibilidad.

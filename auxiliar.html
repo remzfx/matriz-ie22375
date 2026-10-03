@@ -302,10 +302,6 @@ function asisKey(al) {
   const fecha = (document.getElementById('inpFecha').value || hoyISO());
   return [fecha, al.nivel, al.grado, al.seccion, al.nombre].join('||');
 }
-function qrPayload(al) {
-  return 'IE22375|' + al.nivel + '|' + al.grado + '|' + al.seccion + '|' + al.nombre;
-}
-
 let BD = null;
 function fijarNiveles(j) {
   if (!j) return j;

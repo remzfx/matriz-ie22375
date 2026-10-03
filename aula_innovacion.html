@@ -583,7 +583,7 @@ async function subirAipNube(){
     const data=await res.json();
     if(!data||!data.ok) throw new Error((data&&data.error)||'Sin respuesta');
     alert('Plan AIP subido a la nube.');
-  }catch(e){ alert('No subió a la nube.\n'+e.message+'\nPublica Nueva versión del Apps Script (saveaip).'); }
+  }catch(e){ alert('No subió a la nube.\n'+e.message+'\nVerifique la conexión e intente sincronizar nuevamente.'); }
 }
 async function bajarAipNube(){
   try{
