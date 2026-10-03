@@ -8,6 +8,9 @@
  */
 
 const HOJA_AREAS = 'EstadosAreas';
+const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+const TOKEN_SECRET_PROPERTY = 'IE22375_TOKEN_SECRET';
+const ADMIN_PASS_PROPERTY = 'IE22375_ADMIN_PASS';
 
 function asegurarAsis_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -44,6 +47,150 @@ function asegurarDoc_() {
     sh.setFrozenRows(1);
   }
   return sh;
+}
+
+function obtenerDocentesConfig_() {
+  const sh = asegurarDoc_();
+  const last = sh.getLastRow();
+  if (last < 2) return { docentes: [], ts: 0 };
+  const data = sh.getRange(2, 1, last - 1, 3).getValues();
+  let best = null;
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]) !== 'DOCENTE_ACCESOS') continue;
+    const ts = Number(data[i][1]) || 0;
+    if (!best || ts >= best.ts) {
+      let list = [];
+      try {
+        const raw = data[i][2];
+        if (typeof raw === 'string' && raw) list = JSON.parse(raw);
+        else if (Array.isArray(raw)) list = raw;
+      } catch (err) { list = []; }
+      best = { ts: ts, docentes: Array.isArray(list) ? list : [] };
+    }
+  }
+  return best || { docentes: [], ts: 0 };
+}
+
+function normalizarUsuario_(value) {
+  return String(value || '').trim().toLowerCase().replace(/^@+/, '');
+}
+
+function secretoToken_() {
+  const props = PropertiesService.getScriptProperties();
+  let secret = props.getProperty(TOKEN_SECRET_PROPERTY);
+  if (!secret) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    try {
+      secret = props.getProperty(TOKEN_SECRET_PROPERTY);
+      if (!secret) {
+        secret = Utilities.getUuid() + Utilities.getUuid();
+        props.setProperty(TOKEN_SECRET_PROPERTY, secret);
+      }
+    } finally {
+      lock.releaseLock();
+    }
+  }
+  return secret;
+}
+
+function base64UrlTexto_(value) {
+  return Utilities.base64EncodeWebSafe(
+    Utilities.newBlob(String(value)).getBytes()
+  ).replace(/=+$/, '');
+}
+
+function firmarToken_(claims) {
+  const payload = base64UrlTexto_(JSON.stringify(claims));
+  const firma = Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(payload, secretoToken_(), Utilities.Charset.UTF_8)
+  ).replace(/=+$/, '');
+  return payload + '.' + firma;
+}
+
+function compararSeguro_(a, b) {
+  const aa = String(a || '');
+  const bb = String(b || '');
+  let diff = aa.length ^ bb.length;
+  const max = Math.max(aa.length, bb.length);
+  for (let i = 0; i < max; i++) diff |= (aa.charCodeAt(i) || 0) ^ (bb.charCodeAt(i) || 0);
+  return diff === 0;
+}
+
+function validarToken_(token, role) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 2) return null;
+  const firma = Utilities.base64EncodeWebSafe(
+    Utilities.computeHmacSha256Signature(parts[0], secretoToken_(), Utilities.Charset.UTF_8)
+  ).replace(/=+$/, '');
+  if (!compararSeguro_(firma, parts[1])) return null;
+  let claims = null;
+  try {
+    claims = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString());
+  } catch (err) { return null; }
+  if (!claims || Number(claims.exp) <= Date.now()) return null;
+  if (role && String(claims.role) !== String(role)) return null;
+  const config = obtenerDocentesConfig_();
+  if (Number(claims.permisosVersion) !== Number(config.ts)) return null;
+  return claims;
+}
+
+function responderLogin_(body) {
+  const tipo = String(body.tipo || '').toLowerCase();
+  const usuario = normalizarUsuario_(body.usuario);
+  const pass = String(body.password == null ? '' : body.password).trim();
+  if (!pass || (tipo !== 'docente' && tipo !== 'admin')) {
+    return { ok: false, error: 'Usuario o contraseña incorrectos.' };
+  }
+
+  const config = obtenerDocentesConfig_();
+  let perfil = null;
+  if (tipo === 'admin') {
+    const adminPass = PropertiesService.getScriptProperties().getProperty(ADMIN_PASS_PROPERTY);
+    if (usuario === 'admin' && adminPass && compararSeguro_(pass, adminPass)) {
+      perfil = {
+        user: 'admin', label: 'Administrador', role: 'admin', nivel: 'admin', grados: null,
+        areas: null, aulas: null, asignaciones: null,
+        mods: ['admin_bd', 'registro', 'auxiliar', 'wa_grupos', 'matriz_pri', 'matriz_sec', 'aip']
+      };
+    }
+  } else {
+    const docente = config.docentes.find(function (item) {
+      return normalizarUsuario_(item.user) === usuario &&
+        compararSeguro_(String(item.pass == null ? '' : item.pass).trim(), pass);
+    });
+    if (docente) {
+      const nivel = String(docente.nivel || '').toLowerCase();
+      perfil = {
+        user: docente.user,
+        label: docente.nombre || docente.user,
+        role: 'docente',
+        nivel: nivel,
+        grados: nivel === 'primaria' ? (docente.grados || []) : null,
+        areas: nivel === 'secundaria' ? (docente.areas || []) : null,
+        aulas: nivel === 'secundaria' ? (docente.aulas || []) : null,
+        asignaciones: nivel === 'secundaria' ? (docente.asignaciones || null) : null,
+        mods: nivel === 'primaria' ? ['registro', 'matriz_pri'] : ['registro', 'matriz_sec']
+      };
+    }
+  }
+  if (!perfil) return { ok: false, error: 'Usuario o contraseña incorrectos.' };
+
+  const now = Date.now();
+  const exp = now + TOKEN_TTL_MS;
+  const token = firmarToken_({
+    user: perfil.user,
+    role: perfil.role,
+    nivel: perfil.nivel,
+    permisosVersion: config.ts,
+    iat: now,
+    exp: exp
+  });
+  perfil.ok = true;
+  perfil.token = token;
+  perfil.tokenExp = exp;
+  perfil.permisosVersion = config.ts;
+  return perfil;
 }
 
 function asegurarConfig_() {
@@ -328,37 +475,7 @@ function doGet(e) {
     }
 
     if (action === 'loaddoc') {
-      const sh = asegurarDoc_();
-      const last = sh.getLastRow();
-      if (last < 2) return responder_({ ok: true, docentes: [], ts: 0, total: 0 });
-      const data = sh.getRange(2, 1, last, 3).getValues();
-      let best = null;
-      for (let i = 0; i < data.length; i++) {
-        if (String(data[i][0]) !== 'DOCENTE_ACCESOS') continue;
-        const ts = Number(data[i][1]) || 0;
-        if (!best || ts >= best.ts) {
-          let list = [];
-          try {
-            const raw = data[i][2];
-            if (typeof raw === 'string' && raw) list = JSON.parse(raw);
-            else if (Array.isArray(raw)) list = raw;
-          } catch (err) { list = []; }
-          best = { ts: ts, docentes: Array.isArray(list) ? list : [] };
-        }
-      }
-      const out = {
-        ok: true,
-        docentes: best ? best.docentes : [],
-        ts: best ? best.ts : 0,
-        total: best ? best.docentes.length : 0
-      };
-      const cb = String(p.callback || '');
-      if (cb && /^[A-Za-z0-9_]+$/.test(cb)) {
-        return ContentService
-          .createTextOutput(cb + '(' + JSON.stringify(out) + ')')
-          .setMimeType(ContentService.MimeType.JAVASCRIPT);
-      }
-      return responder_(out);
+      return responder_({ ok: false, error: 'loaddoc requiere POST y sesión administrativa.' });
     }
 
     if (action === 'loadnivel' || action === 'load') {
@@ -428,6 +545,15 @@ function doPost(e) {
     }
     const body = JSON.parse(e.postData.contents);
     const action = String(body.action || 'saveArea').toLowerCase();
+
+    if (action === 'login') return responder_(responderLogin_(body));
+
+    if (action === 'loaddoc') {
+      const sesion = validarToken_(body.token, 'admin');
+      if (!sesion) return responder_({ ok: false, error: 'Sesión administrativa inválida o vencida.' });
+      const config = obtenerDocentesConfig_();
+      return responder_({ ok: true, docentes: config.docentes, ts: config.ts, total: config.docentes.length });
+    }
 
     if (action === 'saveasis') {
       const items = Array.isArray(body.items) ? body.items : [body];

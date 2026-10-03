@@ -2,7 +2,6 @@
   {
     "id": "d1787778211169",
     "user": "21535992",
-    "pass": "21535992",
     "nombre": "CABRERA RIOS, GONZALO CELESTINO",
     "nivel": "primaria",
     "grados": [
@@ -15,7 +14,6 @@
   {
     "id": "d1787778261793",
     "user": "21463028",
-    "pass": "21463028",
     "nombre": "CARHUAYO GUTIERREZ, EUDELIA MADELEINE",
     "nivel": "primaria",
     "grados": [
@@ -28,7 +26,6 @@
   {
     "id": "d1787778394488",
     "user": "21533436",
-    "pass": "21533436",
     "nombre": "CHACALIAZA CONDORI, Luisa Victoria",
     "nivel": "primaria",
     "grados": [
@@ -41,7 +38,6 @@
   {
     "id": "d1787778453337",
     "user": "44953164",
-    "pass": "44953164",
     "nombre": "MORENO QUISPE, KATHERINE LISSET",
     "nivel": "primaria",
     "grados": [
@@ -54,7 +50,6 @@
   {
     "id": "d1787778510225",
     "user": "22316115",
-    "pass": "22316115",
     "nombre": "SANTA CRUZ PACHECO, JOEL ALVARO",
     "nivel": "primaria",
     "grados": [
@@ -72,7 +67,6 @@
   {
     "id": "d1787778570904",
     "user": "21573011",
-    "pass": "21573011",
     "nombre": "SERVELLON OTINIANO, CESAR AUGUSTO",
     "nivel": "primaria",
     "grados": [
@@ -85,7 +79,6 @@
   {
     "id": "d1787778604617",
     "user": "46406649",
-    "pass": "46406649",
     "nombre": "VILLAMARES HERNANDEZ, ANA FIORELLA",
     "nivel": "primaria",
     "grados": [
@@ -98,7 +91,6 @@
   {
     "id": "d1787778861273",
     "user": "40505215",
-    "pass": "40505215",
     "nombre": "ALALUNA CHIPANA, MARIA DEL PILAR",
     "nivel": "secundaria",
     "grados": [],
@@ -121,7 +113,6 @@
   {
     "id": "d1787778909562",
     "user": "21864735",
-    "pass": "21864735",
     "nombre": "ARIAS SALDAÑA, PILAR GUILLERMINA",
     "nivel": "secundaria",
     "grados": [],
@@ -141,7 +132,6 @@
   {
     "id": "d1787778979538",
     "user": "44549320",
-    "pass": "44549320",
     "nombre": "BAUTISTA HUISA, CARMEN ROSA",
     "nivel": "secundaria",
     "grados": [],
@@ -165,7 +155,6 @@
   {
     "id": "d1787779039929",
     "user": "21573390",
-    "pass": "21573390",
     "nombre": "BENITO HUAMANI, EDGAR CIRILO",
     "nivel": "secundaria",
     "grados": [],
@@ -188,7 +177,6 @@
   {
     "id": "d1787947545759",
     "user": "40297749",
-    "pass": "40297749",
     "nombre": "CHOQUE AYBAR, LUIS JAVIER",
     "nivel": "secundaria",
     "grados": [],
@@ -207,7 +195,6 @@
   {
     "id": "d1787947737935",
     "user": "28854774",
-    "pass": "28854774",
     "nombre": "GALINDO ALVIAR, Ninoska",
     "nivel": "secundaria",
     "grados": [],
@@ -226,7 +213,6 @@
   {
     "id": "d1787947838542",
     "user": "21469494",
-    "pass": "21469494",
     "nombre": "HUARCAYA HOSTIA, ANA ELIZABETH",
     "nivel": "secundaria",
     "grados": [],
@@ -244,7 +230,6 @@
   {
     "id": "d1787947997583",
     "user": "21549890",
-    "pass": "21549890",
     "nombre": "HUARCAYA SERVELLON, NILDA EVANGELINA",
     "nivel": "secundaria",
     "grados": [
@@ -273,7 +258,6 @@
   {
     "id": "d1787948148135",
     "user": "23522944",
-    "pass": "23522944",
     "nombre": "MARTINEZ ÑAÑEZ, IVAN GENARO",
     "nivel": "secundaria",
     "grados": [],
@@ -293,7 +277,6 @@
   {
     "id": "d1787948288855",
     "user": "21539372",
-    "pass": "21539372",
     "nombre": "PACHECO HUAROTTO, NANCY SOLEDAD",
     "nivel": "secundaria",
     "grados": [],
@@ -316,7 +299,6 @@
   {
     "id": "d1787948400143",
     "user": "40977340",
-    "pass": "40977340",
     "nombre": "SANCHEZ HUAYTA, LAURA GUISELLA",
     "nivel": "secundaria",
     "grados": [],
@@ -339,7 +321,6 @@
   {
     "id": "d1787948491327",
     "user": "21466751",
-    "pass": "21466751",
     "nombre": "ZORRILLA NIETO, JULIO RICARDO",
     "nivel": "secundaria",
     "grados": [],

@@ -1277,7 +1277,16 @@ async function subirDocentesNube(silencio) {
 }
 async function bajarDocentesNube() {
   try {
-    const res = await fetch(CLOUD_API_URL + '?action=loaddoc&t=' + Date.now(), { cache: 'no-store' });
+    const rawSesion = sessionStorage.getItem('ie22375_session_v1') || localStorage.getItem('ie22375_session_v1');
+    const sesion = rawSesion ? JSON.parse(rawSesion) : null;
+    if (!sesion || sesion.role !== 'admin' || !sesion.token) {
+      throw new Error('La sesión administrativa no es válida. Vuelve a iniciar sesión.');
+    }
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'loaddoc', token: sesion.token })
+    });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Error nube');
     const list = Array.isArray(data.docentes) ? data.docentes : [];
@@ -1308,9 +1317,13 @@ function importarDocentes(ev) {
       const data = JSON.parse(reader.result);
       const list = Array.isArray(data) ? data : (data.docentes || []);
       if (!list.length) { alert('El JSON no tiene docentes.'); return; }
+      if (list.some(d => !Object.prototype.hasOwnProperty.call(d, 'pass'))) {
+        alert('El JSON público no contiene contraseñas y no puede reemplazar la configuración administrativa.');
+        return;
+      }
       saveDocentes(list);
       renderDocentes();
-      alert('Importados ' + list.length + ' docentes. Ya puedes iniciar sesión con ellos EN ESTA máquina.\n\nPara todas las máquinas: sube este mismo docentes.json a GitHub.');
+      alert('Importados ' + list.length + ' docentes para administración. Usa Nube ↑ para sincronizarlos.');
     } catch(e) {
       alert('JSON inválido');
     }
