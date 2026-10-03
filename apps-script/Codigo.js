@@ -230,6 +230,80 @@ function responderLogin_(body) {
   return perfil;
 }
 
+function gradoEscritura_(value) {
+  const raw = String(value == null ? '' : value).trim().toUpperCase();
+  const nombres = ['PRIMERO', 'SEGUNDO', 'TERCERO', 'CUARTO', 'QUINTO', 'SEXTO'];
+  const ordinal = nombres.indexOf(raw);
+  if (ordinal >= 0) return ordinal + 1;
+  return /^[1-6]°?$/.test(raw) ? Number(raw.replace('°', '')) : 0;
+}
+
+function seccionEscritura_(value) {
+  const raw = String(value == null ? '' : value).trim().toUpperCase();
+  if (raw === 'UNICA' || raw === 'ÚNICA') return 'ÚNICA';
+  return /^[A-Z]$/.test(raw) ? raw : '';
+}
+
+function contextoEscritura_(body, registro) {
+  const nivel = String(body.nivel || '').trim().toLowerCase();
+  const bimestre = String(body.bimestre || '').trim().toUpperCase();
+  const numero = gradoEscritura_(body.grado);
+  const seccion = seccionEscritura_(body.seccion || (nivel === 'primaria' ? 'UNICA' : ''));
+  const area = typeof body.area === 'string' ? body.area.trim() : '';
+  if ((nivel !== 'primaria' && nivel !== 'secundaria') ||
+      !/^(I|II|III|IV)$/.test(bimestre) || !numero ||
+      (nivel === 'secundaria' && numero > 5) || !seccion ||
+      !area || /[|\u0000-\u001f]/.test(area)) return null;
+  // Conservar los formatos que generan Registro y las matrices actuales.
+  const nombres = ['PRIMERO', 'SEGUNDO', 'TERCERO', 'CUARTO', 'QUINTO', 'SEXTO'];
+  return {
+    nivel: nivel, bimestre: bimestre, numero: numero, area: area,
+    grado: registro ? String(numero) : (nivel === 'primaria' ? nombres[numero - 1] : numero + '°'),
+    seccion: seccion === 'ÚNICA' ? (registro ? 'Única' : (nivel === 'primaria' ? 'UNICA' : 'ÚNICA')) : seccion
+  };
+}
+
+function aulaEscritura_(value, ctx) {
+  const parts = String(value || '').split('|');
+  return parts.length === 2 && gradoEscritura_(parts[0]) === ctx.numero &&
+    seccionEscritura_(parts[1]) === seccionEscritura_(ctx.seccion);
+}
+
+function autorizarEscritura_(body, ctx) {
+  const sesion = validarToken_(body.token);
+  if (!sesion) return null;
+  if (sesion.role === 'admin') {
+    return { role: 'admin', user: sesion.user, docente: String(body.docente || '') };
+  }
+  if (sesion.role !== 'docente') return null;
+  const config = obtenerDocentesConfig_();
+  if (Number(sesion.permisosVersion) !== Number(config.ts)) return null;
+  const usuario = normalizarUsuario_(sesion.user);
+  const docente = config.docentes.find(function (item) {
+    return usuario && normalizarUsuario_(item.user) === usuario;
+  });
+  if (!docente || String(docente.nivel || '').toLowerCase() !== ctx.nivel) return null;
+  let permitido = false;
+  if (ctx.nivel === 'primaria') {
+    // Admin asigna el grado completo: no hay permisos de área/sección en este formato.
+    permitido = Array.isArray(docente.grados) && docente.grados.some(function (grado) {
+      return gradoEscritura_(grado) === ctx.numero;
+    });
+  } else {
+    const mapa = docente.asignaciones;
+    if (mapa != null && (typeof mapa !== 'object' || Array.isArray(mapa))) return null;
+    if (mapa && typeof mapa === 'object' && !Array.isArray(mapa) && Object.keys(mapa).length) {
+      const aulas = Object.prototype.hasOwnProperty.call(mapa, ctx.area) ? mapa[ctx.area] : null;
+      permitido = Array.isArray(aulas) && aulas.some(function (aula) { return aulaEscritura_(aula, ctx); });
+    } else if (Array.isArray(docente.areas) && Array.isArray(docente.aulas)) {
+      // Formato anterior: áreas y aulas explícitas. Vacíos no conceden permisos.
+      permitido = docente.areas.indexOf(ctx.area) >= 0 &&
+        docente.aulas.some(function (aula) { return aulaEscritura_(aula, ctx); });
+    }
+  }
+  return permitido ? { role: 'docente', user: docente.user, docente: docente.nombre || docente.user } : null;
+}
+
 function asegurarConfig_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName('ConfigSistema');
@@ -627,14 +701,15 @@ function doPost(e) {
     }
 
     if (action === 'savereg') {
-      const nivelR = String(body.nivel || '').toLowerCase();
-      const bimestre = String(body.bimestre || '');
-      const grado = String(body.grado || '');
-      const seccion = String(body.seccion || '');
-      const area = String(body.area || '');
-      if (!nivelR || !bimestre || !grado || !area) {
-        return responder_({ ok: false, error: 'Faltan nivel, bimestre, grado o área' });
-      }
+      const ctx = contextoEscritura_(body, true);
+      if (!ctx) return responder_({ ok: false, error: 'Contexto de escritura inválido.' });
+      const permiso = autorizarEscritura_(body, ctx);
+      if (!permiso) return responder_({ ok: false, error: 'Sesión inválida o sin autorización para este registro.' });
+      const nivelR = ctx.nivel;
+      const bimestre = ctx.bimestre;
+      const grado = ctx.grado;
+      const seccion = ctx.seccion;
+      const area = ctx.area;
       if (!bimestreAbierto_(bimestre)) {
         return responder_({
           ok: false,
@@ -642,7 +717,7 @@ function doPost(e) {
           error: 'Bimestre ' + bimestre + ' cerrado o bloqueado por Administración. Solo lectura.'
         });
       }
-      const clave = String(body.clave || [nivelR, bimestre, grado, seccion, area].join('||'));
+      const clave = [nivelR, bimestre, grado, seccion, area].join('||');
       const sh = asegurarReg_();
       const last = sh.getLastRow();
       let fila = -1;
@@ -659,9 +734,11 @@ function doPost(e) {
       sh.getRange(fila, 4).setValue(grado);
       sh.getRange(fila, 5).setValue(seccion);
       sh.getRange(fila, 6).setValue(area);
-      sh.getRange(fila, 7).setValue(body.docente || '');
+      sh.getRange(fila, 7).setValue(permiso.docente);
       sh.getRange(fila, 8).setValue(body.ts || Date.now());
-      sh.getRange(fila, 9).setValue(JSON.stringify(body.payload || {}));
+      const payload = Object.assign({}, body.payload || {});
+      if (permiso.role === 'docente') payload.meta = permiso.docente;
+      sh.getRange(fila, 9).setValue(JSON.stringify(payload));
       return responder_({ ok: true, clave: clave, fila: fila, msg: 'Registro guardado' });
     }
 
@@ -745,6 +822,7 @@ function doPost(e) {
     }
 
     if (action === 'saveperiodos') {
+      if (!validarToken_(body.token, 'admin')) return responder_({ ok: false, error: 'Sesión administrativa inválida o vencida.' });
       const periodos = body.periodos || {};
       const sh = asegurarConfig_();
       const last = sh.getLastRow();
@@ -764,6 +842,7 @@ function doPost(e) {
     }
 
     if (action === 'savedoc') {
+      if (!validarToken_(body.token, 'admin')) return responder_({ ok: false, error: 'Sesión administrativa inválida o vencida.' });
       const lock = LockService.getScriptLock();
       lock.waitLock(5000);
       try {
@@ -799,21 +878,19 @@ function doPost(e) {
       return responder_({ ok: false, error: 'Acción no válida' });
     }
 
-    const nivel = String(body.nivel || '').toLowerCase();
-    const bimestre = String(body.bimestre || '');
-    const grado = String(body.grado || '');
-    const seccion = String(body.seccion || 'UNICA');
-    const area = String(body.area || '');
-    const docente = String(body.docente || '');
+    const ctx = contextoEscritura_(body, false);
+    if (!ctx) return responder_({ ok: false, error: 'Contexto de escritura inválido.' });
+    const permiso = autorizarEscritura_(body, ctx);
+    if (!permiso) return responder_({ ok: false, error: 'Sesión inválida o sin autorización para esta área.' });
+    const nivel = ctx.nivel;
+    const bimestre = ctx.bimestre;
+    const grado = ctx.grado;
+    const seccion = ctx.seccion;
+    const area = ctx.area;
+    const docente = permiso.docente;
     const totalEstudiantes = body.totalEstudiantes || '';
     const competencias = body.competencias || {};
 
-    if (nivel !== 'primaria' && nivel !== 'secundaria') {
-      return responder_({ ok: false, error: 'nivel inválido' });
-    }
-    if (!bimestre || !grado || !area) {
-      return responder_({ ok: false, error: 'Faltan bimestre, grado o área' });
-    }
     if (!bimestreAbierto_(bimestre)) {
       return responder_({
         ok: false,
@@ -822,7 +899,7 @@ function doPost(e) {
       });
     }
 
-    const clave = String(body.clave || [nivel, bimestre, grado, seccion, area].join('|'));
+    const clave = [nivel, bimestre, grado, seccion, area].join('|');
     const sh = asegurarHoja_();
     const ahora = new Date();
     const json = JSON.stringify(competencias);

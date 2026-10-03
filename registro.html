@@ -622,6 +622,7 @@ async function subirRegistroNube() {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         action: 'savereg',
+        token: (getLoginSession() || {}).token || '',
         clave: cloudClaveReg(),
         nivel: c.nivel,
         bimestre: c.bim,

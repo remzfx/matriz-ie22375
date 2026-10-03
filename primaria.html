@@ -3414,6 +3414,7 @@ window.__IE_gradoOK = function(gradoVal) {
             const docenteArea = getNombreDocente() || (document.getElementById('nombreDocente') || {}).value || '';
             const payload = {
                 action: 'saveArea',
+                token: (window.__IE_SES || {}).token || '',
                 nivel: CLOUD_NIVEL,
                 bimestre: estado.bimestre,
                 grado: estado.grado,
