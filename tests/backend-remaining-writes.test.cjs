@@ -14,7 +14,7 @@ function setup() {
     {user: 'test-legacy', nombre: 'Test Legacy', nivel: 'secundaria', areas: ['Matemática'], aulas: ['2|B']},
     {user: 'test-empty', nivel: 'secundaria', areas: [], aulas: []}
   ];
-  const state = {writes: 0, held: false, files: 0, tasks: []};
+  const state = {writes: 0, held: false, files: 0};
   const tables = new Map();
   const cacheEntries = new Map();
   function sheet(name, rows) {
@@ -40,7 +40,7 @@ function setup() {
   sheet('ConfigSistema', [['clave', 'ts', 'json'], ['PERIODOS', 1000, JSON.stringify({bimestres: {I: 'abierto', II: 'cerrado', III: 'bloqueado'}})]]);
   sheet('RegistroNotas', [['clave', 'nivel', 'bimestre', 'grado', 'seccion', 'area', 'docente', 'ts', 'json']]);
   sheet('EstadosAreas', [['clave', 'nivel', 'bimestre', 'grado', 'seccion', 'area', 'docente', 'totalEstudiantes', 'actualizado', 'json']]);
-  const props = {IE22375_TOKEN_SECRET: 'synthetic-test-secret', IE22375_AUXILIAR_PASS: 'synthetic-aux-password', IE22375_PIP_PASS: 'synthetic-pip-password', IE22375_CLASSROOM_CONTEXTS: JSON.stringify({'course-allowed': {nivel: 'secundaria', grado: 1, seccion: 'A', area: 'Matemática'}, 'course-forbidden': {nivel: 'secundaria', grado: 5, seccion: 'ÚNICA', area: 'Matemática'}, 'course-primary': {nivel: 'primaria', grado: 1, seccion: 'Única', area: 'Comunicación'}})};
+  const props = {IE22375_TOKEN_SECRET: 'synthetic-test-secret', IE22375_AUXILIAR_PASS: 'synthetic-aux-password', IE22375_PIP_PASS: 'synthetic-pip-password'};
   const c = vm.createContext({
     SpreadsheetApp: {getActiveSpreadsheet: () => ({getSheetByName: name => tables.get(name), insertSheet: name => sheet(name, [])}), flush() {}},
     CacheService: {getScriptCache: () => ({get: key => cacheEntries.get(key) || null, put: (key, value, ttl) => {assert.equal(state.held, true); assert.equal(ttl, 600); cacheEntries.set(key, value);}, remove: key => {assert.equal(state.held, true); cacheEntries.delete(key);}})},
@@ -59,7 +59,6 @@ function setup() {
       getFileById: () => ({setTrashed() {state.files++;}})
     },
     MimeType: {MICROSOFT_EXCEL: 'test-excel'},
-    Classroom: {Courses: {CourseWork: {create(task, courseId) {state.tasks.push({task, courseId}); return {id: 'synthetic-task', alternateLink: 'test-link'};}}}},
     ContentService: {MimeType: {JSON: 'json'}, createTextOutput: text => ({setMimeType: () => ({text})})}
   });
   new vm.Script(source).runInContext(c);
@@ -78,13 +77,12 @@ function request(s, action, token, extra = {}) {
     b64: Buffer.from('synthetic-file').toString('base64'), filename: 'Test.xlsx',
     payload: {plan: 'synthetic-plan'}, grupos: [],
     items: [{fecha: '2026-10-03', nivel: 'primaria', grado: 1, seccion: 'Única', nombre: 'Synthetic Student', marca: 'P'}],
-    courseId: 'course-allowed', titulo: 'Synthetic task',
     ...extra
   };
 }
 const allowed = {
   saveasis: ['admin', 'auxiliar'], saveaip: ['admin', 'pip'],
-  savetpl: ['admin'], savewa: ['admin'], classroomtarea: ['admin', 'docente']
+  savetpl: ['admin'], savewa: ['admin']
 };
 for (const [action, roles] of Object.entries(allowed)) {
   for (const role of ['admin', 'auxiliar', 'pip', 'docente']) {
@@ -94,7 +92,7 @@ for (const [action, roles] of Object.entries(allowed)) {
       const result = s.post(request(s, action, token));
       assert.equal(result.ok, roles.includes(role));
       if (!roles.includes(role)) {
-        assert.equal(s.state.writes, 0); assert.equal(s.state.files, 0); assert.equal(s.state.tasks.length, 0);
+        assert.equal(s.state.writes, 0); assert.equal(s.state.files, 0);
       }
     });
   }
@@ -105,7 +103,7 @@ for (const [action, roles] of Object.entries(allowed)) {
       const token = mode === 'no-token' || mode === 'forged-identity' ? '' : mode === 'expired' ? s.token(rightful, rightful, {exp: Date.now() - 1}) : s.token(rightful, rightful) + 'x';
       const result = s.post(request(s, action, token, {role: 'admin', user: 'admin', docente: 'admin', permisos: ['all']}));
       assert.equal(result.ok, false);
-      assert.equal(s.state.writes, 0); assert.equal(s.state.files, 0); assert.equal(s.state.tasks.length, 0);
+      assert.equal(s.state.writes, 0); assert.equal(s.state.files, 0);
     });
   }
 }
@@ -134,37 +132,6 @@ test('saveasis: body role/user cannot expand a PIP or teacher session to attenda
     assert.equal(s.post(request(s, 'saveasis', token, {role: 'auxiliar', user: 'auxiliar'})).ok, false);
   }
   assert.equal(s.state.writes, 0);
-});
-
-test('Classroom: server course binding defeats forged level/area/aula and identity', () => {
-  const s = setup();
-  const body = request(s, 'classroomtarea', s.secondary, {courseId: 'course-forbidden', nivel: 'secundaria', grado: 1, seccion: 'A', area: 'Matemática', docente: 'admin'});
-  assert.equal(s.post(body).ok, false);
-  assert.equal(s.state.tasks.length, 0);
-  assert.equal(s.post({...body, courseId: 'course-allowed', nivel: 'other', grado: 99, area: 'forged'}).ok, true);
-  assert.equal(s.state.tasks[0].courseId, 'course-allowed');
-});
-test('Classroom: primary assigned grade accepted; teacher version revocation preserved', () => {
-  const s = setup();
-  const body = request(s, 'classroomtarea', s.primary, {courseId: 'course-primary'});
-  assert.equal(s.post(body).ok, true);
-  assert.equal(s.post(s.body('savedoc', {token: s.admin, ts: 2000})).ok, true);
-  const count = s.state.tasks.length;
-  assert.equal(s.post(body).ok, false); assert.equal(s.state.tasks.length, count);
-});
-test('Classroom: unknown or malformed server course binding fails closed', () => {
-  const s = setup();
-  for (const value of [undefined, '{invalid', '{}', JSON.stringify({'course-allowed': {nivel: 'secundaria', grado: 99, seccion: 'A', area: 'Matemática'}})]) {
-    s.props.IE22375_CLASSROOM_CONTEXTS = value;
-    assert.equal(s.post(request(s, 'classroomtarea', s.secondary)).ok, false);
-  }
-  assert.equal(s.state.tasks.length, 0);
-});
-test('Classroom: creartarea alias and direct helper cannot bypass token checks', () => {
-  const s = setup();
-  assert.equal(s.c.crearTareaClassroom_({courseId: 'course-allowed'}).ok, false);
-  assert.equal(JSON.parse(s.c.doGet({parameter: {action: 'creartarea', courseId: 'course-allowed'}}).text).ok, false);
-  assert.equal(s.state.tasks.length, 0);
 });
 
 for (const [role, property] of [['auxiliar', 'IE22375_AUXILIAR_PASS'], ['pip', 'IE22375_PIP_PASS']]) {

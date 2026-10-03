@@ -123,14 +123,7 @@ Cuando tengamos al menos un despliegue correcto y comprobemos que la URL públic
 - `saveasis`: Admin/Auxiliar, cuyo módulo actual cubre todo el colegio. Solo contextos de Primaria/Secundaria válidos; se valida el lote completo antes de escribir y se construye la clave en servidor. Docentes registran su asistencia académica por `savereg`, no por esta ruta de ingreso.
 - `saveaip`: Admin/Innovación (`pip`), sin conceder acceso a docentes ni auxiliares.
 - `savetpl` y `savewa`: solo Admin. Auxiliar conserva la consulta/envío a grupos existentes, sin editar su configuración.
-- `classroomtarea`: Admin o Docente con permisos vigentes para el contexto del curso. También se protege el helper compartido por el alias de escritura `creartarea`; las rutas de lectura no cambian.
 
-Para tareas docentes, configurar en propiedades de Apps Script `IE22375_CLASSROOM_CONTEXTS`, un objeto JSON que vincule **IDs reales de cursos** a su contexto escolar verificado. Es configuración exclusiva del servidor; nunca se acepta el mapa ni el nivel/área/aula del cliente para autorizar el curso. Ejemplo de forma (no son datos ni permisos reales):
+Antes de una implementación futura, definir las dos contraseñas privadas. Este bloque no configura propiedades, no fusiona ramas ni despliega.
 
-```json
-{"COURSE_ID_REAL":{"nivel":"secundaria","grado":1,"seccion":"A","area":"ÁREA_CONFIGURADA"}}
-```
 
-El área/aula debe coincidir con las asignaciones vigentes de `DOCENTE_ACCESOS`. Un mapa ausente, inválido o sin el curso solicitado **rechaza tareas docentes**; Admin conserva su operación administrativa. No se infieren permisos a partir del nombre libre de un curso Classroom. No existe actualmente un consumidor de creación de tareas en este repositorio; futuras llamadas deben enviar token y courseId, y no necesitan suministrar permisos.
-
-Antes de una implementación futura, definir las dos contraseñas privadas y las asociaciones de cursos que se quieran habilitar para docentes. Este bloque no configura propiedades, no fusiona ramas ni despliega.

@@ -13,7 +13,6 @@ const TOKEN_SECRET_PROPERTY = 'IE22375_TOKEN_SECRET';
 const ADMIN_PASS_PROPERTY = 'IE22375_ADMIN_PASS';
 const AUXILIAR_PASS_PROPERTY = 'IE22375_AUXILIAR_PASS';
 const PIP_PASS_PROPERTY = 'IE22375_PIP_PASS';
-const CLASSROOM_CONTEXTS_PROPERTY = 'IE22375_CLASSROOM_CONTEXTS';
 const DOCENTES_CACHE_KEY = 'IE22375_DOCENTE_ACCESOS_V1';
 const DOCENTES_CACHE_TTL_SECONDS = 600;
 
@@ -338,24 +337,6 @@ function itemAsistenciaAutorizado_(item) {
     seccion: seccion === 'ÚNICA' ? 'Única' : seccion, nombre: nombre,
     clave: [fecha, nivel, grado, seccion === 'ÚNICA' ? 'Única' : seccion, nombre].join('||')
   });
-}
-
-function contextoCursoClassroom_(courseId) {
-  try {
-    const raw = PropertiesService.getScriptProperties().getProperty(CLASSROOM_CONTEXTS_PROPERTY);
-    const cursos = raw ? JSON.parse(raw) : null;
-    if (!cursos || !Object.prototype.hasOwnProperty.call(cursos, courseId)) return null;
-    const curso = cursos[courseId];
-    if (!curso || typeof curso !== 'object' || Array.isArray(curso)) return null;
-    const nivel = String(curso.nivel || '').trim().toLowerCase();
-    const numero = gradoEscritura_(curso.grado);
-    const seccion = seccionEscritura_(curso.seccion);
-    const area = typeof curso.area === 'string' ? curso.area.trim() : '';
-    if ((nivel !== 'primaria' && nivel !== 'secundaria') || !numero ||
-        (nivel === 'secundaria' && numero > 5) || !seccion ||
-        !area || /[|\u0000-\u001f]/.test(area)) return null;
-    return { nivel: nivel, numero: numero, seccion: seccion, area: area };
-  } catch (err) { return null; }
 }
 
 function asegurarConfig_() {
@@ -684,10 +665,8 @@ function doGet(e) {
       return responder_({ ok: true, nivel: nivel, items: items, total: items.length });
     }
 
-    if (action === 'classroom' || action === 'creartarea') {
-      const data = action === 'creartarea'
-        ? crearTareaClassroom_(p)
-        : listarClassroom_();
+    if (action === 'classroom') {
+      const data = listarClassroom_();
       const cb = String(p.callback || '');
       if (cb && /^[A-Za-z0-9_]+$/.test(cb)) {
         return ContentService
@@ -946,10 +925,6 @@ function doPost(e) {
       }
     }
 
-    if (action === 'classroomtarea') {
-      return responder_(crearTareaClassroom_(body));
-    }
-
     if (action !== 'savearea') {
       return responder_({ ok: false, error: 'Acción no válida' });
     }
@@ -1033,27 +1008,4 @@ function listarClassroom_() {
   }
 }
 
-function crearTareaClassroom_(body) {
-  try {
-    const sesion = sesionRutaEscritura_(body.token, ['admin', 'docente']);
-    if (!sesion) return { ok: false, error: 'Sesión inválida o sin autorización para Classroom.' };
-    var courseId = String(body.courseId || '');
-    if (!courseId) return { ok: false, error: 'Falta el curso' };
-    if (sesion.role === 'docente') {
-      const ctx = contextoCursoClassroom_(courseId);
-      if (!ctx || !autorizarEscritura_({ token: body.token }, ctx)) {
-        return { ok: false, error: 'Sin autorización para el contexto de este curso.' };
-      }
-    }
-    var trabajo = Classroom.Courses.CourseWork.create({
-      title: String(body.titulo || 'Sesión IE 22375'),
-      description: String(body.descripcion || ''),
-      workType: 'ASSIGNMENT',
-      state: 'PUBLISHED',
-      materials: body.link ? [{ link: { url: String(body.link), title: 'Registro auxiliar' } }] : []
-    }, courseId);
-    return { ok: true, id: trabajo.id, alternateLink: trabajo.alternateLink || '', msg: 'Tarea creada en Classroom' };
-  } catch (err) {
-    return { ok: false, error: String(err) };
-  }
-}
+
