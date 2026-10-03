@@ -737,7 +737,11 @@ function doPost(e) {
       sh.getRange(fila, 7).setValue(permiso.docente);
       sh.getRange(fila, 8).setValue(body.ts || Date.now());
       const payload = Object.assign({}, body.payload || {});
-      if (permiso.role === 'docente') payload.meta = permiso.docente;
+      if (permiso.role === 'docente') {
+        const meta = payload.meta && typeof payload.meta === 'object' && !Array.isArray(payload.meta)
+          ? payload.meta : {};
+        payload.meta = Object.assign({}, meta, { docente: permiso.docente });
+      }
       sh.getRange(fila, 9).setValue(JSON.stringify(payload));
       return responder_({ ok: true, clave: clave, fila: fila, msg: 'Registro guardado' });
     }

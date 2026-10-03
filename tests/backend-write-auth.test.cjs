@@ -60,7 +60,7 @@ function setup() {
   const primary = token('test-primary');
   const secondary = token('test-secondary');
   const admin = token('admin', 'admin');
-  const body = (action, extra = {}) => ({action, nivel: 'primaria', bimestre: 'I', grado: 1, seccion: 'Única', area: 'Comunicación', payload: {meta: 'Forged Name'}, competencias: {test: 1}, docentes, periodos: {bimestres: {I: 'abierto'}}, ...extra});
+  const body = (action, extra = {}) => ({action, nivel: 'primaria', bimestre: 'I', grado: 1, seccion: 'Única', area: 'Comunicación', payload: {meta: {docente: 'Forged Name', observacion: 'Preserved field'}}, competencias: {test: 1}, docentes, periodos: {bimestres: {I: 'abierto'}}, ...extra});
   return {c, post, token, primary, secondary, admin, body, state, tables, docentes};
 }
 
@@ -104,7 +104,7 @@ for (const action of ['savereg', 'saveArea']) {
     assert.equal(response.clave, action === 'savereg' ? 'primaria||I||1||Única||Comunicación' : 'primaria|I|PRIMERO|UNICA|Comunicación');
     assert.deepEqual(s.tables.get(table).rows[1], victim);
     assert.equal(s.tables.get(table).rows[2][6], 'Test Primary');
-    if (action === 'savereg') assert.equal(JSON.parse(s.tables.get(table).rows[2][8]).meta, 'Test Primary');
+    if (action === 'savereg') assert.deepEqual(JSON.parse(s.tables.get(table).rows[2][8]).meta, {docente: 'Test Primary', observacion: 'Preserved field'});
   });
   for (const extra of [{grado: 2}, {nivel: 'secundaria', grado: 1, seccion: 'A'}]) {
     test(action + ': primary rejects unassigned grade/level ' + JSON.stringify(extra), () => {
@@ -226,7 +226,7 @@ for (const [file, name, action] of [
       CLOUD_API_URL: 'test-url', CLOUD_NIVEL: secondary ? 'secundaria' : 'primaria',
       nivel: 'primaria', areaActual: 'Comunicación',
       ctxBase: () => ({nivel: 'primaria', bim: 'I', grado: 1, seccion: 'Única', area: 'Comunicación'}),
-      sliceRegistroArea: () => ({meta: 'Forged Name', ts: 1}),
+      sliceRegistroArea: () => ({meta: {docente: 'Forged Name', observacion: 'Preserved field'}, ts: 1}),
       cloudClaveReg: () => 'forged-key', cloudClave: () => 'forged-key',
       estado: {bimestre: 'I', grado: secondary ? '1°' : 'PRIMERO', seccion: secondary ? 'A' : 'UNICA', areaActual: secondary ? 'Matemática' : 'Comunicación', datos: {}},
       getNombreDocente: () => 'Forged Name', getDocenteArea: () => 'Forged Name', getTotalEstudiantes: () => 1,
@@ -246,3 +246,51 @@ for (const [file, name, action] of [
   });
 }
 
+
+test('savereg: meta remains an object through save, loadreg and the unchanged client merge', () => {
+  const s = setup();
+  const meta = {docente: 'Forged Name', observacion: 'Keep this', extra: {value: 7}};
+  const response = s.post(s.body('savereg', {token: s.primary, docente: 'Forged Name', payload: {meta, capsSel: {test: true}}}));
+  assert.equal(response.ok, true);
+  const stored = s.tables.get('RegistroNotas').rows[1];
+  assert.equal(stored[6], 'Test Primary');
+  const savedMeta = JSON.parse(stored[8]).meta;
+  assert.equal(typeof savedMeta, 'object');
+  assert.equal(Array.isArray(savedMeta), false);
+  assert.deepEqual(savedMeta, {...meta, docente: 'Test Primary'});
+  // The source request must not be mutated.
+  assert.equal(meta.docente, 'Forged Name');
+
+  const loaded = JSON.parse(s.c.doGet({parameter: {action: 'loadreg', nivel: 'primaria'}}).text);
+  assert.equal(loaded.ok, true);
+  const item = loaded.items.find(item => item.clave === response.clave);
+  assert.ok(item);
+  assert.equal(item.docente, 'Test Primary');
+  assert.deepEqual(item.payload.meta, savedMeta);
+
+  const store = {sessions: [], grades: {}, meta: {[response.clave]: {localField: true}}};
+  const context = vm.createContext({store, cloudClaveReg: () => response.clave});
+  new vm.Script(clientFunction('registro.html', 'mergeRegistroPayload')).runInContext(context);
+  context.mergeRegistroPayload(item.payload);
+  assert.deepEqual(JSON.parse(JSON.stringify(store.meta[response.clave])), {
+    localField: true, ...meta, docente: 'Test Primary'
+  });
+  assert.equal(Object.hasOwn(store.meta[response.clave], '0'), false);
+});
+
+test('savereg: admin metadata object remains unchanged', () => {
+  const s = setup();
+  const meta = {docente: 'Admin-selected responsible teacher', observacion: 'Keep this'};
+  assert.equal(s.post(s.body('savereg', {token: s.admin, docente: 'Responsible teacher', payload: {meta}})).ok, true);
+  const row = s.tables.get('RegistroNotas').rows[1];
+  assert.equal(row[6], 'Responsible teacher');
+  assert.deepEqual(JSON.parse(row[8]).meta, meta);
+});
+
+for (const meta of [undefined, null, 'legacy text']) {
+  test('savereg: missing or non-object meta uses dedicated identity field (' + String(meta) + ')', () => {
+    const s = setup();
+    assert.equal(s.post(s.body('savereg', {token: s.primary, payload: {meta}})).ok, true);
+    assert.deepEqual(JSON.parse(s.tables.get('RegistroNotas').rows[1][8]).meta, {docente: 'Test Primary'});
+  });
+}
