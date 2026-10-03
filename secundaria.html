@@ -1829,7 +1829,6 @@ window.__IE_gradoOK = function(gradoVal) {
             actualizarBotonesSeleccion();
             renderizarAreas();
             renderizarResumen();
-            syncDocenteTop();
             syncInputTotalEstudiantes();
             aplicarModoPeriodoActual();
 
@@ -1842,7 +1841,6 @@ window.__IE_gradoOK = function(gradoVal) {
                 actualizarBotonesSeleccion();
                 renderizarAreas();
                 renderizarResumen();
-                syncDocenteTop();
                 syncInputTotalEstudiantes();
                 aplicarModoPeriodoActual();
             }).catch(function(e) {
@@ -2009,7 +2007,6 @@ window.__IE_gradoOK = function(gradoVal) {
             guardarDatos();
             renderizarAreas();
             renderizarResumen();
-            syncDocenteTop();
             const label = seccion === 'ÚNICA' ? `${grado} ÚNICA` : `${grado} ${seccion}`;
             mostrarToast(label + ' seleccionado', 'success');
         }
@@ -2035,7 +2032,6 @@ window.__IE_gradoOK = function(gradoVal) {
             guardarDatos();
             renderizarAreas();
             renderizarResumen();
-            syncDocenteTop();
             aplicarModoPeriodoActual();
             const st = estadoPeriodoAdmin(val);
             mostrarToast(st === 'abierto'
@@ -2173,7 +2169,6 @@ window.__IE_gradoOK = function(gradoVal) {
             renderizarCompetencias();
             renderizarResumen();
             renderNavegadorAreas();
-            if (typeof syncDocenteTop === 'function') syncDocenteTop();
             // Quedarse en la zona de gráficos / navegador (exposición)
             const dest = document.getElementById('seccionGraficos') || document.getElementById('navAreasExpo');
             if (dest) dest.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2262,7 +2257,6 @@ window.__IE_gradoOK = function(gradoVal) {
                         if (typeof renderizarCompetencias === 'function') renderizarCompetencias();
                         if (typeof renderizarResumen === 'function') renderizarResumen();
                         if (typeof renderNavegadorAreas === 'function') renderNavegadorAreas();
-                        if (typeof syncDocenteTop === 'function') syncDocenteTop();
                         if (typeof syncInputTotalEstudiantes === 'function') syncInputTotalEstudiantes();
                         actualizarCabeceraPresentacion();
                         renderPresNavAreas();
@@ -2299,7 +2293,6 @@ window.__IE_gradoOK = function(gradoVal) {
                     if (typeof renderizarCompetencias === 'function') renderizarCompetencias();
                     if (typeof renderizarResumen === 'function') renderizarResumen();
                     if (typeof renderNavegadorAreas === 'function') renderNavegadorAreas();
-                    if (typeof syncDocenteTop === 'function') syncDocenteTop();
                     if (typeof syncInputTotalEstudiantes === 'function') syncInputTotalEstudiantes();
                     if (typeof guardarDatos === 'function') guardarDatos();
                     actualizarCabeceraPresentacion();
@@ -2639,7 +2632,6 @@ window.__IE_gradoOK = function(gradoVal) {
             renderizarAreaHeader();
             renderizarCompetencias();
             renderizarResumen();
-            syncDocenteTop();
             aplicarModoPeriodoActual();
             
             document.getElementById('panelCompetencias').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2665,22 +2657,6 @@ window.__IE_gradoOK = function(gradoVal) {
             if (!estado.docentes[k]) estado.docentes[k] = {};
             estado.docentes[k][area] = nombre;
             guardarDatos();
-        }
-
-        // Campo de docente ARRIBA (junto a N° estudiantes)
-        function onDocenteTopInput(valor) {
-            if (!estado.areaActual) {
-                mostrarToast('Primero elige un área curricular', 'warning');
-                return;
-            }
-            setDocenteArea(estado.areaActual, valor);
-        }
-
-        function syncDocenteTop() {
-            // El campo de docente ahora está dentro del área (abajo).
-            // Esta función se mantiene por compatibilidad.
-            const input = document.getElementById('nombreDocente');
-            if (!input) return;
         }
 
         function renderizarAreaHeader() {

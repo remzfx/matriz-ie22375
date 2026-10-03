@@ -1153,24 +1153,6 @@ function capacidadElegida() {
   if (v === '__otra__') return ((document.getElementById('inpCapacidad')||{}).value || '').trim();
   return v.trim();
 }
-function setCapacidadUI(texto) {
-  const t = (texto||'').trim();
-  fillCaps();
-  const sel = document.getElementById('selCap');
-  const wrap = document.getElementById('wrapCapOtra');
-  const inp = document.getElementById('inpCapacidad');
-  if (!sel) return;
-  const opts = Array.from(sel.options).map(o => o.value);
-  if (t && opts.indexOf(t) >= 0) {
-    sel.value = t;
-    if (wrap) wrap.classList.add('hidden');
-  } else if (t) {
-    sel.value = '__otra__';
-    if (wrap) wrap.classList.remove('hidden');
-    if (inp) inp.value = t;
-  }
-}
-
 function onCompChange() {
   if (sesionActiva && hayNotasPendientes()) {
     if (confirm('Hay notas en la sesión actual.\n¿Desea guardar antes de cambiar de competencia?')) {
@@ -1265,16 +1247,6 @@ function activarSesion() {
   renderSesiones();
   renderStudents();
   toast('Capacidad agregada');
-}
-
-function loadNotasSesion() {
-  notas = {};
-  if (!sesionActiva) return;
-  estudiantes().forEach(al => {
-    const k = gradeKey(al.nombre);
-    if (k && store.grades[k]) notas[al.nombre] = JSON.parse(JSON.stringify(store.grades[k]));
-  });
-  markClean();
 }
 
 function recolectarPantalla() {
@@ -1424,34 +1396,6 @@ function borrarSesionFecha(fecha) {
   toast('Sesión del ' + fecha + ' eliminada');
 }
 
-function borrarSesion(id) {
-  const s = store.sessions.find(x => sessionId(x) === id);
-  if (!s) return;
-  const ok = confirm(
-    '¿Borrar esta sesión y todas sus notas?\n\n' +
-    (s.fecha || '') + ' · ' + (s.comp || '') + '\n' +
-    (s.capacidad || '') +
-    '\n\nEsta acción no se puede deshacer.'
-  );
-  if (!ok) return;
-  // delete grades with this session prefix
-  const prefix = [s.nivel, s.bim, s.grado, s.seccion, s.area, s.comp, s.capacidad, s.fecha].join('||') + '||';
-  Object.keys(store.grades).forEach(k => {
-    if (k.startsWith(prefix)) delete store.grades[k];
-  });
-  store.sessions = store.sessions.filter(x => sessionId(x) !== id);
-  if (sesionActiva && sessionId(sesionActiva) === id) {
-    sesionActiva = null;
-    notas = {};
-    document.getElementById('lblSesionActiva').textContent = 'Define fecha, competencia y capacidad arriba';
-  }
-  saveStore();
-  markClean();
-  renderSesiones();
-  renderStudents();
-  toast('Sesión borrada');
-}
-
 function syncModoBtns() {
   document.querySelectorAll('[data-modo]').forEach(b => {
     b.classList.toggle('on', b.getAttribute('data-modo') === modoCalif);
@@ -1468,56 +1412,6 @@ function setModoCalif(m) {
   renderStudents();
   if (document.getElementById('panelFinales') && document.getElementById('panelFinales').classList.contains('on')) renderFinales();
   if (document.getElementById('panelAvance') && document.getElementById('panelAvance').classList.contains('on')) renderAvance();
-}
-
-function setNivel(nombre, niv) {
-  if (!sesionActiva) { toast('Activa una sesión primero'); return; }
-  const bimC = document.getElementById('selBim').value;
-  const sL = getLoginSession();
-  if (!bimestreHabilitado(bimC) && !(sL && (sL.role==='admin'||sL.user==='admin'))) {
-    alert('Bimestre cerrado por administración'); return;
-  }
-  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
-  notas[nombre].nivel = niv;
-  if (notas[nombre].nota20 === '' || notas[nombre].nota20 == null)
-    notas[nombre].nota20 = letterToNum(niv);
-  markDirty();
-  renderStudents();
-}
-
-function setNota20(nombre, val) {
-  if (!sesionActiva) { toast('Activa una sesión primero'); return; }
-  const bimC = document.getElementById('selBim').value;
-  const sL = getLoginSession();
-  if (!bimestreHabilitado(bimC) && !(sL && (sL.role==='admin'||sL.user==='admin'))) {
-    alert('Bimestre cerrado por administración'); return;
-  }
-  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
-  let n = val === '' || val == null ? '' : Number(val);
-  if (n !== '' && (isNaN(n) || n < 0 || n > 20)) {
-    toast('Solo 0 a 20');
-    renderStudents();
-    return;
-  }
-  if (n === '') {
-    notas[nombre].nota20 = '';
-    markDirty();
-    renderStudents();
-    return;
-  }
-  n = Math.round(n);
-  notas[nombre].nota20 = n;
-  notas[nombre].nivel = numToLetter(n);
-  markDirty();
-  renderStudents();
-}
-
-function abrirConclusion(nombre) {
-  if (!notas[nombre]) notas[nombre] = { nivel:'', nota20:'', conclusion:'' };
-  modalCtx = { nombre };
-  document.getElementById('modalStu').textContent = nombre + (notas[nombre].nivel ? ' · ' + notas[nombre].nivel : '');
-  document.getElementById('modalText').value = notas[nombre].conclusion || '';
-  document.getElementById('modalConc').classList.remove('hidden');
 }
 
 function cerrarModal(ok) {
@@ -1915,7 +1809,7 @@ async function rellenarSiagieExcel() {
     for (let i=0;i<raw.length;i++) u8[i] = raw.charCodeAt(i);
     buf = u8.buffer;
   } catch (e) {
-    alert('No se pudo bajar la plantilla. Publique el Apps Script nuevo.');
+    alert('No se pudo bajar la plantilla. Verifique la conexión e intente nuevamente.');
     return;
   }
   const wb = XLSX.read(buf, { type:'array', cellDates:true });
@@ -2211,14 +2105,6 @@ function promGeneralAlumno(nombre, comps) {
   return { prom: prom==null?'':prom, letra: prom==null?'':numToLetter(prom), n: nums.length };
 }
 
-function compTieneSesiones(comp) {
-  const c = ctxBase();
-  return (store.sessions || []).some(s =>
-    s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
-    s.seccion === c.seccion && s.area === c.area && s.comp === comp
-  );
-}
-
 function bimCerradoDocente() {
   const bim = document.getElementById('selBim').value;
   const sL = getLoginSession();
@@ -2427,25 +2313,6 @@ function agregarFechaAsis() {
   asisFechaActiva = f;
   renderAsistencia();
   toast('Fecha agregada');
-}
-
-function cicloAsis(nombre) {
-  if (!asisFechaActiva) { toast('Elige o agrega una fecha'); return; }
-  const k = asisMarkKey(asisFechaActiva, nombre);
-  const cur = asisGet(store.asistencia[k]).marca;
-  const orden = ['', 'P', 'F', 'T', 'J'];
-  const i = orden.indexOf(cur);
-  const next = orden[(i + 1) % orden.length];
-  asisSet(nombre, next);
-  saveStore();
-  renderAsistencia();
-}
-
-function setAsis(nombre, val) {
-  if (!asisFechaActiva) { toast('Elige o agrega una fecha'); return; }
-  asisSet(nombre, val);
-  saveStore();
-  renderAsistencia();
 }
 
 function guardarAsistencia() {
