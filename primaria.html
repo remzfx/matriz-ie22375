@@ -1766,7 +1766,6 @@ window.__IE_gradoOK = function(gradoVal) {
             renderizarCompetencias();
             renderizarResumen();
             renderNavegadorAreas();
-            if (typeof syncDocenteTop === 'function') syncDocenteTop();
             // Quedarse en la zona de gráficos / navegador (exposición)
             const dest = document.getElementById('seccionGraficos') || document.getElementById('navAreasExpo');
             if (dest) dest.scrollIntoView({ behavior: 'smooth', block: 'start' });
