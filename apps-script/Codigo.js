@@ -130,8 +130,10 @@ function validarToken_(token, role) {
   } catch (err) { return null; }
   if (!claims || Number(claims.exp) <= Date.now()) return null;
   if (role && String(claims.role) !== String(role)) return null;
-  const config = obtenerDocentesConfig_();
-  if (Number(claims.permisosVersion) !== Number(config.ts)) return null;
+  if (claims.role === 'docente') {
+    const config = obtenerDocentesConfig_();
+    if (Number(claims.permisosVersion) !== Number(config.ts)) return null;
+  }
   return claims;
 }
 
