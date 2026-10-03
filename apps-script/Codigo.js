@@ -11,6 +11,8 @@ const HOJA_AREAS = 'EstadosAreas';
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 const TOKEN_SECRET_PROPERTY = 'IE22375_TOKEN_SECRET';
 const ADMIN_PASS_PROPERTY = 'IE22375_ADMIN_PASS';
+const DOCENTES_CACHE_KEY = 'IE22375_DOCENTE_ACCESOS_V1';
+const DOCENTES_CACHE_TTL_SECONDS = 600;
 
 function asegurarAsis_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -49,7 +51,40 @@ function asegurarDoc_() {
   return sh;
 }
 
+function leerDocentesConfigCache_() {
+  try {
+    const raw = CacheService.getScriptCache().get(DOCENTES_CACHE_KEY);
+    if (raw) {
+      const config = JSON.parse(raw);
+      if (config && Array.isArray(config.docentes) &&
+          typeof config.ts === 'number' && isFinite(config.ts)) return config;
+    }
+  } catch (err) { /* Caché no disponible o inválida: consultar Sheets. */ }
+  return null;
+}
+
 function obtenerDocentesConfig_() {
+  let config = leerDocentesConfigCache_();
+  if (config) return config;
+  // Solo los misses comparten bloqueo con savedoc; los hits no se serializan.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    config = leerDocentesConfigCache_();
+    if (config) return config;
+    config = leerDocentesConfigSheets_();
+    try {
+      CacheService.getScriptCache().put(
+        DOCENTES_CACHE_KEY, JSON.stringify(config), DOCENTES_CACHE_TTL_SECONDS
+      );
+    } catch (err) { /* Si excede el límite de caché, Sheets sigue siendo la fuente. */ }
+    return config;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function leerDocentesConfigSheets_() {
   const sh = asegurarDoc_();
   const last = sh.getLastRow();
   if (last < 2) return { docentes: [], ts: 0 };
@@ -729,22 +764,31 @@ function doPost(e) {
     }
 
     if (action === 'savedoc') {
-      const list = Array.isArray(body.docentes) ? body.docentes : [];
-      const sh = asegurarDoc_();
-      const last = sh.getLastRow();
-      let fila = -1;
-      if (last >= 2) {
-        const claves = sh.getRange(2, 1, last, 1).getValues();
-        for (let i = 0; i < claves.length; i++) {
-          if (String(claves[i][0]) === 'DOCENTE_ACCESOS') { fila = i + 2; break; }
+      const lock = LockService.getScriptLock();
+      lock.waitLock(5000);
+      try {
+        // Invalidar antes de escribir; si falla, no guardar con una caché obsoleta.
+        CacheService.getScriptCache().remove(DOCENTES_CACHE_KEY);
+        const list = Array.isArray(body.docentes) ? body.docentes : [];
+        const sh = asegurarDoc_();
+        const last = sh.getLastRow();
+        let fila = -1;
+        if (last >= 2) {
+          const claves = sh.getRange(2, 1, last, 1).getValues();
+          for (let i = 0; i < claves.length; i++) {
+            if (String(claves[i][0]) === 'DOCENTE_ACCESOS') { fila = i + 2; break; }
+          }
         }
+        if (fila < 0) fila = sh.getLastRow() + 1;
+        const ts = body.ts || Date.now();
+        sh.getRange(fila, 1).setValue('DOCENTE_ACCESOS');
+        sh.getRange(fila, 2).setValue(ts);
+        sh.getRange(fila, 3).setValue(JSON.stringify(list));
+        return responder_({ ok: true, total: list.length, ts: ts, msg: 'Docentes guardados' });
+      } finally {
+        // Confirmar también escrituras parciales antes de permitir otra lectura.
+        try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
       }
-      if (fila < 0) fila = sh.getLastRow() + 1;
-      const ts = body.ts || Date.now();
-      sh.getRange(fila, 1).setValue('DOCENTE_ACCESOS');
-      sh.getRange(fila, 2).setValue(ts);
-      sh.getRange(fila, 3).setValue(JSON.stringify(list));
-      return responder_({ ok: true, total: list.length, ts: ts, msg: 'Docentes guardados' });
     }
 
     if (action === 'classroomtarea') {
