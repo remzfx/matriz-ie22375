@@ -89,6 +89,13 @@ Antes de ejecutarlo, comprobar que `apps-script/` contiene:
 - código Apps Script actual;
 - `appsscript.json` real, obtenido del proyecto existente.
 
+Además, en **Configuración del proyecto → Propiedades de la secuencia de comandos**, crear:
+
+- `IE22375_ADMIN_PASS`: contraseña vigente del rol Admin. No escribir su valor en el repositorio.
+
+El backend crea automáticamente `IE22375_TOKEN_SECRET` la primera vez que emite un token. Si ya existe,
+no debe reemplazarse: cambiarlo invalida inmediatamente todas las sesiones firmadas.
+
 Luego:
 
 **GitHub → Actions → Deploy Apps Script → Run workflow**
