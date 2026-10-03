@@ -569,10 +569,17 @@ function aplicarPaqueteAip(p){
   pintarFormHorario(); guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan||{}));
   renderPlantilla(); renderFeriados(); renderCursosMes(); renderEditorHS(); render();
 }
+function tokenSesionAip() {
+  try {
+    const raw = sessionStorage.getItem('ie22375_session_v1') || localStorage.getItem('ie22375_session_v1');
+    const sesion = raw ? JSON.parse(raw) : null;
+    return sesion && sesion.token ? sesion.token : '';
+  } catch (e) { return ''; }
+}
 async function subirAipNube(){
   guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS();
   try{
-    const res=await fetch(CLOUD_API_URL,{ method:'POST', body:JSON.stringify({ action:'saveaip', payload:paqueteAip(), ts:Date.now() }) });
+    const res=await fetch(CLOUD_API_URL,{ method:'POST', body:JSON.stringify({ action:'saveaip', token:tokenSesionAip(), payload:paqueteAip(), ts:Date.now() }) });
     const data=await res.json();
     if(!data||!data.ok) throw new Error((data&&data.error)||'Sin respuesta');
     alert('Plan AIP subido a la nube.');

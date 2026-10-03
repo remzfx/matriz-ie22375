@@ -128,7 +128,7 @@ function leerSesionCruda() {
 function getSession() {
   const s = leerSesionCruda();
   if (!s || !s.ts) return null;
-  if ((s.role === 'admin' || s.role === 'docente') && (!s.token || Number(s.tokenExp) <= Date.now())) {
+  if ((['admin', 'docente', 'auxiliar', 'pip'].includes(s.role)) && (!s.token || Number(s.tokenExp) <= Date.now())) {
     clearSession();
     return null;
   }
@@ -151,8 +151,8 @@ function onTipoChange() {
   if (!u) return;
   u.readOnly = t === 'admin';
   if (t === 'admin') u.value = 'admin';
-  if (t === 'auxiliar' && !u.value) u.value = 'auxiliar';
-  if (t === 'pip' && !u.value) u.value = 'pip';
+  if (t === 'auxiliar') u.value = 'auxiliar';
+  if (t === 'pip') u.value = 'pip';
   if (t === 'docente' && (u.value === 'admin' || u.value === 'auxiliar' || u.value === 'pip')) u.value = '';
 }
 async function intentarLogin() {
@@ -165,31 +165,7 @@ async function intentarLogin() {
     err.classList.remove('hidden');
     return;
   }
-  if (tipo === 'auxiliar') {
-    if (pass !== 'aux22375') {
-      err.textContent = 'La contraseña no es correcta.';
-      err.classList.remove('hidden');
-      return;
-    }
-    setSession({ user:'auxiliar', label:'Auxiliar', nivel:'colegio', role:'auxiliar',
-      grados:null, areas:null, mods:['auxiliar','wa_grupos'], ts:Date.now(),
-      recordar: !!(document.getElementById('inpRecordar')||{}).checked });
-    mostrarHub();
-    return;
-  }
-  if (tipo === 'pip') {
-    if (pass !== 'pip22375') {
-      err.textContent = 'La contraseña no es correcta.';
-      err.classList.remove('hidden');
-      return;
-    }
-    setSession({ user:'pip', label:'Innovación', nivel:'colegio', role:'pip',
-      grados:null, areas:null, mods:['aip'], ts:Date.now(),
-      recordar: !!(document.getElementById('inpRecordar')||{}).checked });
-    mostrarHub();
-    return;
-  }
-  const usuario = normalizarUsuarioDocente(document.getElementById('inpDocUser').value);
+  const usuario = (tipo === 'auxiliar' || tipo === 'pip') ? tipo : normalizarUsuarioDocente(document.getElementById('inpDocUser').value);
   if (!usuario) {
     err.textContent = tipo === 'admin' ? 'Ingrese el usuario administrador.' : 'Ingrese su usuario o DNI de docente.';
     err.classList.remove('hidden');

@@ -392,6 +392,13 @@ function recToItem(clave, rec) {
     marca: rec.marca || '', hora: rec.hora || '', via: rec.via || '', ts: rec.ts || Date.now(), motivo: rec.motivo || ''
   };
 }
+function tokenSesionAuxiliar() {
+  try {
+    const raw = sessionStorage.getItem('ie22375_session_v1') || localStorage.getItem('ie22375_session_v1');
+    const sesion = raw ? JSON.parse(raw) : null;
+    return sesion && sesion.token ? sesion.token : '';
+  } catch (e) { return ''; }
+}
 async function subirUnoNube(al) {
   try {
     const k = asisKey(al);
@@ -400,7 +407,7 @@ async function subirUnoNube(al) {
     await fetch(CLOUD_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'saveasis', items: [recToItem(k, rec)] })
+      body: JSON.stringify({ action: 'saveasis', token: tokenSesionAuxiliar(), items: [recToItem(k, rec)] })
     });
   } catch(e) {}
 }
@@ -429,7 +436,7 @@ async function subirTodoNube() {
     const res = await fetch(CLOUD_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'saveasis', items: items })
+      body: JSON.stringify({ action: 'saveasis', token: tokenSesionAuxiliar(), items: items })
     });
     const data = JSON.parse(await res.text());
     toast(data.ok

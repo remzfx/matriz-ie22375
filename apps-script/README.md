@@ -92,6 +92,7 @@ Antes de ejecutarlo, comprobar que `apps-script/` contiene:
 Además, en **Configuración del proyecto → Propiedades de la secuencia de comandos**, crear:
 
 - `IE22375_ADMIN_PASS`: contraseña vigente del rol Admin. No escribir su valor en el repositorio.
+- `IE22375_AUXILIAR_PASS` y `IE22375_PIP_PASS`: contraseñas privadas para los roles existentes Auxiliar e Innovación. El login ahora se valida en servidor y emite el mismo token HMAC. Definir contraseñas nuevas; las anteriores estaban publicadas en el cliente. No hay fallback al login local y las sesiones anteriores sin token requieren volver a iniciar sesión.
 
 El backend crea automáticamente `IE22375_TOKEN_SECRET` la primera vez que emite un token. Si ya existe,
 no debe reemplazarse: cambiarlo invalida inmediatamente todas las sesiones firmadas.
@@ -116,3 +117,13 @@ Cuando tengamos al menos un despliegue correcto y comprobemos que la URL públic
 ## Nota sobre clasp
 
 `clasp push` reemplaza el contenido del proyecto remoto con los archivos locales aceptados. Por eso la primera sincronización debe preservar el manifiesto y cualquier archivo existente del proyecto.
+
+## Autorización de las escrituras restantes
+
+- `saveasis`: Admin/Auxiliar, cuyo módulo actual cubre todo el colegio. Solo contextos de Primaria/Secundaria válidos; se valida el lote completo antes de escribir y se construye la clave en servidor. Docentes registran su asistencia académica por `savereg`, no por esta ruta de ingreso.
+- `saveaip`: Admin/Innovación (`pip`), sin conceder acceso a docentes ni auxiliares.
+- `savetpl` y `savewa`: solo Admin. Auxiliar conserva la consulta/envío a grupos existentes, sin editar su configuración.
+
+Antes de una implementación futura, definir las dos contraseñas privadas. Este bloque no configura propiedades, no fusiona ramas ni despliega.
+
+
