@@ -964,7 +964,7 @@ async function subirPlantillaSiagie() {
     const res = await fetch(CLOUD_API_URL, {
       method:'POST',
       headers:{ 'Content-Type':'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action:'savetpl', nivel, bimestre:bim, grado, seccion, filename:f[0].name, b64, ts:Date.now() })
+      body: JSON.stringify({ action:'savetpl',token:tokenSesionAdmin(), nivel, bimestre:bim, grado, seccion, filename:f[0].name, b64, ts:Date.now() })
     });
     const data = JSON.parse(await res.text());
     msg.textContent = data.ok ? ('Habilitado: '+f[0].name) : (data.error || 'Error al subir');
@@ -1012,7 +1012,7 @@ async function guardarGruposWa(){
   const msg=document.getElementById('waMsg');
   if(msg) msg.textContent='Guardado en este equipo. Subiendo a la nube…';
   try{
-    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'savewa',grupos:list,ts:Date.now()})});
+    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'savewa',token:tokenSesionAdmin(),grupos:list,ts:Date.now()})});
     const data=JSON.parse(await res.text());
     if(msg) msg.textContent=data.ok?('Guardado · '+list.length+' aulas'):(data.error||'Nube no disponible; quedó en este equipo.');
   }catch(e){ if(msg) msg.textContent='Guardado local. Publique Apps Script para la nube.'; }
@@ -1145,7 +1145,7 @@ async function subirPlantillaAula(grado, seccion, inputId){
   const bytes=new Uint8Array(buf);
   let bin=''; for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
   try{
-    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'savetpl',nivel,bimestre:bim,grado,seccion,filename:inp.files[0].name,b64:btoa(bin),ts:Date.now()})});
+    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'savetpl',token:tokenSesionAdmin(),nivel,bimestre:bim,grado,seccion,filename:inp.files[0].name,b64:btoa(bin),ts:Date.now()})});
     const data=JSON.parse(await res.text());
     if(msg) msg.textContent=data.ok?('Guardado: '+inp.files[0].name):(data.error||'Error');
     renderAulasSiagie();

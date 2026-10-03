@@ -11,6 +11,9 @@ const HOJA_AREAS = 'EstadosAreas';
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 const TOKEN_SECRET_PROPERTY = 'IE22375_TOKEN_SECRET';
 const ADMIN_PASS_PROPERTY = 'IE22375_ADMIN_PASS';
+const AUXILIAR_PASS_PROPERTY = 'IE22375_AUXILIAR_PASS';
+const PIP_PASS_PROPERTY = 'IE22375_PIP_PASS';
+const CLASSROOM_CONTEXTS_PROPERTY = 'IE22375_CLASSROOM_CONTEXTS';
 const DOCENTES_CACHE_KEY = 'IE22375_DOCENTE_ACCESOS_V1';
 const DOCENTES_CACHE_TTL_SECONDS = 600;
 
@@ -176,7 +179,7 @@ function responderLogin_(body) {
   const tipo = String(body.tipo || '').toLowerCase();
   const usuario = normalizarUsuario_(body.usuario);
   const pass = String(body.password == null ? '' : body.password).trim();
-  if (!pass || (tipo !== 'docente' && tipo !== 'admin')) {
+  if (!pass || (['docente', 'admin', 'auxiliar', 'pip'].indexOf(tipo) < 0)) {
     return { ok: false, error: 'Usuario o contraseña incorrectos.' };
   }
 
@@ -189,6 +192,16 @@ function responderLogin_(body) {
         user: 'admin', label: 'Administrador', role: 'admin', nivel: 'admin', grados: null,
         areas: null, aulas: null, asignaciones: null,
         mods: ['admin_bd', 'registro', 'auxiliar', 'wa_grupos', 'matriz_pri', 'matriz_sec', 'aip']
+      };
+    }
+  } else if (tipo === 'auxiliar' || tipo === 'pip') {
+    const propiedad = tipo === 'auxiliar' ? AUXILIAR_PASS_PROPERTY : PIP_PASS_PROPERTY;
+    const password = PropertiesService.getScriptProperties().getProperty(propiedad);
+    if (usuario === tipo && password && compararSeguro_(pass, password)) {
+      perfil = {
+        user: tipo, label: tipo === 'auxiliar' ? 'Auxiliar' : 'Innovación', role: tipo,
+        nivel: 'colegio', grados: null, areas: null, aulas: null, asignaciones: null,
+        mods: tipo === 'auxiliar' ? ['auxiliar', 'wa_grupos'] : ['aip']
       };
     }
   } else {
@@ -302,6 +315,47 @@ function autorizarEscritura_(body, ctx) {
     }
   }
   return permitido ? { role: 'docente', user: docente.user, docente: docente.nombre || docente.user } : null;
+}
+
+function sesionRutaEscritura_(token, roles) {
+  const sesion = validarToken_(token);
+  return sesion && roles.indexOf(sesion.role) >= 0 ? sesion : null;
+}
+
+function itemAsistenciaAutorizado_(item) {
+  // Admin/Auxiliar tienen el colegio completo; Docente no usa esta ruta de ingreso.
+  const nivel = String(item.nivel || '').trim().toLowerCase();
+  const grado = gradoEscritura_(item.grado);
+  const seccion = seccionEscritura_(item.seccion);
+  const fecha = typeof item.fecha === 'string' ? item.fecha.trim() : '';
+  const nombre = typeof item.nombre === 'string' ? item.nombre.trim() : '';
+  if ((nivel !== 'primaria' && nivel !== 'secundaria') || !grado ||
+      (nivel === 'secundaria' && grado > 5) || !seccion ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !nombre ||
+      /[|\u0000-\u001f]/.test(nombre)) return null;
+  return Object.assign({}, item, {
+    fecha: fecha, nivel: nivel, grado: String(grado),
+    seccion: seccion === 'ÚNICA' ? 'Única' : seccion, nombre: nombre,
+    clave: [fecha, nivel, grado, seccion === 'ÚNICA' ? 'Única' : seccion, nombre].join('||')
+  });
+}
+
+function contextoCursoClassroom_(courseId) {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty(CLASSROOM_CONTEXTS_PROPERTY);
+    const cursos = raw ? JSON.parse(raw) : null;
+    if (!cursos || !Object.prototype.hasOwnProperty.call(cursos, courseId)) return null;
+    const curso = cursos[courseId];
+    if (!curso || typeof curso !== 'object' || Array.isArray(curso)) return null;
+    const nivel = String(curso.nivel || '').trim().toLowerCase();
+    const numero = gradoEscritura_(curso.grado);
+    const seccion = seccionEscritura_(curso.seccion);
+    const area = typeof curso.area === 'string' ? curso.area.trim() : '';
+    if ((nivel !== 'primaria' && nivel !== 'secundaria') || !numero ||
+        (nivel === 'secundaria' && numero > 5) || !seccion ||
+        !area || /[|\u0000-\u001f]/.test(area)) return null;
+    return { nivel: nivel, numero: numero, seccion: seccion, area: area };
+  } catch (err) { return null; }
 }
 
 function asegurarConfig_() {
@@ -667,7 +721,16 @@ function doPost(e) {
     }
 
     if (action === 'saveasis') {
-      const items = Array.isArray(body.items) ? body.items : [body];
+      if (!sesionRutaEscritura_(body.token, ['admin', 'auxiliar'])) {
+        return responder_({ ok: false, error: 'Sesión inválida o sin autorización para asistencia de ingreso.' });
+      }
+      const originales = Array.isArray(body.items) ? body.items : [body];
+      const items = originales.map(function (item) {
+        return item && typeof item === 'object' ? itemAsistenciaAutorizado_(item) : null;
+      });
+      if (items.some(function (item) { return !item; })) {
+        return responder_({ ok: false, error: 'Contexto de asistencia inválido.' });
+      }
       const sh = asegurarAsis_();
       const last = sh.getLastRow();
       const mapa = {};
@@ -677,7 +740,7 @@ function doPost(e) {
       }
       let n = 0;
       items.forEach(function (it) {
-        const clave = String(it.clave || [it.fecha, it.nivel, it.grado, it.seccion, it.nombre].join('||'));
+        const clave = it.clave;
         if (!clave || clave === '||||') return;
         let fila = mapa[clave];
         if (!fila) {
@@ -747,6 +810,9 @@ function doPost(e) {
     }
 
     if (action === 'saveaip') {
+      if (!sesionRutaEscritura_(body.token, ["admin","pip"])) {
+        return responder_({ ok: false, error: 'Sesión inválida o sin autorización para esta operación.' });
+      }
       const payload = body.payload || body.plan || {};
       const sh = asegurarAip_();
       const last = sh.getLastRow();
@@ -766,6 +832,9 @@ function doPost(e) {
     }
 
     if (action === 'savetpl') {
+      if (!sesionRutaEscritura_(body.token, ["admin"])) {
+        return responder_({ ok: false, error: 'Sesión inválida o sin autorización para esta operación.' });
+      }
       const nivelT = String(body.nivel || '').toLowerCase();
       const bimestre = String(body.bimestre || '');
       const grado = String(body.grado || '');
@@ -807,6 +876,9 @@ function doPost(e) {
     }
 
     if (action === 'savewa') {
+      if (!sesionRutaEscritura_(body.token, ["admin"])) {
+        return responder_({ ok: false, error: 'Sesión inválida o sin autorización para esta operación.' });
+      }
       const list = Array.isArray(body.grupos) ? body.grupos : [];
       const sh = asegurarWa_();
       const last = sh.getLastRow();
@@ -963,8 +1035,16 @@ function listarClassroom_() {
 
 function crearTareaClassroom_(body) {
   try {
+    const sesion = sesionRutaEscritura_(body.token, ['admin', 'docente']);
+    if (!sesion) return { ok: false, error: 'Sesión inválida o sin autorización para Classroom.' };
     var courseId = String(body.courseId || '');
     if (!courseId) return { ok: false, error: 'Falta el curso' };
+    if (sesion.role === 'docente') {
+      const ctx = contextoCursoClassroom_(courseId);
+      if (!ctx || !autorizarEscritura_({ token: body.token }, ctx)) {
+        return { ok: false, error: 'Sin autorización para el contexto de este curso.' };
+      }
+    }
     var trabajo = Classroom.Courses.CourseWork.create({
       title: String(body.titulo || 'Sesión IE 22375'),
       description: String(body.descripcion || ''),
