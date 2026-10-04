@@ -19,7 +19,7 @@ function fixture(role='admin'){
   const calls=[],elements=new Map(),alerts=[];
   function el(id){if(!elements.has(id))elements.set(id,{value:'',style:{},textContent:'',innerHTML:'',classList:{add(){},remove(){}}});return elements.get(id);}
   const c=vm.createContext({window:{},sessionStorage:storage,localStorage:storage,atob,console,Date,
-    document:{getElementById:el},alert:v=>alerts.push(v),confirm:()=>true,setTimeout:()=>0,
+    document:{getElementById:el,querySelector:sel=>sel==='main'?{inert:false,setAttribute(){}}:null},alert:v=>alerts.push(v),confirm:()=>true,setTimeout:()=>0,
     fetch:async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({ok:true,version:'synthetic-current',inicializada:true,estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',orden:1,nombre:'Synthetic Primary'},{nivel:'secundaria',grado:1,seccion:'A',orden:1,nombre:'Synthetic Secondary'}]})};}
   });
   new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;
@@ -59,7 +59,7 @@ test('Registro enters its current flow only after protected students are loaded'
     function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};
     function fillCaps(){};function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};
     function sincronizarPeriodosNube(){return Promise.resolve()};function onContexto(){};`);
-  for(const name of ['loadBD','llenarAulasPadron','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  for(const name of ['loadBD','llenarAulasPadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
   await s.c.entrarNivel('primaria');checkRequest(s,'III');
   assert.match(s.elements.get('selGrado').innerHTML,/value="1"/);
   assert.equal(s.c.loadBD().primaria.estudiantes[0].nombre,'Synthetic Primary');
@@ -129,6 +129,8 @@ test('loadRoster keeps bimestre, identifiers and explicit safe fallback; invalid
     s.calls.push({url,options});return {ok:true,json:async()=>({ok:true,inicializada:true,version:'v',bimestre:'III',padronInicializado:false,fuentePadron:'actual',estudiantes:[{nivel:'secundaria',grado:4,seccion:'B',nombre:'Synthetic Student',idSiagie:'42',codigoEstudiante:'00042',estadoMatricula:'TRASLADADO'}]})};
   };
   const base=await s.c.IEStudents.loadRoster('III');checkRequest(s,'III');
+  assert.equal(s.c.IEStudents.peekRoster('III').secundaria.estudiantes[0].idSiagie,'42');
+  assert.equal(s.c.IEStudents.peekRoster('IV'),null);
   assert.equal(base.bimestre,'III');assert.equal(base.padronInicializado,false);assert.equal(base.secundaria.estudiantes[0].idSiagie,'42');
   assert.equal(base.secundaria.estudiantes[0].codigoEstudiante,'00042');
   await assert.rejects(s.c.IEStudents.loadRoster('V'),/inválido/);assert.equal(s.calls.length,1);

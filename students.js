@@ -93,7 +93,9 @@
     if (!base.inicializada) { clear(); throw new Error('Base privada no inicializada. Admin debe completar la inicialización SIAGIE.'); }
     return base;
   }
-  global.IEStudents = {empty: empty, peek: () => peek('students:actual'), clear: clear, session: session,
+  global.IEStudents = {empty: empty, peek: () => peek('students:actual'),
+    peekRoster: bimestre => ['I','II','III','IV'].includes(bimestre) ? peek('students:' + bimestre) : null,
+    clear: clear, session: session,
     load: () => checkedLoad(),
     inspect: () => request('loadstudents'),
     loadRoster: bimestre => {

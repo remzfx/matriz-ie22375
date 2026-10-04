@@ -778,26 +778,59 @@ function metaRegistro() {
   const old = store.meta[cloudClaveReg()];
   return Object.assign({}, typeof old === 'object' ? old : {docente: old || ''}, {studentAliases: aliasesAula()});
 }
-let padronBimestre = '', solicitudPadron = 0;
+let padronBimestre = '', solicitudPadron = 0, padronVerificadoServidor = false;
+function bloquearRegistroMientrasValida(bloquear) {
+  padronVerificadoServidor = !bloquear;
+  const main = document.querySelector('main');
+  if (main) {
+    main.inert = !!bloquear;
+    main.setAttribute('aria-busy', bloquear ? 'true' : 'false');
+  }
+}
+function pintarPadronInmediato(base, bimestre) {
+  bdEstudiantes = base; padronBimestre = bimestre;
+  recordarPadron(base); saveStore();
+  try { llenarAulasPadron(nivel); onContexto(); } catch (e) { try { renderStudents(); } catch (_) {} }
+}
 async function cargarPadronRegistro(bimestre) {
   const solicitud = ++solicitudPadron;
   cargandoEstudiantes = true;
+  bloquearRegistroMientrasValida(true);
   recordarPadron(bdEstudiantes);
-  bdEstudiantes = IEStudents.empty();
   sesionActiva = null; notas = {};
   ['finLista','avanceBox','asisLista'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
-  renderStudents();
+
+  const cache = IEStudents.peekRoster ? IEStudents.peekRoster(bimestre) : null;
+  if (cache) {
+    pintarPadronInmediato(cache, bimestre);
+    const st = document.getElementById('studentsStatus');
+    if (st) st.textContent = 'Padrón cargado. Verificando con el servidor…';
+  } else {
+    bdEstudiantes = IEStudents.empty();
+    renderStudents();
+  }
+
   try {
     const base = await IEStudents.loadRoster(bimestre);
     if (solicitud !== solicitudPadron) return false;
-    bdEstudiantes = base; padronBimestre = bimestre;
-    recordarPadron(base); saveStore();
-    if (base.offline) alert('Sin conexión: padrón temporal de esta sesión; no valida producción.');
-    else if (!base.padronInicializado) toast('Padrón pendiente: el servidor entregó la base actual autorizada.');
+    pintarPadronInmediato(base, bimestre);
+    if (base.offline) {
+      const st = document.getElementById('studentsStatus');
+      if (st) st.textContent = 'Sin conexión: padrón temporal en modo solo lectura.';
+      alert('Sin conexión: se muestra el último padrón válido, pero Registro queda en solo lectura hasta verificar el servidor.');
+      return true;
+    }
+    bloquearRegistroMientrasValida(false);
+    if (!base.padronInicializado) toast('Padrón pendiente: el servidor entregó la base actual autorizada.');
     return true;
   } catch(e) {
-    if (solicitud === solicitudPadron) { padronBimestre = ''; alert(e.message); }
-    return false;
+    if (solicitud === solicitudPadron) {
+      if (!cache) padronBimestre = '';
+      const st = document.getElementById('studentsStatus');
+      if (st && cache) st.textContent = 'No se pudo verificar el servidor. Padrón visible en modo solo lectura.';
+      alert(e.message);
+    }
+    return !!cache;
   } finally {
     if (solicitud === solicitudPadron) cargandoEstudiantes = false;
   }

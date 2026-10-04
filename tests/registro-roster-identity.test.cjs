@@ -10,17 +10,18 @@ function extract(file,name){
 function fixture(){
  const els=new Map();const el=id=>{if(!els.has(id))els.set(id,{value:id==='selBim'?'III':id==='selGrado'?'4':id==='selSeccion'?'B':'2026-10-03'});return els.get(id);};
  const requests=[],alerts=[];const roster=(al,bim='III',extra={})=>({primaria:{estudiantes:[]},secundaria:{estudiantes:al},bimestre:bim,padronInicializado:true,...extra});
- const c=vm.createContext({window:{},document:{getElementById:el},console,alert:v=>alerts.push(v),toast(){},saveStore(){},renderStudents(){},getLoginSession:()=>({role:'docente'}),bimestreHabilitado:()=>true,
-   IEStudents:{empty:()=>roster([]),loadRoster:async bim=>{requests.push(bim);return roster(c.next,bim);}}});
+ const main={inert:false,attrs:{},setAttribute(k,v){this.attrs[k]=v;}};
+ const c=vm.createContext({window:{},document:{getElementById:el,querySelector:s=>s==='main'?main:null},console,alert:v=>alerts.push(v),toast(){},saveStore(){},renderStudents(){},getLoginSession:()=>({role:'docente'}),bimestreHabilitado:()=>true,
+   IEStudents:{empty:()=>roster([]),peekRoster:()=>null,loadRoster:async bim=>{requests.push(bim);return roster(c.next,bim);}}});
  new vm.Script(read('student-identity.js')).runInContext(c);c.studentKey=c.window.studentKey;c.IEStudentIdentity=c.window.IEStudentIdentity;
  const run=s=>new vm.Script(s).runInContext(c);
  run(`let nivel='secundaria',areaActual='Matemática',store={sessions:[],grades:{},finales:{},concArea:{},meta:{},studentAliases:{}},notas={},sesionActiva={comp:'Resuelve',capacidad:'Capacidad',fecha:'2026-10-03'},cargandoEstudiantes=false,padronBimestre='III',solicitudPadron=0,bdEstudiantes=IEStudents.empty();
    function ctxBase(){return {nivel,bim:document.getElementById('selBim').value,grado:4,seccion:'B',area:areaActual};}
    function estudiantes(){return bdEstudiantes.secundaria.estudiantes;}
    function cloudClaveReg(){const c=ctxBase();return [c.nivel,c.bim,c.grado,c.seccion,c.area].join('||');}`);
- for(const name of ['alumnoIdentidad','identidadAlumno','aliasesAula','recordarPadron','leerNota','metaRegistro','cargarPadronRegistro','cambiarBimestreRegistro','gradeKey','finalKey','concAreaKey','sliceRegistroArea','mergeRegistroPayload','bimCerradoDocente'])run(extract('registro.html',name));
+ for(const name of ['alumnoIdentidad','identidadAlumno','aliasesAula','recordarPadron','leerNota','metaRegistro','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','cambiarBimestreRegistro','gradeKey','finalKey','concAreaKey','sliceRegistroArea','mergeRegistroPayload','bimCerradoDocente'])run(extract('registro.html',name));
  run("function prefijoReg(){return cloudClaveReg()+'||';}function tsDe(x){return x&&x.ts||0;}let savedBim='';function guardarTodo(){savedBim=ctxBase().bim;}function llenarAulasPadron(){}function onContexto(){}");
- return {c,run,roster,requests,alerts,el};
+ return {c,run,roster,requests,alerts,el,main};
 }
 test('studentKey prefers SIAGIE ID, then student code, then normalized name',()=>{
  const {c}=fixture();assert.equal(c.studentKey({idSiagie:'42',codigoEstudiante:'C',nombre:'Name'}),'id:42');
@@ -30,6 +31,15 @@ test('Registro selection III loads the quarterly roster, not BASE_ACTUAL; change
  const s=fixture();s.c.next=[{idSiagie:'new',nombre:'Synthetic New'}];s.run("padronBimestre='II'");
  await s.c.cambiarBimestreRegistro();assert.deepEqual(s.requests,['III']);assert.equal(s.run('savedBim'),'II');
  assert.equal(s.run('bdEstudiantes.bimestre'),'III');assert.equal(s.run('estudiantes().length'),1);
+});
+test('Registro renders same-session cached roster immediately but stays locked until server verification',async()=>{
+ const s=fixture(),cached=s.roster([{idSiagie:'cached',nombre:'Synthetic Cached'}]);
+ let resolveServer;s.c.IEStudents.peekRoster=b=>b==='III'?cached:null;
+ s.c.IEStudents.loadRoster=b=>{s.requests.push(b);return new Promise(r=>{resolveServer=r;});};
+ const pending=s.c.cargarPadronRegistro('III');
+ assert.equal(s.run('estudiantes()[0].idSiagie'),'cached');assert.equal(s.main.inert,true);
+ resolveServer(s.roster([{idSiagie:'fresh',nombre:'Synthetic Fresh'}]));
+ await pending;assert.equal(s.run('estudiantes()[0].idSiagie'),'fresh');assert.equal(s.main.inert,false);
 });
 test('Same ID keeps notes after rename/order change; new is empty, removed is hidden and all history survives',async()=>{
  const s=fixture(),continuing={idSiagie:'42',nombre:'Synthetic Before',grado:4,seccion:'B',orden:1},removed={idSiagie:'43',nombre:'Synthetic Removed',grado:4,seccion:'B'};
