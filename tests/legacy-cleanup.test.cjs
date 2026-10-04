@@ -155,3 +155,31 @@ test('No embedded-data initialization control reappears; initial SIAGIE review s
   assert.doesNotMatch(read('admin.html'),/onclick="inicializarBDOficial/);
   assert.match(read('admin.html'),/IEMigrateStudents\.inicializar\(\)/);
 });
+
+
+test('UI refinements keep Registro Promedios compact and cloud actions explicit', () => {
+  const src = read('registro.html');
+  assert.match(src, /Nube Subir/);
+  assert.match(src, /Nube Bajar/);
+  assert.doesNotMatch(src, />Nube [↑↓]</);
+  assert.match(src, /max-width:104px/);
+  assert.match(src, /fin-grid thead th:not\(\.fin-nom\)/);
+  assert.match(src, /viewHome[^>]*min-h-screen[^>]*justify-center/);
+});
+
+for (const file of ['primaria.html', 'secundaria.html']) {
+  test(file + ': teacher summary omits Progreso General card and comparative has no redundant back controls', () => {
+    const src = read(file);
+    assert.match(src, /mostrarProgresoGeneral/);
+    assert.match(src, /window\.__IE_SES\.role === 'docente'/);
+    assert.doesNotMatch(src, /← Volver a áreas|>← Volver</);
+    assert.match(src, /Nube Subir/);
+    assert.match(src, /Nube Bajar/);
+  });
+}
+
+test('Secundaria comparative reads only the exact requested section and shows responsible teacher on mobile', () => {
+  const src = read('secundaria.html');
+  assert.match(src, /sec !== secObjetivo/);
+  assert.match(src, /Docente responsable: \$\{docente \|\| 'Sin registrar'\}/);
+});
