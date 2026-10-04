@@ -139,7 +139,7 @@ for(const action of ['loadstudents','savestudents','initstudents','restorestuden
   const s=studentsFixture(),before=s.state.writes,res=s.get({action,token:s.admin,base:s.base});
   assert.equal(res.ok,false);assert.equal('estudiantes' in res,false);assert.equal(s.state.writes,before);
 });
-for(const action of ['savestudents','initstudents','restorestudents'])test(action+': only Admin may administer the student base',()=> {
+for(const action of ['savestudents','initstudents','restorestudents','seedstudentsroster','syncstudents'])test(action+': only Admin may administer the student base',()=> {
   const s=studentsFixture();
   for(const token of [undefined,s.primary,s.secondary,s.token('auxiliar','auxiliar'),s.token('pip','pip'),s.token('admin','admin',{exp:Date.now()-1})]){
     const before=s.state.writes,res=s.post({action,token,base:s.base,version:s.init.version});
@@ -182,4 +182,54 @@ test('Initial migration is explicit; saving an uninitialized base is rejected',(
   const load=s.post({action:'loadstudents',token:s.admin});assert.equal(load.inicializada,false);assert.deepEqual(load.estudiantes,[]);
   assert.equal(s.post({action:'savestudents',token:s.admin,version:'',base:{primaria:{estudiantes:[]},secundaria:{estudiantes:[]}}}).ok,false);
   assert.equal(s.post({action:'initstudents',token:s.admin,version:'',base:{primaria:{estudiantes:[]},secundaria:{estudiantes:[]}}}).ok,false);
+});
+
+
+test('Bimonthly roster sync changes only the open roster and never touches existing grades',()=> {
+  const s=studentsFixture();
+  const seeded=s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'I'});
+  assert.equal(seeded.ok,true);assert.equal(seeded.padronInicializado,true);assert.equal(seeded.bimestre,'I');
+
+  const reg=s.tables.get('RegistroNotas');
+  const savedPayload={grades:{'primaria||I||1||Única||Comunicación||Comp||Cap||2026-03-20||Synthetic Student 1':{nota20:17,nivel:'A'}}};
+  reg.rows.push(['reg-key','primaria','I','1','Única','Comunicación','Test Primary',1234,JSON.stringify(savedPayload)]);
+  const registroAntes=JSON.stringify(reg.rows);
+
+  const nueva=JSON.parse(JSON.stringify(s.base));
+  nueva.primaria.estudiantes=nueva.primaria.estudiantes.filter(a=>a.nombre!=='Synthetic Student 0');
+  nueva.primaria.estudiantes.push({nivel:'primaria',grado:1,seccion:'Única',orden:99,nombre:'Synthetic New Student'});
+  const synced=s.post({action:'syncstudents',token:s.admin,version:s.init.version,bimestre:'I',base:nueva});
+  assert.equal(synced.ok,true);
+  assert.equal(JSON.stringify(reg.rows),registroAntes,'student roster updates must not rewrite RegistroNotas');
+
+  const roster=s.load(s.admin,{bimestre:'I'});
+  assert.equal(roster.padronInicializado,true);
+  assert.equal(roster.estudiantes.some(a=>a.nombre==='Synthetic Student 0'),false);
+  assert.equal(roster.estudiantes.some(a=>a.nombre==='Synthetic Student 1'),true);
+  assert.equal(roster.estudiantes.some(a=>a.nombre==='Synthetic New Student'),true);
+
+  const current=s.load(s.admin);
+  assert.equal(current.version,synced.version);
+  assert.equal(current.estudiantes.some(a=>a.nombre==='Synthetic New Student'),true);
+});
+
+test('Closed bimesters cannot be resynchronized and their roster remains frozen',()=> {
+  const s=studentsFixture();
+  const seeded=s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'II'});
+  assert.equal(seeded.ok,true);
+  const before=s.load(s.admin,{bimestre:'II'}).estudiantes.map(a=>a.nombre);
+  const nueva=JSON.parse(JSON.stringify(s.base));
+  nueva.primaria.estudiantes.push({nivel:'primaria',grado:1,seccion:'Única',orden:99,nombre:'Should Not Enter Closed Roster'});
+  const res=s.post({action:'syncstudents',token:s.admin,version:s.init.version,bimestre:'II',base:nueva});
+  assert.equal(res.ok,false);assert.equal(res.code,'PERIOD_CLOSED');
+  assert.deepEqual(s.load(s.admin,{bimestre:'II'}).estudiantes.map(a=>a.nombre),before);
+  assert.equal(s.load(s.admin).estudiantes.some(a=>a.nombre==='Should Not Enter Closed Roster'),false);
+});
+
+test('A bimestre without its own roster reports fallback explicitly instead of pretending it is frozen',()=> {
+  const s=studentsFixture();
+  const res=s.load(s.admin,{bimestre:'IV'});
+  assert.equal(res.ok,true);assert.equal(res.padronInicializado,false);
+  assert.equal(res.fuentePadron,'actual');assert.equal(res.bimestre,'IV');
+  assert.equal(res.estudiantes.length,7);
 });
