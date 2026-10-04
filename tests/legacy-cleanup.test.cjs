@@ -266,3 +266,14 @@ test('Secundaria hides obsolete global summary cards for all roles', () => {
   assert.match(block, /container\.classList\.add\('hidden'\)/);
   assert.doesNotMatch(block, /Progreso General|Inicio \(C\)|En Proceso \(B\)|Logrado \(A\+AD\)/);
 });
+
+
+test('Areas actions stack title above and keep buttons in one horizontal row', () => {
+  for (const file of ['primaria.html', 'secundaria.html']) {
+    const src = read(file);
+    assert.match(src, /Áreas Curriculares/);
+    assert.match(src, /flex flex-nowrap sm:flex-wrap items-center justify-start gap-2 overflow-x-auto/);
+    assert.match(src, /px-4 py-2\.5 rounded-xl text-sm font-bold whitespace-nowrap shrink-0/);
+    assert.match(src, /mt-2 text-xs text-slate-500">Haz clic en un área para editar/);
+  }
+});
