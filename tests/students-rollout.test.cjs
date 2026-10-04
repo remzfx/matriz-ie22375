@@ -5,9 +5,9 @@ const hashes={"registro.html":"d2c076fa3716cd31bd98e1aa16ae070dbd87145ae9df64a78
 for(const [file,hash]of Object.entries(hashes))test(file+': stage A preserves the production consumer byte for byte',()=>assert.equal(crypto.createHash('sha256').update(read(file)).digest('hex'),hash));
 function fixture(){
  const els=new Map();function el(id){if(!els.has(id))els.set(id,{value:'primaria',checked:false,textContent:''});return els.get(id);}
- const calls=[],window={parseCSV:()=>[{nivel:el('importNivel').value,grado:1,seccion:'Única',orden:1,nombre:'Synthetic SIAGIE'}]};
+ const calls=[],parseOptions=[],window={parseCSV:(text,options)=>{parseOptions.push(options);return [{nivel:el('importNivel').value,grado:1,seccion:'Única',orden:1,nombre:'Synthetic SIAGIE'}];}};
  const c=vm.createContext({window,document:{getElementById:el},IEStudents:{load:async()=>{calls.push('load');return {inicializada:false,version:''};},initialize:async(base,version)=>{calls.push({base,version});}},confirm:()=>true});
- new vm.Script(read('students-migration.js')).runInContext(c);return {c,window,calls,el,api:window.IEMigrateStudents};
+ new vm.Script(read('students-migration.js')).runInContext(c);return {c,window,calls,parseOptions,el,api:window.IEMigrateStudents};
 }
 const file={files:[{text:async()=> 'NumeroDeOrden;ApellidoPaterno;EstadoMatricula\nsynthetic'}]};
 test('Stage A keeps the public JSON and embedded rosters unchanged, including the unresolved count difference',()=>{
@@ -25,6 +25,7 @@ test('Stage A imports only explicit SIAGIE selections, and never reads embedded/
  await s.api.importar({files:[{text:async()=>'{"primaria":{"estudiantes":[]}}'}]},'primaria');
  assert.match(s.el('migracionEstado').textContent,/CSV SIAGIE vigente/);
  await s.api.importar(file,'primaria');await s.api.importar(file,'secundaria');
+ assert.deepEqual(s.parseOptions,[{includeTransferred:true},{includeTransferred:true}]);
  await s.api.inicializar();assert.equal(s.calls.length,0);
  s.el('migracionRevisada').checked=true;await s.api.inicializar();
  assert.equal(s.calls.length,2);assert.equal(s.calls[1].base.primaria.estudiantes[0].nombre,'Synthetic SIAGIE');
