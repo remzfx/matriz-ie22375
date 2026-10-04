@@ -787,10 +787,18 @@ function bloquearRegistroMientrasValida(bloquear) {
     main.setAttribute('aria-busy', bloquear ? 'true' : 'false');
   }
 }
-function pintarPadronInmediato(base, bimestre) {
+function pintarPadronInmediato(base, bimestre, desdeCache) {
   bdEstudiantes = base; padronBimestre = bimestre;
   recordarPadron(base); saveStore();
-  try { llenarAulasPadron(nivel); onContexto(); } catch (e) { try { renderStudents(); } catch (_) {} }
+  try {
+    llenarAulasPadron(nivel);
+    // Con caché válida, pintar también el contexto académico local mientras
+    // el servidor verifica. La edición continúa bloqueada por main.inert.
+    if (desdeCache) onContexto({permitirDuranteCarga:true, localOnly:true});
+    else onContexto();
+  } catch (e) {
+    try { renderStudents(); renderSesiones(); } catch (_) {}
+  }
 }
 async function cargarPadronRegistro(bimestre) {
   const solicitud = ++solicitudPadron;
@@ -802,7 +810,7 @@ async function cargarPadronRegistro(bimestre) {
 
   const cache = IEStudents.peekRoster ? IEStudents.peekRoster(bimestre) : null;
   if (cache) {
-    pintarPadronInmediato(cache, bimestre);
+    pintarPadronInmediato(cache, bimestre, true);
     const st = document.getElementById('studentsStatus');
     if (st) st.textContent = 'Padrón cargado. Verificando con el servidor…';
   } else {
@@ -813,7 +821,7 @@ async function cargarPadronRegistro(bimestre) {
   try {
     const base = await IEStudents.loadRoster(bimestre);
     if (solicitud !== solicitudPadron) return false;
-    pintarPadronInmediato(base, bimestre);
+    pintarPadronInmediato(base, bimestre, false);
     if (base.offline) {
       const st = document.getElementById('studentsStatus');
       if (st) st.textContent = 'Sin conexión: padrón temporal en modo solo lectura.';
@@ -1069,6 +1077,10 @@ async function entrarNivel(n) {
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
 
+  // El nombre ya forma parte de la sesión autenticada: mostrarlo antes de
+  // cualquier consulta de red.
+  aplicarDocenteSesion();
+
   // Arranque rápido: usar de inmediato la última configuración válida de bimestres.
   // Solo si todavía no existe configuración local se espera una primera consulta al servidor.
   let periodosIniciales = loadPeriodosAdmin();
@@ -1081,9 +1093,6 @@ async function entrarNivel(n) {
   llenarAulasPadron(n);
 
   document.getElementById('inpFecha').value = hoyISO();
-
-  // Docente visible desde el primer render, sin esperar la nube.
-  aplicarDocenteSesion();
 
   onGrado();
   areaActual = areas()[0] || null;
@@ -1171,9 +1180,13 @@ function onGrado() {
   onContexto();
 }
 
-function onContexto() {
-  if (cargandoEstudiantes) return;
-  if (document.getElementById('selBim').value !== padronBimestre) { cambiarBimestreRegistro(); return; }
+function onContexto(options) {
+  options = options || {};
+  if (cargandoEstudiantes && !options.permitirDuranteCarga) return;
+  if (document.getElementById('selBim').value !== padronBimestre) {
+    if (!options.localOnly) cambiarBimestreRegistro();
+    return;
+  }
   const permitidasAhora = areas();
   if (!areaActual || !permitidasAhora.includes(areaActual)) {
     areaActual = permitidasAhora[0] || null;
@@ -1207,7 +1220,7 @@ function onContexto() {
   if (fin && fin.classList.contains('on')) renderFinales();
   else if (av && av.classList.contains('on')) renderAvance();
   else if (asis && asis.classList.contains('on')) renderAsistencia();
-  consultarEstadoSiagie();
+  if (!options.localOnly) consultarEstadoSiagie();
 }
 
 function guardarMeta() {
