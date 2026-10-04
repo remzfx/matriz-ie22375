@@ -637,7 +637,8 @@ function respuestaEstudiantes_(base, acceso, meta) {
   meta = meta || {};
   return {
     ok: true, estudiantes: estudiantes, version: base ? base.version : '', inicializada: !!base,
-    bimestre: meta.bimestre || '', padronInicializado: meta.padronInicializado !== false,
+    bimestre: meta.bimestre || '',
+    padronInicializado: Object.prototype.hasOwnProperty.call(meta, 'padronInicializado') ? !!meta.padronInicializado : !!base,
     fuentePadron: meta.fuentePadron || ''
   };
 }
