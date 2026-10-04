@@ -82,7 +82,7 @@ test('a persistent cache miss reads and populates only while holding the lock', 
   const context = vm.createContext({
     CacheService: {getScriptCache: () => ({
       get() {gets++; return null;},
-      put(key, value, ttl) {assert.equal(held, true); assert.equal(ttl, 600); assert.equal(JSON.parse(value).ts, 0); puts++;}
+      put(key, value, ttl) {assert.equal(held, true); assert.equal(ttl, 21600); assert.equal(JSON.parse(value).ts, 0); puts++;}
     })},
     LockService: {getScriptLock: () => ({
       waitLock() {assert.equal(held, false); held = true;},
