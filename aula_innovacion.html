@@ -231,6 +231,16 @@
 const KEY = 'ie22375_aip_plan_v1';
 const CFG_KEY = 'ie22375_aip_cfg_v1';
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
+function fetchLecturaNube(url) {
+  const params = new URLSearchParams(url.slice(url.indexOf('?') + 1));
+  const body = {};
+  params.forEach(function (value, key) { body[key] = value; });
+  body.token = tokenSesionAip();
+  return fetch(CLOUD_API_URL, {
+    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    cache: 'no-store', body: JSON.stringify(body)
+  });
+}
 const FERIADOS_DEF = {};
 let feriados = {};
 const DOW = ['LUN','MAR','MIE','JUE','VIE'];
@@ -587,7 +597,7 @@ async function subirAipNube(){
 }
 async function bajarAipNube(){
   try{
-    const res=await fetch(CLOUD_API_URL+'?action=loadaip&t='+Date.now(),{ cache:'no-store' });
+    const res=await fetchLecturaNube(CLOUD_API_URL+'?action=loadaip&t='+Date.now());
     const data=await res.json();
     if(!data||!data.ok) throw new Error((data&&data.error)||'Sin respuesta');
     if(!data.payload){ alert('En la nube no hay plan AIP. Sube con Nube ↑.'); return; }

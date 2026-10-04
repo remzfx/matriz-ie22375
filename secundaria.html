@@ -3867,6 +3867,16 @@ window.__IE_gradoOK = function(gradoVal) {
         // NUBE (Google Sheets) — guardado POR ÁREA
         // ============================================
         const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec";
+        function fetchLecturaNube(url) {
+          const params = new URLSearchParams(url.slice(url.indexOf('?') + 1));
+          const body = {};
+          params.forEach(function (value, key) { body[key] = value; });
+          body.token = (window.__IE_SES || {}).token || '';
+          return fetch(CLOUD_API_URL, {
+            method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            cache: 'no-store', body: JSON.stringify(body)
+          });
+        }
         const CLOUD_NIVEL = "secundaria";
 
         function cloudClave(area) {
@@ -3937,7 +3947,7 @@ window.__IE_gradoOK = function(gradoVal) {
             try {
                 mostrarToast('Descargando áreas de la nube...', 'success');
                 const url = CLOUD_API_URL + '?action=loadNivel&nivel=' + encodeURIComponent(CLOUD_NIVEL);
-                const res = await fetch(url);
+                const res = await fetchLecturaNube(url);
                 const text = await res.text();
                 let data;
                 try { data = JSON.parse(text); } catch(e) {

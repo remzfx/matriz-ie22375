@@ -445,11 +445,115 @@ function responder_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+function sesionLectura_(token, roles) {
+  const sesion = validarToken_(token);
+  if (!sesion || roles.indexOf(sesion.role) < 0) return null;
+  if (sesion.role !== 'docente') return { sesion: sesion };
+  const config = obtenerDocentesConfig_();
+  if (Number(sesion.permisosVersion) !== Number(config.ts)) return null;
+  const user = normalizarUsuario_(sesion.user);
+  const docente = config.docentes.find(function (item) {
+    return user && normalizarUsuario_(item.user) === user;
+  });
+  if (!docente) return null;
+  const mapa = docente.asignaciones;
+  if (String(docente.nivel || '').toLowerCase() === 'secundaria' &&
+      mapa != null && (typeof mapa !== 'object' || Array.isArray(mapa))) return null;
+  return { sesion: sesion, docente: docente };
+}
+
+function puedeLeerContexto_(acceso, ctx) {
+  if (acceso.sesion.role === 'admin') return true;
+  const docente = acceso.docente;
+  if (!docente || String(docente.nivel || '').toLowerCase() !== ctx.nivel ||
+      !ctx.numero || !seccionEscritura_(ctx.seccion)) return false;
+  if (ctx.nivel === 'primaria') {
+    return Array.isArray(docente.grados) && docente.grados.some(function (grado) {
+      return gradoEscritura_(grado) === ctx.numero;
+    });
+  }
+  if (ctx.nivel !== 'secundaria' || ctx.numero > 5) return false;
+  const mapa = docente.asignaciones;
+  if (mapa && Object.keys(mapa).length) {
+    const aulas = Object.prototype.hasOwnProperty.call(mapa, ctx.area) ? mapa[ctx.area] : null;
+    return Array.isArray(aulas) && aulas.some(function (aula) { return aulaEscritura_(aula, ctx); });
+  }
+  return Array.isArray(docente.areas) && docente.areas.indexOf(ctx.area) >= 0 &&
+    Array.isArray(docente.aulas) && docente.aulas.some(function (aula) { return aulaEscritura_(aula, ctx); });
+}
+
+function contextoFilaLectura_(row) {
+  return {
+    nivel: String(row[1] || '').toLowerCase(), bimestre: String(row[2] || ''),
+    numero: gradoEscritura_(row[3]), seccion: String(row[4] || ''), area: String(row[5] || '')
+  };
+}
+
+function coincideConsultaLectura_(p, ctx) {
+  return (!p.nivel || String(p.nivel).toLowerCase() === ctx.nivel) &&
+    (!(p.bimestre || p.bim) || String(p.bimestre || p.bim) === ctx.bimestre) &&
+    (!p.grado || gradoEscritura_(p.grado) === ctx.numero) &&
+    (!p.seccion || seccionEscritura_(p.seccion) === seccionEscritura_(ctx.seccion)) &&
+    (!p.area || String(p.area) === ctx.area);
+}
+
+function puedeLeerAula_(acceso, ctx) {
+  if (acceso.sesion.role === 'admin') return true;
+  const docente = acceso.docente;
+  const mapa = docente.asignaciones;
+  const areas = mapa && Object.keys(mapa).length ? Object.keys(mapa) : (docente.areas || []);
+  if (ctx.nivel === 'primaria') return puedeLeerContexto_(acceso, ctx);
+  return Array.isArray(areas) && areas.some(function (area) {
+    return puedeLeerContexto_(acceso, Object.assign({}, ctx, { area: area }));
+  });
+}
+
+function payloadRegistroLectura_(payload, acceso, ctx) {
+  if (acceso.sesion.role === 'admin') return payload;
+  payload = payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {};
+  // Los mapas internos también pueden contener datos de otros contextos (capsSel es global en el cliente).
+  function mismoContexto(nivel, bim, grado, seccion, area) {
+    return String(nivel).toLowerCase() === ctx.nivel && String(bim) === ctx.bimestre &&
+      gradoEscritura_(grado) === ctx.numero && seccionEscritura_(seccion) === seccionEscritura_(ctx.seccion) &&
+      (area == null || String(area) === ctx.area);
+  }
+  function mapaContexto(mapa, conArea) {
+    const out = {};
+    if (!mapa || typeof mapa !== 'object' || Array.isArray(mapa)) return out;
+    Object.keys(mapa).forEach(function (key) {
+      const parts = key.split('||');
+      if (parts.length > (conArea ? 5 : 4) && mismoContexto(parts[0], parts[1], parts[2], parts[3], conArea ? parts[4] : null)) out[key] = mapa[key];
+    });
+    return out;
+  }
+  return {
+    ts: payload.ts,
+    sessions: Array.isArray(payload.sessions) ? payload.sessions.filter(function (s) {
+      return s && mismoContexto(s.nivel, s.bim, s.grado, s.seccion, s.area);
+    }) : [],
+    grades: mapaContexto(payload.grades, true), finales: mapaContexto(payload.finales, true),
+    concArea: mapaContexto(payload.concArea, true), asistencia: mapaContexto(payload.asistencia, false),
+    capsSel: mapaContexto(payload.capsSel, true), meta: payload.meta || {}
+  };
+}
+
+
 function doGet(e) {
   try {
     const p = (e && e.parameter) || {};
     const action = String(p.action || '').toLowerCase();
     const nivel = String(p.nivel || '').toLowerCase();
+    const rolesLectura = {
+      loadreg: ['admin', 'docente'], loadnivel: ['admin', 'docente'], load: ['admin', 'docente'],
+      loadtpl: ['admin'], loadtplstatus: ['admin', 'docente'],
+      loadasis: ['admin', 'auxiliar'], loadaip: ['admin', 'pip'],
+      loadwa: ['admin', 'auxiliar'], classroom: ['admin']
+    };
+    const roles = Object.prototype.hasOwnProperty.call(rolesLectura, action) ? rolesLectura[action] : null;
+    const acceso = roles ? sesionLectura_(p.token, roles) : null;
+    if (roles && !acceso) {
+      return responder_({ ok: false, error: 'Sesión inválida o sin autorización para esta lectura.' });
+    }
 
     if (action === 'ping') {
       return responder_({ ok: true, msg: 'API Matriz IE 22375 — áreas + asistencia + registro + docentes' });
@@ -491,6 +595,8 @@ function doGet(e) {
         for (let i = 0; i < data.length; i++) {
           const rowNivel = String(data[i][1] || '').toLowerCase();
           if (nivel && rowNivel !== nivel) continue;
+          const ctx = contextoFilaLectura_(data[i]);
+          if (!puedeLeerContexto_(acceso, ctx) || !coincideConsultaLectura_(p, ctx)) continue;
           let payload = {};
           try {
             const raw = data[i][8];
@@ -506,7 +612,7 @@ function doGet(e) {
             area: data[i][5],
             docente: data[i][6],
             ts: data[i][7],
-            payload: payload
+            payload: payloadRegistroLectura_(payload, acceso, ctx)
           });
         }
       }
@@ -550,6 +656,8 @@ function doGet(e) {
           if (bim && String(data[i][2]) !== bim) continue;
           if (grado && String(data[i][3]) !== String(grado)) continue;
           if (seccion && String(data[i][4]) !== String(seccion)) continue;
+          const ctx = contextoFilaLectura_(data[i]);
+          if (!puedeLeerAula_(acceso, ctx)) continue;
           items.push({
             clave: data[i][0],
             nivel: data[i][1],
@@ -557,7 +665,7 @@ function doGet(e) {
             grado: data[i][3],
             seccion: data[i][4],
             filename: data[i][5],
-            fileId: data[i][6],
+            fileId: acceso.sesion.role === 'admin' ? data[i][6] : '',
             ts: data[i][7]
           });
         }
@@ -638,6 +746,8 @@ function doGet(e) {
       for (let i = 0; i < data.length; i++) {
         const rowNivel = String(data[i][1] || '').toLowerCase();
         if (rowNivel !== nivel) continue;
+        const ctx = contextoFilaLectura_(data[i]);
+        if (!puedeLeerContexto_(acceso, ctx) || !coincideConsultaLectura_(p, ctx)) continue;
         let competencias = {};
         try {
           const raw = data[i][9];
@@ -689,6 +799,10 @@ function doPost(e) {
     }
     const body = JSON.parse(e.postData.contents);
     const action = String(body.action || 'saveArea').toLowerCase();
+
+    if (['loadreg', 'loadnivel', 'load', 'loadasis', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
+      return doGet({ parameter: body });
+    }
 
     if (action === 'login') return responder_(responderLogin_(body));
 
