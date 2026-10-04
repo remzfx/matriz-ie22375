@@ -82,7 +82,7 @@ function studentsFixture() {
   return {...s,rows,base,init,load,get};
 }
 
-test('Admin reads the complete private base with exactly the five consumer fields',()=> {
+test('Admin reads the complete private base and optional SIAGIE identifiers without leaking unrelated fields',()=> {
   const s=studentsFixture(),res=s.load(s.admin);
   assert.equal(res.ok,true);assert.equal(res.estudiantes.length,7);
   for(const a of res.estudiantes)assert.deepEqual(Object.keys(a).sort(),['grado','nivel','nombre','orden','seccion']);
@@ -135,11 +135,11 @@ test('Revocation while waiting for the student lock is checked again without nes
   s.c.LockService.getScriptLock=()=>({waitLock(){assert.equal(s.state.held,false);s.state.held=true;s.tables.get('DocentesAcceso').rows[1][1]=2000;},releaseLock(){s.state.held=false;}});
   assert.equal(s.load(s.primary).ok,false);assert.equal(s.state.held,false);
 });
-for(const action of ['loadstudents','savestudents','initstudents','restorestudents','seedstudentsroster','syncstudents'])test(action+': GET never exposes students or changes the private base',()=> {
+for(const action of ['loadstudents','savestudents','initstudents','restorestudents','seedstudentsroster','syncstudents','enrichstudents'])test(action+': GET never exposes students or changes the private base',()=> {
   const s=studentsFixture(),before=s.state.writes,res=s.get({action,token:s.admin,base:s.base});
   assert.equal(res.ok,false);assert.equal('estudiantes' in res,false);assert.equal(s.state.writes,before);
 });
-for(const action of ['savestudents','initstudents','restorestudents','seedstudentsroster','syncstudents'])test(action+': only Admin may administer the student base',()=> {
+for(const action of ['savestudents','initstudents','restorestudents','seedstudentsroster','syncstudents','enrichstudents'])test(action+': only Admin may administer the student base',()=> {
   const s=studentsFixture();
   for(const token of [undefined,s.primary,s.secondary,s.token('auxiliar','auxiliar'),s.token('pip','pip'),s.token('admin','admin',{exp:Date.now()-1})]){
     const before=s.state.writes,res=s.post({action,token,base:s.base,version:s.init.version});
@@ -232,4 +232,34 @@ test('A bimestre without its own roster reports fallback explicitly instead of p
   assert.equal(res.ok,true);assert.equal(res.padronInicializado,false);
   assert.equal(res.fuentePadron,'actual');assert.equal(res.bimestre,'IV');
   assert.equal(res.estudiantes.length,7);
+});
+
+
+test('Official matrix identities enrich current base and the selected bimonthly roster without changing membership',()=> {
+  const s=studentsFixture();
+  const seeded=s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'I'});
+  assert.equal(seeded.ok,true);
+  const before=s.load(s.admin,{bimestre:'I'}).estudiantes.map(a=>a.nombre);
+  const res=s.post({
+    action:'enrichstudents',token:s.admin,version:s.init.version,bimestre:'I',
+    nivel:'primaria',grado:1,seccion:'Única',
+    identidades:[{nombre:'Synthetic Student 0',idSiagie:'25084489',codigoEstudiante:'00000062165159'}]
+  });
+  assert.equal(res.ok,true);assert.equal(res.enriquecidosBase,1);assert.equal(res.enriquecidosPadron,1);
+  const current=s.load(s.admin);
+  const alumno=current.estudiantes.find(a=>a.nombre==='Synthetic Student 0');
+  assert.equal(alumno.idSiagie,'25084489');assert.equal(alumno.codigoEstudiante,'00000062165159');
+  assert.deepEqual(s.load(s.admin,{bimestre:'I'}).estudiantes.map(a=>a.nombre),before);
+  assert.equal(s.load(s.admin,{bimestre:'I'}).estudiantes[0].idSiagie,'25084489');
+});
+
+test('Student save/load preserves SIAGIE ID, student code and enrollment status when supplied',()=> {
+  const s=studentsFixture();
+  s.base.primaria.estudiantes[0].idSiagie='25084489';
+  s.base.primaria.estudiantes[0].codigoEstudiante='00000062165159';
+  s.base.primaria.estudiantes[0].estadoMatricula='DEFINITIVA';
+  const saved=s.post({action:'savestudents',token:s.admin,base:s.base,version:s.init.version});
+  assert.equal(saved.ok,true);
+  const al=s.load(s.admin).estudiantes.find(a=>a.nombre==='Synthetic Student 0');
+  assert.equal(al.idSiagie,'25084489');assert.equal(al.codigoEstudiante,'00000062165159');assert.equal(al.estadoMatricula,'DEFINITIVA');
 });
