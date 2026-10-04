@@ -40,7 +40,7 @@ function setup() {
   sheet('ConfigSistema', [['clave', 'ts', 'json'], ['PERIODOS', 1000, JSON.stringify({bimestres: {I: 'abierto', II: 'cerrado', III: 'bloqueado'}})]]);
   sheet('RegistroNotas', [['clave', 'nivel', 'bimestre', 'grado', 'seccion', 'area', 'docente', 'ts', 'json']]);
   sheet('EstadosAreas', [['clave', 'nivel', 'bimestre', 'grado', 'seccion', 'area', 'docente', 'totalEstudiantes', 'actualizado', 'json']]);
-  const props = {IE22375_TOKEN_SECRET: 'synthetic-test-secret', IE22375_AUXILIAR_PASS: 'synthetic-aux-password', IE22375_PIP_PASS: 'synthetic-pip-password'};
+  const props = {IE22375_TOKEN_SECRET: 'synthetic-test-secret', IE22375_ADMIN_PASS: 'synthetic-admin-password', IE22375_AUXILIAR_PASS: 'synthetic-aux-password', IE22375_PIP_PASS: 'synthetic-pip-password'};
   const c = vm.createContext({
     SpreadsheetApp: {getActiveSpreadsheet: () => ({getSheetByName: name => tables.get(name), insertSheet: name => sheet(name, [])}), flush() {}},
     CacheService: {getScriptCache: () => ({get: key => cacheEntries.get(key) || null, put: (key, value, ttl) => {assert.equal(state.held, true); assert.equal(ttl, 21600); cacheEntries.set(key, value);}, remove: key => {assert.equal(state.held, true); cacheEntries.delete(key);}})},
@@ -132,6 +132,22 @@ test('saveasis: body role/user cannot expand a PIP or teacher session to attenda
     assert.equal(s.post(request(s, 'saveasis', token, {role: 'auxiliar', user: 'auxiliar'})).ok, false);
   }
   assert.equal(s.state.writes, 0);
+});
+
+test('admin/auxiliar/pip login fast path does not load DOCENTE_ACCESOS', () => {
+  for (const [role, property] of [
+    ['admin', 'IE22375_ADMIN_PASS'],
+    ['auxiliar', 'IE22375_AUXILIAR_PASS'],
+    ['pip', 'IE22375_PIP_PASS']
+  ]) {
+    const s = setup();
+    s.c.obtenerDocentesConfig_ = () => { throw new Error('DOCENTE_ACCESOS should not be read'); };
+    const profile = s.post({action: 'login', tipo: role, usuario: role, password: s.props[property]});
+    assert.equal(profile.ok, true);
+    assert.equal(profile.role, role);
+    assert.equal(profile.permisosVersion, 0);
+    assert.ok(s.c.validarToken_(profile.token, role));
+  }
 });
 
 for (const [role, property] of [['auxiliar', 'IE22375_AUXILIAR_PASS'], ['pip', 'IE22375_PIP_PASS']]) {
