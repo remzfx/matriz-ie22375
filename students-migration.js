@@ -47,6 +47,64 @@
     } catch(e) { mensaje(e.message); }
     finally { ocupada = false; }
   }
+  function bimestreSeleccionado() {
+    const el = document.getElementById('migracionBimestre');
+    const bim = String(el && el.value || '').trim().toUpperCase();
+    if (!/^(I|II|III|IV)$/.test(bim)) throw new Error('Selecciona el bimestre que corresponde a esta lista SIAGIE.');
+    return bim;
+  }
+  async function verificarPadron() {
+    if (ocupada) return;
+    ocupada = true;
+    try {
+      const bim = bimestreSeleccionado();
+      mensaje('Verificando padrón del bimestre ' + bim + '…');
+      const base = await IEStudents.loadRoster(bim);
+      if (base.offline) throw new Error('La verificación del padrón requiere conexión.');
+      if (!base.inicializada) throw new Error('La base privada todavía no está inicializada.');
+      mensaje(base.padronInicializado
+        ? 'Padrón ' + bim + ' guardado en servidor: Primaria ' + base.primaria.estudiantes.length + ' · Secundaria ' + base.secundaria.estudiantes.length + '.'
+        : 'El bimestre ' + bim + ' todavía no tiene padrón propio. La base vigente tiene Primaria ' + base.primaria.estudiantes.length + ' · Secundaria ' + base.secundaria.estudiantes.length + '.');
+    } catch(e) { mensaje(e.message); }
+    finally { ocupada = false; }
+  }
+  async function crearPadron() {
+    if (ocupada) return;
+    ocupada = true;
+    try {
+      const bim = bimestreSeleccionado();
+      const actual = await IEStudents.load();
+      if (actual.offline) throw new Error('La creación del padrón requiere conexión.');
+      if (!actual.inicializada) throw new Error('Primero inicializa la base privada.');
+      if (!confirm('¿Crear el padrón del bimestre ' + bim + ' desde la base SIAGIE vigente? Si ya existe, no se reemplazará.')) return;
+      const padron = await IEStudents.seedRoster(actual.version, bim);
+      mensaje('Padrón ' + bim + ' listo: Primaria ' + padron.primaria.estudiantes.length + ' · Secundaria ' + padron.secundaria.estudiantes.length + '.');
+    } catch(e) { mensaje(e.message); }
+    finally { ocupada = false; }
+  }
+  async function sincronizarPadron() {
+    if (ocupada) return;
+    if (!listas.primaria || !listas.secundaria || !document.getElementById('migracionRevisada').checked) {
+      mensaje('Importa ambos CSV SIAGIE vigentes y confirma que revisaste las dos listas.'); return;
+    }
+    ocupada = true;
+    try {
+      const bim = bimestreSeleccionado();
+      const actual = await IEStudents.load();
+      if (actual.offline) throw new Error('La actualización requiere conexión al backend.');
+      if (!actual.inicializada) throw new Error('Primero inicializa la base privada.');
+      const totalAntes = actual.primaria.estudiantes.length + actual.secundaria.estudiantes.length;
+      const totalNuevo = listas.primaria.length + listas.secundaria.length;
+      if (!confirm('¿Actualizar la base SIAGIE vigente y el padrón del bimestre ' + bim + '?\n\nActual: ' + totalAntes + ' estudiantes · Nueva lista: ' + totalNuevo + '.\n\nLas notas ya guardadas no se modifican; los alumnos que ya no estén en esta lista dejarán de aparecer en el padrón activo del bimestre.')) return;
+      const base = await IEStudents.sync(
+        {primaria: {estudiantes: listas.primaria}, secundaria: {estudiantes: listas.secundaria}},
+        actual.version, bim
+      );
+      mensaje('Actualización SIAGIE aplicada al bimestre ' + bim + ': Primaria ' + base.primaria.estudiantes.length + ' · Secundaria ' + base.secundaria.estudiantes.length + '. Las notas existentes permanecen intactas.');
+    } catch(e) { mensaje(e.message); }
+    finally { ocupada = false; }
+  }
+
   async function inicializar() {
     if (ocupada) return;
     if (!listas.primaria || !listas.secundaria || !document.getElementById('migracionRevisada').checked) {
@@ -63,5 +121,5 @@
     } catch(e) { mensaje(e.message); }
     finally { ocupada = false; }
   }
-  global.IEMigrateStudents = {importar: importar, verificar: verificar, inicializar: inicializar};
+  global.IEMigrateStudents = {importar: importar, verificar: verificar, verificarPadron: verificarPadron, crearPadron: crearPadron, sincronizarPadron: sincronizarPadron, inicializar: inicializar};
 })(window);
