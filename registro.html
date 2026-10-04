@@ -220,10 +220,13 @@
       </div>
       <div class="mobile-header-actions flex gap-1.5 shrink-0 flex-wrap justify-end">
         <a href="https://classroom.google.com/" target="_blank" rel="noopener noreferrer"
+           data-mobile-app="classroom"
            class="btn btn-ghost text-xs !py-2 !px-3" title="Abrir Google Classroom">Classroom</a>
         <a href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer"
+           data-mobile-app="gemini"
            class="btn btn-ghost text-xs !py-2 !px-3" title="Abrir Gemini IA">Gemini IA</a>
         <a href="https://notebooklm.google.com/" target="_blank" rel="noopener noreferrer"
+           data-mobile-app="notebook"
            class="btn btn-ghost text-xs !py-2 !px-3" title="Abrir Gemini Notebook">Gemini Notebook</a>
         <button type="button" class="btn btn-ghost text-xs !py-2 !px-3" onclick="volverHome()">Salir</button>
       </div>
@@ -2733,6 +2736,45 @@ function renderAvance() {
   });
 }
 
+const MOBILE_APP_STORES = {
+  classroom: {
+    ios: 'https://apps.apple.com/pe/app/google-classroom/id924620788',
+    android: 'https://play.google.com/store/apps/details?id=com.google.android.apps.classroom'
+  },
+  gemini: {
+    ios: 'https://apps.apple.com/pe/app/google-gemini/id6477489729',
+    android: 'https://play.google.com/store/apps/details?id=com.google.android.apps.bard'
+  },
+  notebook: {
+    ios: 'https://apps.apple.com/pe/app/gemini-notebook/id6737527615',
+    android: 'https://play.google.com/store/apps/details?id=com.google.android.apps.labs.language.tailwind'
+  }
+};
+
+function plataformaMovilApps() {
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  return '';
+}
+
+function configurarAccesosAppsMoviles() {
+  const plataforma = plataformaMovilApps();
+  if (!plataforma) return;
+  document.querySelectorAll('[data-mobile-app]').forEach(function(link) {
+    const app = link.getAttribute('data-mobile-app');
+    const cfg = MOBILE_APP_STORES[app];
+    if (!cfg || !cfg[plataforma]) return;
+    link.removeAttribute('target');
+    link.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      // En móvil abrimos la ficha oficial: si la app ya está instalada,
+      // la tienda muestra "Abrir"; si no, permite instalarla.
+      window.location.href = cfg[plataforma];
+    });
+  });
+}
+
 function volverHome() {
   guardarTodo();
   var perm = nivelPermitido();
@@ -2753,6 +2795,7 @@ window.addEventListener('resize', fixHdrHeight);
 document.addEventListener('DOMContentLoaded', function() {
   aplicarRestriccionNivel();
   restaurarCursos();
+  configurarAccesosAppsMoviles();
 });
 // Por si el script corre después de DOMContentLoaded
 if (document.readyState !== 'loading') {
