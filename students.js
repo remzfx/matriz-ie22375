@@ -95,5 +95,8 @@
     initialize: (base, version) => request('initstudents', {base: base, version: version}),
     seedRoster: (version, bimestre) => request('seedstudentsroster', {version: version, bimestre: bimestre}),
     sync: (base, version, bimestre) => request('syncstudents', {base: base, version: version, bimestre: bimestre}),
+    enrich: (version, bimestre, nivel, grado, seccion, identidades) => request('enrichstudents', {
+      version: version, bimestre: bimestre, nivel: nivel, grado: grado, seccion: seccion, identidades: identidades
+    }),
     restore: version => request('restorestudents', {version: version})};
 })(window);
