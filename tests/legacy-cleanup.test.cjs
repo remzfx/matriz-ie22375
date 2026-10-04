@@ -207,3 +207,12 @@ test('Secundaria Desde registro never mixes notes between A and B', () => {
   assert.match(src, /String\(p\[6\] \|\| ''\) !== String\(s\.capacidad \|\| ''\)/);
   assert.match(src, /String\(p\[7\] \|\| ''\) !== String\(s\.fecha \|\| ''\)/);
 });
+
+
+test('Secundaria shows responsible teacher as compact read-only label', () => {
+  const src = read('secundaria.html');
+  assert.match(src, /Docente responsable: \$\{docente \|\| 'Sin registrar'\}/);
+  assert.match(src, /mx-auto w-full max-w-2xl text-center/);
+  assert.doesNotMatch(src, /id="docenteAreaInput"/);
+  assert.doesNotMatch(src, /oninput="setDocenteArea\(estado\.areaActual, this\.value\)"/);
+});
