@@ -29,6 +29,7 @@
     }
     @page { size: A4; margin: 10mm; }
   </style>
+  <script src="students.js"></script>
 </head>
 <body>
 <script>
@@ -59,6 +60,7 @@
 </header>
 
 <main class="max-w-4xl mx-auto px-4 py-4">
+  <p id="studentsStatus" role="status" class="no-print text-sm text-sky-800">Cargando estudiantes…</p>
   <div class="no-print card p-3 mb-4 space-y-2">
     <p class="text-sm text-slate-600">Genera credenciales con QR para la tablet de la puerta. Imprime en A4 (2 por fila) y recorta.</p>
     <div class="flex flex-wrap gap-2 items-end">
@@ -88,36 +90,16 @@
 </main>
 
 <script>
-const BD_KEY = 'ie22375_admin_bd_v1';
-function loadBD() {
-  try { const raw = localStorage.getItem(BD_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
-  return null;
-}
-let BD = null;
-function corregirNiveles(j) {
-  if (!j) return j;
-  const p0 = ((j.primaria && j.primaria.estudiantes) || [])[0];
-  const s0 = ((j.secundaria && j.secundaria.estudiantes) || [])[0];
-  if (p0 && /AGUIRRE/.test(p0.nombre || '') && s0 && /ALEJOS/.test(s0.nombre || '')) {
-    const tmp = j.primaria; j.primaria = j.secundaria; j.secundaria = tmp;
-  }
-  ((j.primaria && j.primaria.estudiantes) || []).forEach(a => { a.nivel = 'primaria'; });
-  ((j.secundaria && j.secundaria.estudiantes) || []).forEach(a => { a.nivel = 'secundaria'; });
-  return j;
-}
+let BD = IEStudents.empty();
 async function ensureBD() {
   try {
-    const r = await fetch('bd_oficial_2026.json?t=' + Date.now(), { cache: 'no-store' });
-    if (r.ok) {
-      const j = corregirNiveles(await r.json());
-      if (j && j.primaria) {
-        BD = j;
-        try { localStorage.setItem(BD_KEY, JSON.stringify(j)); } catch (e) {}
-        return;
-      }
-    }
-  } catch (e) {}
-  BD = corregirNiveles(loadBD()) || { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
+    BD = await IEStudents.load();
+    if (BD.offline) document.getElementById('lblBD').textContent = 'Sin conexión: lista temporal de esta sesión (10 minutos máximo).';
+  } catch(e) {
+    BD = IEStudents.empty();
+    document.getElementById('lblBD').textContent = e.message;
+    throw e;
+  }
 }
 function payload(al) {
   const nivel = al.nivel === 'secundaria' ? 'secundaria' : 'primaria';
@@ -144,25 +126,24 @@ function onGrado() {
   }
   document.getElementById('selSeccion').innerHTML = secs.map(s => '<option value="'+s+'">'+s+'</option>').join('');
 }
-function qrImgUrl(text) {
-  return 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&ecc=M&data=' + encodeURIComponent(text);
-}
+function textoHtml(value) { return String(value).replace(/[&<>"']/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"})[c]); }
 function cardHtml(al, i) {
   const id = 'qr-' + i;
-  const data = payload(al);
   const niv = al.nivel === 'secundaria' ? 'SECUNDARIA' : 'PRIMARIA';
   return '<div class="badge">' +
-    '<div class="qr" id="'+id+'"><img alt="QR" src="'+qrImgUrl(data)+'" width="96" height="96" style="width:96px;height:96px;display:block"></div>' +
+    '<div class="qr" id="'+id+'"></div>' +
     '<div class="min-w-0">' +
       '<div style="font-size:9px;font-weight:800;letter-spacing:.08em;color:#0369a1">IE 22375 SANTA ROSA DE LOS MOLINOS</div>' +
-      '<div style="font-size:12px;font-weight:900;line-height:1.2;margin-top:2px">'+al.nombre+'</div>' +
+      '<div style="font-size:12px;font-weight:900;line-height:1.2;margin-top:2px">'+textoHtml(al.nombre)+'</div>' +
       '<div style="font-size:11px;font-weight:800;margin-top:4px">'+niv+' · '+al.grado+'° '+al.seccion+'</div>' +
       '<div style="font-size:9px;color:#64748b;margin-top:2px">2026 · Photocheck de ingreso</div>' +
     '</div></div>';
 }
 function pintar(list) {
+  if (typeof QRCode === 'undefined') { alert('No se cargó el generador QR. Revisa la conexión y recarga.'); return; }
   const sheet = document.getElementById('sheet');
   sheet.innerHTML = list.map((al,i) => cardHtml(al,i)).join('');
+  list.forEach((al,i) => new QRCode(document.getElementById('qr-' + i), {text: payload(al), width: 96, height: 96, correctLevel: QRCode.CorrectLevel.M}));
   document.getElementById('lblN').textContent = list.length + ' photochecks · debe verse el cuadrado QR a la izquierda';
 }
 function generar() {
@@ -173,7 +154,7 @@ function generar() {
     .filter(a => Number(a.grado)===g && String(a.seccion)===String(sec))
     .map(a => Object.assign({}, a, { nivel: nivel }))
     .sort((a,b)=>(a.orden||0)-(b.orden||0) || a.nombre.localeCompare(b.nombre,'es'));
-  if (!list.length) { alert('No hay alumnos en esa aula. ¿Ya subiste bd_oficial_2026.json?'); return; }
+  if (!list.length) { alert('No hay alumnos en esa aula. Revisa la base oficial en Admin.'); return; }
   pintar(list);
 }
 function generarNivel() {
@@ -188,9 +169,9 @@ ensureBD().then(function(){
   const np = ((BD.primaria||{}).estudiantes||[]).length;
   const ns = ((BD.secundaria||{}).estudiantes||[]).length;
   const el = document.getElementById('lblBD');
-  if (el) el.textContent = 'Lista oficial: Primaria ' + np + ' · Secundaria ' + ns + ' (sec. 1°–4° = A/B · 5° = Única)';
+  if (el && !BD.offline) el.textContent = 'Lista oficial: Primaria ' + np + ' · Secundaria ' + ns + ' (sec. 1°–4° = A/B · 5° = Única)';
   onNivel();
-});
+}).catch(function() {});
 </script>
 </body>
 </html>

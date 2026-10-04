@@ -31,22 +31,29 @@ function admin(session, oldFlag = false) {
   const memory = new Map(session ? [['ie22375_session_v1', JSON.stringify(session)]] : []);
   if (oldFlag) memory.set('ie22375_admin_ok', '1');
   const storage = {getItem: key => memory.get(key) || null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key)};
-  const redirects = [], alerts = [], downloads = [];
+  const redirects = [], alerts = [], downloads = [], studentWrites = [];
   const document = {
     getElementById: id => elements.get(id) || null,
     querySelectorAll: selector => selector === '.tab' ? [...elements].filter(([id]) => id.startsWith('tab-')).map(([,el]) => el) : selector === '.doc-grado:checked' ? [{value: '1'}] : [],
     createElement: () => ({click() {downloads.push(this);}})
   };
   const context = vm.createContext({
-    document, window: {}, localStorage: storage, sessionStorage: storage,
+    document, window: {addEventListener() {}}, localStorage: storage, sessionStorage: storage,
     location: {replace: value => redirects.push(value)}, alert: value => alerts.push(value), confirm: () => true,
     Blob, URL: {createObjectURL: () => 'synthetic-blob-url'}, console,
+    IEStudents: {
+      empty: () => JSON.parse(JSON.stringify(fixture)),
+      load: async () => ({...JSON.parse(JSON.stringify(fixture)), version: 'synthetic-version', inicializada: true}),
+      save: async (base, version) => {studentWrites.push({action:'savestudents',base:JSON.parse(JSON.stringify(base)),version});return {...JSON.parse(JSON.stringify(base)),version:'saved-version',inicializada:true};},
+      initialize: async (base, version) => {studentWrites.push({action:'initstudents',base,version});return {...JSON.parse(JSON.stringify(base)),version:'initial-version',inicializada:true};},
+      restore: async version => {studentWrites.push({action:'restorestudents',version});return {...JSON.parse(JSON.stringify(fixture)),version:'restored-version',inicializada:true};}
+    },
     fetch: async () => {throw new Error('Unexpected network call in bootstrap');}
   });
   // Synthetic students only; no production fixture is printed or persisted by these tests.
   const fixture = {anio: 2026, primaria: {estudiantes: [], docentes: []}, secundaria: {estudiantes: [], docentes: []}};
-  for (const script of inline(html)) new vm.Script(script.replace(/^const BD_EMPOTRADA = .*;$/m, 'const BD_EMPOTRADA = ' + JSON.stringify(fixture) + ';')).runInContext(context);
-  return {context, elements, memory, redirects, alerts, downloads};
+  for (const script of inline(html)) new vm.Script(script).runInContext(context);
+  return {context, elements, memory, redirects, alerts, downloads, studentWrites};
 }
 
 test('Admin session opens the panel and Docentes without the removed login controls', () => {
@@ -86,11 +93,55 @@ test('Docentes form still saves and renders a teacher through the current flow',
 
 test('Student JSON import listener and full backup export remain usable', async () => {
   const s = admin({user: 'admin', role: 'admin'});
+  await s.context.cargarEstudiantesAdmin();
   const fixture = {anio: 2026, primaria: {estudiantes: [{nivel: 'primaria', grado: 1, seccion: 'Única', nombre: 'Synthetic Student', orden: 1}], docentes: []}, secundaria: {estudiantes: [], docentes: []}};
   await s.elements.get('importFile').listeners.change({target: {files: [{name: 'synthetic-students.json', text: async () => JSON.stringify(fixture)}]}});
   s.elements.get('importModo').value = 'replace'; s.elements.get('importNivel').value = 'ambos';
   s.context.procesarImport();
   assert.equal(s.context.estudiantesDe('primaria').length, 1);
   s.context.exportarJSON();
-  assert.equal(s.downloads[0].download, 'bd_oficial_2026.json');
+  assert.equal(s.downloads[0].download, 'estudiantes_respaldo.json');
+});
+
+test('Admin import/edit/save/restore uses server revisions and leaves old local backups untouched', async()=>{
+  const s=admin({user:'admin',role:'admin'});await s.context.cargarEstudiantesAdmin();
+  s.memory.set('ie22375_admin_bd_v1','synthetic-legacy-backup');
+  s.context.window._importCSV=s.context.parseCSV('nivel,grado,seccion,orden,nombre\nprimaria,1,Única,1,"Synthetic, Student"');
+  s.elements.get('importModo').value='replace';s.elements.get('importNivel').value='primaria';
+  s.context.procesarImport();assert.equal(s.context.estudiantesDe('primaria').length,1);
+  const alumno=s.context.estudiantesDe('primaria')[0];alumno.nombre='Synthetic Edited Student';
+  s.context.saveEstado();await s.context.guardarBD();
+  assert.equal(s.studentWrites[0].action,'savestudents');assert.equal(s.studentWrites[0].version,'synthetic-version');
+  assert.equal(s.studentWrites[0].base.primaria.estudiantes[0].nombre,'Synthetic Edited Student');
+  await s.context.restaurarBDOficial();
+  assert.equal(s.studentWrites[1].action,'restorestudents');assert.equal(s.studentWrites[1].version,'saved-version');
+  assert.equal(s.context.estudiantesDe('primaria').length,0);
+  assert.equal(s.memory.get('ie22375_admin_bd_v1'),'synthetic-legacy-backup');
+});
+test('SIAGIE CSV import still excludes transferred students and maps current grade/section formats', async()=>{
+  const s=admin({user:'admin',role:'admin'});await s.context.cargarEstudiantesAdmin();
+  const csv='NumeroDeOrden;ApellidoPaterno;ApellidoMaterno;NombreEstudiante;Grado;Seccion;EstadoMatricula;Nivel\n1;SYNTHETIC;ONE;STUDENT;PRIMERO;UNICA;DEFINITIVA;primaria\n2;SYNTHETIC;TWO;STUDENT;PRIMERO;UNICA;TRASLADADO;primaria';
+  s.context.window._importCSV=s.context.parseCSV(csv);
+  s.elements.get('importModo').value='replace';s.elements.get('importNivel').value='primaria';s.context.procesarImport();
+  assert.equal(s.context.estudiantesDe('primaria').length,1);assert.equal(s.context.estudiantesDe('primaria')[0].grado,1);
+  await s.context.guardarBD();assert.equal(s.studentWrites[0].base.primaria.estudiantes.length,1);
+});
+test('Failed Admin save keeps the reviewed draft and displays the error', async()=>{
+  const s=admin({user:'admin',role:'admin'});await s.context.cargarEstudiantesAdmin();
+  s.context.window._importJSON={primaria:{estudiantes:[{grado:1,seccion:'Única',nombre:'Synthetic Draft'}]},secundaria:{estudiantes:[]}};
+  s.elements.get('importModo').value='replace';s.elements.get('importNivel').value='ambos';s.context.procesarImport();
+  s.context.IEStudents.save=async()=>{throw Error('Synthetic conflict');};
+  await s.context.guardarBD();assert.equal(s.context.estudiantesDe('primaria')[0].nombre,'Synthetic Draft');
+  assert.equal(s.elements.get('bdEstado').textContent,'Synthetic conflict');
+});
+test('Admin cannot edit or save an empty placeholder while students are loading',()=>{
+  const s=admin({user:'admin',role:'admin'});
+  s.context.window._importJSON={primaria:{estudiantes:[{nombre:'Synthetic'}]},secundaria:{estudiantes:[]}};
+  s.context.procesarImport();assert.equal(s.context.estudiantesDe('primaria').length,0);assert.equal(s.studentWrites.length,0);
+});
+
+test('Stage B has no initial import control: production must be validated in stage A',()=>{
+  const s=admin({user:'admin',role:'admin'});
+  assert.equal(typeof s.context.inicializarBDOficial,'undefined');
+  assert.doesNotMatch(read('admin.html'),/onclick="inicializarBDOficial/);
 });

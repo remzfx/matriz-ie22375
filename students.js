@@ -84,7 +84,15 @@
     return remember(toBase(response), token);
   }
   global.IEStudents = {empty: empty, peek: peek, clear: clear, session: session,
-    load: () => request('loadstudents'),
+    load: async () => {
+      const base = await request('loadstudents');
+      if (!base.inicializada) {
+        clear();
+        status('Base privada no inicializada. Admin debe completar y validar la etapa A.');
+        throw new Error('Base privada no inicializada. Admin debe completar y validar la etapa A.');
+      }
+      return base;
+    },
     save: (base, version) => request('savestudents', {base: base, version: version}),
     initialize: (base, version) => request('initstudents', {base: base, version: version}),
     restore: version => request('restorestudents', {version: version})};

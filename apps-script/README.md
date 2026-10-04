@@ -149,20 +149,21 @@ Para Primaria se filtran grados autorizados. Para Secundaria se exige la relaci�
 - `ping`: diagnóstico de conexión, sin registros, alumnos ni permisos.
 - `loadperiodos`: año y estados globales de bimestres necesarios para sincronizar las interfaces; no devuelve registros académicos ni configuración de docentes.
 
-La acción `login` sigue siendo el punto público de autenticación existente, con credenciales y sin cambios en este bloque. Los archivos estáticos del repositorio (incluida la base de estudiantes ya publicada) quedan fuera del alcance de estas rutas de Apps Script; este PR no cambia su publicación.
+La acción `login` sigue siendo el punto público de autenticación existente, con credenciales y sin cambios en este bloque. La retirada de las listas estáticas corresponde exclusivamente a la etapa B, después de validar la base privada en producción.
 
 No se modifican rutas de escritura, formatos almacenados, secretos ni diseño de tokens.
 
-## Estudiantes privados — etapa A del rollout
 
-El PR #34 prepara acciones nuevas exclusivamente POST con token: `loadstudents` (alcance server-side por rol), `initstudents` (inicialización explícita solo Admin), `savestudents` y `restorestudents` (solo Admin, revisión contra sobrescrituras concurrentes). Se usa la hoja privada `EstudiantesBase` del mismo Spreadsheet, con una base vigente y respaldo de restauración privado. El despliegue no importa datos automáticamente.
 
-**Esta etapa conserva la fuente pública y todos los consumidores actuales.** Admin añade controles manuales independientes de preparación en Importar, sin cambiar su base local, importación SIAGIE/CSV/JSON, edición, guardado ni restauración vigentes. Si Apps Script aún no se actualiza, esos controles nuevos muestran un error; el funcionamiento actual continúa. No se requiere publicar GitHub Pages y Apps Script simultáneamente.
+## Estudiantes privados — etapa B pendiente de producción
 
-La inicialización debe usar exclusivamente exportaciones CSV SIAGIE vigentes de ambos niveles, revisadas y confirmadas por Admin. No se usa la copia antigua de 408 alumnos ni el JSON de 407 como semilla. La discrepancia de Secundaria 4.º B, orden 217 se resuelve mediante esa revisión, sin fusionar automáticamente datos.
+Este PR migra los seis consumidores a POST con token y elimina BD_EMPOTRADA, BD_EMP y el JSON público. Depende de la etapa A del PR #34, que preserva todos los consumidores y fuentes actuales mientras Admin prepara, inicializa y verifica la hoja privada EstudiantesBase.
 
-El segundo PR queda en borrador: solo después de validar la base privada en producción y recibir confirmación de Admin migrará los seis consumidores y retirará las listas públicas. Una caché offline no sirve como verificación de producción. Plan completo y criterios de corte en [auditoria-estudiantes.md](auditoria-estudiantes.md).
+**No fusionar ni desplegar B hasta que Admin confirme la validación real de A en producción.** El borrador y su dependencia no sustituyen esa confirmación. Después del merge de A y de esa validación, retargetear B contra main y actualizar con main antes de revisarlo para el corte. El backend y los alumnos privados ya estarán operativos; Pages puede publicarse después sin necesitar sincronía entre despliegues.
 
-Pruebas: `node --test tests/*.test.cjs`. No se ejecutaron merge, despliegue ni importaciones reales.
+La semilla inicial es exclusivamente una exportación SIAGIE vigente revisada por Admin, no las copias históricas de 408/407 alumnos. La discrepancia de Secundaria 4.º B, orden 217 no se decide ni fusiona automáticamente. B no tiene un control para inicializar desde listas antiguas: su lector falla si la base privada aún no está inicializada.
 
+Admin mantiene importación SIAGIE/CSV/JSON, edición, guardado con revisión y restauración desde el respaldo privado de la importación inicial. La caché temporal está ligada al token exacto, dura diez minutos y se limpia ante denegaciones. Un fallo de conexión solo permite la respuesta autorizada vigente de esa misma sesión dentro del TTL; no permite usar un roster público. Photochecks sigue siendo Admin y genera el QR localmente con el mismo contenido usado por Auxiliar.
+
+Plan y fuentes por consumidor: [auditoria-estudiantes.md](auditoria-estudiantes.md). Las acciones protegidas y roles se preparan en A; B no cambia autenticación, permisos ni rutas académicas. Pruebas: `node --test tests/*.test.cjs`; solo fixtures sintéticos. No se ejecutaron merge, despliegue ni importaciones reales.
 
