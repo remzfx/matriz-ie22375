@@ -2646,7 +2646,9 @@ window.__IE_gradoOK = function(gradoVal) {
             const area = ESTRUCTURA_AREAS[estado.areaActual];
             const header = document.getElementById('areaHeader');
             const resumen = calcularResumenArea(estado.areaActual);
-            const docente = getDocenteArea(estado.areaActual);
+            const sesionDocente = (window.__IE_SES && window.__IE_SES.role === 'docente')
+                ? (window.__IE_SES.label || window.__IE_SES.user || '') : '';
+            const docente = getDocenteArea(estado.areaActual) || sesionDocente;
             
             header.innerHTML = `
                 <div class="w-full space-y-4">
@@ -2658,6 +2660,9 @@ window.__IE_gradoOK = function(gradoVal) {
                             <div>
                                 <h2 class="text-xl font-bold ${area.textColor}">${estado.areaActual}</h2>
                                 <p class="text-sm text-slate-500">${area.competencias.length} competencias • ${estado.grado} ${estado.seccion} • Bimestre ${estado.bimestre}</p>
+                                <p class="md:hidden mt-2 text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg px-2 py-1.5">
+                                    Docente responsable: ${docente || 'Sin registrar'}
+                                </p>
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-2">
@@ -2727,13 +2732,32 @@ window.__IE_gradoOK = function(gradoVal) {
             return (g || '') + ' ' + sec;
         }
         function datoCompAula(area, comp, grado, seccion) {
-            const keys = [
-                estado.bimestre + '|' + grado + '|' + seccion,
-                estado.bimestre + '|' + grado + '|' + (seccion === 'ÚNICA' ? 'UNICA' : seccion)
-            ];
-            for (let i = 0; i < keys.length; i++) {
-                const bloque = ((estado.datos || {})[keys[i]] || {})[area] || {};
-                if (bloque[comp]) return bloque[comp];
+            const bimObjetivo = String(estado.bimestre || '').toUpperCase();
+            const gradoObjetivo = String(grado || '').replace(/[^0-9]/g, '');
+            let secObjetivo = String(seccion || '').trim().toUpperCase();
+            if (secObjetivo === 'UNICA' || secObjetivo === 'ÚNICA') secObjetivo = 'ÚNICA';
+
+            const datos = estado.datos || {};
+            const claves = Object.keys(datos);
+            for (let i = 0; i < claves.length; i++) {
+                const partes = String(claves[i]).split('|');
+                if (partes.length < 3) continue;
+                const bim = String(partes[0] || '').toUpperCase();
+                const g = String(partes[1] || '').replace(/[^0-9]/g, '');
+                let sec = String(partes[2] || '').trim().toUpperCase();
+                if (sec === 'UNICA' || sec === 'ÚNICA') sec = 'ÚNICA';
+                if (bim !== bimObjetivo || g !== gradoObjetivo || sec !== secObjetivo) continue;
+
+                const bloque = (datos[claves[i]] || {})[area] || {};
+                if (Object.prototype.hasOwnProperty.call(bloque, comp)) {
+                    const d = bloque[comp] || {};
+                    return {
+                        inicio: Number(d.inicio) || 0,
+                        proceso: Number(d.proceso) || 0,
+                        previsto: Number(d.previsto) || 0,
+                        destacado: Number(d.destacado) || 0
+                    };
+                }
             }
             return { inicio: 0, proceso: 0, previsto: 0, destacado: 0 };
         }
