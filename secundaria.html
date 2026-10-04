@@ -1182,19 +1182,22 @@ window.__IE_gradoOK = function(gradoVal) {
 
         <!-- ÁREAS -->
         <div class="no-print">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-lg font-bold text-slate-700 flex items-center gap-2">
+            <div class="mb-4">
+                <h2 class="text-lg font-bold text-slate-700 flex items-center gap-2 mb-2">
                     <i class="fas fa-th-large text-sky-600"></i> Áreas Curriculares
                 </h2>
-                <div class="flex items-center gap-2">
-                    <button type="button" onclick="traerDesdeRegistro()" class="bg-teal-600 hover:bg-teal-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
+                <div class="flex flex-nowrap sm:flex-wrap items-center justify-start gap-2 overflow-x-auto pb-1">
+                    <button type="button" onclick="traerDesdeRegistro()" class="bg-teal-600 hover:bg-teal-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap shrink-0">
                         Desde registro
                     </button>
-                    <button type="button" onclick="abrirComparativo()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
+                    <button type="button" id="btnComparativo" onclick="abrirComparativo()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap shrink-0">
                         <i class="fas fa-balance-scale mr-1"></i> Comparativo
                     </button>
-                    <span class="text-xs text-slate-500 bg-white px-3 py-1 rounded-full shadow-sm">Haz clic en un área para editar</span>
-                </div>
+                    <button type="button" id="btnResumenGradoAdmin" onclick="abrirResumenGradoAdmin()" class="hidden bg-violet-700 hover:bg-violet-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap shrink-0">
+                        <i class="fas fa-chart-column mr-1"></i> Resumen del grado
+                    </button>
+                    </div>
+                <div class="mt-2 text-xs text-slate-500">Haz clic en un área para editar</div>
             </div>
             <div id="areasContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
         </div>
@@ -1206,7 +1209,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     <p class="text-xs text-slate-500">Un área. El grado de arriba y sus secciones. Cada barra suma 100%: Inicio, Proceso, Logrado y Destacado.</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="abrirCmpPresentacion()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
+                    <button type="button" onclick="abrirCmpPresentacion()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap shrink-0">
                         <i class="fas fa-expand mr-1"></i> Presentar
                     </button>
                 </div>
@@ -1231,6 +1234,47 @@ window.__IE_gradoOK = function(gradoVal) {
                 <table class="w-full text-sm">
                     <thead id="cmpThead"></thead>
                     <tbody id="cmpTbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="vistaResumenGradoAdmin" class="hidden glass rounded-2xl shadow-lg p-5 no-print space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-black text-slate-800">
+                        <i class="fas fa-chart-column text-violet-700 mr-2"></i>Resumen consolidado del grado
+                    </h2>
+                    <p class="text-xs text-slate-500">Suma todas las secciones con datos del grado seleccionado y muestra su distribución conjunta por competencia.</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Área</label>
+                    <select id="rgArea" onchange="renderResumenGradoAdmin()" class="w-full border-2 border-slate-200 rounded-xl px-3 py-2 font-bold"></select>
+                </div>
+                <div class="flex items-end">
+                    <p id="rgGradoLbl" class="text-sm font-bold text-slate-600">Grado —</p>
+                </div>
+            </div>
+            <div id="rgInfo" class="text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-xl px-3 py-2 text-center"></div>
+            <div id="rgChartWrap" class="bg-white rounded-xl border border-slate-100 p-4 shadow-sm">
+                <div class="relative" style="height:360px">
+                    <canvas id="chartResumenGradoAdmin"></canvas>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-[11px] uppercase text-slate-500 border-b">
+                            <th class="py-2 pr-2">Competencia</th>
+                            <th class="py-2 px-1 text-center">Inicio</th>
+                            <th class="py-2 px-1 text-center">Proceso</th>
+                            <th class="py-2 px-1 text-center">Logrado</th>
+                            <th class="py-2 px-1 text-center">Destacado</th>
+                            <th class="py-2 px-1 text-center">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rgTbody"></tbody>
                 </table>
             </div>
         </div>
@@ -1982,6 +2026,8 @@ window.__IE_gradoOK = function(gradoVal) {
             
             document.getElementById('panelCompetencias').classList.add('hidden');
             document.getElementById('vistaTabla').classList.add('hidden');
+            const vrg = document.getElementById('vistaResumenGradoAdmin');
+            if (vrg) vrg.classList.add('hidden');
             document.getElementById('mensajeInicial').classList.remove('hidden');
             document.getElementById('areasContainer').parentElement.classList.remove('hidden');
             document.getElementById('resumenRapido').classList.remove('hidden');
@@ -2007,6 +2053,8 @@ window.__IE_gradoOK = function(gradoVal) {
             // Cerrar paneles y volver a la vista de áreas (datos del nuevo bimestre empiezan vacíos o con lo que ya se haya guardado de ese bimestre)
             document.getElementById('panelCompetencias').classList.add('hidden');
             document.getElementById('vistaTabla').classList.add('hidden');
+            const vrg = document.getElementById('vistaResumenGradoAdmin');
+            if (vrg) vrg.classList.add('hidden');
             document.getElementById('mensajeInicial').classList.remove('hidden');
             document.getElementById('areasContainer').parentElement.classList.remove('hidden');
             document.getElementById('resumenRapido').classList.remove('hidden');
@@ -2029,6 +2077,8 @@ window.__IE_gradoOK = function(gradoVal) {
             
             document.getElementById('panelCompetencias').classList.add('hidden');
             document.getElementById('vistaTabla').classList.add('hidden');
+            const vrg = document.getElementById('vistaResumenGradoAdmin');
+            if (vrg) vrg.classList.add('hidden');
             document.getElementById('mensajeInicial').classList.remove('hidden');
             document.getElementById('areasContainer').parentElement.classList.remove('hidden');
             document.getElementById('resumenRapido').classList.remove('hidden');
@@ -2080,6 +2130,7 @@ window.__IE_gradoOK = function(gradoVal) {
                 `;
                 container.appendChild(btn);
             });
+            actualizarVisibilidadComparativo();
         }
 
         function calcularProgresoArea(nombreArea) {
@@ -2840,12 +2891,198 @@ window.__IE_gradoOK = function(gradoVal) {
             else alert(llenas ? 'Conteo traído del registro auxiliar' : 'Esta sección no tiene notas: se dejó en blanco en la matriz');
         }
 
+        let chartResumenGradoAdmin = null;
+
+        function esAdminDirector() {
+            const ses = window.__IE_SES;
+            return !!(ses && (ses.role === 'admin' || ses.role === 'director' || ses.user === 'admin'));
+        }
+
+        function seccionesConDatosAreaGrado(area, grado) {
+            const bimObjetivo = String(estado.bimestre || '').toUpperCase();
+            const gradoObjetivo = String(grado || '').replace(/[^0-9]/g, '');
+            const vistas = [];
+            Object.keys(estado.datos || {}).forEach(function(k) {
+                const p = String(k).split('|');
+                if (p.length < 3) return;
+                const bim = String(p[0] || '').toUpperCase();
+                const g = String(p[1] || '').replace(/[^0-9]/g, '');
+                let sec = String(p[2] || '').trim().toUpperCase();
+                if (sec === 'UNICA') sec = 'ÚNICA';
+                if (bim !== bimObjetivo || g !== gradoObjetivo) return;
+                const bloque = ((estado.datos || {})[k] || {})[area] || {};
+                const tieneDatos = Object.keys(bloque).some(function(comp) {
+                    const d = bloque[comp] || {};
+                    return (Number(d.inicio)||0) + (Number(d.proceso)||0) + (Number(d.previsto)||0) + (Number(d.destacado)||0) > 0;
+                });
+                if (tieneDatos && vistas.indexOf(sec) < 0) vistas.push(sec);
+            });
+            return vistas.sort();
+        }
+
+        function datoCompGradoCompleto(area, comp, grado) {
+            const secs = seccionesConDatosAreaGrado(area, grado);
+            const total = { inicio:0, proceso:0, previsto:0, destacado:0 };
+            secs.forEach(function(sec) {
+                const d = datoCompAula(area, comp, grado, sec);
+                total.inicio += Number(d.inicio)||0;
+                total.proceso += Number(d.proceso)||0;
+                total.previsto += Number(d.previsto)||0;
+                total.destacado += Number(d.destacado)||0;
+            });
+            return { dato: total, secciones: secs };
+        }
+
+        function abrirResumenGradoAdmin() {
+            if (!esAdminDirector()) {
+                mostrarToast('Este resumen está disponible solo para Admin/Director', 'error');
+                return;
+            }
+            const box = document.getElementById('vistaResumenGradoAdmin');
+            if (!box) return;
+            const areas = Object.keys(ESTRUCTURA_AREAS);
+            const sel = document.getElementById('rgArea');
+            if (sel) {
+                sel.innerHTML = areas.map(function(n){ return '<option value="'+n.replace(/"/g,'&quot;')+'">'+n+'</option>'; }).join('');
+                if (estado.areaActual && areas.indexOf(estado.areaActual) >= 0) sel.value = estado.areaActual;
+            }
+            const cmp = document.getElementById('vistaComparativo');
+            if (cmp) cmp.classList.add('hidden');
+            document.getElementById('panelCompetencias').classList.add('hidden');
+            box.classList.remove('hidden');
+            renderResumenGradoAdmin();
+            box.scrollIntoView({ behavior:'smooth', block:'start' });
+        }
+
+        function renderResumenGradoAdmin() {
+            if (!esAdminDirector()) return;
+            const area = ((document.getElementById('rgArea') || {}).value) || estado.areaActual;
+            if (!area || !ESTRUCTURA_AREAS[area]) return;
+            const grado = estado.grado || '1°';
+            const comps = ESTRUCTURA_AREAS[area].competencias || [];
+            const secs = seccionesConDatosAreaGrado(area, grado);
+            const filas = comps.map(function(comp, idx) {
+                const pack = datoCompGradoCompleto(area, comp, grado);
+                const l = logroDe(pack.dato);
+                return { i:idx+1, nombre:comp, d:pack.dato, l:l };
+            });
+            const lbl = document.getElementById('rgGradoLbl');
+            if (lbl) lbl.textContent = 'Bimestre ' + estado.bimestre + ' · ' + grado;
+            const info = document.getElementById('rgInfo');
+            if (info) info.textContent = secs.length
+                ? ('Secciones incluidas: ' + secs.map(function(s){ return s === 'ÚNICA' ? 'Única' : s; }).join(', '))
+                : 'No hay secciones con datos para esta área y grado';
+
+            const tbody = document.getElementById('rgTbody');
+            if (tbody) {
+                tbody.innerHTML = filas.map(function(f) {
+                    const sum = f.l.sum;
+                    if (!sum) return '<tr class="border-b border-slate-100"><td class="py-2 pr-2 font-semibold">'+f.i+'. '+f.nombre+'</td><td colspan="5" class="py-2 text-center text-slate-400">Sin datos</td></tr>';
+                    return '<tr class="border-b border-slate-100">'+
+                        '<td class="py-2 pr-2 font-semibold">'+f.i+'. '+f.nombre+'</td>'+
+                        '<td class="py-2 px-1 text-center text-red-600 font-bold">'+f.d.inicio+' ('+f.l.pI+'%)</td>'+
+                        '<td class="py-2 px-1 text-center text-amber-600 font-bold">'+f.d.proceso+' ('+f.l.pP+'%)</td>'+
+                        '<td class="py-2 px-1 text-center text-lime-600 font-bold">'+f.d.previsto+' ('+f.l.pPr+'%)</td>'+
+                        '<td class="py-2 px-1 text-center text-emerald-700 font-bold">'+f.d.destacado+' ('+f.l.pD+'%)</td>'+
+                        '<td class="py-2 px-1 text-center font-black">'+sum+'</td></tr>';
+                }).join('');
+            }
+
+            const canvas = document.getElementById('chartResumenGradoAdmin');
+            if (!canvas || typeof Chart === 'undefined') return;
+            if (chartResumenGradoAdmin) { try { chartResumenGradoAdmin.destroy(); } catch(e){} }
+            chartResumenGradoAdmin = new Chart(canvas, {
+                type:'bar',
+                data:{
+                    labels:filas.map(function(f){ return 'C'+f.i; }),
+                    datasets:[
+                        { label:'Inicio', data:filas.map(function(f){ return f.l.sum ? f.l.pI : 0; }), backgroundColor:'#ef4444', stack:'g' },
+                        { label:'Proceso', data:filas.map(function(f){ return f.l.sum ? f.l.pP : 0; }), backgroundColor:'#eab308', stack:'g' },
+                        { label:'Logrado', data:filas.map(function(f){ return f.l.sum ? f.l.pPr : 0; }), backgroundColor:'#84cc16', stack:'g' },
+                        { label:'Destacado', data:filas.map(function(f){ return f.l.sum ? f.l.pD : 0; }), backgroundColor:'#16a34a', stack:'g' }
+                    ]
+                },
+                options:{
+                    responsive:true,
+                    maintainAspectRatio:false,
+                    plugins:{
+                        legend:{ position:'bottom' },
+                        tooltip:{ callbacks:{ title:function(items){ const i=items[0] ? items[0].dataIndex : -1; return i>=0 ? filas[i].nombre : ''; } } }
+                    },
+                    scales:{
+                        x:{ stacked:true },
+                        y:{ stacked:true, beginAtZero:true, max:100, ticks:{ callback:function(v){ return v+'%'; } } }
+                    }
+                }
+            });
+        }
+
+        function seccionesAsignadasAreaGrado(area, grado) {
+            const ses = window.__IE_SES;
+            if (!ses || ses.role === 'admin' || ses.user === 'admin') {
+                return seccionesDelGrado(grado);
+            }
+            if (ses.role !== 'docente') return [];
+
+            // Para docentes, solo cuentan las secciones asignadas explícitamente
+            // a ESTA área y ESTE grado. No cruzar aulas de otras áreas.
+            const asignadas = ses.asignaciones && Array.isArray(ses.asignaciones[area])
+                ? ses.asignaciones[area] : [];
+            const out = [];
+            asignadas.forEach(function(k) {
+                const p = String(k).split('|');
+                const g = String(p[0] || '').replace(/[^0-9]/g,'') + '°';
+                let sec = String(p[1] || '').trim().toUpperCase();
+                if (sec === 'UNICA') sec = 'ÚNICA';
+                if (g === grado && out.indexOf(sec) < 0) out.push(sec);
+            });
+            return out;
+        }
+
+        function puedeCompararAreaGrado(area, grado) {
+            const ses = window.__IE_SES;
+            if (!ses || ses.role === 'admin' || ses.user === 'admin') return true;
+            if (ses.role !== 'docente') return false;
+            return seccionesAsignadasAreaGrado(area, grado).length >= 2;
+        }
+
+        function areasComparablesGrado(grado) {
+            return Object.keys(ESTRUCTURA_AREAS).filter(function(area) {
+                return areaVisibleSesion(area) && puedeCompararAreaGrado(area, grado);
+            });
+        }
+
+        function actualizarVisibilidadComparativo() {
+            const btn = document.getElementById('btnComparativo');
+            const btnResumen = document.getElementById('btnResumenGradoAdmin');
+            if (btnResumen) btnResumen.classList.toggle('hidden', !esAdminDirector());
+            if (!btn) return;
+            const ses = window.__IE_SES;
+            if (!ses || ses.role === 'admin' || ses.role === 'director' || ses.user === 'admin') {
+                btn.classList.remove('hidden');
+                return;
+            }
+            btn.classList.toggle('hidden', areasComparablesGrado(estado.grado).length === 0);
+            if (btn.classList.contains('hidden')) {
+                const vista = document.getElementById('vistaComparativo');
+                if (vista) vista.classList.add('hidden');
+            }
+        }
+
         function abrirComparativo() {
             const box = document.getElementById('vistaComparativo');
             if (!box) return;
+            const ses = window.__IE_SES;
+            const areas = (ses && ses.role === 'docente')
+                ? areasComparablesGrado(estado.grado)
+                : Object.keys(ESTRUCTURA_AREAS).filter(function(n){ return areaVisibleSesion(n); });
+            if (!areas.length) {
+                mostrarToast('Comparativo disponible solo para Admin/Director o docentes con ambas secciones del mismo grado y área', 'error');
+                box.classList.add('hidden');
+                return;
+            }
             document.getElementById('panelCompetencias').classList.add('hidden');
             box.classList.remove('hidden');
-            const areas = Object.keys(ESTRUCTURA_AREAS).filter(function(n){ return areaVisibleSesion(n); });
             const sel = document.getElementById('cmpArea');
             if (sel) {
                 sel.innerHTML = areas.map(n => '<option value="'+n.replace(/"/g,'"')+'">'+n+'</option>').join('');
@@ -2870,7 +3107,11 @@ window.__IE_gradoOK = function(gradoVal) {
             const area = ((document.getElementById('cmpArea') || {}).value) || estado.areaActual;
             if (!area || !ESTRUCTURA_AREAS[area]) return;
             const grado = estado.grado || '1°';
-            const secs = seccionesDelGrado(grado);
+            const ses = window.__IE_SES;
+            if (ses && ses.role === 'docente' && !puedeCompararAreaGrado(area, grado)) return;
+            const secs = (ses && ses.role === 'docente')
+                ? seccionesAsignadasAreaGrado(area, grado)
+                : seccionesDelGrado(grado);
             if (!secs.length) return;
             const colA = secs[0], colB = secs[1] || null;
             const filas = ESTRUCTURA_AREAS[area].competencias.map((c, i) => ({
@@ -2895,7 +3136,16 @@ window.__IE_gradoOK = function(gradoVal) {
             const area = ((document.getElementById('cmpArea') || {}).value) || estado.areaActual;
             if (!area || !ESTRUCTURA_AREAS[area]) return;
             const grado = estado.grado || '1°';
-            const secs = seccionesDelGrado(grado);
+            const ses = window.__IE_SES;
+            if (ses && ses.role === 'docente' && !puedeCompararAreaGrado(area, grado)) {
+                const box = document.getElementById('vistaComparativo');
+                if (box) box.classList.add('hidden');
+                mostrarToast('No tienes ambas secciones asignadas en esta área y grado', 'error');
+                return;
+            }
+            const secs = (ses && ses.role === 'docente')
+                ? seccionesAsignadasAreaGrado(area, grado)
+                : seccionesDelGrado(grado);
             if (!secs.length) return;
             const lbl = document.getElementById('cmpGradoLbl');
             if (lbl) lbl.textContent = 'Bimestre ' + estado.bimestre + ' · ' + grado + ' · ' + secs.map(s => s === 'ÚNICA' ? 'Única' : s).join(' y ');
@@ -3475,56 +3725,11 @@ window.__IE_gradoOK = function(gradoVal) {
         // ============================================
         function renderizarResumen() {
             const container = document.getElementById('resumenRapido');
-            // En sesión docente no mostrar tarjetas globales (Progreso/Inicio/Proceso/Logrado).
-            // El detalle útil queda por área y competencia.
-            if (window.__IE_SES && window.__IE_SES.role === 'docente') {
-                container.innerHTML = '';
-                container.classList.add('hidden');
-                return;
-            }
-            container.classList.remove('hidden');
-            let totalInicio = 0, totalProceso = 0, totalLogrado = 0, totalDestacado = 0;
-            let competenciasLlenas = 0, totalCompetencias = 0;
-            
-            Object.keys(ESTRUCTURA_AREAS).forEach(area => {
-                ESTRUCTURA_AREAS[area].competencias.forEach(comp => {
-                    totalCompetencias++;
-                    const d = getDato(area, comp);
-                    const suma = d.inicio + d.proceso + d.previsto + d.destacado;
-                    if (suma > 0) competenciasLlenas++;
-                    totalInicio += d.inicio;
-                    totalProceso += d.proceso;
-                    totalLogrado += d.previsto;
-                    totalDestacado += d.destacado;
-                });
-            });
-            
-            const pctLlenado = totalCompetencias ? Math.round((competenciasLlenas / totalCompetencias) * 100) : 0;
-            const mostrarProgresoGeneral = !(window.__IE_SES && window.__IE_SES.role === 'docente');
-            
-            container.innerHTML = `
-                ${mostrarProgresoGeneral ? `
-                <div class="glass rounded-2xl p-4 shadow-md border-l-4 border-sky-500">
-                    <div class="text-xs font-semibold text-slate-500 uppercase">Progreso General</div>
-                    <div class="text-2xl font-bold text-sky-700 mt-1">${pctLlenado}%</div>
-                    <div class="text-xs text-slate-400 mt-1">${competenciasLlenas}/${totalCompetencias} competencias</div>
-                </div>` : ''}
-                <div class="glass rounded-2xl p-4 shadow-md border-l-4 border-red-500">
-                    <div class="text-xs font-semibold text-slate-500 uppercase">Inicio (C)</div>
-                    <div class="text-2xl font-bold text-red-600 mt-1">${totalInicio}</div>
-                    <div class="text-xs text-slate-400 mt-1">estudiantes</div>
-                </div>
-                <div class="glass rounded-2xl p-4 shadow-md border-l-4 border-yellow-500">
-                    <div class="text-xs font-semibold text-slate-500 uppercase">En Proceso (B)</div>
-                    <div class="text-2xl font-bold text-yellow-600 mt-1">${totalProceso}</div>
-                    <div class="text-xs text-slate-400 mt-1">estudiantes</div>
-                </div>
-                <div class="glass rounded-2xl p-4 shadow-md border-l-4 border-green-500">
-                    <div class="text-xs font-semibold text-slate-500 uppercase">Logrado (A+AD)</div>
-                    <div class="text-2xl font-bold text-green-600 mt-1">${totalLogrado + totalDestacado}</div>
-                    <div class="text-xs text-slate-400 mt-1">Logrado + Destacado</div>
-                </div>
-            `;
+            if (!container) return;
+            // Resumen global retirado para todos los roles: podía confundirse con
+            // indicadores de rendimiento. El análisis queda en Comparativo y Resumen del grado.
+            container.innerHTML = '';
+            container.classList.add('hidden');
         }
 
         // ============================================
@@ -3847,6 +4052,8 @@ window.__IE_gradoOK = function(gradoVal) {
             estado.areaActual = null;
             document.getElementById('panelCompetencias').classList.add('hidden');
             document.getElementById('vistaTabla').classList.add('hidden');
+            const vrg = document.getElementById('vistaResumenGradoAdmin');
+            if (vrg) vrg.classList.add('hidden');
             document.getElementById('mensajeInicial').classList.remove('hidden');
             document.getElementById('areasContainer').parentElement.classList.remove('hidden');
             document.getElementById('resumenRapido').classList.remove('hidden');

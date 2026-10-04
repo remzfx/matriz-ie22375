@@ -216,3 +216,64 @@ test('Secundaria shows responsible teacher as compact read-only label', () => {
   assert.doesNotMatch(src, /id="docenteAreaInput"/);
   assert.doesNotMatch(src, /oninput="setDocenteArea\(estado\.areaActual, this\.value\)"/);
 });
+
+
+test('Registro routes mobile quick tools to official app stores while keeping desktop web links', () => {
+  const src = read('registro.html');
+  assert.match(src, /data-mobile-app="classroom"/);
+  assert.match(src, /data-mobile-app="gemini"/);
+  assert.match(src, /data-mobile-app="notebook"/);
+  assert.match(src, /apps\.apple\.com\/pe\/app\/google-classroom\/id924620788/);
+  assert.match(src, /play\.google\.com\/store\/apps\/details\?id=com\.google\.android\.apps\.classroom/);
+  assert.match(src, /apps\.apple\.com\/pe\/app\/google-gemini\/id6477489729/);
+  assert.match(src, /play\.google\.com\/store\/apps\/details\?id=com\.google\.android\.apps\.bard/);
+  assert.match(src, /apps\.apple\.com\/pe\/app\/gemini-notebook\/id6737527615/);
+  assert.match(src, /play\.google\.com\/store\/apps\/details\?id=com\.google\.android\.apps\.labs\.language\.tailwind/);
+  assert.match(src, /https:\/\/classroom\.google\.com\//);
+  assert.match(src, /https:\/\/gemini\.google\.com\//);
+  assert.match(src, /https:\/\/notebooklm\.google\.com\//);
+});
+
+
+test('Secundaria comparative is limited to admin/director or same teacher with two sections in the same area and grade', () => {
+  const src = read('secundaria.html');
+  assert.match(src, /function seccionesAsignadasAreaGrado/);
+  assert.match(src, /ses\.asignaciones && Array\.isArray\(ses\.asignaciones\[area\]\)/);
+  assert.match(src, /return seccionesAsignadasAreaGrado\(area, grado\)\.length >= 2/);
+  assert.match(src, /areasComparablesGrado\(estado\.grado\)/);
+  assert.match(src, /No tienes ambas secciones asignadas en esta área y grado/);
+  assert.match(src, /id="btnComparativo"/);
+});
+
+
+test('Admin has whole-grade consolidated comparison across all sections with data', () => {
+  const src = read('secundaria.html');
+  assert.match(src, /id="btnResumenGradoAdmin"/);
+  assert.match(src, /function esAdminDirector\(\)/);
+  assert.match(src, /function seccionesConDatosAreaGrado/);
+  assert.match(src, /function datoCompGradoCompleto/);
+  assert.match(src, /function abrirResumenGradoAdmin/);
+  assert.match(src, /function renderResumenGradoAdmin/);
+  assert.match(src, /id="chartResumenGradoAdmin"/);
+  assert.match(src, /Secciones incluidas:/);
+  assert.match(src, /stack:'g'/);
+});
+
+
+test('Secundaria hides obsolete global summary cards for all roles', () => {
+  const src = read('secundaria.html');
+  const block = src.slice(src.indexOf('function renderizarResumen()'), src.indexOf('// VISTA TABLA CONSOLIDADA'));
+  assert.match(block, /container\.classList\.add\('hidden'\)/);
+  assert.doesNotMatch(block, /Progreso General|Inicio \(C\)|En Proceso \(B\)|Logrado \(A\+AD\)/);
+});
+
+
+test('Areas actions stack title above and keep buttons in one horizontal row', () => {
+  for (const file of ['primaria.html', 'secundaria.html']) {
+    const src = read(file);
+    assert.match(src, /Áreas Curriculares/);
+    assert.match(src, /flex flex-nowrap sm:flex-wrap items-center justify-start gap-2 overflow-x-auto/);
+    assert.match(src, /px-4 py-2\.5 rounded-xl text-sm font-bold whitespace-nowrap shrink-0/);
+    assert.match(src, /mt-2 text-xs text-slate-500">Haz clic en un área para editar/);
+  }
+});
