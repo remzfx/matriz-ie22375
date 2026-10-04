@@ -244,3 +244,17 @@ test('Secundaria comparative is limited to admin/director or same teacher with t
   assert.match(src, /No tienes ambas secciones asignadas en esta área y grado/);
   assert.match(src, /id="btnComparativo"/);
 });
+
+
+test('Admin has whole-grade consolidated comparison across all sections with data', () => {
+  const src = read('secundaria.html');
+  assert.match(src, /id="btnResumenGradoAdmin"/);
+  assert.match(src, /function esAdminDirector\(\)/);
+  assert.match(src, /function seccionesConDatosAreaGrado/);
+  assert.match(src, /function datoCompGradoCompleto/);
+  assert.match(src, /function abrirResumenGradoAdmin/);
+  assert.match(src, /function renderResumenGradoAdmin/);
+  assert.match(src, /id="chartResumenGradoAdmin"/);
+  assert.match(src, /Secciones incluidas:/);
+  assert.match(src, /stack:'g'/);
+});
