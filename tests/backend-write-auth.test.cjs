@@ -261,7 +261,7 @@ test('savereg: meta remains an object through save, loadreg and the unchanged cl
   // The source request must not be mutated.
   assert.equal(meta.docente, 'Forged Name');
 
-  const loaded = JSON.parse(s.c.doGet({parameter: {action: 'loadreg', nivel: 'primaria'}}).text);
+  const loaded = JSON.parse(s.c.doGet({parameter: {action: 'loadreg', nivel: 'primaria', token: s.primary}}).text);
   assert.equal(loaded.ok, true);
   const item = loaded.items.find(item => item.clave === response.clave);
   assert.ok(item);

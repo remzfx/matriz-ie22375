@@ -127,3 +127,30 @@ Cuando tengamos al menos un despliegue correcto y comprobemos que la URL públic
 Antes de una implementación futura, definir las dos contraseñas privadas. Este bloque no configura propiedades, no fusiona ramas ni despliega.
 
 
+
+## Lecturas protegidas
+
+GET y POST aplican la misma autorización. Los consumidores de la plataforma envían el token de sesión por POST en el cuerpo; no lo incorporan a la URL. Los GET existentes requieren token para las lecturas protegidas.
+
+| Ruta | Acceso |
+| --- | --- |
+| `loadreg`, `loadNivel`, alias `load` | Admin: lectura completa; Docente: solo su alcance vigente en `DocentesAcceso`. |
+| `loadtplstatus` | Admin: completo; Docente: estado de plantillas de sus aulas autorizadas, sin IDs de Drive. |
+| `loadtpl` | Solo Admin. El Excel completo puede incluir varias áreas y no se puede filtrar por área en el backend actual. Restricción aprobada: docentes conservan consulta de estado, pero la exportación del Excel completo desde Registro requiere Admin. |
+| `loadasis`, `loadwa` | Admin/Auxiliar, conforme al alcance escolar de sus módulos existentes. |
+| `loadaip` | Admin/PIP. |
+| `classroom` | Admin; conserva respuesta JSON/JSONP, sin exponer públicamente cursos de la cuenta de ejecución. No hay consumidor de lectura en la interfaz actual; el botón solo abre Classroom. |
+| `loaddoc` | Conserva POST solo Admin; GET siempre rechazado. |
+
+Para Primaria se filtran grados autorizados. Para Secundaria se exige la relación exacta área → aula de `asignaciones`; solo los registros antiguos sin ese mapa conservan el fallback explícito `areas`+`aulas`. Los filtros de la consulta solo reducen ese alcance: omitirlos o falsificarlos nunca concede otros contextos. Firma, expiración y revocación por `permisosVersion` se conservan. Los registros se filtran antes de retornar su payload; sus sesiones y mapas internos también se limitan al contexto de la fila. La forma de `payload.meta` permanece intacta.
+
+### Lecturas públicas deliberadas
+
+- `ping`: diagnóstico de conexión, sin registros, alumnos ni permisos.
+- `loadperiodos`: año y estados globales de bimestres necesarios para sincronizar las interfaces; no devuelve registros académicos ni configuración de docentes.
+
+La acción `login` sigue siendo el punto público de autenticación existente, con credenciales y sin cambios en este bloque. Los archivos estáticos del repositorio (incluida la base de estudiantes ya publicada) quedan fuera del alcance de estas rutas de Apps Script; este PR no cambia su publicación.
+
+No se modifican rutas de escritura, formatos almacenados, secretos ni diseño de tokens.
+
+

@@ -533,6 +533,16 @@ function saveStore() {
 }
 
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
+function fetchLecturaNube(url) {
+  const params = new URLSearchParams(url.slice(url.indexOf('?') + 1));
+  const body = {};
+  params.forEach(function (value, key) { body[key] = value; });
+  body.token = (getLoginSession() || {}).token || '';
+  return fetch(CLOUD_API_URL, {
+    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    cache: 'no-store', body: JSON.stringify(body)
+  });
+}
 function cloudClaveReg() {
   const c = ctxBase();
   return [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
@@ -645,7 +655,7 @@ async function bajarRegistroNube() {
   toast('Bajando…');
   try {
     const url = CLOUD_API_URL + '?action=loadreg&nivel=' + encodeURIComponent(nivel);
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetchLecturaNube(url);
     const data = JSON.parse(await res.text());
     if (!data.ok) throw new Error(data.error || 'Error');
     const c = ctxBase();
@@ -1653,15 +1663,16 @@ async function consultarEstadoSiagie() {
     const url = CLOUD_API_URL + '?action=loadtplstatus&nivel=' + encodeURIComponent(c.nivel) +
       '&bimestre=' + encodeURIComponent(c.bim) + '&grado=' + encodeURIComponent(c.grado) +
       '&seccion=' + encodeURIComponent(c.seccion) + '&t=' + Date.now();
-    const r = await fetch(url, { cache:'no-store' });
+    const r = await fetchLecturaNube(url);
     const data = JSON.parse(await r.text());
     const items = (data && data.items) || [];
     const hit = items.find(it => String(it.grado)===String(c.grado) && String(it.seccion)===String(c.seccion) && String(it.bimestre)===String(c.bim));
     if (hit) {
-      siagieHabilitado = true;
+      const puedeDescargar = (getLoginSession() || {}).role === 'admin';
+      siagieHabilitado = puedeDescargar;
       siagieTplMeta = hit;
-      if (lbl) { lbl.textContent = 'Habilitado para SIAGIE · ' + (hit.filename||'RegNotas'); lbl.className = 'text-sm font-black text-emerald-700'; }
-      if (btn) { btn.disabled = false; btn.textContent = 'Validar y procesar a SIAGIE'; }
+      if (lbl) { lbl.textContent = (puedeDescargar ? 'Habilitado para SIAGIE · ' : 'Plantilla disponible · Excel completo solo Admin · ') + (hit.filename||'RegNotas'); lbl.className = 'text-sm font-black text-emerald-700'; }
+      if (btn) { btn.disabled = !puedeDescargar; btn.textContent = puedeDescargar ? 'Validar y procesar a SIAGIE' : 'Exportación de Excel completo solo Admin'; }
     } else {
       if (lbl) { lbl.textContent = 'Aún no se puede procesar al SIAGIE'; lbl.className = 'text-sm font-black text-amber-700'; }
     }
@@ -1800,9 +1811,9 @@ async function rellenarSiagieExcel() {
   let filename = (siagieTplMeta && siagieTplMeta.filename) || 'RegNotas.xlsx';
   let buf;
   try {
-    const res = await fetch(url, { cache:'no-store' });
+    const res = await fetchLecturaNube(url);
     const data = JSON.parse(await res.text());
-    if (!data.ok || !data.b64) { alert('No hay plantilla oficial para este grado/sección.'); return; }
+    if (!data.ok || !data.b64) { alert(data.error || 'No hay plantilla oficial para este grado/sección.'); return; }
     filename = data.filename || filename;
     const raw = atob(data.b64);
     const u8 = new Uint8Array(raw.length);
