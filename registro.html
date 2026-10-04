@@ -95,10 +95,11 @@
   .fin-grid thead th { background:#0f172a; color:#fff; font-size:11px; font-weight:800; position:sticky; top:0; z-index:2; }
   .fin-grid th.fin-nom, .fin-grid td.fin-nom { position:sticky; left:0; background:#fff; z-index:1; min-width:160px; max-width:200px; }
   .fin-grid thead th.fin-nom { background:#0f172a; z-index:3; }
-  .fin-grid thead th:not(.fin-nom) { background:#075985; color:#fff; }
-  .fin-grid tbody td:not(.fin-nom) { background:#f0f9ff; }
-  .fin-grid tbody tr:nth-child(even) td:not(.fin-nom) { background:#e0f2fe; }
-  .fin-grid .fin-caps { font-size:10px; font-weight:600; color:#bae6fd; margin-top:4px; line-height:1.3; }
+  .fin-grid .fin-caps { font-size:10px; font-weight:600; color:#cbd5e1; margin-top:4px; line-height:1.3; }
+  /* Resumen: solo la columna Promedio general lleva color. */
+  .fin-grid thead th.av-prom-col { background:#075985; color:#fff; }
+  .fin-grid tbody td.av-prom-col { background:#f0f9ff; }
+  .fin-grid tbody tr:nth-child(even) td.av-prom-col { background:#e0f2fe; }
   .fin-grid td .fin-caps { color:#64748b; }
   .fin-cell { display:flex; flex-direction:column; align-items:center; gap:4px; min-width:92px; }
   @media (max-width:640px) {
@@ -2687,7 +2688,7 @@ function renderAvance() {
     const cl = cp!=null ? numToLetter(cp) : '';
     head += '<th>C'+(idx+1)+(cl?' · '+cl:'')+'<div class="fin-caps">'+comp+'<br>'+capsTxt+'</div></th>';
   });
-  head += '<th>Promedio<div class="fin-caps">Promedio de competencias</div></th>';
+  head += '<th class="av-prom-col">Promedio<div class="fin-caps">Promedio de competencias</div></th>';
   head += '<th>Conclusión<div class="fin-caps">'+(nivel==='primaria'?'Obligatoria si B o C':'Obligatoria solo si C')+'</div></th>';
 
   const rows = alumnos.map((al, i) => {
@@ -2705,7 +2706,7 @@ function renderAvance() {
     const ck = concAreaKey(studentKey(al));
     const txt = (leerNota(store.concArea, ck)||{}).texto || '';
     const abre = requiereConclusion(lg);
-    tds += '<td><div class="fin-cell">' +
+    tds += '<td class="av-prom-col"><div class="fin-cell">' +
       (modoCalif==='num' && pg!=null ? '<div style="font-weight:800;font-size:16px">'+pg+'</div>' : '') +
       '<span class="eq-letter '+(lg?eqClass(lg):'eq-none')+'">'+(lg||'—')+'</span></div></td>';
     tds += '<td style="min-width:160px">' +
