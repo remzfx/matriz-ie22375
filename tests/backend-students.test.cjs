@@ -224,6 +224,10 @@ test('Closed bimesters cannot be resynchronized and their roster remains frozen'
   assert.equal(res.ok,false);assert.equal(res.code,'PERIOD_CLOSED');
   assert.deepEqual(s.load(s.admin,{bimestre:'II'}).estudiantes.map(a=>a.nombre),before);
   assert.equal(s.load(s.admin).estudiantes.some(a=>a.nombre==='Should Not Enter Closed Roster'),false);
+  const open=s.post({action:'syncstudents',token:s.admin,version:s.init.version,bimestre:'I',base:nueva});
+  assert.equal(open.ok,true);
+  assert.equal(s.load(s.admin).estudiantes.some(a=>a.nombre==='Should Not Enter Closed Roster'),true);
+  assert.deepEqual(s.load(s.admin,{bimestre:'II'}).estudiantes.map(a=>a.nombre),before,'BASE_ACTUAL updates must not change the closed roster');
 });
 
 test('A bimestre without its own roster reports fallback explicitly instead of pretending it is frozen',()=> {

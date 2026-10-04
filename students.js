@@ -88,9 +88,18 @@
     status(response.inicializada ? (response.estudiantes.length + ' estudiantes cargados para tu sesión.') : 'La base oficial está pendiente de inicialización por Admin.');
     return remember(toBase(response), token, scope);
   }
+  async function checkedLoad(data) {
+    const base = await request('loadstudents', data);
+    if (!base.inicializada) { clear(); throw new Error('Base privada no inicializada. Admin debe completar la inicialización SIAGIE.'); }
+    return base;
+  }
   global.IEStudents = {empty: empty, peek: () => peek('students:actual'), clear: clear, session: session,
-    load: () => request('loadstudents'),
-    loadRoster: bimestre => request('loadstudents', {bimestre: bimestre}),
+    load: () => checkedLoad(),
+    inspect: () => request('loadstudents'),
+    loadRoster: bimestre => {
+      if (!['I','II','III','IV'].includes(bimestre)) return Promise.reject(new Error('Bimestre inválido.'));
+      return checkedLoad({bimestre: bimestre});
+    },
     save: (base, version) => request('savestudents', {base: base, version: version}),
     initialize: (base, version) => request('initstudents', {base: base, version: version}),
     seedRoster: (version, bimestre) => request('seedstudentsroster', {version: version, bimestre: bimestre}),

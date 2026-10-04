@@ -149,20 +149,20 @@ Para Primaria se filtran grados autorizados. Para Secundaria se exige la relaci�
 - `ping`: diagnóstico de conexión, sin registros, alumnos ni permisos.
 - `loadperiodos`: año y estados globales de bimestres necesarios para sincronizar las interfaces; no devuelve registros académicos ni configuración de docentes.
 
-La acción `login` sigue siendo el punto público de autenticación existente, con credenciales y sin cambios en este bloque. Los archivos estáticos del repositorio (incluida la base de estudiantes ya publicada) quedan fuera del alcance de estas rutas de Apps Script; este PR no cambia su publicación.
+La acción `login` sigue siendo el punto público de autenticación existente, con credenciales y sin cambios en este bloque. La retirada de las listas estáticas corresponde exclusivamente a la etapa B, después de validar la base privada en producción.
 
 No se modifican rutas de escritura, formatos almacenados, secretos ni diseño de tokens.
 
-## Estudiantes privados — etapa A del rollout
-
-El PR #34 prepara acciones nuevas exclusivamente POST con token: `loadstudents` (alcance server-side por rol), `initstudents` (inicialización explícita solo Admin), `savestudents` y `restorestudents` (solo Admin, revisión contra sobrescrituras concurrentes). Se usa la hoja privada `EstudiantesBase` del mismo Spreadsheet, con una base vigente y respaldo de restauración privado. El despliegue no importa datos automáticamente.
-
-**Esta etapa conserva la fuente pública y todos los consumidores actuales.** Admin añade controles manuales independientes de preparación en Importar, sin cambiar su base local, importación SIAGIE/CSV/JSON, edición, guardado ni restauración vigentes. Si Apps Script aún no se actualiza, esos controles nuevos muestran un error; el funcionamiento actual continúa. No se requiere publicar GitHub Pages y Apps Script simultáneamente.
-
-La inicialización debe usar exclusivamente exportaciones CSV SIAGIE vigentes de ambos niveles, revisadas y confirmadas por Admin. No se usa la copia antigua de 408 alumnos ni el JSON de 407 como semilla. La discrepancia de Secundaria 4.º B, orden 217 se resuelve mediante esa revisión, sin fusionar automáticamente datos.
-
-El segundo PR queda en borrador: solo después de validar la base privada en producción y recibir confirmación de Admin migrará los seis consumidores y retirará las listas públicas. Una caché offline no sirve como verificación de producción. Plan completo y criterios de corte en [auditoria-estudiantes.md](auditoria-estudiantes.md).
-
-Pruebas: `node --test tests/*.test.cjs`. No se ejecutaron merge, despliegue ni importaciones reales.
 
 
+## Estudiantes privados — etapa B en revisión (PR #35)
+
+La rama integra el main que incluye los PR #34 y #36–38. Migra los seis consumidores a POST con token y retira las bases embebidas y el JSON público. Conserva el backend actual, el alcance por rol y los controles manuales SIAGIE/padrones en Admin; no usa listas históricas ni almacenamiento local como semilla.
+
+Registro carga el padrón del bimestre seleccionado mediante IEStudents.loadRoster. Si falta, conserva el resultado autorizado con padronInicializado:false y lo informa. Un padrón cerrado existente permanece congelado. La caché temporal exige el mismo token y bimestre; offline no equivale a validación de producción.
+
+student-identity.js comparte la identidad ID → código → nombre normalizado y la lectura de notas antiguas por nombre. Las nuevas notas usan identidad estable; las claves históricas no se renombrarán ni borrarán automáticamente. Admin y Registro mantienen el cruce SIAGIE por ID/código antes de nombre.
+
+El borrador no autoriza un corte de producción. Antes de publicar, revisar la base privada, padrones y permisos conectado al servidor. No resolver automáticamente la discrepancia histórica de Secundaria 4.º B, orden 217. La inicialización sigue requiriendo CSV SIAGIE vigente de ambos niveles y revisión/confirmación explícitas.
+
+Detalle, fuentes y límites de compatibilidad: [auditoria-estudiantes.md](auditoria-estudiantes.md). Pruebas: node --test tests/*.test.cjs, con fixtures sintéticos. No se han ejecutado merge, despliegue ni importaciones reales.

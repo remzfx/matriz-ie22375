@@ -36,7 +36,7 @@
     ocupada = true;
     mensaje('Verificando la base privada en el servidor…');
     try {
-      const base = await IEStudents.load();
+      const base = await (IEStudents.inspect || IEStudents.load)();
       if (base.offline) throw new Error('La verificación requiere conexión; una caché no confirma producción.');
       if (base.inicializada) {
         ['primaria', 'secundaria'].forEach(nivel => {
@@ -73,7 +73,7 @@
     ocupada = true;
     try {
       const bim = bimestreSeleccionado();
-      const actual = await IEStudents.load();
+      const actual = await (IEStudents.inspect || IEStudents.load)();
       if (actual.offline) throw new Error('La creación del padrón requiere conexión.');
       if (!actual.inicializada) throw new Error('Primero inicializa la base privada.');
       if (!confirm('¿Crear el padrón del bimestre ' + bim + ' desde la base SIAGIE vigente? Si ya existe, no se reemplazará.')) return;
@@ -90,7 +90,7 @@
     ocupada = true;
     try {
       const bim = bimestreSeleccionado();
-      const actual = await IEStudents.load();
+      const actual = await (IEStudents.inspect || IEStudents.load)();
       if (actual.offline) throw new Error('La actualización requiere conexión al backend.');
       if (!actual.inicializada) throw new Error('Primero inicializa la base privada.');
       const totalAntes = actual.primaria.estudiantes.length + actual.secundaria.estudiantes.length;
@@ -110,14 +110,14 @@
     if (!listas.primaria || !listas.secundaria || !document.getElementById('migracionRevisada').checked) {
       mensaje('Importa ambos CSV SIAGIE vigentes y confirma que revisaste las dos listas.'); return;
     }
-    if (!confirm('¿Inicializar una sola vez la base privada y su respaldo con estas dos listas SIAGIE revisadas? La base pública actual y los módulos existentes se conservan en esta etapa.')) return;
+    if (!confirm('¿Inicializar una sola vez la base privada y su respaldo con estas dos listas SIAGIE revisadas? Se conservarán las notas académicas existentes.')) return;
     ocupada = true;
     try {
-      const actual = await IEStudents.load();
+      const actual = await (IEStudents.inspect || IEStudents.load)();
       if (actual.offline) throw new Error('La inicialización requiere conexión al backend.');
       if (actual.inicializada) throw new Error('La base privada ya está inicializada. No se reemplazará durante la migración.');
       await IEStudents.initialize({primaria: {estudiantes: listas.primaria}, secundaria: {estudiantes: listas.secundaria}}, actual.version);
-      mensaje('Base privada y respaldo inicializados desde SIAGIE revisado. Verifica los datos en servidor; la etapa B sigue pendiente de tu autorización.');
+      mensaje('Base privada y respaldo inicializados desde SIAGIE revisado. Verifica los datos y padrones en el servidor.');
     } catch(e) { mensaje(e.message); }
     finally { ocupada = false; }
   }

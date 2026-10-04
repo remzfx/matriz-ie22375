@@ -26,7 +26,8 @@ No introducir frameworks ni reemplazar la arquitectura actual salvo pedido expl�
 - `auxiliar.html`: asistencia/QR
 - `photochecks.html`: fotochecks QR
 - `aula_innovacion.html`: AIP
-- `bd_oficial_2026.json`: base oficial de estudiantes
+- `students.js`: carga protegida y caché temporal de estudiantes por sesión
+- Hoja privada `EstudiantesBase`: base oficial y respaldo de restauración, administrados desde Admin
 - Apps Script: sincronización con Google Sheets y acciones de nube
 
 Antes de editar, leer siempre la versión actual desde `main`.
@@ -128,7 +129,7 @@ La clave interna `previsto` puede existir por compatibilidad. No renombrar clave
 Preferir **render local inmediato + actualización de nube en segundo plano**.
 
 La interfaz debe pintar de inmediato usando:
-- datos embebidos
+- última respuesta autorizada del backend
 - última caché válida
 - sesión actual
 
