@@ -185,3 +185,13 @@ test('Secundaria comparative reads only the exact requested section and shows re
   assert.match(src, /sec !== secObjetivo/);
   assert.match(src, /Docente responsable: \$\{docente \|\| 'Sin registrar'\}/);
 });
+
+
+test('Registro keeps cloud actions on one mobile row', () => {
+  const src = read('registro.html');
+  assert.match(src, /grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex/);
+  const subir = src.indexOf('Nube Subir');
+  const bajar = src.indexOf('Nube Bajar');
+  const guardar = src.indexOf(">Guardar</button>", bajar);
+  assert.ok(subir >= 0 && bajar > subir && guardar > bajar);
+});
