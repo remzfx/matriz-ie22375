@@ -216,3 +216,20 @@ test('Secundaria shows responsible teacher as compact read-only label', () => {
   assert.doesNotMatch(src, /id="docenteAreaInput"/);
   assert.doesNotMatch(src, /oninput="setDocenteArea\(estado\.areaActual, this\.value\)"/);
 });
+
+
+test('Registro routes mobile quick tools to official app stores while keeping desktop web links', () => {
+  const src = read('registro.html');
+  assert.match(src, /data-mobile-app="classroom"/);
+  assert.match(src, /data-mobile-app="gemini"/);
+  assert.match(src, /data-mobile-app="notebook"/);
+  assert.match(src, /apps\.apple\.com\/pe\/app\/google-classroom\/id924620788/);
+  assert.match(src, /play\.google\.com\/store\/apps\/details\?id=com\.google\.android\.apps\.classroom/);
+  assert.match(src, /apps\.apple\.com\/pe\/app\/google-gemini\/id6477489729/);
+  assert.match(src, /play\.google\.com\/store\/apps\/details\?id=com\.google\.android\.apps\.bard/);
+  assert.match(src, /apps\.apple\.com\/pe\/app\/gemini-notebook\/id6737527615/);
+  assert.match(src, /play\.google\.com\/store\/apps\/details\?id=com\.google\.android\.apps\.labs\.language\.tailwind/);
+  assert.match(src, /https:\/\/classroom\.google\.com\//);
+  assert.match(src, /https:\/\/gemini\.google\.com\//);
+  assert.match(src, /https:\/\/notebooklm\.google\.com\//);
+});
