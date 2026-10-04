@@ -155,15 +155,14 @@ No se modifican rutas de escritura, formatos almacenados, secretos ni diseño de
 
 
 
-## Estudiantes privados — etapa B pendiente de producción
+## Estudiantes privados — etapa B en revisión (PR #35)
 
-Este PR migra los seis consumidores a POST con token y elimina BD_EMPOTRADA, BD_EMP y el JSON público. Depende de la etapa A del PR #34, que preserva todos los consumidores y fuentes actuales mientras Admin prepara, inicializa y verifica la hoja privada EstudiantesBase.
+La rama integra el main que incluye los PR #34 y #36–38. Migra los seis consumidores a POST con token y retira las bases embebidas y el JSON público. Conserva el backend actual, el alcance por rol y los controles manuales SIAGIE/padrones en Admin; no usa listas históricas ni almacenamiento local como semilla.
 
-**No fusionar ni desplegar B hasta que Admin confirme la validación real de A en producción.** El borrador y su dependencia no sustituyen esa confirmación. Después del merge de A y de esa validación, retargetear B contra main y actualizar con main antes de revisarlo para el corte. El backend y los alumnos privados ya estarán operativos; Pages puede publicarse después sin necesitar sincronía entre despliegues.
+Registro carga el padrón del bimestre seleccionado mediante IEStudents.loadRoster. Si falta, conserva el resultado autorizado con padronInicializado:false y lo informa. Un padrón cerrado existente permanece congelado. La caché temporal exige el mismo token y bimestre; offline no equivale a validación de producción.
 
-La semilla inicial es exclusivamente una exportación SIAGIE vigente revisada por Admin, no las copias históricas de 408/407 alumnos. La discrepancia de Secundaria 4.º B, orden 217 no se decide ni fusiona automáticamente. B no tiene un control para inicializar desde listas antiguas: su lector falla si la base privada aún no está inicializada.
+student-identity.js comparte la identidad ID → código → nombre normalizado y la lectura de notas antiguas por nombre. Las nuevas notas usan identidad estable; las claves históricas no se renombrarán ni borrarán automáticamente. Admin y Registro mantienen el cruce SIAGIE por ID/código antes de nombre.
 
-Admin mantiene importación SIAGIE/CSV/JSON, edición, guardado con revisión y restauración desde el respaldo privado de la importación inicial. La caché temporal está ligada al token exacto, dura diez minutos y se limpia ante denegaciones. Un fallo de conexión solo permite la respuesta autorizada vigente de esa misma sesión dentro del TTL; no permite usar un roster público. Photochecks sigue siendo Admin y genera el QR localmente con el mismo contenido usado por Auxiliar.
+El borrador no autoriza un corte de producción. Antes de publicar, revisar la base privada, padrones y permisos conectado al servidor. No resolver automáticamente la discrepancia histórica de Secundaria 4.º B, orden 217. La inicialización sigue requiriendo CSV SIAGIE vigente de ambos niveles y revisión/confirmación explícitas.
 
-Plan y fuentes por consumidor: [auditoria-estudiantes.md](auditoria-estudiantes.md). Las acciones protegidas y roles se preparan en A; B no cambia autenticación, permisos ni rutas académicas. Pruebas: `node --test tests/*.test.cjs`; solo fixtures sintéticos. No se ejecutaron merge, despliegue ni importaciones reales.
-
+Detalle, fuentes y límites de compatibilidad: [auditoria-estudiantes.md](auditoria-estudiantes.md). Pruebas: node --test tests/*.test.cjs, con fixtures sintéticos. No se han ejecutado merge, despliegue ni importaciones reales.

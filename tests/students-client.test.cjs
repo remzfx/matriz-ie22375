@@ -26,12 +26,12 @@ function fixture(role='admin'){
   const run=code=>new vm.Script(code).runInContext(c);
   return {c,run,calls,memory,storage,session,elements,alerts};
 }
-function checkRequest(s){
+function checkRequest(s,bimestre){
   assert.equal(s.calls.length,1);const {url,options}=s.calls[0];
   assert.match(url,/^https:\/\/script.google.com\//);assert.equal(options.method,'POST');
   assert.equal(options.headers['Content-Type'],'text/plain;charset=utf-8');
   const body=JSON.parse(options.body);assert.equal(body.action,'loadstudents');assert.equal(body.token,s.session.token);
-  assert.deepEqual(Object.keys(body).sort(),['action','token']);
+  assert.deepEqual(Object.keys(body).sort(),bimestre?['action','bimestre','token']:['action','token']);if(bimestre)assert.equal(body.bimestre,bimestre);
 }
 test('Admin real loader consumes the protected backend response',async()=>{
   const s=fixture();s.run('let bdGuardando=false,bdPendiente=false,baseCargada=false;let recibido;function estadoBD(){};function aplicarBaseServidor(base){recibido=base;}');
@@ -52,15 +52,15 @@ for(const file of ['auxiliar.html','photochecks.html'])test(file+': real loader 
 });
 test('Registro enters its current flow only after protected students are loaded',async()=>{
   const s=fixture('docente');
-  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;
-    function nivelPermitido(){return 'primaria'};function loadStore(){};function pintarBimestresRegistro(){};function loadPeriodosAdmin(){};
+  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;function recordarPadron(){};function saveStore(){};function toast(){};
+    function nivelPermitido(){return 'primaria'};function loadStore(){};function pintarBimestresRegistro(){document.getElementById('selBim').value='III'};function loadPeriodosAdmin(){};
     function gradosPermitidos(){return [1]};function aulasPermitidas(){return null};function hoyISO(){return '2026-10-03'};
     function aplicarDocenteSesion(){};function onGrado(){};function areas(){return ['Comunicación']};function renderAreas(){};
     function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};
     function fillCaps(){};function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};
     function sincronizarPeriodosNube(){return Promise.resolve()};function onContexto(){};`);
-  s.run(extract('registro.html','loadBD'));s.run(extract('registro.html','entrarNivel'));
-  await s.c.entrarNivel('primaria');checkRequest(s);
+  for(const name of ['loadBD','llenarAulasPadron','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  await s.c.entrarNivel('primaria');checkRequest(s,'III');
   assert.match(s.elements.get('selGrado').innerHTML,/value="1"/);
   assert.equal(s.c.loadBD().primaria.estudiantes[0].nombre,'Synthetic Primary');
 });
@@ -100,7 +100,7 @@ test('Missing/expired token is rejected before a client request',async()=>{
 });
 test('Stage B fails closed if the private base was not initialized in stage A',async()=>{
   const s=fixture();s.c.fetch=async()=>({ok:true,json:async()=>({ok:true,inicializada:false,version:'',estudiantes:[]})});
-  await assert.rejects(s.c.IEStudents.load(),/etapa A/);assert.equal(s.c.IEStudents.peek(),null);
+  await assert.rejects(s.c.IEStudents.load(),/no inicializada/);assert.equal(s.c.IEStudents.peek(),null);
 });
 test('Session switched during an in-flight request cannot receive/cache the old response',async()=>{
   const s=fixture(),fetch=s.c.fetch;s.c.fetch=async(...args)=>{const result=await fetch(...args);s.storage.removeItem('ie22375_session_v1');return result;};
@@ -117,9 +117,28 @@ test('Photochecks keep the current QR payload and render QR locally without expo
 test('Production consumers include the shared protected loader; no public base/old fallback survives',()=>{
   assert.equal(fs.existsSync(path.join(root,'bd_oficial_2026.json')),false);
   for(const file of ['admin.html','registro.html','primaria.html','secundaria.html','auxiliar.html','photochecks.html']){
-    const src=read(file);assert.match(src,/<script src="students.js"><\/script>/);assert.match(src,/IEStudents\.load\(/);
+    const src=read(file);assert.match(src,/<script src="students.js"><\/script>/);assert.match(src,file==='registro.html'?/IEStudents\.loadRoster\(/:/IEStudents\.load\(/);
     assert.doesNotMatch(src,/BD_EMP|bd_oficial_2026\.json|ie22375_admin_bd_v1|ie22375_bd_sec_cache_v1/);
   }
   assert.doesNotMatch(read('photochecks.html'),/api\.qrserver\.com|corregirNiveles/);
   new vm.Script(read('students.js'));
+});
+
+test('loadRoster keeps bimestre, identifiers and explicit safe fallback; invalid bimesters never request a global base',async()=>{
+  const s=fixture();s.c.fetch=async(url,options)=>{
+    s.calls.push({url,options});return {ok:true,json:async()=>({ok:true,inicializada:true,version:'v',bimestre:'III',padronInicializado:false,fuentePadron:'actual',estudiantes:[{nivel:'secundaria',grado:4,seccion:'B',nombre:'Synthetic Student',idSiagie:'42',codigoEstudiante:'00042',estadoMatricula:'TRASLADADO'}]})};
+  };
+  const base=await s.c.IEStudents.loadRoster('III');checkRequest(s,'III');
+  assert.equal(base.bimestre,'III');assert.equal(base.padronInicializado,false);assert.equal(base.secundaria.estudiantes[0].idSiagie,'42');
+  assert.equal(base.secundaria.estudiantes[0].codigoEstudiante,'00042');
+  await assert.rejects(s.c.IEStudents.loadRoster('V'),/inválido/);assert.equal(s.calls.length,1);
+  s.c.fetch=async()=>{throw Error('offline');};
+  const cached=await s.c.IEStudents.loadRoster('III');assert.equal(cached.offline,true);assert.equal(cached.padronInicializado,false);
+  await assert.rejects(s.c.IEStudents.loadRoster('IV'),/conectar/);
+});
+
+test('Initial inspection remains manual and can inspect an empty private base without enabling a public fallback',async()=>{
+  const s=fixture();s.c.fetch=async()=>({ok:true,json:async()=>({ok:true,inicializada:false,version:'',estudiantes:[]})});
+  assert.equal((await s.c.IEStudents.inspect()).inicializada,false);
+  await assert.rejects(s.c.IEStudents.load(),/no inicializada/);assert.equal(s.c.IEStudents.peek(),null);
 });

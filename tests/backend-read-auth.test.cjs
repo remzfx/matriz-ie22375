@@ -263,6 +263,7 @@ for(const [file,name,helper,role,action] of [
     renderizarAreas(){},renderizarResumen(){},renderizarNavegadorAreas(){},
     loadAsis:()=>({}),saveAsis(){},renderLista(){},hoyISO:()=> '2026-10-03',WA_KEY:'synthetic-wa',saveGruposWaLocal(){},renderWaAulas(){},
     aplicarPaqueteAip(){},aulasDelNivel:()=>[],informeSiagie:()=>({ok:true}),siagieTplMeta:null,
+    IEStudents:{loadRoster:async()=>({primaria:{estudiantes:[]},secundaria:{estudiantes:[]}})},
     XLSX:{read:()=>({SheetNames:[]}),write:()=>new Uint8Array()},fetchRegAula:async()=>[],areasDeNivel:()=>[],estudiantesDe:()=>[]
   });
   if(helper)new vm.Script(clientFunction(file,helper)).runInContext(context);

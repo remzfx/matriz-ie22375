@@ -82,7 +82,7 @@ function studentsFixture() {
   return {...s,rows,base,init,load,get};
 }
 
-test('Admin reads the complete private base with exactly the five consumer fields',()=> {
+test('Admin reads the complete private base and optional SIAGIE identifiers without leaking unrelated fields',()=> {
   const s=studentsFixture(),res=s.load(s.admin);
   assert.equal(res.ok,true);assert.equal(res.estudiantes.length,7);
   for(const a of res.estudiantes)assert.deepEqual(Object.keys(a).sort(),['grado','nivel','nombre','orden','seccion']);
@@ -135,11 +135,11 @@ test('Revocation while waiting for the student lock is checked again without nes
   s.c.LockService.getScriptLock=()=>({waitLock(){assert.equal(s.state.held,false);s.state.held=true;s.tables.get('DocentesAcceso').rows[1][1]=2000;},releaseLock(){s.state.held=false;}});
   assert.equal(s.load(s.primary).ok,false);assert.equal(s.state.held,false);
 });
-for(const action of ['loadstudents','savestudents','initstudents','restorestudents'])test(action+': GET never exposes students or changes the private base',()=> {
+for(const action of ['loadstudents','savestudents','initstudents','restorestudents','seedstudentsroster','syncstudents','enrichstudents'])test(action+': GET never exposes students or changes the private base',()=> {
   const s=studentsFixture(),before=s.state.writes,res=s.get({action,token:s.admin,base:s.base});
   assert.equal(res.ok,false);assert.equal('estudiantes' in res,false);assert.equal(s.state.writes,before);
 });
-for(const action of ['savestudents','initstudents','restorestudents'])test(action+': only Admin may administer the student base',()=> {
+for(const action of ['savestudents','initstudents','restorestudents','seedstudentsroster','syncstudents','enrichstudents'])test(action+': only Admin may administer the student base',()=> {
   const s=studentsFixture();
   for(const token of [undefined,s.primary,s.secondary,s.token('auxiliar','auxiliar'),s.token('pip','pip'),s.token('admin','admin',{exp:Date.now()-1})]){
     const before=s.state.writes,res=s.post({action,token,base:s.base,version:s.init.version});
@@ -182,4 +182,88 @@ test('Initial migration is explicit; saving an uninitialized base is rejected',(
   const load=s.post({action:'loadstudents',token:s.admin});assert.equal(load.inicializada,false);assert.deepEqual(load.estudiantes,[]);
   assert.equal(s.post({action:'savestudents',token:s.admin,version:'',base:{primaria:{estudiantes:[]},secundaria:{estudiantes:[]}}}).ok,false);
   assert.equal(s.post({action:'initstudents',token:s.admin,version:'',base:{primaria:{estudiantes:[]},secundaria:{estudiantes:[]}}}).ok,false);
+});
+
+
+test('Bimonthly roster sync changes only the open roster and never touches existing grades',()=> {
+  const s=studentsFixture();
+  const seeded=s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'I'});
+  assert.equal(seeded.ok,true);assert.equal(seeded.padronInicializado,true);assert.equal(seeded.bimestre,'I');
+
+  const reg=s.tables.get('RegistroNotas');
+  const savedPayload={grades:{'primaria||I||1||Única||Comunicación||Comp||Cap||2026-03-20||Synthetic Student 1':{nota20:17,nivel:'A'}}};
+  reg.rows.push(['reg-key','primaria','I','1','Única','Comunicación','Test Primary',1234,JSON.stringify(savedPayload)]);
+  const registroAntes=JSON.stringify(reg.rows);
+
+  const nueva=JSON.parse(JSON.stringify(s.base));
+  nueva.primaria.estudiantes=nueva.primaria.estudiantes.filter(a=>a.nombre!=='Synthetic Student 0');
+  nueva.primaria.estudiantes.push({nivel:'primaria',grado:1,seccion:'Única',orden:99,nombre:'Synthetic New Student'});
+  const synced=s.post({action:'syncstudents',token:s.admin,version:s.init.version,bimestre:'I',base:nueva});
+  assert.equal(synced.ok,true);
+  assert.equal(JSON.stringify(reg.rows),registroAntes,'student roster updates must not rewrite RegistroNotas');
+
+  const roster=s.load(s.admin,{bimestre:'I'});
+  assert.equal(roster.padronInicializado,true);
+  assert.equal(roster.estudiantes.some(a=>a.nombre==='Synthetic Student 0'),false);
+  assert.equal(roster.estudiantes.some(a=>a.nombre==='Synthetic Student 1'),true);
+  assert.equal(roster.estudiantes.some(a=>a.nombre==='Synthetic New Student'),true);
+
+  const current=s.load(s.admin);
+  assert.equal(current.version,synced.version);
+  assert.equal(current.estudiantes.some(a=>a.nombre==='Synthetic New Student'),true);
+});
+
+test('Closed bimesters cannot be resynchronized and their roster remains frozen',()=> {
+  const s=studentsFixture();
+  const seeded=s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'II'});
+  assert.equal(seeded.ok,true);
+  const before=s.load(s.admin,{bimestre:'II'}).estudiantes.map(a=>a.nombre);
+  const nueva=JSON.parse(JSON.stringify(s.base));
+  nueva.primaria.estudiantes.push({nivel:'primaria',grado:1,seccion:'Única',orden:99,nombre:'Should Not Enter Closed Roster'});
+  const res=s.post({action:'syncstudents',token:s.admin,version:s.init.version,bimestre:'II',base:nueva});
+  assert.equal(res.ok,false);assert.equal(res.code,'PERIOD_CLOSED');
+  assert.deepEqual(s.load(s.admin,{bimestre:'II'}).estudiantes.map(a=>a.nombre),before);
+  assert.equal(s.load(s.admin).estudiantes.some(a=>a.nombre==='Should Not Enter Closed Roster'),false);
+  const open=s.post({action:'syncstudents',token:s.admin,version:s.init.version,bimestre:'I',base:nueva});
+  assert.equal(open.ok,true);
+  assert.equal(s.load(s.admin).estudiantes.some(a=>a.nombre==='Should Not Enter Closed Roster'),true);
+  assert.deepEqual(s.load(s.admin,{bimestre:'II'}).estudiantes.map(a=>a.nombre),before,'BASE_ACTUAL updates must not change the closed roster');
+});
+
+test('A bimestre without its own roster reports fallback explicitly instead of pretending it is frozen',()=> {
+  const s=studentsFixture();
+  const res=s.load(s.admin,{bimestre:'IV'});
+  assert.equal(res.ok,true);assert.equal(res.padronInicializado,false);
+  assert.equal(res.fuentePadron,'actual');assert.equal(res.bimestre,'IV');
+  assert.equal(res.estudiantes.length,7);
+});
+
+
+test('Official matrix identities enrich current base and the selected bimonthly roster without changing membership',()=> {
+  const s=studentsFixture();
+  const seeded=s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'I'});
+  assert.equal(seeded.ok,true);
+  const before=s.load(s.admin,{bimestre:'I'}).estudiantes.map(a=>a.nombre);
+  const res=s.post({
+    action:'enrichstudents',token:s.admin,version:s.init.version,bimestre:'I',
+    nivel:'primaria',grado:1,seccion:'Única',
+    identidades:[{nombre:'Synthetic Student 0',idSiagie:'25084489',codigoEstudiante:'00000062165159'}]
+  });
+  assert.equal(res.ok,true);assert.equal(res.enriquecidosBase,1);assert.equal(res.enriquecidosPadron,1);
+  const current=s.load(s.admin);
+  const alumno=current.estudiantes.find(a=>a.nombre==='Synthetic Student 0');
+  assert.equal(alumno.idSiagie,'25084489');assert.equal(alumno.codigoEstudiante,'00000062165159');
+  assert.deepEqual(s.load(s.admin,{bimestre:'I'}).estudiantes.map(a=>a.nombre),before);
+  assert.equal(s.load(s.admin,{bimestre:'I'}).estudiantes[0].idSiagie,'25084489');
+});
+
+test('Student save/load preserves SIAGIE ID, student code and enrollment status when supplied',()=> {
+  const s=studentsFixture();
+  s.base.primaria.estudiantes[0].idSiagie='25084489';
+  s.base.primaria.estudiantes[0].codigoEstudiante='00000062165159';
+  s.base.primaria.estudiantes[0].estadoMatricula='DEFINITIVA';
+  const saved=s.post({action:'savestudents',token:s.admin,base:s.base,version:s.init.version});
+  assert.equal(saved.ok,true);
+  const al=s.load(s.admin).estudiantes.find(a=>a.nombre==='Synthetic Student 0');
+  assert.equal(al.idSiagie,'25084489');assert.equal(al.codigoEstudiante,'00000062165159');assert.equal(al.estadoMatricula,'DEFINITIVA');
 });

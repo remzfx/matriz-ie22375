@@ -142,6 +142,7 @@
   }
 </style>
   <script src="students.js"></script>
+<script src="student-identity.js"></script>
 </head>
 <body class="min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['primaria','secundaria','admin'];</script>
@@ -222,7 +223,7 @@
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <div>
             <label class="text-[10px] font-bold text-slate-500">Bimestre</label>
-            <select id="selBim" onchange="onContexto()"></select>
+            <select id="selBim" onchange="cambiarBimestreRegistro()"></select>
           </div>
           <div>
             <label class="text-[10px] font-bold text-slate-500">Grado</label>
@@ -522,6 +523,7 @@ function loadStore() {
   if (!store.finales) store.finales = {};
   if (!store.concArea) store.concArea = {};
   if (!store.capsSel) store.capsSel = {};
+  if (!store.studentAliases) store.studentAliases = {};
 }
 function saveStore() {
   store._ts = Date.now();
@@ -570,7 +572,7 @@ function sliceRegistroArea() {
     concArea: concArea,
     asistencia: asistencia,
     capsSel: store.capsSel || {},
-    meta: (store.meta && store.meta[cloudClaveReg()]) || {}
+    meta: metaRegistro()
   };
 }
 function tsDe(obj) {
@@ -609,7 +611,13 @@ function mergeRegistroPayload(p) {
     store.asistencia[k] = p.asistencia[k];
     n++;
   });
-  if (p.meta) store.meta[cloudClaveReg()] = Object.assign({}, store.meta[cloudClaveReg()] || {}, p.meta);
+  if (p.meta && typeof p.meta === 'object') {
+    const aliases = aliasesAula();
+    Object.entries(p.meta.studentAliases || {}).forEach(([id,nombres]) => {
+      if (Array.isArray(nombres)) aliases[id] = [...new Set([...(aliases[id] || []), ...nombres.filter(n => typeof n === 'string')])];
+    });
+    store.meta[cloudClaveReg()] = Object.assign({}, metaRegistro(), p.meta, {studentAliases: aliases});
+  }
   if (p.capsSel) {
     store.capsSel = Object.assign({}, store.capsSel || {}, p.capsSel);
     n++;
@@ -618,7 +626,7 @@ function mergeRegistroPayload(p) {
 }
 async function subirRegistroNube() {
   if (!nivel || !areaActual) { toast('Elija área primero'); return; }
-  guardarTodo();
+  if (guardarTodo() === false) { toast('Espera a que cargue el padrón del bimestre.'); return; }
   toast('Guardado local. Subiendo a la nube…');
   const c = ctxBase();
   const payload = sliceRegistroArea();
@@ -668,8 +676,8 @@ async function bajarRegistroNube() {
     notas = {};
     if (sesionActiva) {
       estudiantes().forEach(al => {
-        const k = gradeKey(al.nombre);
-        if (k && store.grades[k]) notas[al.nombre] = JSON.parse(JSON.stringify(store.grades[k]));
+        const k = gradeKey(studentKey(al));
+        if (k && leerNota(store.grades, k)) notas[studentKey(al)] = JSON.parse(JSON.stringify(leerNota(store.grades, k)));
       });
     }
     try { renderSesiones(); } catch (e) {}
@@ -734,10 +742,78 @@ function ctxBase() {
   };
 }
 
+
+function alumnoIdentidad(value) {
+  if (value && typeof value === 'object') return value;
+  const alumnos = estudiantes();
+  const exacto = alumnos.find(al => studentKey(al) === value);
+  if (exacto) return exacto;
+  const matches = alumnos.filter(al => IEStudentIdentity.normalizarNombre(al.nombre) === IEStudentIdentity.normalizarNombre(value));
+  return matches.length === 1 ? matches[0] : null;
+}
+function identidadAlumno(value) {
+  const al = alumnoIdentidad(value);
+  return al ? studentKey(al) : value;
+}
+function aliasesAula() {
+  const c = ctxBase(), key = [c.nivel,c.grado,c.seccion].join('||');
+  store.studentAliases = store.studentAliases || {};
+  return store.studentAliases[key] || (store.studentAliases[key] = {});
+}
+function recordarPadron(base) {
+  ['primaria','secundaria'].forEach(n => ((base[n] || {}).estudiantes || []).forEach(al => {
+    const key = [n,al.grado,al.seccion].join('||');
+    store.studentAliases = store.studentAliases || {};
+    IEStudentIdentity.recordar(store.studentAliases[key] || (store.studentAliases[key] = {}), al);
+  }));
+}
+function leerNota(mapa, key) {
+  if (!key) return undefined;
+  const tail = key.slice(key.lastIndexOf('||') + 2), al = alumnoIdentidad(tail);
+  if (!al) return undefined;
+  const homonimos = estudiantes().filter(a => IEStudentIdentity.normalizarNombre(a.nombre) === IEStudentIdentity.normalizarNombre(al.nombre));
+  return IEStudentIdentity.leer(mapa, key, al, aliasesAula(), homonimos.length === 1);
+}
+function metaRegistro() {
+  const old = store.meta[cloudClaveReg()];
+  return Object.assign({}, typeof old === 'object' ? old : {docente: old || ''}, {studentAliases: aliasesAula()});
+}
+let padronBimestre = '', solicitudPadron = 0;
+async function cargarPadronRegistro(bimestre) {
+  const solicitud = ++solicitudPadron;
+  cargandoEstudiantes = true;
+  recordarPadron(bdEstudiantes);
+  bdEstudiantes = IEStudents.empty();
+  sesionActiva = null; notas = {};
+  ['finLista','avanceBox','asisLista'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+  renderStudents();
+  try {
+    const base = await IEStudents.loadRoster(bimestre);
+    if (solicitud !== solicitudPadron) return false;
+    bdEstudiantes = base; padronBimestre = bimestre;
+    recordarPadron(base); saveStore();
+    if (base.offline) alert('Sin conexión: padrón temporal de esta sesión; no valida producción.');
+    else if (!base.padronInicializado) toast('Padrón pendiente: el servidor entregó la base actual autorizada.');
+    return true;
+  } catch(e) {
+    if (solicitud === solicitudPadron) { padronBimestre = ''; alert(e.message); }
+    return false;
+  } finally {
+    if (solicitud === solicitudPadron) cargandoEstudiantes = false;
+  }
+}
+async function cambiarBimestreRegistro() {
+  const sel = document.getElementById('selBim'), solicitado = sel.value;
+  if (padronBimestre && !cargandoEstudiantes) {
+    sel.value = padronBimestre; guardarTodo(); sel.value = solicitado;
+  }
+  if (await cargarPadronRegistro(solicitado)) { llenarAulasPadron(nivel); onContexto(); }
+}
+
 function gradeKey(nombre) {
   if (!sesionActiva) return null;
   const c = ctxBase();
-  return [c.nivel, c.bim, c.grado, c.seccion, c.area, sesionActiva.comp, sesionActiva.capacidad, sesionActiva.fecha, nombre].join('||');
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area, sesionActiva.comp, sesionActiva.capacidad, sesionActiva.fecha, identidadAlumno(nombre)].join('||');
 }
 
 function sessionId(s) {
@@ -943,22 +1019,6 @@ function aplicarDocenteSesion() {
 }
 
 async function entrarNivel(n) {
-  if (cargandoEstudiantes) return;
-  cargandoEstudiantes = true;
-  const origen = typeof event !== 'undefined' && event.currentTarget;
-  if (origen && 'disabled' in origen) origen.disabled = true;
-  try {
-    bdEstudiantes = await IEStudents.load();
-    if (bdEstudiantes.offline) alert('Sin conexión: lista temporal de esta sesión (máximo 10 minutos).');
-  } catch(e) {
-    bdEstudiantes = IEStudents.empty();
-    if (nivel) renderStudents();
-    alert(e.message);
-    return;
-  } finally {
-    cargandoEstudiantes = false;
-    if (origen && 'disabled' in origen) origen.disabled = false;
-  }
   // Bloquear cruce de nivel si la sesión no lo permite
   var perm = nivelPermitido();
   if (perm === 'primaria' && n !== 'primaria') {
@@ -977,27 +1037,10 @@ async function entrarNivel(n) {
   document.getElementById('viewApp').classList.remove('hidden');
 
   // Lista obtenida del backend para el alcance de esta sesión.
+  try { await sincronizarPeriodosNube(); } catch(e) { console.warn('Periodos sin conexión'); }
   pintarBimestresRegistro(loadPeriodosAdmin());
-
-  const bd = loadBD();
-  const list = (bd[n] && bd[n].estudiantes) || [];
-  let grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
-
-  const gp = gradosPermitidos();
-  if (gp && gp.length) grados = grados.filter(g => gp.includes(g));
-
-  const apAulas = aulasPermitidas();
-  if (apAulas && apAulas.length) {
-    const gs = new Set(apAulas.map(a => parseInt(String(a).split('|')[0],10)));
-    grados = grados.filter(g => gs.has(Number(g)));
-  }
-
-  const selGrado = document.getElementById('selGrado');
-  selGrado.innerHTML = grados.map(g => `<option value="${g}">${g}°</option>`).join('');
-
-  if (!grados.length) {
-    alert('No hay grados/secciones asignados a su usuario. Contacte al administrador.');
-  }
+  if (!await cargarPadronRegistro(document.getElementById('selBim').value)) return;
+  llenarAulasPadron(n);
 
   document.getElementById('inpFecha').value = hoyISO();
 
@@ -1035,7 +1078,7 @@ async function entrarNivel(n) {
   sincronizarPeriodosNube().then(function() {
     const cambio = pintarBimestresRegistro(loadPeriodosAdmin());
     if (cambio) {
-      onContexto();
+      cambiarBimestreRegistro();
     } else {
       updateHdr();
     }
@@ -1044,6 +1087,34 @@ async function entrarNivel(n) {
   });
 }
 
+function llenarAulasPadron(n) {
+  const anteriorGrado = document.getElementById('selGrado').value;
+  const anteriorSeccion = document.getElementById('selSeccion').value;
+  const bd = loadBD();
+  const list = (bd[n] && bd[n].estudiantes) || [];
+  let grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
+
+  const gp = gradosPermitidos();
+  if (gp && gp.length) grados = grados.filter(g => gp.includes(g));
+
+  const apAulas = aulasPermitidas();
+  if (apAulas && apAulas.length) {
+    const gs = new Set(apAulas.map(a => parseInt(String(a).split('|')[0],10)));
+    grados = grados.filter(g => gs.has(Number(g)));
+  }
+
+  const selGrado = document.getElementById('selGrado');
+  selGrado.innerHTML = grados.map(g => `<option value="${g}">${g}°</option>`).join('');
+
+  if (!grados.length) {
+    alert('No hay grados/secciones asignados a su usuario. Contacte al administrador.');
+  }
+
+  if (grados.some(g => String(g) === anteriorGrado)) selGrado.value = anteriorGrado;
+  onGrado();
+  const lista = ((loadBD()[nivel] || {}).estudiantes || []);
+  if (lista.some(a => String(a.grado) === selGrado.value && a.seccion === anteriorSeccion)) document.getElementById('selSeccion').value = anteriorSeccion;
+}
 function onGrado() {
   const bd = loadBD();
   const g = parseInt(document.getElementById('selGrado').value, 10);
@@ -1063,6 +1134,8 @@ function onGrado() {
 }
 
 function onContexto() {
+  if (cargandoEstudiantes) return;
+  if (document.getElementById('selBim').value !== padronBimestre) { cambiarBimestreRegistro(); return; }
   const permitidasAhora = areas();
   if (!areaActual || !permitidasAhora.includes(areaActual)) {
     areaActual = permitidasAhora[0] || null;
@@ -1076,7 +1149,7 @@ function onContexto() {
   if (s && s.role === 'docente' && s.label) {
     document.getElementById('inpDocente').value = s.label;
   } else {
-    document.getElementById('inpDocente').value = (store.meta && store.meta[mk]) || '';
+    document.getElementById('inpDocente').value = ((store.meta[mk] && typeof store.meta[mk] === 'object') ? store.meta[mk].docente : store.meta[mk]) || '';
   }
   aplicarDocenteSesion();
   // Al cambiar contexto: limpiar capacidad (fecha la elige el docente)
@@ -1102,7 +1175,7 @@ function onContexto() {
 function guardarMeta() {
   const c = ctxBase();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
-  store.meta[mk] = document.getElementById('inpDocente').value.trim();
+  store.meta[mk] = Object.assign({}, metaRegistro(), {docente: document.getElementById('inpDocente').value.trim()});
   saveStore();
 }
 
@@ -1283,7 +1356,7 @@ function recolectarPantalla() {
     if (n !== '') n = Math.round(n);
     upsertSesionCap(comp, cap);
     const k = capKeyHoy(comp, cap, nombre);
-    if (n === '') delete store.grades[k];
+    if (n === '') store.grades[k] = {borrado:true,ts:Date.now()};
     else store.grades[k] = { nota20: n, nivel: numToLetter(n), ts: Date.now() };
   });
   document.querySelectorAll('#finLista [data-fin][data-comp]').forEach(cell => {
@@ -1293,7 +1366,7 @@ function recolectarPantalla() {
     const cp = decodeURIComponent(cell.dataset.comp);
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(cp, nombre);
-    if (nraw === '' || isNaN(nraw)) { delete store.finales[k]; return; }
+    if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
     store.finales[k] = { nota20: n, nivel: numToLetter(n), ts: Date.now() };
   });
@@ -1303,7 +1376,7 @@ function recolectarPantalla() {
     if (!nom) return;
     const t = el.value.trim();
     const k = concAreaKey(nom);
-    if (!t) delete store.concArea[k];
+    if (!t) store.concArea[k] = {borrado: true, ts: Date.now()};
     else store.concArea[k] = { texto: t, ts: Date.now() };
   });
   if (typeof guardarAsistencia === 'function') {
@@ -1311,6 +1384,7 @@ function recolectarPantalla() {
   }
 }
 function guardarTodo() {
+  if (cargandoEstudiantes || !padronBimestre || document.getElementById('selBim').value !== padronBimestre) return false;
   recolectarPantalla();
   if (sesionActiva) {
     Object.keys(notas).forEach(nombre => {
@@ -1509,7 +1583,7 @@ function colsCalificar() {
 function capKeyHoy(comp, cap, nombre) {
   const c = ctxBase();
   const fecha = document.getElementById('inpFecha').value || hoyISO();
-  return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, cap, fecha, nombre].join('||');
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, cap, fecha, identidadAlumno(nombre)].join('||');
 }
 function upsertSesionCap(comp, cap) {
   const c = ctxBase();
@@ -1557,12 +1631,12 @@ function renderStudents() {
   const rows = list.map((al, i) => {
     let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
     cols.forEach(col => {
-      const k = capKeyHoy(col.comp, col.cap, al.nombre);
-      const g = store.grades[k] || {};
+      const k = capKeyHoy(col.comp, col.cap, studentKey(al));
+      const g = leerNota(store.grades, k) || {};
       let nota = (g.nota20!=='' && g.nota20!=null) ? g.nota20 : '';
       let letra = g.nivel || (nota!=='' ? numToLetter(nota) : '');
       if (letra==='AD') cAD++; else if (letra==='A') cA++; else if (letra==='B') cB++; else if (letra==='C') cC++;
-      const encN = encodeURIComponent(al.nombre);
+      const encN = encodeURIComponent(studentKey(al));
       const encC = encodeURIComponent(col.cap);
       const encP = encodeURIComponent(col.comp);
       if (modoCalif === 'letra') {
@@ -1603,7 +1677,7 @@ function renderStudents() {
       if (n !== '') inp.value = pad2(n);
       upsertSesionCap(cp, cap);
       const k = capKeyHoy(cp, cap, nombre);
-      if (n === '') delete store.grades[k];
+      if (n === '') store.grades[k] = {borrado:true,ts:Date.now()};
       else store.grades[k] = { nota20: n, nivel: letra, ts: Date.now() };
       saveStore();
     });
@@ -1622,7 +1696,7 @@ function renderStudents() {
       const n = letra ? letterToNum(letra) : '';
       upsertSesionCap(cp, cap);
       const k = capKeyHoy(cp, cap, nombre);
-      if (!letra) delete store.grades[k];
+      if (!letra) store.grades[k] = {borrado:true,ts:Date.now()};
       else store.grades[k] = { nota20: n, nivel: letra, ts: Date.now() };
       saveStore();
       renderStudents();
@@ -1651,9 +1725,9 @@ function validarConclusionesOficial(c, alumnos, sess) {
   const comps = competencias();
   const faltan = [];
   alumnos.forEach(al => {
-    const g = promGeneralAlumno(al.nombre, comps);
+    const g = promGeneralAlumno(studentKey(al), comps);
     if (!requiereConclusion(g.letra)) return;
-    const txt = ((store.concArea||{})[concAreaKey(al.nombre)]||{}).texto || '';
+    const txt = (leerNota(store.concArea, concAreaKey(studentKey(al)))||{}).texto || '';
     if (!txt.trim()) faltan.push(al.nombre + ' · Promedio ' + g.prom + ' (' + g.letra + ')');
   });
   return faltan;
@@ -1702,14 +1776,14 @@ function informeSiagie() {
   alumnos.forEach((al, i) => {
     const row = { n: i+1, nombre: al.nombre, letras: {}, prom:'', letra:'', conc:'' };
     comps.forEach(cp => {
-      const d = notaCompAlumno(cp, al.nombre);
+      const d = notaCompAlumno(cp, studentKey(al));
       row.letras[cp] = d.letra || '';
       if (!d.letra) faltanNota.push(al.nombre + ' · ' + cp);
     });
-    const g = promGeneralAlumno(al.nombre, comps);
+    const g = promGeneralAlumno(studentKey(al), comps);
     row.prom = g.prom;
     row.letra = g.letra;
-    row.conc = ((store.concArea||{})[concAreaKey(al.nombre)]||{}).texto || '';
+    row.conc = (leerNota(store.concArea, concAreaKey(studentKey(al)))||{}).texto || '';
     if (requiereConclusion(g.letra) && !row.conc.trim()) {
       faltanConc.push(al.nombre + ' · Prom. ' + (g.prom||'—') + ' (' + g.letra + ')');
     }
@@ -1776,8 +1850,8 @@ function areaDeHojaSiagie(name) {
 }
 function letraEnArea(area, comp, nombre) {
   const c = ctxBase();
-  const fk = [c.nivel,c.bim,c.grado,c.seccion,area,comp,nombre].join('||');
-  const f = (store.finales||{})[fk];
+  const fk = [c.nivel,c.bim,c.grado,c.seccion,area,comp, identidadAlumno(nombre)].join('||');
+  const f = leerNota(store.finales, fk);
   if (f) {
     const nota = (f.nota20!=='' && f.nota20!=null && !isNaN(Number(f.nota20))) ? Number(f.nota20) : '';
     const letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
@@ -1789,8 +1863,8 @@ function letraEnArea(area, comp, nombre) {
   );
   const nums = [];
   sess.forEach(s => {
-    const gk = [c.nivel,c.bim,c.grado,c.seccion,area,s.comp,s.capacidad,s.fecha,nombre].join('||');
-    const g = store.grades[gk];
+    const gk = [c.nivel,c.bim,c.grado,c.seccion,area,s.comp,s.capacidad,s.fecha, identidadAlumno(nombre)].join('||');
+    const g = leerNota(store.grades, gk);
     if (!g) return;
     if (g.nota20!=='' && g.nota20!=null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
     else if (g.nivel) { const m = letterToNum(g.nivel); if (m!=='') nums.push(Number(m)); }
@@ -1800,8 +1874,8 @@ function letraEnArea(area, comp, nombre) {
 }
 function concEnArea(area, nombre) {
   const c = ctxBase();
-  const k = [c.nivel,c.bim,c.grado,c.seccion,area,nombre].join('||');
-  return (((store.concArea||{})[k]||{}).texto || '').trim();
+  const k = [c.nivel,c.bim,c.grado,c.seccion,area, identidadAlumno(nombre)].join('||');
+  return ((leerNota(store.concArea, k)||{}).texto || '').trim();
 }
 function compsDeArea(area) {
   const est = estructura();
@@ -1850,13 +1924,20 @@ async function rellenarSiagieExcel() {
     const useComps = map.only == null ? comps : [comps[map.only]].filter(Boolean);
     if (!useComps.length) return;
     hojas++;
-    const idxNom = {};
-    estudiantes().forEach(al => { idxNom[normNomSiagie(al.nombre)] = al.nombre; });
+    const idxNom = {}, idxId = {}, idxCod = {};
+    estudiantes().forEach(al => {
+      const nom = normNomSiagie(al.nombre);
+      idxNom[nom] = Object.hasOwn(idxNom,nom) ? null : studentKey(al);
+      if (al.idSiagie) idxId[String(al.idSiagie).trim()] = studentKey(al);
+      if (al.codigoEstudiante) idxCod[String(al.codigoEstudiante).trim()] = studentKey(al);
+    });
     for (let r = range.s.r + 2; r <= range.e.r; r++) {
       const cellNom = ws[XLSX.utils.encode_cell({r:r, c:2})];
       const nomX = cellNom ? cellNom.v : '';
       const key = normNomSiagie(nomX);
-      const nombre = idxNom[key];
+      const idX = String((ws[XLSX.utils.encode_cell({r:r,c:0})] || {}).v || '').trim();
+      const codX = String((ws[XLSX.utils.encode_cell({r:r,c:1})] || {}).v || '').trim();
+      const nombre = (idX && idxId[idX]) || (codX && idxCod[codX]) || idxNom[key];
       if (!nombre) { if (nomX) sinMatch++; continue; }
       useComps.forEach((cp, i) => {
         const letra = letraEnArea(map.area, cp, nombre);
@@ -1957,8 +2038,8 @@ function prepararImpresion() {
     alumnos.forEach(al => {
       const ns = [];
       evidencias.forEach(s => {
-        const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,al.nombre].join('||');
-        const g = store.grades[k];
+        const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha, studentKey(al)].join('||');
+        const g = leerNota(store.grades, k);
         if (!g) return;
         if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) ns.push(Number(g.nota20));
         else if (g.nivel) { const m = letterToNum(g.nivel); if (m!=='') ns.push(Number(m)); }
@@ -1999,8 +2080,8 @@ function prepararImpresion() {
       const vals = [];
       let cells = '';
       evidencias.forEach(s => {
-        const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,al.nombre].join('||');
-        const g = store.grades[k];
+        const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha, studentKey(al)].join('||');
+        const g = leerNota(store.grades, k);
         let show = '';
         if (g) {
           if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) {
@@ -2097,14 +2178,14 @@ function showPanel(which) {
 
 function finalKey(comp, nombre) {
   const c = ctxBase();
-  return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, nombre].join('||');
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, identidadAlumno(nombre)].join('||');
 }
 function concAreaKey(nombre) {
   const c = ctxBase();
-  return [c.nivel, c.bim, c.grado, c.seccion, c.area, nombre].join('||');
+  return [c.nivel, c.bim, c.grado, c.seccion, c.area, identidadAlumno(nombre)].join('||');
 }
 function notaDirectaAlumno(comp, nombre) {
-  const f = store.finales[finalKey(comp, nombre)];
+  const f = leerNota(store.finales, finalKey(comp, nombre));
   if (!f) return { nota:'', letra:'' };
   const nota = (f.nota20!=='' && f.nota20!=null && !isNaN(Number(f.nota20))) ? Number(f.nota20) : '';
   const letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
@@ -2131,7 +2212,7 @@ function bimCerradoDocente() {
   const bim = document.getElementById('selBim').value;
   const sL = getLoginSession();
   const esAdmin = sL && (sL.role === 'admin' || sL.user === 'admin');
-  return !bimestreHabilitado(bim) && !esAdmin;
+  return cargandoEstudiantes || !padronBimestre || bim !== padronBimestre || (!bimestreHabilitado(bim) && !esAdmin);
 }
 
 function capsDeComp(comp) {
@@ -2156,8 +2237,8 @@ function notaDesdeSesiones(comp, nombre) {
   );
   const nums = [];
   sess.forEach(s => {
-    const gk = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,nombre].join('||');
-    const g = store.grades[gk];
+    const gk = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha, identidadAlumno(nombre)].join('||');
+    const g = leerNota(store.grades, gk);
     if (!g) return;
     if (g.nota20!=='' && g.nota20!=null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
     else if (g.nivel) { const m = letterToNum(g.nivel); if (m!=='') nums.push(Number(m)); }
@@ -2199,15 +2280,15 @@ function renderFinales() {
     let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
     comps.forEach(cp => {
       const lock = bloqueado;
-      const dir = notaDirectaAlumno(cp, al.nombre);
-      const ev = notaDesdeSesiones(cp, al.nombre);
-      const ofi = notaCompAlumno(cp, al.nombre);
+      const dir = notaDirectaAlumno(cp, studentKey(al));
+      const ev = notaDesdeSesiones(cp, studentKey(al));
+      const ofi = notaCompAlumno(cp, studentKey(al));
       let nota='', letra='';
       if (dir.nota !== '' && dir.nota != null) { nota = dir.nota; letra = dir.letra; }
       if (ofi.letra==='AD') cAD++; else if (ofi.letra==='A') cA++; else if (ofi.letra==='B') cB++; else if (ofi.letra==='C') cC++;
       if (ofi.letra) cV++;
       cTot++;
-      const encN = encodeURIComponent(al.nombre);
+      const encN = encodeURIComponent(studentKey(al));
       const encC = encodeURIComponent(cp);
       if (modoCalif === 'letra') {
         const L = letra || ofi.letra || '';
@@ -2251,7 +2332,7 @@ function renderFinales() {
       }
       if (n !== '') inp.value = pad2(n);
       const k = finalKey(comp, nombre);
-      if (n === '') delete store.finales[k];
+      if (n === '') store.finales[k] = {borrado: true, ts: Date.now()};
       else store.finales[k] = { nota20: n, nivel: letra, ts: Date.now() };
       saveStore();
     });
@@ -2267,7 +2348,7 @@ function renderFinales() {
       const mismo = btn.classList.contains('on');
       const letra = mismo ? '' : val;
       const k = finalKey(comp, nombre);
-      if (!letra) delete store.finales[k];
+      if (!letra) store.finales[k] = {borrado: true, ts: Date.now()};
       else store.finales[k] = { nota20: letterToNum(letra), nivel: letra, ts: Date.now() };
       saveStore();
       renderFinales();
@@ -2284,7 +2365,7 @@ function guardarFinales() {
     const comp = decodeURIComponent(cell.dataset.comp);
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(comp, nombre);
-    if (nraw === '' || isNaN(nraw)) { delete store.finales[k]; return; }
+    if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
     store.finales[k] = { nota20: n, nivel: numToLetter(n), ts: Date.now() };
   });
@@ -2297,7 +2378,7 @@ function asisCtxKey() {
 }
 
 function asisMarkKey(fecha, nombre) {
-  return asisCtxKey() + '||' + fecha + '||' + nombre;
+  return asisCtxKey() + '||' + fecha + '||' + identidadAlumno(nombre);
 }
 function horaAhora() {
   const d = new Date();
@@ -2310,6 +2391,7 @@ function asisGet(rec) {
   return { marca: rec.marca || '', hora: rec.hora || '' };
 }
 function asisSet(nombre, marca) {
+  if (cargandoEstudiantes || document.getElementById('selBim').value !== padronBimestre) return;
   const k = asisMarkKey(asisFechaActiva, nombre);
   if (!marca) delete store.asistencia[k];
   else store.asistencia[k] = { marca: marca, hora: horaAhora() };
@@ -2349,7 +2431,7 @@ function compartirAsisWhatsApp() {
   let cP=0,cF=0,cT=0,cJ=0;
   const faltas = [];
   alumnos.forEach((al, i) => {
-    const rec = asisGet(store.asistencia[asisMarkKey(asisFechaActiva, al.nombre)]);
+    const rec = asisGet(leerNota(store.asistencia, asisMarkKey(asisFechaActiva, studentKey(al))));
     const m = rec.marca || '—';
     if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++;
     if (m==='F') faltas.push(al.nombre);
@@ -2424,12 +2506,12 @@ function renderAsistencia() {
   let cP=0,cF=0,cT=0,cJ=0;
   lista.innerHTML = `<div class="text-[11px] font-bold text-slate-500 mb-2">Marcando: ${asisFechaActiva}</div>` +
     alumnos.map((al, i) => {
-      const k = asisMarkKey(asisFechaActiva, al.nombre);
-      const rec = asisGet(store.asistencia[k]);
+      const k = asisMarkKey(asisFechaActiva, studentKey(al));
+      const rec = asisGet(leerNota(store.asistencia, k));
       const m = rec.marca;
       if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++;
       const horaTxt = rec.hora ? `<span class="text-[10px] text-slate-500 font-bold">${rec.hora}</span>` : '';
-      const enc = encodeURIComponent(al.nombre);
+      const enc = encodeURIComponent(studentKey(al));
       return `<div class="stu-row">
         <div class="flex gap-2 items-center">
           <div class="text-xs font-bold text-slate-400 w-6">${i+1}</div>
@@ -2454,7 +2536,7 @@ function renderAsistencia() {
     const nombre = decodeURIComponent(b.dataset.an);
     const val = b.dataset.av;
     const k = asisMarkKey(asisFechaActiva, nombre);
-    const cur = asisGet(store.asistencia[k]).marca;
+    const cur = asisGet(leerNota(store.asistencia, k)).marca;
     if (cur === val) asisSet(nombre, '');
     else asisSet(nombre, val);
     saveStore();
@@ -2501,7 +2583,7 @@ function renderAvance() {
 
   // also include comps with no data at end
   comps.forEach(comp => {
-    if (!byComp[comp] && alumnos.some(al => store.finales[finalKey(comp, al.nombre)])) {
+    if (!byComp[comp] && alumnos.some(al => leerNota(store.finales, finalKey(comp, studentKey(al))))) {
       byComp[comp] = []; // sin evidencias; se usarán finales
     }
   });
@@ -2514,8 +2596,8 @@ function renderAvance() {
     data[comp] = alumnos.map(al => {
       const nums = [];
       evidencias.forEach(s => {
-        const k = [c.nivel, c.bim, c.grado, c.seccion, c.area, s.comp, s.capacidad, s.fecha, al.nombre].join('||');
-        const g = store.grades[k];
+        const k = [c.nivel, c.bim, c.grado, c.seccion, c.area, s.comp, s.capacidad, s.fecha, studentKey(al)].join('||');
+        const g = leerNota(store.grades, k);
         if (!g) return;
         if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
         else if (g.nivel) {
@@ -2523,7 +2605,7 @@ function renderAvance() {
           if (mid !== '') nums.push(Number(mid));
         }
       });
-      const ofi = notaCompAlumno(comp, al.nombre);
+      const ofi = notaCompAlumno(comp, studentKey(al));
       return { prom: ofi.nota===''?null:Number(ofi.nota), letra: ofi.letra };
     });
     aula[comp] = {
@@ -2557,15 +2639,15 @@ function renderAvance() {
     });
     const pg = promedioNums(nums);
     const lg = pg==null?'':numToLetter(pg);
-    const ck = concAreaKey(al.nombre);
-    const txt = ((store.concArea||{})[ck]||{}).texto || '';
+    const ck = concAreaKey(studentKey(al));
+    const txt = (leerNota(store.concArea, ck)||{}).texto || '';
     const abre = requiereConclusion(lg);
     tds += '<td><div class="fin-cell">' +
       (modoCalif==='num' && pg!=null ? '<div style="font-weight:800;font-size:16px">'+pg+'</div>' : '') +
       '<span class="eq-letter '+(lg?eqClass(lg):'eq-none')+'">'+(lg||'—')+'</span></div></td>';
     tds += '<td style="min-width:160px">' +
       (abre
-        ? '<textarea class="av-conc" data-nom="'+encodeURIComponent(al.nombre)+'" placeholder="Conclusión descriptiva (obligatoria: promedio '+lg+')" style="width:100%;min-height:54px;font-size:11px;border:1.5px solid #f87171;border-radius:8px;padding:6px">'+txt.replace(/</g,'&lt;')+'</textarea>'
+        ? '<textarea class="av-conc" data-nom="'+encodeURIComponent(studentKey(al))+'" placeholder="Conclusión descriptiva (obligatoria: promedio '+lg+')" style="width:100%;min-height:54px;font-size:11px;border:1.5px solid #f87171;border-radius:8px;padding:6px">'+txt.replace(/</g,'&lt;')+'</textarea>'
         : '<div class="text-[10px] text-slate-400">'+(txt?txt.slice(0,80):'—')+'</div>') +
       '</td>';
     return '<tr>'+tds+'</tr>';
@@ -2578,7 +2660,7 @@ function renderAvance() {
       const nom = decodeURIComponent(el.dataset.nom);
       const k = concAreaKey(nom);
       const t = el.value.trim();
-      if (!t) delete store.concArea[k];
+      if (!t) store.concArea[k] = {borrado: true, ts: Date.now()};
       else store.concArea[k] = { texto: t, ts: Date.now() };
       saveStore();
     });

@@ -269,11 +269,11 @@ test('savereg: meta remains an object through save, loadreg and the unchanged cl
   assert.deepEqual(item.payload.meta, savedMeta);
 
   const store = {sessions: [], grades: {}, meta: {[response.clave]: {localField: true}}};
-  const context = vm.createContext({store, cloudClaveReg: () => response.clave});
+  const context = vm.createContext({store, aliasesAula:()=>({}),metaRegistro:()=>store.meta[response.clave], cloudClaveReg: () => response.clave});
   new vm.Script(clientFunction('registro.html', 'mergeRegistroPayload')).runInContext(context);
   context.mergeRegistroPayload(item.payload);
   assert.deepEqual(JSON.parse(JSON.stringify(store.meta[response.clave])), {
-    localField: true, ...meta, docente: 'Test Primary'
+    localField: true, ...meta, docente: 'Test Primary', studentAliases: {}
   });
   assert.equal(Object.hasOwn(store.meta[response.clave], '0'), false);
 });

@@ -43,6 +43,7 @@
   }
 </style>
   <script src="students.js"></script>
+<script src="student-identity.js"></script>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['admin'];</script>
@@ -185,7 +186,7 @@
           </div>
         </div>
         <div class="text-xs text-slate-500 mb-1" id="bdCount"></div>
-        <p class="text-[11px] text-slate-400 mb-2">Solo matrícula DEFINITIVA · los TRASLADADOS del SIAGIE no aparecen aquí.</p>
+        <p class="text-[11px] text-slate-400 mb-2">Lista SIAGIE vigente, incluidos estudiantes trasladados.</p>
         <div class="overflow-auto max-h-[60vh] border border-slate-100 rounded-xl">
           <table class="data">
             <thead><tr><th>Nº</th><th>Grado</th><th>Sección</th><th>Apellidos y nombres</th><th></th></tr></thead>
@@ -204,10 +205,42 @@
     <section id="tab-import" class="tab hidden">
       <div class="card p-4 space-y-3">
         <h2 class="font-black text-lg">Importar base oficial</h2>
+        <details class="border border-sky-200 rounded-lg p-3">
+          <summary class="font-bold cursor-pointer">Administrar base y padrones privados</summary>
+          <p class="text-sm mt-2">Usa CSV SIAGIE vigentes de ambos niveles y revisa las listas. La base privada incluye a todo estudiante que aparezca en el CSV oficial, incluso si figura como TRASLADADO. No se importa automáticamente la base antigua de 408/407 alumnos; cualquier diferencia se resuelve con SIAGIE vigente.</p>
+          <label class="block mt-2">SIAGIE Primaria <input type="file" accept=".csv,.txt" onchange="IEMigrateStudents.importar(this,'primaria')"></label>
+          <pre id="migracionPreview-primaria" class="text-xs max-h-32 overflow-auto"></pre>
+          <label class="block mt-2">SIAGIE Secundaria <input type="file" accept=".csv,.txt" onchange="IEMigrateStudents.importar(this,'secundaria')"></label>
+          <pre id="migracionPreview-secundaria" class="text-xs max-h-32 overflow-auto"></pre>
+          <label class="block my-2"><input id="migracionRevisada" type="checkbox"> Revisé ambas exportaciones SIAGIE vigentes, aulas y matrícula; autorizo estas listas como base oficial revisada.</label>
+          <div class="flex flex-wrap gap-2 mb-2">
+            <button class="btn btn-ghost text-sm" onclick="IEMigrateStudents.verificar()">Verificar backend y base privada</button>
+            <button class="btn btn-primary text-sm" onclick="IEMigrateStudents.inicializar()">Inicializar base privada desde SIAGIE revisado</button>
+          </div>
+          <div class="border border-emerald-200 bg-emerald-50 rounded-xl p-3 mt-3 space-y-2">
+            <div class="font-bold text-sm text-emerald-900">Padrón SIAGIE por bimestre</div>
+            <p class="text-xs text-emerald-900">Cada bimestre conserva su propia lista. Una actualización del padrón no modifica las notas ya guardadas: mantiene a quienes continúan, agrega los nuevos y deja de mostrar a quienes ya no aparecen en el SIAGIE de ese bimestre.</p>
+            <label class="block text-xs font-bold text-slate-600">Bimestre
+              <select id="migracionBimestre" class="mt-1">
+                <option value="I">I</option>
+                <option value="II">II</option>
+                <option value="III">III</option>
+                <option value="IV">IV</option>
+              </select>
+            </label>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn btn-ghost text-sm" onclick="IEMigrateStudents.verificarPadron()">Verificar padrón</button>
+              <button class="btn btn-ghost text-sm" onclick="IEMigrateStudents.crearPadron()">Crear padrón desde base vigente</button>
+              <button class="btn btn-ok text-sm" onclick="IEMigrateStudents.sincronizarPadron()">Actualizar base y padrón con estos CSV</button>
+            </div>
+            <p class="text-[11px] text-emerald-800">La actualización de un padrón existente solo se permite mientras ese bimestre esté abierto. Los bimestres cerrados quedan protegidos.</p>
+          </div>
+          <p id="migracionEstado" role="status" class="text-sm text-sky-800 mt-2">Los padrones se actualizan solo mediante una confirmación SIAGIE explícita. Las notas históricas se conservan.</p>
+        </details>
         <button class="btn btn-ghost text-sm" onclick="cargarEstudiantesAdmin()">Recargar base privada</button>
         <p class="text-sm text-slate-600">Acepta CSV del <b>SIAGIE</b> (listado de estudiantes) o JSON. Columnas sugeridas: <code class="bg-slate-100 px-1 rounded">nivel,grado,seccion,orden,nombre</code></p>
         <p class="text-[11px] text-amber-800 bg-amber-50 rounded-lg px-2 py-1.5 leading-snug">
-          Al importar del SIAGIE se excluyen alumnos con estado <b>TRASLADADO</b>. Solo ingresan matrículas <b>DEFINITIVA</b> (ej. 150 en el CSV → 148 activos).
+          Se incluyen todos los estudiantes del CSV SIAGIE vigente, también quienes figuren como <b>TRASLADADO</b>. Se conserva su estado de matrícula.
         </p>
         <div>
           <label class="text-[11px] font-bold text-slate-500">Nivel destino</label>
@@ -651,7 +684,8 @@ function mapSecSiagie(s) {
   if (s==='A'||s==='B'||s==='C') return s;
   return s || 'Única';
 }
-function parseCSV(text) {
+function parseCSV(text, options) {
+  const includeTransferred = !!(options && options.includeTransferred);
   const raw = text.replace(/\r/g,'');
   // Formato SIAGIE: buscar línea de cabecera con ApellidoPaterno
   let lines = raw.split('\n');
@@ -690,7 +724,7 @@ function parseCSV(text) {
     if (!nombre && (ap || ne)) nombre = (ap + ' ' + am + ', ' + ne).replace(/\s+/g,' ').trim();
     if (!nombre) continue;
     const estado = (row.estadomatricula || '').toUpperCase();
-    if (estado === 'TRASLADADO') continue; // no activos
+    if (estado === 'TRASLADADO' && !includeTransferred) continue; // flujo legado: solo activos; base privada puede incluir todo el padrón SIAGIE
     let grado = parseInt(row.grado || row.grado_num || '0', 10) || 0;
     if (!grado) grado = mapGradoSiagie(row.grado1 || row.grado || row.descgrado || '');
     if (!grado) {
@@ -702,12 +736,17 @@ function parseCSV(text) {
     const orden = parseInt(row.orden || row.ord || row.n || row.numerodeorden || row.item || '0', 10) || 0;
     const nivelRaw = (row.nivel || row.descnivel || document.getElementById('importNivel').value || 'primaria').toLowerCase();
     const nivel = nivelRaw.includes('sec') ? 'secundaria' : 'primaria';
+    const idSiagie = row.id || row.idestudiante || row.idalumno || row.codigoid || '';
+    const codigoEstudiante = row.codigoestudiante || row['cód. estudiante'] || row.codestudiante || row.codigodelestudiante || row.codigosiagie || '';
     out.push({
       nivel,
       grado,
       seccion,
       orden,
-      nombre: nombre.toUpperCase()
+      nombre: nombre.toUpperCase(),
+      idSiagie: String(idSiagie || '').trim(),
+      codigoEstudiante: String(codigoEstudiante || '').trim(),
+      estadoMatricula: estado
     });
   }
   return out.filter(x => x.grado && x.nombre);
@@ -729,7 +768,7 @@ document.getElementById('importFile')?.addEventListener('change', async (e) => {
       prev.textContent = 'JSON inválido';
     }
   } else {
-    const rows = parseCSV(text);
+    const rows = parseCSV(text, {includeTransferred:true});
     window._importCSV = rows;
     window._importJSON = null;
     prev.textContent = rows.length + ' filas detectadas.\n' + rows.slice(0,5).map(r => r.grado+'° '+r.seccion+' · '+r.nombre).join('\n');
@@ -800,13 +839,19 @@ function procesarImport() {
 
 function mergeOrReplace(nivel, rows, modo) {
   if (!estado[nivel]) estado[nivel] = { estudiantes: [], docentes: [] };
-  const clean = rows.map(r => ({
-    nivel,
-    grado: +r.grado || 0,
-    seccion: r.seccion || 'Única',
-    orden: +r.orden || 0,
-    nombre: String(r.nombre || '').toUpperCase()
-  })).filter(r => r.grado && r.nombre);
+  const clean = rows.map(r => {
+    const out = {
+      nivel,
+      grado: +r.grado || 0,
+      seccion: r.seccion || 'Única',
+      orden: +r.orden || 0,
+      nombre: String(r.nombre || '').toUpperCase()
+    };
+    if (r.idSiagie) out.idSiagie = String(r.idSiagie);
+    if (r.codigoEstudiante) out.codigoEstudiante = String(r.codigoEstudiante);
+    if (r.estadoMatricula) out.estadoMatricula = String(r.estadoMatricula);
+    return out;
+  }).filter(r => r.grado && r.nombre);
   if (!clean.length) {
     alert('No se pudo leer alumnos para ' + nivel + ' (grado o nombre vacíos).');
     return;
@@ -1032,10 +1077,10 @@ function areaDeHojaAdm(name){
   if (u.indexOf('GEST AUTO')>=0) return {area:'Competencias Transversales', only:1};
   return null;
 }
-function letraDesdePayload(p, ctx, area, comp, nombre){
+function letraDesdePayload(p, ctx, area, comp, nombre, permitirNombre = true){
   if (!p) return '';
-  const fk=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,comp,nombre].join('||');
-  const f=(p.finales||{})[fk];
+  const fk=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,comp,studentKey(nombre)].join('||');
+  const f=IEStudentIdentity.leer(p.finales, fk, nombre, (p.meta||{}).studentAliases, permitirNombre);
   if (f){
     const nota=(f.nota20!==''&&f.nota20!=null&&!isNaN(Number(f.nota20)))?Number(f.nota20):'';
     const letra=f.nivel||(nota!==''?numToLetterAdm(nota):'');
@@ -1044,8 +1089,8 @@ function letraDesdePayload(p, ctx, area, comp, nombre){
   const nums=[];
   (p.sessions||[]).forEach(s=>{
     if (!(s.area===area && s.comp===comp && String(s.bim)===String(ctx.bim))) return;
-    const gk=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,s.comp,s.capacidad,s.fecha,nombre].join('||');
-    const g=(p.grades||{})[gk];
+    const gk=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,s.comp,s.capacidad,s.fecha,studentKey(nombre)].join('||');
+    const g=IEStudentIdentity.leer(p.grades, gk, nombre, (p.meta||{}).studentAliases, permitirNombre);
     if (!g) return;
     if (g.nota20!==''&&g.nota20!=null&&!isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
     else if (g.nivel){ const m=letterToNumAdm(g.nivel); if(m!=='') nums.push(Number(m)); }
@@ -1053,9 +1098,9 @@ function letraDesdePayload(p, ctx, area, comp, nombre){
   const pr=promedioAdm(nums);
   return pr==null?'':numToLetterAdm(pr);
 }
-function concDesdePayload(p, ctx, area, nombre){
-  const k=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,nombre].join('||');
-  return ((((p||{}).concArea)||{})[k]||{}).texto||'';
+function concDesdePayload(p, ctx, area, nombre, permitirNombre = true){
+  const k=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,studentKey(nombre)].join('||');
+  return (IEStudentIdentity.leer((p||{}).concArea, k, nombre, ((p||{}).meta||{}).studentAliases, permitirNombre)||{}).texto||'';
 }
 async function fetchRegAula(ctx){
   const r=await fetchLecturaNube(CLOUD_API_URL+'?action=loadreg&nivel='+encodeURIComponent(ctx.nivel)+'&t='+Date.now());
@@ -1111,6 +1156,37 @@ async function renderAulasSiagie(){
     '</div>';
   }).join('');
 }
+function extraerIdentidadesMatrizSiagie(buf){
+  if(typeof XLSX==='undefined') return [];
+  const wb=XLSX.read(buf,{type:'array',cellDates:true});
+  for(const sn of wb.SheetNames){
+    const ws=wb.Sheets[sn];
+    if(!ws||!ws['!ref']) continue;
+    const a1=String((ws.A1||{}).v||'').trim().toUpperCase();
+    const b1=String((ws.B1||{}).v||'').trim().toUpperCase();
+    const c1=String((ws.C1||{}).v||'').trim().toUpperCase();
+    if(a1!=='ID'||b1.indexOf('ESTUDIANTE')<0||c1!=='NOMBRES') continue;
+    const range=XLSX.utils.decode_range(ws['!ref']), out=[];
+    for(let r=2;r<=range.e.r;r++){
+      const id=String(((ws[XLSX.utils.encode_cell({r,c:0})]||{}).v)||'').trim();
+      const codigo=String(((ws[XLSX.utils.encode_cell({r,c:1})]||{}).v)||'').trim();
+      const nombre=String(((ws[XLSX.utils.encode_cell({r,c:2})]||{}).v)||'').trim();
+      if(!nombre||(!id&&!codigo)) continue;
+      out.push({idSiagie:id,codigoEstudiante:codigo,nombre});
+    }
+    if(out.length) return out;
+  }
+  return [];
+}
+
+async function enriquecerIdentidadesDesdeMatriz(buf,nivel,bim,grado,seccion){
+  const identidades=extraerIdentidadesMatrizSiagie(buf);
+  if(!identidades.length) return {enriquecidosBase:0,enriquecidosPadron:0};
+  const actual=await IEStudents.load();
+  if(actual.offline||!actual.inicializada) throw new Error('No se pudo verificar la base privada para asociar los ID SIAGIE.');
+  return IEStudents.enrich(actual.version,bim,nivel,grado,seccion,identidades);
+}
+
 async function subirPlantillaAula(grado, seccion, inputId){
   const inp=document.getElementById(inputId);
   const msg=document.getElementById('msg_'+inputId);
@@ -1125,7 +1201,11 @@ async function subirPlantillaAula(grado, seccion, inputId){
   try{
     const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'savetpl',token:tokenSesionAdmin(),nivel,bimestre:bim,grado,seccion,filename:inp.files[0].name,b64:btoa(bin),ts:Date.now()})});
     const data=JSON.parse(await res.text());
-    if(msg) msg.textContent=data.ok?('Guardado: '+inp.files[0].name):(data.error||'Error');
+    if(!data.ok){ if(msg) msg.textContent=data.error||'Error'; return; }
+    let ids={enriquecidosBase:0,enriquecidosPadron:0};
+    try{ ids=await enriquecerIdentidadesDesdeMatriz(buf,nivel,bim,grado,seccion); }
+    catch(e){ if(msg) msg.textContent='Plantilla guardada, pero faltó asociar ID SIAGIE: '+e.message; renderAulasSiagie(); return; }
+    if(msg) msg.textContent='Guardado: '+inp.files[0].name+' · ID SIAGIE asociados: '+Math.max(ids.enriquecidosBase||0,ids.enriquecidosPadron||0);
     renderAulasSiagie();
   }catch(e){ if(msg) msg.textContent='No se pudo sincronizar con la nube. Verifique la conexión e intente nuevamente.'; }
 }
@@ -1189,8 +1269,17 @@ async function vaciarSiagieOficial(){
   }catch(e){ alert('No se pudo bajar la plantilla. Verifique la conexión e intente nuevamente.'); return; }
   const by={};
   items.forEach(it=>{ by[it.area]=it.payload||{}; });
-  const alumnos=(estudiantesDe(ctx.nivel)||[]).filter(a=>String(a.grado)===String(ctx.grado)&&String(a.seccion)===String(ctx.seccion));
-  const idx={}; alumnos.forEach(al=>{ idx[normNomAdm(al.nombre)]=al.nombre; });
+  let padron;
+  try { padron=await IEStudents.loadRoster(ctx.bim); } catch(e) { alert(e.message); return; }
+  if(padron.offline){alert('Exportación SIAGIE requiere el padrón del servidor con conexión.');return;}
+  const alumnos=((padron[ctx.nivel]||{}).estudiantes||[]).filter(a=>String(a.grado)===String(ctx.grado)&&String(a.seccion)===String(ctx.seccion));
+  const idxNom={},idxId={},idxCod={};
+  alumnos.forEach(al=>{
+    const nom=normNomAdm(al.nombre);
+    idxNom[nom]=Object.hasOwn(idxNom,nom)?null:al;
+    if(al.idSiagie) idxId[String(al.idSiagie).trim()]=al;
+    if(al.codigoEstudiante) idxCod[String(al.codigoEstudiante).trim()]=al;
+  });
   const wb=XLSX.read(buf,{type:'array',cellDates:true});
   let escritos=0;
   wb.SheetNames.forEach(sn=>{
@@ -1203,18 +1292,23 @@ async function vaciarSiagieOficial(){
     const use=map.only==null?comps:[comps[map.only]].filter(Boolean);
     const p=by[map.area];
     for(let r=range.s.r+2;r<=range.e.r;r++){
+      const cellId=ws[XLSX.utils.encode_cell({r:r,c:0})];
+      const cellCod=ws[XLSX.utils.encode_cell({r:r,c:1})];
       const cell=ws[XLSX.utils.encode_cell({r:r,c:2})];
+      const idX=cellId?String(cellId.v||'').trim():'';
+      const codX=cellCod?String(cellCod.v||'').trim():'';
       const nomX=cell?cell.v:'';
-      const nombre=idx[normNomAdm(nomX)];
+      const nombre=(idX&&idxId[idX])||(codX&&idxCod[codX])||idxNom[normNomAdm(nomX)];
       if(!nombre) continue;
       use.forEach((cp,i)=>{
-        const letra=letraDesdePayload(p,ctx,map.area,cp,nombre);
+        const permitirNombre=alumnos.filter(a=>normNomAdm(a.nombre)===normNomAdm(nombre.nombre)).length===1;
+        const letra=letraDesdePayload(p,ctx,map.area,cp,nombre,permitirNombre);
         if(!letra) return;
         ws[XLSX.utils.encode_cell({r:r,c:3+i*2})]={t:'s',v:letra};
         escritos++;
         const need=ctx.nivel==='primaria'?(letra==='B'||letra==='C'):(letra==='C');
         if(need){
-          const txt=concDesdePayload(p,ctx,map.area,nombre);
+          const txt=concDesdePayload(p,ctx,map.area,nombre,permitirNombre);
           if(txt) ws[XLSX.utils.encode_cell({r:r,c:4+i*2})]={t:'s',v:txt};
         }
       });

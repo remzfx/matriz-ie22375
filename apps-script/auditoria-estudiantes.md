@@ -1,36 +1,42 @@
-# Estudiantes privados: rollout en dos PR
+# Etapa B: consumidores privados y padrones por bimestre
 
-## Fuentes y discrepancia (sin resolución automática)
+El PR #35 integra `main` con los PR #36, #37 y #38. Conserva sin cambios `apps-script/Codigo.js`: estudiantes trasladados, punteros privados `BASE_ACTUAL`, `BASE_OFICIAL`, `PADRON_I` a `PADRON_IV`, sincronización solo de bimestres abiertos y enriquecimiento opcional de identidad. No ejecuta importaciones, merge ni despliegue.
 
-Admin y Registro contienen 408 alumnos; el JSON público contiene 407. La diferencia identificada por el propietario corresponde a Secundaria, 4.º B, orden 217. Ninguna lista antigua se considera semilla de la base privada, ni se incluye/excluye esa fila automáticamente. La base inicial será exclusivamente una exportación SIAGIE vigente revisada por Admin, de ambos niveles. El archivo local extraído anteriormente sirve solo como respaldo histórico y comparación; **no usarlo para inicializar**.
+| Consumidor | Fuente después del corte |
+| --- | --- |
+| Admin | `IEStudents.load()` para administrar la base actual; `loadRoster(bimestre)` para exportar notas SIAGIE. Conserva importación SIAGIE/CSV/JSON, edición, guardado y restauración privados. |
+| Registro | `IEStudents.loadRoster(bimestre)` al entrar y al cambiar bimestre. La lista activa solo proviene de ese resultado. |
+| Primaria | Base privada autorizada para totales por grado; conserva el flujo académico de la matriz. |
+| Secundaria | Base privada autorizada para totales por aula; conserva las relaciones exactas área → aula del servidor. |
+| Auxiliar | Base privada de todo el colegio, con el rol existente Admin/Auxiliar. |
+| Photochecks | Base privada para Admin; QR generado localmente con el contenido compatible con Auxiliar. |
 
-No había una base oficial de estudiantes en Sheets: Admin editaba localStorage y restauraba la copia empotrada. Se usa una hoja privada `EstudiantesBase` en el mismo Spreadsheet vinculado, con versiones fragmentadas y punteros `BASE_ACTUAL`/`BASE_OFICIAL`. Solo hay una base privada vigente; el segundo puntero es el respaldo de restauración de la primera importación revisada.
+Los seis consumidores usan `students.js`, POST y token en el cuerpo. No hay fallback a alumnos embebidos, JSON público ni claves antiguas de localStorage. Se eliminan `BD_EMPOTRADA` de Admin, `BD_EMP` de Registro y `bd_oficial_2026.json`. No quedan copias estáticas de estudiantes en el árbol de producción; el historial de Git no se reescribe.
 
-| Consumidor | Etapa A / PR #34 | Etapa B, pendiente de validación |
-| --- | --- | --- |
-| Admin | Conserva BD_EMPOTRADA, base local, importación SIAGIE/CSV/JSON, guardado y restauración actuales. Añade preparación privada manual e independiente en Importar. | Base privada; importación/edición/guardado y restauración en servidor. |
-| Registro | Conserva BD_EMP y la fuente local actual. | POST protegido con alcance de sesión. |
-| Primaria | Conserva totales y flujo actual. | Totales desde estudiantes privados. |
-| Secundaria | Conserva JSON público y caché actuales. | Lista autorizada del backend. |
-| Auxiliar | Conserva JSON público y base local actuales. | Lectura protegida de todo el colegio para Admin/Auxiliar. |
-| Photochecks | Conserva fuente pública, QR y gate Admin actuales. | Lectura protegida Admin y QR generado localmente. |
+## Registro: identidad y compatibilidad
 
-## Etapa A: backend y preparación compatibles
+`student-identity.js` define una sola `studentKey(alumno)`: `id:<idSiagie>`, después `cod:<codigoEstudiante>`, finalmente `nom:<nombre normalizado>`. Los identificadores se codifican para no introducir separadores en las claves. Los eventos de edición transportan esa identidad, manteniendo el nombre visible.
 
-1. Revisar y, cuando el propietario lo autorice, desplegar el backend del PR #34. Las nuevas acciones son aditivas: `loadstudents`, `initstudents`, `savestudents`, `restorestudents`. No cambian rutas existentes ni los seis consumidores. La hoja se crea al verificar la nueva lectura autenticada. No hay carga automática de alumnos ni migración de datos al desplegar.
-2. El Admin de esta etapa puede publicarse antes o después del backend: sus funciones actuales siguen funcionando. Si el backend aún es antiguo, solo falla el botón manual de verificación/preparación privada; los módulos no usan ese lector nuevo.
-3. En Admin → Importar → Preparar base privada, seleccionar CSV SIAGIE **vigentes** de Primaria y Secundaria. Se reutiliza el parser SIAGIE existente. Revisar las listas completas, grados/secciones/orden y matrícula; resolver la discrepancia contra SIAGIE vigente. Los archivos de la plataforma, localStorage, BD_EMPOTRADA, BD_EMP y el JSON público no se importan como semilla. Marcar la revisión y confirmar explícitamente la inicialización de una sola vez.
-4. Verificar nuevamente conectado al servidor. Una respuesta desde caché offline **no** confirma la base en producción. Comparar conteos y listas de la base privada con SIAGIE; comprobar Admin, Auxiliar, Primaria por grados, Secundaria por relaciones exactas área→aula y rechazo de PIP/tokens inválidos. Validar guardado/restauración sobre datos de prueba o respaldo autorizado. No publicar datos privados ni modificar notas para esta comprobación.
-5. Admin debe confirmar que la base privada está inicializada y correcta. Conservar registro de la validación sin nombres/credenciales. Mientras tanto los seis consumidores y las fuentes públicas originales se mantienen.
+La lectura busca primero las claves estables del estudiante y luego una clave histórica por nombre normalizado, dentro del mismo contexto académico. Los nombres observados para una identidad estable se conservan como alias del aula en `payload.meta.studentAliases`; `meta` sigue siendo un objeto y mantiene el docente y demás campos. Estos alias viajan en la sincronización existente de Registro. No se renombra, elimina ni migra destructivamente ninguna clave de `RegistroNotas`.
 
-## Etapa B: corte posterior, en borrador
+Una corrección de nombre/orden con el mismo ID mantiene sus notas estables. Los alias permiten recuperar notas antiguas por nombre cuando se ha observado su asociación con ese ID/código. Un alumno nuevo aparece vacío; un retirado desaparece de la lista activa sin borrar su historial. Borrar explícitamente una nota guarda una marca en su clave estable para que el respaldo antiguo no la haga reaparecer. No se asignan notas por nombre ambiguo a homónimos.
 
-Solo después de la confirmación de producción, revisar/autorizar el segundo PR, cambiar su base a main si corresponde y actualizarlo con main. Este migra los seis consumidores a `students.js` por POST con token y elimina las tres copias públicas y los fallbacks globales. El backend y los datos privados ya existirán: el frontend podrá publicarse después sin requerir un despliegue simultáneo de Apps Script. No usar la existencia de la hoja, un número esperado de alumnos o una caché como aprobación automática. El borrador no se fusiona ni despliega durante esta preparación.
+Admin y Registro conservan el cruce Excel por ID primero, luego código y nombre como respaldo. Ambos leen notas estables e históricas con el mismo auxiliar. Se preservan los identificadores opcionales y matrícula transferida del PR #38; las plantillas y estructura de notas no cambian.
 
-Si falla la validación en A, detener B y continuar con la plataforma actual. Tras el corte B, no volver a publicar rosters antiguos como solución a un error de conexión; corregir la lectura protegida. El respaldo privado permite restauración de Admin. El historial Git anterior no se reescribe en estos PR.
+## Padrones y conectividad
 
-## Alcance y controles
+El backend existente entrega `PADRON_<bimestre>` si está inicializado. Si falta, devuelve la base actual autorizada con `padronInicializado:false`; Registro informa que ese padrón está pendiente y no lo presenta como congelado. No crea un padrón automáticamente. Un padrón cerrado ya existente conserva su lista aunque cambie `BASE_ACTUAL`.
 
-Admin/Auxiliar: escuela completa; Primaria: grados del servidor; Secundaria: aulas de asignaciones exactas área→aula, con el formato legado explícito ya admitido. PIP no consume alumnos. Se mantienen tokens HMAC, expiración, revocación por permisosVersion, permisos, notas, escrituras académicas, bimestres, SIAGIE Excel y Classroom.
+La caché es temporal, de diez minutos, ligada al token exacto y al bimestre solicitado. No sirve un bimestre distinto, ni se usa ante una denegación del servidor. Una falla sin caché válida vacía la lista activa y bloquea la edición. Una respuesta offline se identifica expresamente y no confirma producción.
 
-La preparación es manual, usa POST con token y exige conexión para inicializar/verificar. No se ejecutan merge, despliegue ni importaciones reales con estos PR. Las pruebas usan únicamente datos sintéticos. La exposición pública permanece deliberadamente en A para permitir el rollout compatible; se retira en B tras validar producción.
+Los controles manuales de `students-migration.js` permanecen porque ahora también administran los padrones y la sincronización del PR #37. La inspección inicial puede verificar una base aún no inicializada; los consumidores normales fallan hasta que Admin la inicialice. Solo CSV SIAGIE vigente de ambos niveles, revisión marcada y confirmación explícita pueden iniciar la base. No se usan copias históricas ni localStorage como semilla. La discrepancia histórica de Secundaria 4.º B, orden 217 sigue sin resolverse automáticamente.
+
+## Revisión antes de publicar
+
+- Confirmar conectado al servidor la base privada y los padrones necesarios. Un bimestre cerrado sin padrón sigue reportando el fallback; no se inventa una lista histórica.
+- Verificar los ID/códigos vigentes. Si una nota antigua solo tiene un nombre que cambió antes de su primera asociación con un ID/código, no puede recuperarse esa relación de forma inequívoca: requiere revisión manual, sin emparejamiento aproximado automático.
+- Revisar el corte de los seis consumidores y la exportación SIAGIE con una copia controlada. Las pruebas locales son simuladas y no sustituyen validación de producción.
+
+Ejecutar `node --test tests/*.test.cjs`. La suite conserva controles de rol, tokens ausentes/vencidos/alterados/revocados, padrones congelados, transferidos, enriquecimiento de identidad, carga de consumidores y sintaxis HTML, y añade casos de identidad estable y compatibilidad de notas.
+
+El PR permanece en borrador para revisión. No se modifican tokens, permisos, rutas del backend, escrituras académicas ni reglas de bimestre; no hay merge ni despliegue automático en esta preparación.

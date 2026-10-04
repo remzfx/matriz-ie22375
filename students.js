@@ -34,25 +34,30 @@
     });
     base.version = response.version;
     base.inicializada = response.inicializada;
+    base.bimestre = response.bimestre || '';
+    base.padronInicializado = response.padronInicializado !== false;
+    base.fuentePadron = response.fuentePadron || '';
     return base;
   }
-  function peek() {
+  function peek(scope) {
     const token = validToken();
     if (!token) { clear(); return null; }
     try {
       const cached = memory || JSON.parse(sessionStorage.getItem(KEY) || 'null');
-      if (cached && cached.token === token && cached.until > Date.now()) return JSON.parse(JSON.stringify(cached.base));
+      if (cached && cached.token === token && cached.scope === scope && cached.until > Date.now()) return JSON.parse(JSON.stringify(cached.base));
     } catch (e) {}
     clear();
     return null;
   }
-  function remember(base, token) {
-    memory = {token: token, until: Date.now() + TTL, base: JSON.parse(JSON.stringify(base))};
+  function remember(base, token, scope) {
+    memory = {token: token, scope: scope, until: Date.now() + TTL, base: JSON.parse(JSON.stringify(base))};
     try { sessionStorage.setItem(KEY, JSON.stringify(memory)); } catch (e) {}
     return base;
   }
   async function request(action, data) {
+    data = data || {};
     const token = validToken();
+    const scope = action === 'loadstudents' ? ('students:' + (data.bimestre || 'actual')) : ('students:' + (data.bimestre || 'actual'));
     if (!token) {
       clear(); status('Sesión ausente o vencida. Vuelve a iniciar sesión.');
       throw new Error('Sesión ausente o vencida. Vuelve a iniciar sesión.');
@@ -65,7 +70,7 @@
       if (!r.ok) throw new Error('HTTP ' + r.status);
       response = await r.json();
     } catch (e) {
-      const cached = action === 'loadstudents' ? peek() : null;
+      const cached = action === 'loadstudents' ? peek(scope) : null;
       if (cached) {
         status('Sin conexión: lista temporal de esta sesión (máximo 10 minutos).');
         return Object.assign({}, cached, {offline: true});
@@ -81,19 +86,26 @@
     }
     if (!Array.isArray(response.estudiantes)) { clear(); throw new Error('Respuesta de estudiantes inválida.'); }
     status(response.inicializada ? (response.estudiantes.length + ' estudiantes cargados para tu sesión.') : 'La base oficial está pendiente de inicialización por Admin.');
-    return remember(toBase(response), token);
+    return remember(toBase(response), token, scope);
   }
-  global.IEStudents = {empty: empty, peek: peek, clear: clear, session: session,
-    load: async () => {
-      const base = await request('loadstudents');
-      if (!base.inicializada) {
-        clear();
-        status('Base privada no inicializada. Admin debe completar y validar la etapa A.');
-        throw new Error('Base privada no inicializada. Admin debe completar y validar la etapa A.');
-      }
-      return base;
+  async function checkedLoad(data) {
+    const base = await request('loadstudents', data);
+    if (!base.inicializada) { clear(); throw new Error('Base privada no inicializada. Admin debe completar la inicialización SIAGIE.'); }
+    return base;
+  }
+  global.IEStudents = {empty: empty, peek: () => peek('students:actual'), clear: clear, session: session,
+    load: () => checkedLoad(),
+    inspect: () => request('loadstudents'),
+    loadRoster: bimestre => {
+      if (!['I','II','III','IV'].includes(bimestre)) return Promise.reject(new Error('Bimestre inválido.'));
+      return checkedLoad({bimestre: bimestre});
     },
     save: (base, version) => request('savestudents', {base: base, version: version}),
     initialize: (base, version) => request('initstudents', {base: base, version: version}),
+    seedRoster: (version, bimestre) => request('seedstudentsroster', {version: version, bimestre: bimestre}),
+    sync: (base, version, bimestre) => request('syncstudents', {base: base, version: version, bimestre: bimestre}),
+    enrich: (version, bimestre, nivel, grado, seccion, identidades) => request('enrichstudents', {
+      version: version, bimestre: bimestre, nivel: nivel, grado: grado, seccion: seccion, identidades: identidades
+    }),
     restore: version => request('restorestudents', {version: version})};
 })(window);

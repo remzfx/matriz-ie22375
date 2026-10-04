@@ -118,13 +118,22 @@ test('Admin import/edit/save/restore uses server revisions and leaves old local 
   assert.equal(s.context.estudiantesDe('primaria').length,0);
   assert.equal(s.memory.get('ie22375_admin_bd_v1'),'synthetic-legacy-backup');
 });
-test('SIAGIE CSV import still excludes transferred students and maps current grade/section formats', async()=>{
+test('Legacy CSV parser default remains compatible with previous grade/section formats', async()=>{
   const s=admin({user:'admin',role:'admin'});await s.context.cargarEstudiantesAdmin();
   const csv='NumeroDeOrden;ApellidoPaterno;ApellidoMaterno;NombreEstudiante;Grado;Seccion;EstadoMatricula;Nivel\n1;SYNTHETIC;ONE;STUDENT;PRIMERO;UNICA;DEFINITIVA;primaria\n2;SYNTHETIC;TWO;STUDENT;PRIMERO;UNICA;TRASLADADO;primaria';
   s.context.window._importCSV=s.context.parseCSV(csv);
   s.elements.get('importModo').value='replace';s.elements.get('importNivel').value='primaria';s.context.procesarImport();
   assert.equal(s.context.estudiantesDe('primaria').length,1);assert.equal(s.context.estudiantesDe('primaria')[0].grado,1);
   await s.context.guardarBD();assert.equal(s.studentWrites[0].base.primaria.estudiantes.length,1);
+});
+
+test('Active Admin CSV upload includes transferred students before private save',async()=>{
+  const s=admin({user:'admin',role:'admin'});await s.context.cargarEstudiantesAdmin();
+  const csv='NumeroDeOrden;ApellidoPaterno;ApellidoMaterno;NombreEstudiante;Grado;Seccion;EstadoMatricula;Nivel\n1;SYNTHETIC;ONE;STUDENT;PRIMERO;UNICA;DEFINITIVA;primaria\n2;SYNTHETIC;TWO;STUDENT;PRIMERO;UNICA;TRASLADADO;primaria';
+  await s.elements.get('importFile').listeners.change({target:{files:[{name:'synthetic.csv',text:async()=>csv}]}});
+  s.elements.get('importModo').value='replace';s.elements.get('importNivel').value='primaria';s.context.procesarImport();await s.context.guardarBD();
+  assert.equal(s.studentWrites[0].base.primaria.estudiantes.length,2);
+  assert.equal(s.studentWrites[0].base.primaria.estudiantes[1].estadoMatricula,'TRASLADADO');
 });
 test('Failed Admin save keeps the reviewed draft and displays the error', async()=>{
   const s=admin({user:'admin',role:'admin'});await s.context.cargarEstudiantesAdmin();
@@ -140,8 +149,9 @@ test('Admin cannot edit or save an empty placeholder while students are loading'
   s.context.procesarImport();assert.equal(s.context.estudiantesDe('primaria').length,0);assert.equal(s.studentWrites.length,0);
 });
 
-test('Stage B has no initial import control: production must be validated in stage A',()=>{
+test('No embedded-data initialization control reappears; initial SIAGIE review stays manual',()=>{
   const s=admin({user:'admin',role:'admin'});
   assert.equal(typeof s.context.inicializarBDOficial,'undefined');
   assert.doesNotMatch(read('admin.html'),/onclick="inicializarBDOficial/);
+  assert.match(read('admin.html'),/IEMigrateStudents\.inicializar\(\)/);
 });
