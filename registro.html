@@ -95,9 +95,21 @@
   .fin-grid thead th { background:#0f172a; color:#fff; font-size:11px; font-weight:800; position:sticky; top:0; z-index:2; }
   .fin-grid th.fin-nom, .fin-grid td.fin-nom { position:sticky; left:0; background:#fff; z-index:1; min-width:160px; max-width:200px; }
   .fin-grid thead th.fin-nom { background:#0f172a; z-index:3; }
-  .fin-grid .fin-caps { font-size:10px; font-weight:600; color:#cbd5e1; margin-top:4px; line-height:1.3; }
+  .fin-grid thead th:not(.fin-nom) { background:#075985; color:#fff; }
+  .fin-grid tbody td:not(.fin-nom) { background:#f0f9ff; }
+  .fin-grid tbody tr:nth-child(even) td:not(.fin-nom) { background:#e0f2fe; }
+  .fin-grid .fin-caps { font-size:10px; font-weight:600; color:#bae6fd; margin-top:4px; line-height:1.3; }
   .fin-grid td .fin-caps { color:#64748b; }
   .fin-cell { display:flex; flex-direction:column; align-items:center; gap:4px; min-width:92px; }
+  @media (max-width:640px) {
+    .fin-grid { min-width:540px; }
+    .fin-grid th.fin-nom, .fin-grid td.fin-nom {
+      min-width:104px; width:104px; max-width:104px;
+      padding-left:4px; padding-right:4px;
+    }
+    .fin-grid td.fin-nom .font-bold { font-size:10px; line-height:1.15; overflow-wrap:anywhere; }
+    .fin-cell { min-width:80px; }
+  }
   .fin-cell input { width:3.6rem; text-align:center; font-weight:800; border:1.5px solid #cbd5e1; border-radius:10px; padding:6px 4px; font-size:16px; }
   .fin-cell input[readonly] { background:#f1f5f9; color:#334155; }
   .asis-chip {
@@ -171,7 +183,7 @@
 </script>
 
 
-<div id="viewHome" class="hidden max-w-lg mx-auto p-4 pt-10">
+<div id="viewHome" class="hidden max-w-lg mx-auto p-4 min-h-screen flex flex-col justify-center">
   <div class="text-center mb-6">
     <div class="text-xs font-bold tracking-widest text-sky-600">IE 22375 SANTA ROSA DE LOS MOLINOS</div>
     <h1 class="text-2xl font-black mt-1">Registro auxiliar</h1>
@@ -326,7 +338,7 @@
         <div id="avanceBox"></div>
         <div class="mt-3 space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
           <div class="text-sm font-black text-slate-700">Cierre de área</div>
-          <p class="text-[11px] text-slate-500">Usted solo <b>Guarda</b> y da <b>Nube ↑</b>. El director vacía al SIAGIE desde Admin cuando el aula esté completa.</p>
+          <p class="text-[11px] text-slate-500">Usted solo <b>Guarda</b> y usa <b>Nube Subir</b>. El director vacía al SIAGIE desde Admin cuando el aula esté completa.</p>
           <button type="button" class="btn btn-ghost w-full text-sm" onclick="procesarSiagie()">Revisar si falta algo en mi área</button>
         </div>
       </div>
@@ -401,8 +413,8 @@
         <span class="px-2 py-1 rounded-lg bg-lime-50 text-lime-700">A <span id="cA">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
-      <button type="button" class="btn btn-ghost text-xs !py-2" onclick="bajarRegistroNube()">Nube ↓</button>
-      <button type="button" class="btn btn-ghost text-xs !py-2" onclick="subirRegistroNube()">Nube ↑</button>
+      <button type="button" class="btn text-xs !py-2" style="background:#16a34a;color:#fff" onclick="subirRegistroNube()">Nube Subir</button>
+      <button type="button" class="btn text-xs !py-2" style="background:#0284c7;color:#fff" onclick="bajarRegistroNube()">Nube Bajar</button>
       <button type="button" class="btn btn-primary text-xs !py-2" onclick="guardarTodo(); toast('Guardado local')">Guardar</button>
     </div>
   </div>
@@ -1849,7 +1861,7 @@ function procesarSiagie() {
   document.getElementById('siagieCtx').textContent = ctx;
   let html = '';
   if (inf.ok) {
-    html += '<div class="rounded-lg bg-emerald-50 text-emerald-800 p-3 font-bold">Área completa. Suba a la nube (Nube ↑) para que el director la vacíe a SIAGIE.</div>';
+    html += '<div class="rounded-lg bg-emerald-50 text-emerald-800 p-3 font-bold">Área completa. Use Nube Subir para que el director la vacíe a SIAGIE.</div>';
   } else {
     html += '<div class="rounded-lg bg-red-50 text-red-800 p-3 font-bold">No se puede procesar todavía.</div>';
     if (inf.faltanNota.length) {
