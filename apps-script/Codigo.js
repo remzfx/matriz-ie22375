@@ -14,7 +14,7 @@ const ADMIN_PASS_PROPERTY = 'IE22375_ADMIN_PASS';
 const AUXILIAR_PASS_PROPERTY = 'IE22375_AUXILIAR_PASS';
 const PIP_PASS_PROPERTY = 'IE22375_PIP_PASS';
 const DOCENTES_CACHE_KEY = 'IE22375_DOCENTE_ACCESOS_V1';
-const DOCENTES_CACHE_TTL_SECONDS = 600;
+const DOCENTES_CACHE_TTL_SECONDS = 21600;
 
 function asegurarAsis_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -182,7 +182,9 @@ function responderLogin_(body) {
     return { ok: false, error: 'Usuario o contraseña incorrectos.' };
   }
 
-  const config = obtenerDocentesConfig_();
+  // Admin, Auxiliar y PIP no dependen de DOCENTE_ACCESOS.
+  // Evitar Sheets/CacheService en esos logins reduce la latencia del inicio.
+  let config = null;
   let perfil = null;
   if (tipo === 'admin') {
     const adminPass = PropertiesService.getScriptProperties().getProperty(ADMIN_PASS_PROPERTY);
@@ -204,6 +206,8 @@ function responderLogin_(body) {
       };
     }
   } else {
+    // Solo el login docente necesita cargar la configuración de accesos.
+    config = obtenerDocentesConfig_();
     const docente = config.docentes.find(function (item) {
       return normalizarUsuario_(item.user) === usuario &&
         compararSeguro_(String(item.pass == null ? '' : item.pass).trim(), pass);
@@ -231,14 +235,14 @@ function responderLogin_(body) {
     user: perfil.user,
     role: perfil.role,
     nivel: perfil.nivel,
-    permisosVersion: config.ts,
+    permisosVersion: config ? config.ts : 0,
     iat: now,
     exp: exp
   });
   perfil.ok = true;
   perfil.token = token;
   perfil.tokenExp = exp;
-  perfil.permisosVersion = config.ts;
+  perfil.permisosVersion = config ? config.ts : 0;
   return perfil;
 }
 
