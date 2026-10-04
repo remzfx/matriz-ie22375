@@ -2814,10 +2814,16 @@ window.__IE_gradoOK = function(gradoVal) {
                         if (nv) { conteo[nv]++; vistos[p[6]] = 1; llenas++; }
                     });
                     sessions.forEach(s => {
-                        if (s.nivel!=='secundaria' || s.bim!==bim || String(s.grado)!==gradoN || s.area!==area || s.comp!==comp) return;
+                        const secSesion = String(s.seccion || '').toUpperCase().replace('UNICA','ÚNICA');
+                        const secActual = String(sec || '').toUpperCase().replace('UNICA','ÚNICA');
+                        if (s.nivel!=='secundaria' || s.bim!==bim || String(s.grado)!==gradoN ||
+                            secSesion!==secActual || s.area!==area || s.comp!==comp) return;
                         Object.keys(grades).forEach(gk => {
                             const p = gk.split('||');
-                            if (p[0]!=='secundaria' || p[5]!==comp || p[4]!==area) return;
+                            const secNota = String(p[3] || '').toUpperCase().replace('UNICA','ÚNICA');
+                            if (p[0]!=='secundaria' || p[1]!==bim || String(p[2])!==gradoN ||
+                                secNota!==secActual || p[4]!==area || p[5]!==comp) return;
+                            if (String(p[6] || '') !== String(s.capacidad || '') || String(p[7] || '') !== String(s.fecha || '')) return;
                             const nom = p[p.length-1];
                             if (vistos[nom]) return;
                             const g = grades[gk] || {};
@@ -2839,8 +2845,11 @@ window.__IE_gradoOK = function(gradoVal) {
                 if (typeof crearGraficos === 'function') crearGraficos();
                 if (typeof renderizarResumen === 'function') renderizarResumen();
             }
-            if (typeof mostrarToast === 'function') mostrarToast(llenas ? 'Conteo traído del registro auxiliar' : 'No hay notas de este aula en el registro', llenas ? 'ok' : 'error');
-            else alert(llenas ? 'Conteo traído del registro auxiliar' : 'No hay notas de este aula en el registro');
+            if (typeof mostrarToast === 'function') mostrarToast(
+                llenas ? 'Conteo traído del registro auxiliar' : 'Esta sección no tiene notas: se dejó en blanco en la matriz',
+                llenas ? 'ok' : 'success'
+            );
+            else alert(llenas ? 'Conteo traído del registro auxiliar' : 'Esta sección no tiene notas: se dejó en blanco en la matriz');
         }
 
         function abrirComparativo() {
