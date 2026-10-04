@@ -105,13 +105,24 @@ function normalizarUsuarioDocente(v) {
   return String(v || '').trim().toLowerCase().replace(/^@+/, '');
 }
 async function loginBackend(tipo, usuario, password) {
+  const t0 = performance.now();
   const r = await fetchConTiempo(CLOUD_API_URL, 12000, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action:'login', tipo:tipo, usuario:usuario, password:password })
   });
+  const t1 = performance.now();
   if (!r || !r.ok) throw new Error('Respuesta HTTP ' + (r ? r.status : 'sin respuesta'));
-  return JSON.parse(await r.text());
+  const raw = await r.text();
+  const t2 = performance.now();
+  let data = JSON.parse(raw);
+  data = data && typeof data === 'object' ? data : {};
+  data.__timing = {
+    totalMs: Math.round(t2 - t0),
+    fetchMs: Math.round(t1 - t0),
+    parseMs: Math.round(t2 - t1)
+  };
+  return data;
 }
 let loginPrecalentado = false;
 function precalentarLoginBackend() {
@@ -200,6 +211,18 @@ async function intentarLogin() {
   if (!perfil || !perfil.ok) {
     err.textContent = (perfil && perfil.error) || 'Usuario o contraseña incorrectos.';
     return;
+  }
+  if (perfil.__timing) {
+    console.info('[Login timing]', perfil.__timing);
+    try {
+      sessionStorage.setItem('ie22375_login_timing_v1', JSON.stringify({
+        ts: Date.now(),
+        role: perfil.role,
+        totalMs: perfil.__timing.totalMs,
+        fetchMs: perfil.__timing.fetchMs,
+        parseMs: perfil.__timing.parseMs
+      }));
+    } catch (e) {}
   }
   err.classList.add('hidden');
   setSession({
