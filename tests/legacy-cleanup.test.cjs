@@ -233,3 +233,14 @@ test('Registro routes mobile quick tools to official app stores while keeping de
   assert.match(src, /https:\/\/gemini\.google\.com\//);
   assert.match(src, /https:\/\/notebooklm\.google\.com\//);
 });
+
+
+test('Secundaria comparative is limited to admin/director or same teacher with two sections in the same area and grade', () => {
+  const src = read('secundaria.html');
+  assert.match(src, /function seccionesAsignadasAreaGrado/);
+  assert.match(src, /ses\.asignaciones && Array\.isArray\(ses\.asignaciones\[area\]\)/);
+  assert.match(src, /return seccionesAsignadasAreaGrado\(area, grado\)\.length >= 2/);
+  assert.match(src, /areasComparablesGrado\(estado\.grado\)/);
+  assert.match(src, /No tienes ambas secciones asignadas en esta área y grado/);
+  assert.match(src, /id="btnComparativo"/);
+});
