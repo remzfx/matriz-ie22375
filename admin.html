@@ -206,7 +206,7 @@
         <h2 class="font-black text-lg">Importar base oficial</h2>
         <details class="border border-sky-200 rounded-lg p-3">
           <summary class="font-bold cursor-pointer">Preparar base privada · etapa A (los módulos actuales no cambian)</summary>
-          <p class="text-sm mt-2">Usa CSV SIAGIE vigentes de ambos niveles y revisa las listas. No se importa automáticamente la base antigua de 408/407 alumnos. La diferencia de Secundaria 4.º B, orden 217 debe resolverse con SIAGIE vigente.</p>
+          <p class="text-sm mt-2">Usa CSV SIAGIE vigentes de ambos niveles y revisa las listas. La base privada incluye a todo estudiante que aparezca en el CSV oficial, incluso si figura como TRASLADADO. No se importa automáticamente la base antigua de 408/407 alumnos; cualquier diferencia se resuelve con SIAGIE vigente.</p>
           <label class="block mt-2">SIAGIE Primaria <input type="file" accept=".csv,.txt" onchange="IEMigrateStudents.importar(this,'primaria')"></label>
           <pre id="migracionPreview-primaria" class="text-xs max-h-32 overflow-auto"></pre>
           <label class="block mt-2">SIAGIE Secundaria <input type="file" accept=".csv,.txt" onchange="IEMigrateStudents.importar(this,'secundaria')"></label>
@@ -630,7 +630,8 @@ function mapSecSiagie(s) {
   if (s==='A'||s==='B'||s==='C') return s;
   return s || 'Única';
 }
-function parseCSV(text) {
+function parseCSV(text, options) {
+  const includeTransferred = !!(options && options.includeTransferred);
   const raw = text.replace(/\r/g,'');
   // Formato SIAGIE: buscar línea de cabecera con ApellidoPaterno
   let lines = raw.split('\n');
@@ -669,7 +670,7 @@ function parseCSV(text) {
     if (!nombre && (ap || ne)) nombre = (ap + ' ' + am + ', ' + ne).replace(/\s+/g,' ').trim();
     if (!nombre) continue;
     const estado = (row.estadomatricula || '').toUpperCase();
-    if (estado === 'TRASLADADO') continue; // no activos
+    if (estado === 'TRASLADADO' && !includeTransferred) continue; // flujo legado: solo activos; base privada puede incluir todo el padrón SIAGIE
     let grado = parseInt(row.grado || row.grado_num || '0', 10) || 0;
     if (!grado) grado = mapGradoSiagie(row.grado1 || row.grado || row.descgrado || '');
     if (!grado) {

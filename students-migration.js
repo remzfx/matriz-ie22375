@@ -20,7 +20,7 @@
       const destino = document.getElementById('importNivel');
       const anterior = destino.value;
       let list;
-      try { destino.value = nivel; list = global.parseCSV(text); }
+      try { destino.value = nivel; list = global.parseCSV(text, {includeTransferred: true}); }
       finally { destino.value = anterior; }
       if (!list.length || list.some(a => a.nivel !== nivel)) throw new Error('Revisa el nivel y los alumnos del archivo SIAGIE.');
       listas[nivel] = list;
