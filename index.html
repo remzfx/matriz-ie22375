@@ -113,6 +113,17 @@ async function loginBackend(tipo, usuario, password) {
   if (!r || !r.ok) throw new Error('Respuesta HTTP ' + (r ? r.status : 'sin respuesta'));
   return JSON.parse(await r.text());
 }
+let loginPrecalentado = false;
+function precalentarLoginBackend() {
+  if (loginPrecalentado || getSession()) return;
+  loginPrecalentado = true;
+  fetchConTiempo(CLOUD_API_URL + '?action=ping&t=' + Date.now(), 4000, {
+    method: 'GET',
+    cache: 'no-store'
+  }).catch(function () {
+    // Es solo una optimización: nunca debe bloquear ni mostrar error al usuario.
+  });
+}
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 function leerSesionCruda() {
   try {
@@ -255,7 +266,12 @@ function mostrarHub() {
   }).join('') || '<p class="text-sm text-slate-500">No hay módulos para este usuario.</p>';
 }
 onTipoChange();
-if (getSession()) mostrarHub();
+if (getSession()) {
+  mostrarHub();
+} else {
+  // Arrancar Apps Script en segundo plano mientras el usuario completa el login.
+  setTimeout(precalentarLoginBackend, 0);
+}
 </script>
 </body>
 </html>
