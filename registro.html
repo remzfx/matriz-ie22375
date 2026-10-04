@@ -407,16 +407,18 @@
   </main>
 
   <div class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
-    <div class="max-w-3xl mx-auto px-3 py-2 flex flex-wrap gap-2 items-center justify-between text-xs font-bold">
+    <div class="max-w-3xl mx-auto px-3 py-2 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between text-xs font-bold">
       <div class="flex gap-1.5 flex-wrap">
         <span class="px-2 py-1 rounded-lg bg-red-50 text-red-700">C <span id="cC">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-700">B <span id="cB">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-lime-50 text-lime-700">A <span id="cA">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
-      <button type="button" class="btn text-xs !py-2" style="background:#16a34a;color:#fff" onclick="subirRegistroNube()">Nube Subir</button>
-      <button type="button" class="btn text-xs !py-2" style="background:#0284c7;color:#fff" onclick="bajarRegistroNube()">Nube Bajar</button>
-      <button type="button" class="btn btn-primary text-xs !py-2" onclick="guardarTodo(); toast('Guardado local')">Guardar</button>
+      <div class="grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex">
+        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#16a34a;color:#fff" onclick="subirRegistroNube()">Nube Subir</button>
+        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#0284c7;color:#fff" onclick="bajarRegistroNube()">Nube Bajar</button>
+        <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" onclick="guardarTodo(); toast('Guardado local')">Guardar</button>
+      </div>
     </div>
   </div>
 </div>
