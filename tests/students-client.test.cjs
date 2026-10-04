@@ -50,6 +50,24 @@ for(const file of ['auxiliar.html','photochecks.html'])test(file+': real loader 
   s.run(extract(file,'ensureBD'));await s.c.ensureBD();checkRequest(s);
   assert.equal(s.run('BD.primaria.estudiantes[0].nombre'),'Synthetic Primary');
 });
+test('Registro startup uses cached period configuration without waiting for the first cloud refresh',async()=>{
+  const s=fixture('docente');
+  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;
+    function recordarPadron(){};function saveStore(){};function toast(){};function bloquearRegistroMientrasValida(){};function pintarPadronInmediato(base,b){bdEstudiantes=base;padronBimestre=b;};
+    function nivelPermitido(){return 'primaria'};function loadStore(){};function loadPeriodosAdmin(){return {bimestres:{I:'cerrado',II:'cerrado',III:'abierto',IV:'bloqueado'}}};
+    function pintarBimestresRegistro(){document.getElementById('selBim').value='III'};function gradosPermitidos(){return [1]};function aulasPermitidas(){return null};
+    function hoyISO(){return '2026-10-04'};function aplicarDocenteSesion(){};function onGrado(){};function areas(){return ['Comunicación']};function renderAreas(){};
+    function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};function fillCaps(){};
+    function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};function onContexto(){};let periodFetches=0;
+    function sincronizarPeriodosNube(){periodFetches++;return new Promise(()=>{});} `);
+  for(const name of ['loadBD','llenarAulasPadron','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  const p=s.c.entrarNivel('primaria');
+  await new Promise(r=>setTimeout(r,0));
+  assert.equal(s.run('padronBimestre'),'III');
+  assert.equal(s.run('periodFetches'),1,'one background refresh should start');
+  // Do not await p because the synthetic background refresh intentionally never resolves.
+});
+
 test('Registro enters its current flow only after protected students are loaded',async()=>{
   const s=fixture('docente');
   s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;function recordarPadron(){};function saveStore(){};function toast(){};
