@@ -1069,9 +1069,14 @@ async function entrarNivel(n) {
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
 
-  // Lista obtenida del backend para el alcance de esta sesión.
-  try { await sincronizarPeriodosNube(); } catch(e) { console.warn('Periodos sin conexión'); }
-  pintarBimestresRegistro(loadPeriodosAdmin());
+  // Arranque rápido: usar de inmediato la última configuración válida de bimestres.
+  // Solo si todavía no existe configuración local se espera una primera consulta al servidor.
+  let periodosIniciales = loadPeriodosAdmin();
+  if (!periodosIniciales || !periodosIniciales.bimestres) {
+    try { await sincronizarPeriodosNube(); } catch(e) { console.warn('Periodos sin conexión'); }
+    periodosIniciales = loadPeriodosAdmin();
+  }
+  pintarBimestresRegistro(periodosIniciales);
   if (!await cargarPadronRegistro(document.getElementById('selBim').value)) return;
   llenarAulasPadron(n);
 
