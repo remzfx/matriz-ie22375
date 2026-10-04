@@ -170,10 +170,11 @@ test('UI refinements keep Registro Promedios compact and cloud actions explicit'
 });
 
 for (const file of ['primaria.html', 'secundaria.html']) {
-  test(file + ': teacher summary omits Progreso General card and comparative has no redundant back controls', () => {
+  test(file + ': teacher view hides aggregate summary cards and comparative has no redundant back controls', () => {
     const src = read(file);
-    assert.match(src, /mostrarProgresoGeneral/);
     assert.match(src, /window\.__IE_SES\.role === 'docente'/);
+    assert.match(src, /container\.classList\.add\('hidden'\)/);
+    assert.match(src, /container\.innerHTML = ''/);
     assert.doesNotMatch(src, /← Volver a áreas|>← Volver</);
     assert.match(src, /Nube Subir/);
     assert.match(src, /Nube Bajar/);
@@ -194,4 +195,24 @@ test('Registro keeps cloud actions on one mobile row', () => {
   const bajar = src.indexOf('Nube Bajar');
   const guardar = src.indexOf(">Guardar</button>", bajar);
   assert.ok(subir >= 0 && bajar > subir && guardar > bajar);
+});
+
+
+test('Secundaria Desde registro never mixes notes between A and B', () => {
+  const src = read('secundaria.html');
+  assert.match(src, /secSesion!==secActual/);
+  assert.match(src, /secNota!==secActual/);
+  assert.match(src, /p\[1\]!==bim/);
+  assert.match(src, /String\(p\[2\]\)!==gradoN/);
+  assert.match(src, /String\(p\[6\] \|\| ''\) !== String\(s\.capacidad \|\| ''\)/);
+  assert.match(src, /String\(p\[7\] \|\| ''\) !== String\(s\.fecha \|\| ''\)/);
+});
+
+
+test('Secundaria shows responsible teacher as compact read-only label', () => {
+  const src = read('secundaria.html');
+  assert.match(src, /Docente responsable: \$\{docente \|\| 'Sin registrar'\}/);
+  assert.match(src, /mx-auto w-full max-w-2xl text-center/);
+  assert.doesNotMatch(src, /id="docenteAreaInput"/);
+  assert.doesNotMatch(src, /oninput="setDocenteArea\(estado\.areaActual, this\.value\)"/);
 });
