@@ -258,3 +258,11 @@ test('Admin has whole-grade consolidated comparison across all sections with dat
   assert.match(src, /Secciones incluidas:/);
   assert.match(src, /stack:'g'/);
 });
+
+
+test('Secundaria hides obsolete global summary cards for all roles', () => {
+  const src = read('secundaria.html');
+  const block = src.slice(src.indexOf('function renderizarResumen()'), src.indexOf('// VISTA TABLA CONSOLIDADA'));
+  assert.match(block, /container\.classList\.add\('hidden'\)/);
+  assert.doesNotMatch(block, /Progreso General|Inicio \(C\)|En Proceso \(B\)|Logrado \(A\+AD\)/);
+});
