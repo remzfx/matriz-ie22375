@@ -1190,7 +1190,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     <button type="button" onclick="traerDesdeRegistro()" class="bg-teal-600 hover:bg-teal-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
                         Desde registro
                     </button>
-                    <button type="button" onclick="abrirComparativo()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
+                    <button type="button" id="btnComparativo" onclick="abrirComparativo()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold">
                         <i class="fas fa-balance-scale mr-1"></i> Comparativo
                     </button>
                     <span class="text-xs text-slate-500 bg-white px-3 py-1 rounded-full shadow-sm">Haz clic en un área para editar</span>
@@ -2080,6 +2080,7 @@ window.__IE_gradoOK = function(gradoVal) {
                 `;
                 container.appendChild(btn);
             });
+            actualizarVisibilidadComparativo();
         }
 
         function calcularProgresoArea(nombreArea) {
@@ -2840,12 +2841,70 @@ window.__IE_gradoOK = function(gradoVal) {
             else alert(llenas ? 'Conteo traído del registro auxiliar' : 'Esta sección no tiene notas: se dejó en blanco en la matriz');
         }
 
+        function seccionesAsignadasAreaGrado(area, grado) {
+            const ses = window.__IE_SES;
+            if (!ses || ses.role === 'admin' || ses.user === 'admin') {
+                return seccionesDelGrado(grado);
+            }
+            if (ses.role !== 'docente') return [];
+
+            // Para docentes, solo cuentan las secciones asignadas explícitamente
+            // a ESTA área y ESTE grado. No cruzar aulas de otras áreas.
+            const asignadas = ses.asignaciones && Array.isArray(ses.asignaciones[area])
+                ? ses.asignaciones[area] : [];
+            const out = [];
+            asignadas.forEach(function(k) {
+                const p = String(k).split('|');
+                const g = String(p[0] || '').replace(/[^0-9]/g,'') + '°';
+                let sec = String(p[1] || '').trim().toUpperCase();
+                if (sec === 'UNICA') sec = 'ÚNICA';
+                if (g === grado && out.indexOf(sec) < 0) out.push(sec);
+            });
+            return out;
+        }
+
+        function puedeCompararAreaGrado(area, grado) {
+            const ses = window.__IE_SES;
+            if (!ses || ses.role === 'admin' || ses.user === 'admin') return true;
+            if (ses.role !== 'docente') return false;
+            return seccionesAsignadasAreaGrado(area, grado).length >= 2;
+        }
+
+        function areasComparablesGrado(grado) {
+            return Object.keys(ESTRUCTURA_AREAS).filter(function(area) {
+                return areaVisibleSesion(area) && puedeCompararAreaGrado(area, grado);
+            });
+        }
+
+        function actualizarVisibilidadComparativo() {
+            const btn = document.getElementById('btnComparativo');
+            if (!btn) return;
+            const ses = window.__IE_SES;
+            if (!ses || ses.role === 'admin' || ses.user === 'admin') {
+                btn.classList.remove('hidden');
+                return;
+            }
+            btn.classList.toggle('hidden', areasComparablesGrado(estado.grado).length === 0);
+            if (btn.classList.contains('hidden')) {
+                const vista = document.getElementById('vistaComparativo');
+                if (vista) vista.classList.add('hidden');
+            }
+        }
+
         function abrirComparativo() {
             const box = document.getElementById('vistaComparativo');
             if (!box) return;
+            const ses = window.__IE_SES;
+            const areas = (ses && ses.role === 'docente')
+                ? areasComparablesGrado(estado.grado)
+                : Object.keys(ESTRUCTURA_AREAS).filter(function(n){ return areaVisibleSesion(n); });
+            if (!areas.length) {
+                mostrarToast('Comparativo disponible solo para Admin/Director o docentes con ambas secciones del mismo grado y área', 'error');
+                box.classList.add('hidden');
+                return;
+            }
             document.getElementById('panelCompetencias').classList.add('hidden');
             box.classList.remove('hidden');
-            const areas = Object.keys(ESTRUCTURA_AREAS).filter(function(n){ return areaVisibleSesion(n); });
             const sel = document.getElementById('cmpArea');
             if (sel) {
                 sel.innerHTML = areas.map(n => '<option value="'+n.replace(/"/g,'"')+'">'+n+'</option>').join('');
@@ -2870,7 +2929,11 @@ window.__IE_gradoOK = function(gradoVal) {
             const area = ((document.getElementById('cmpArea') || {}).value) || estado.areaActual;
             if (!area || !ESTRUCTURA_AREAS[area]) return;
             const grado = estado.grado || '1°';
-            const secs = seccionesDelGrado(grado);
+            const ses = window.__IE_SES;
+            if (ses && ses.role === 'docente' && !puedeCompararAreaGrado(area, grado)) return;
+            const secs = (ses && ses.role === 'docente')
+                ? seccionesAsignadasAreaGrado(area, grado)
+                : seccionesDelGrado(grado);
             if (!secs.length) return;
             const colA = secs[0], colB = secs[1] || null;
             const filas = ESTRUCTURA_AREAS[area].competencias.map((c, i) => ({
@@ -2895,7 +2958,16 @@ window.__IE_gradoOK = function(gradoVal) {
             const area = ((document.getElementById('cmpArea') || {}).value) || estado.areaActual;
             if (!area || !ESTRUCTURA_AREAS[area]) return;
             const grado = estado.grado || '1°';
-            const secs = seccionesDelGrado(grado);
+            const ses = window.__IE_SES;
+            if (ses && ses.role === 'docente' && !puedeCompararAreaGrado(area, grado)) {
+                const box = document.getElementById('vistaComparativo');
+                if (box) box.classList.add('hidden');
+                mostrarToast('No tienes ambas secciones asignadas en esta área y grado', 'error');
+                return;
+            }
+            const secs = (ses && ses.role === 'docente')
+                ? seccionesAsignadasAreaGrado(area, grado)
+                : seccionesDelGrado(grado);
             if (!secs.length) return;
             const lbl = document.getElementById('cmpGradoLbl');
             if (lbl) lbl.textContent = 'Bimestre ' + estado.bimestre + ' · ' + grado + ' · ' + secs.map(s => s === 'ÚNICA' ? 'Única' : s).join(' y ');
