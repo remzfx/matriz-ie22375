@@ -52,7 +52,6 @@
     .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#0f172a; color:#fff;
       font-weight:800; font-size:13px; padding:.5rem 1rem; border-radius:999px; z-index:50; }
   </style>
-  <script src="students.js"></script>
 </head>
 <body>
 <script>
@@ -86,7 +85,6 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
 </header>
 
 <main id="vistaAsis" class="max-w-lg mx-auto px-4 py-4 space-y-3">
-  <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
   <div class="card p-3 space-y-3">
     <div id="scanBox" class="space-y-2">
       <div id="reader"></div>
@@ -169,6 +167,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
 <div id="toast" class="toast hidden"></div>
 
 <script>
+const BD_KEY = 'ie22375_admin_bd_v1';
 const ASIS_KEY = 'ie22375_asistencia_colegio_v1';
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
 function fetchLecturaNube(url) {
@@ -285,7 +284,13 @@ function toast(m) {
   setTimeout(() => el.classList.add('hidden'), 2200);
 }
 
-function loadBD() { return IEStudents.empty(); }
+function loadBD() {
+  try {
+    const raw = localStorage.getItem(BD_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return null;
+}
 function loadAsis() {
   try {
     const raw = localStorage.getItem(ASIS_KEY);
@@ -316,13 +321,17 @@ function fijarNiveles(j) {
 }
 async function ensureBD() {
   try {
-    BD = await IEStudents.load();
-    if (BD.offline) toast('Sin conexión: lista temporal de esta sesión (10 minutos máximo).');
-  } catch(e) {
-    BD = IEStudents.empty();
-    toast(e.message);
-    throw e;
-  }
+    const r = await fetch('bd_oficial_2026.json?t=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) {
+      const j = fijarNiveles(await r.json());
+      if (j && j.primaria && j.primaria.estudiantes && j.primaria.estudiantes.length) {
+        BD = j;
+        try { localStorage.setItem(BD_KEY, JSON.stringify(j)); } catch (e) {}
+        return;
+      }
+    }
+  } catch (e) {}
+  BD = fijarNiveles(loadBD()) || { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
 }
 
 function alumnosAula() {
@@ -340,7 +349,7 @@ function onNivel() {
     ? grados.map(g => '<option value="'+g+'">'+g+'°</option>').join('')
     : '<option value="">—</option>';
   if (!list.length) {
-    document.getElementById('lblAula').textContent = 'Sin alumnos cargados. Revisa la sesión/conexión y la base oficial de Admin.';
+    document.getElementById('lblAula').textContent = 'Sin lista de alumnos. Sube bd_oficial_2026.json a GitHub o carga la BD en Admin en ESTE celular.';
   }
   onGrado();
 }
@@ -753,7 +762,7 @@ function marcarPorQR(text) {
   const p = parseQR(text);
   document.getElementById('scanMsg').textContent = 'Leído: ' + String(text).slice(0, 90);
   if (!nAl) {
-    toast('No hay alumnos cargados. Revisa la sesión/conexión y recarga.');
+    toast('No hay lista de alumnos en este celular. Sube bd_oficial_2026.json a GitHub.');
     return;
   }
   const hit = hallarAlumno(p);
@@ -867,7 +876,7 @@ function esEnvioMasivo() {
 Promise.all([ensureBD(), ensureHorario(), bajarGruposWa()]).then(() => {
   onNivel();
   if (esEnvioMasivo()) verMenu('grupos');
-}).catch(function(e) { document.getElementById('lblAula').textContent = e.message; });
+});
 (function pintarYa() {
   BD = fijarNiveles(loadBD()) || { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
   const f = document.getElementById('inpFecha');

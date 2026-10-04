@@ -900,7 +900,6 @@
             }
         }
 </style>
-  <script src="students.js"></script>
 </head>
 <body class="text-slate-800">
 <script>window.__IE_NEED_['primaria','admin']=['primaria','admin'];</script>
@@ -1003,7 +1002,6 @@ window.__IE_gradoOK = function(gradoVal) {
     <div id="bannerSandbox" class="hidden bg-amber-500 text-white text-center text-sm font-medium py-2 px-4 no-print"></div>
 
     <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
         
         <!-- SELECTORES CON BOTONES -->
         <div class="glass rounded-2xl shadow-lg p-5 md:p-6 no-print space-y-5">
@@ -1048,7 +1046,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
                         <i class="fas fa-user-graduate mr-1.5 text-sky-600"></i>N° Estudiantes
                     </label>
-                    <input type="number" id="totalEstudiantes" readonly value="" placeholder="—" onchange="actualizarTotalEstudiantes()" 
+                    <input type="number" id="totalEstudiantes" min="1" max="60" value="" placeholder="—" onchange="actualizarTotalEstudiantes()" 
                            class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3.5 text-center text-xl font-extrabold text-sky-700 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none">
                 </div>
                 
@@ -1426,21 +1424,6 @@ window.__IE_gradoOK = function(gradoVal) {
             ultimaModificacion: 0 // ms — última edición local de datos
         };
 
-        let baseOficialEstudiantes = [];
-        async function cargarBaseOficialEstudiantes() {
-            try {
-                const db = await IEStudents.load();
-                baseOficialEstudiantes = db.primaria.estudiantes;
-                if (db.offline) mostrarToast('Sin conexión: lista temporal de esta sesión (10 minutos máximo).', 'error');
-            } catch(e) {
-                baseOficialEstudiantes = [];
-                mostrarToast(e.message, 'error');
-            }
-            syncInputTotalEstudiantes();
-            renderizarAreas();
-            renderizarResumen();
-            if (estado.areaActual) { renderizarCompetencias(); renderizarAreaHeader(); }
-        }
         let charts = {};
         let storageDisponible = true;
 
@@ -1452,9 +1435,21 @@ window.__IE_gradoOK = function(gradoVal) {
             return `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
         }
         function getTotalEstudiantes() {
-            const grados = {PRIMERO: 1, SEGUNDO: 2, TERCERO: 3, CUARTO: 4, QUINTO: 5, SEXTO: 6};
-            const sec = String(estado.seccion || 'UNICA').toUpperCase().replace('Ú', 'U');
-            return baseOficialEstudiantes.filter(al => Number(al.grado) === grados[estado.grado] && String(al.seccion).toUpperCase().replace('Ú', 'U') === sec).length;
+            if (!estado.totalesPorAula) estado.totalesPorAula = {};
+            const k = claveAula();
+            if (Object.prototype.hasOwnProperty.call(estado.totalesPorAula, k)) {
+                const v = estado.totalesPorAula[k];
+                if (v != null && v !== '') {
+                    if (typeof v === 'object' && v !== null) {
+                        const n = Number(v.valor != null ? v.valor : v.n);
+                        return n > 0 ? n : 0;
+                    }
+                    const n = Number(v);
+                    return n > 0 ? n : 0;
+                }
+            }
+            // Sin dato para esta sección/grado → vacío (0 = no definido)
+            return 0;
         }
         function setTotalEstudiantes(val, ts) {
             if (!estado.totalesPorAula) estado.totalesPorAula = {};
@@ -1473,8 +1468,6 @@ window.__IE_gradoOK = function(gradoVal) {
             if (!el) return;
             const n = getTotalEstudiantes();
             el.value = n > 0 ? n : '';
-            el.readOnly = true;
-            el.title = 'Calculado desde la base oficial privada';
         }
 
         function getNombreDocente() {
@@ -1607,7 +1600,6 @@ window.__IE_gradoOK = function(gradoVal) {
             
             syncInputTotalEstudiantes();
             syncInputDocente();
-            cargarBaseOficialEstudiantes();
         });
 
         // ============================================
@@ -2956,7 +2948,41 @@ window.__IE_gradoOK = function(gradoVal) {
             if (!silencioso) mostrarToast('Docente guardado para este grado', 'success');
         }
 
-        function actualizarTotalEstudiantes() { syncInputTotalEstudiantes(); }
+        function actualizarTotalEstudiantes() {
+            const raw = document.getElementById('totalEstudiantes').value;
+            if (raw === '' || raw == null) {
+                // Vaciar: quitar dato de ESTA aula
+                if (!estado.totalesPorAula) estado.totalesPorAula = {};
+                if (!estado.totalesPorAulaTs) estado.totalesPorAulaTs = {};
+                const k = claveAula();
+                delete estado.totalesPorAula[k];
+                delete estado.totalesPorAulaTs[k];
+                estado.totalEstudiantes = null;
+                document.getElementById('totalEstudiantes').value = '';
+                guardarDatos();
+                if (estado.areaActual) {
+                    renderizarCompetencias();
+                    renderizarAreaHeader();
+                }
+                renderizarResumen();
+                renderizarAreas();
+                mostrarToast('N° estudiantes vacío para este grado/sección', 'success');
+                return;
+            }
+            let val = parseInt(raw, 10);
+            if (isNaN(val) || val < 1) val = 1;
+            if (val > 60) val = 60;
+            val = setTotalEstudiantes(val);
+            document.getElementById('totalEstudiantes').value = val;
+            guardarDatos();
+            if (estado.areaActual) {
+                renderizarCompetencias();
+                renderizarAreaHeader();
+            }
+            renderizarResumen();
+            renderizarAreas();
+            mostrarToast('N° estudiantes de este grado/sección: ' + val, 'success');
+        }
 
         // ============================================
         // RESUMEN
