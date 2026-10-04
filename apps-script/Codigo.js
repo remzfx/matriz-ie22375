@@ -538,6 +538,129 @@ function payloadRegistroLectura_(payload, acceso, ctx) {
 }
 
 
+// Base privada: versiones inmutables y punteros ACTUAL/OFICIAL en el mismo Spreadsheet.
+// El respaldo oficial apunta a la primera importación explícita de Admin, nunca al navegador.
+function hojaEstudiantes_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName('EstudiantesBase');
+  if (!sh) {
+    sh = ss.insertSheet('EstudiantesBase');
+    sh.appendRow(['clave', 'version', 'json']);
+    sh.getRange(1, 1, 1, 3).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function leerBaseEstudiantes_(sh, oficial) {
+  const last = sh.getLastRow();
+  if (last < 2) return null;
+  const rows = sh.getRange(2, 1, last - 1, 3).getValues();
+  const clave = oficial ? 'BASE_OFICIAL' : 'BASE_ACTUAL';
+  let pointer = null;
+  rows.forEach(function(row) { if (row[0] === clave) pointer = row; });
+  if (!pointer) return null;
+  const version = String(pointer[1]);
+  const manifest = JSON.parse(pointer[2]);
+  if (!Number.isInteger(manifest.partes) || manifest.partes < 1) throw new Error('Base privada incompleta.');
+  const chunks = {};
+  rows.forEach(function(row) { if (String(row[1]) === version) chunks[row[0]] = row[2]; });
+  let raw = '';
+  for (let i = 0; i < manifest.partes; i++) {
+    const chunk = chunks['DATOS_' + version + '_' + i];
+    if (typeof chunk !== 'string') throw new Error('Base privada incompleta.');
+    raw += chunk;
+  }
+  const estudiantes = JSON.parse(raw);
+  if (!Array.isArray(estudiantes)) throw new Error('Base privada inválida.');
+  return {version: version, partes: manifest.partes, estudiantes: estudiantes};
+}
+
+function normalizarBaseEstudiantes_(body) {
+  const db = body.base;
+  if (!db || !db.primaria || !db.secundaria ||
+      !Array.isArray(db.primaria.estudiantes) || !Array.isArray(db.secundaria.estudiantes)) {
+    throw new Error('Importa una base con listas de Primaria y Secundaria.');
+  }
+  const out = [];
+  ['primaria', 'secundaria'].forEach(function(nivel) {
+    db[nivel].estudiantes.forEach(function(item) {
+      if (!item || typeof item !== 'object') throw new Error('Alumno inválido.');
+      const grado = gradoEscritura_(item.grado);
+      const sec = seccionEscritura_(item.seccion);
+      const nombre = String(item.nombre || '').trim();
+      const orden = Number(item.orden) || 0;
+      if (!grado || grado > (nivel === 'primaria' ? 6 : 5) || !sec || !nombre ||
+          nombre.length > 250 || !Number.isInteger(orden) || orden < 0) throw new Error('Alumno inválido.');
+      out.push({nivel: nivel, grado: grado, seccion: sec === 'ÚNICA' ? 'Única' : sec, orden: orden, nombre: nombre});
+    });
+  });
+  return out;
+}
+
+function respuestaEstudiantes_(base, acceso) {
+  const list = base ? base.estudiantes : [];
+  const estudiantes = list.filter(function(al) {
+    if (acceso.sesion.role === 'admin' || acceso.sesion.role === 'auxiliar') return true;
+    return puedeLeerAula_(acceso, {nivel: al.nivel, numero: gradoEscritura_(al.grado), seccion: al.seccion});
+  }).map(function(al) {
+    return {nivel: al.nivel, grado: al.grado, seccion: al.seccion, orden: al.orden, nombre: al.nombre};
+  });
+  return {ok: true, estudiantes: estudiantes, version: base ? base.version : '', inicializada: !!base};
+}
+
+function estudiantesRuta_(body) {
+  const action = String(body.action).toLowerCase();
+  const lectura = action === 'loadstudents';
+  const acceso = sesionLectura_(body.token, lectura ? ['admin', 'auxiliar', 'docente'] : ['admin']);
+  if (!acceso) return {ok: false, code: 'SESSION', error: 'Sesión inválida o sin autorización para estudiantes.'};
+  // DocentesAcceso se valida antes de tomar el lock compartido, evitando bloqueos anidados.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(5000);
+  try {
+    if (acceso.sesion.role === 'docente') {
+      // savedoc comparte este lock: verificar otra vez si cambió mientras esperábamos.
+      const config = leerDocentesConfigSheets_();
+      if (Number(acceso.sesion.permisosVersion) !== Number(config.ts)) {
+        return {ok: false, code: 'SESSION', error: 'La sesión docente fue revocada.'};
+      }
+    }
+    const sh = hojaEstudiantes_();
+    const actual = leerBaseEstudiantes_(sh, false);
+    if (lectura) return respuestaEstudiantes_(actual, acceso);
+    if (String(body.version == null ? '' : body.version) !== (actual ? actual.version : '')) {
+      return {ok: false, code: 'CONFLICT', error: 'La base cambió en otro dispositivo. Recarga antes de guardar.'};
+    }
+    if (action === 'restorestudents') {
+      const respaldo = leerBaseEstudiantes_(sh, true);
+      if (!respaldo) throw new Error('Todavía no existe un respaldo oficial privado.');
+      // Nueva versión para detectar incluso cambios posteriores a una restauración (evita ABA).
+      body.base = {primaria: {estudiantes: respaldo.estudiantes.filter(function(a) { return a.nivel === 'primaria'; })},
+        secundaria: {estudiantes: respaldo.estudiantes.filter(function(a) { return a.nivel === 'secundaria'; })}};
+    } else if (action === 'initstudents') {
+      if (actual || leerBaseEstudiantes_(sh, true)) throw new Error('La base oficial ya está inicializada.');
+    } else if (!actual) {
+      throw new Error('Primero importa e inicializa la base oficial privada.');
+    }
+    const estudiantes = normalizarBaseEstudiantes_(body);
+    if (action === 'initstudents' && !estudiantes.length) throw new Error('La base oficial inicial no puede estar vacía.');
+    const version = Utilities.getUuid();
+    const raw = JSON.stringify(estudiantes);
+    let partes = 0;
+    // Evita el límite de 50.000 caracteres por celda de Sheets.
+    for (let i = 0; i < raw.length; i += 30000) {
+      sh.appendRow(['DATOS_' + version + '_' + partes++, version, raw.slice(i, i + 30000)]);
+    }
+    const manifest = JSON.stringify({partes: partes});
+    // Publicar el puntero al final: una escritura parcial nunca reemplaza la base vigente.
+    if (action === 'initstudents') sh.appendRow(['BASE_OFICIAL', version, manifest]);
+    sh.appendRow(['BASE_ACTUAL', version, manifest]);
+    SpreadsheetApp.flush();
+    return respuestaEstudiantes_({version: version, estudiantes: estudiantes}, acceso);
+  } finally { lock.releaseLock(); }
+}
+
+
 function doGet(e) {
   try {
     const p = (e && e.parameter) || {};
@@ -802,6 +925,10 @@ function doPost(e) {
 
     if (['loadreg', 'loadnivel', 'load', 'loadasis', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
       return doGet({ parameter: body });
+    }
+
+    if (['loadstudents', 'savestudents', 'initstudents', 'restorestudents'].indexOf(action) >= 0) {
+      return responder_(estudiantesRuta_(body));
     }
 
     if (action === 'login') return responder_(responderLogin_(body));

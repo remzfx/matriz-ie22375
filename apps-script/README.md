@@ -153,4 +153,16 @@ La acción `login` sigue siendo el punto público de autenticación existente, c
 
 No se modifican rutas de escritura, formatos almacenados, secretos ni diseño de tokens.
 
+## Estudiantes privados — etapa A del rollout
+
+El PR #34 prepara acciones nuevas exclusivamente POST con token: `loadstudents` (alcance server-side por rol), `initstudents` (inicialización explícita solo Admin), `savestudents` y `restorestudents` (solo Admin, revisión contra sobrescrituras concurrentes). Se usa la hoja privada `EstudiantesBase` del mismo Spreadsheet, con una base vigente y respaldo de restauración privado. El despliegue no importa datos automáticamente.
+
+**Esta etapa conserva la fuente pública y todos los consumidores actuales.** Admin añade controles manuales independientes de preparación en Importar, sin cambiar su base local, importación SIAGIE/CSV/JSON, edición, guardado ni restauración vigentes. Si Apps Script aún no se actualiza, esos controles nuevos muestran un error; el funcionamiento actual continúa. No se requiere publicar GitHub Pages y Apps Script simultáneamente.
+
+La inicialización debe usar exclusivamente exportaciones CSV SIAGIE vigentes de ambos niveles, revisadas y confirmadas por Admin. No se usa la copia antigua de 408 alumnos ni el JSON de 407 como semilla. La discrepancia de Secundaria 4.º B, orden 217 se resuelve mediante esa revisión, sin fusionar automáticamente datos.
+
+El segundo PR queda en borrador: solo después de validar la base privada en producción y recibir confirmación de Admin migrará los seis consumidores y retirará las listas públicas. Una caché offline no sirve como verificación de producción. Plan completo y criterios de corte en [auditoria-estudiantes.md](auditoria-estudiantes.md).
+
+Pruebas: `node --test tests/*.test.cjs`. No se ejecutaron merge, despliegue ni importaciones reales.
+
 

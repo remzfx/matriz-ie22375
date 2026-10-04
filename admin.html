@@ -42,6 +42,8 @@
     .mobile-nav-scroll > button { flex:0 0 auto; }
   }
 </style>
+<script src="students.js"></script>
+<script src="students-migration.js"></script>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['admin'];</script>
@@ -202,6 +204,18 @@
     <section id="tab-import" class="tab hidden">
       <div class="card p-4 space-y-3">
         <h2 class="font-black text-lg">Importar base oficial</h2>
+        <details class="border border-sky-200 rounded-lg p-3">
+          <summary class="font-bold cursor-pointer">Preparar base privada · etapa A (los módulos actuales no cambian)</summary>
+          <p class="text-sm mt-2">Usa CSV SIAGIE vigentes de ambos niveles y revisa las listas. No se importa automáticamente la base antigua de 408/407 alumnos. La diferencia de Secundaria 4.º B, orden 217 debe resolverse con SIAGIE vigente.</p>
+          <label class="block mt-2">SIAGIE Primaria <input type="file" accept=".csv,.txt" onchange="IEMigrateStudents.importar(this,'primaria')"></label>
+          <pre id="migracionPreview-primaria" class="text-xs max-h-32 overflow-auto"></pre>
+          <label class="block mt-2">SIAGIE Secundaria <input type="file" accept=".csv,.txt" onchange="IEMigrateStudents.importar(this,'secundaria')"></label>
+          <pre id="migracionPreview-secundaria" class="text-xs max-h-32 overflow-auto"></pre>
+          <label class="block my-2"><input id="migracionRevisada" type="checkbox"> Revisé ambas exportaciones SIAGIE vigentes, aulas y matrícula; autorizo estas listas como base inicial y respaldo.</label>
+          <button class="btn btn-ghost text-sm" onclick="IEMigrateStudents.verificar()">Verificar backend y base privada</button>
+          <button class="btn btn-primary text-sm" onclick="IEMigrateStudents.inicializar()">Inicializar base privada desde SIAGIE revisado</button>
+          <p id="migracionEstado" role="status" class="text-sm text-sky-800 mt-2">La base pública y el flujo de importación/guardado actuales siguen activos. Esta preparación es manual y no activa la etapa B.</p>
+        </details>
         <p class="text-sm text-slate-600">Acepta CSV del <b>SIAGIE</b> (listado de estudiantes) o JSON. Columnas sugeridas: <code class="bg-slate-100 px-1 rounded">nivel,grado,seccion,orden,nombre</code></p>
         <p class="text-[11px] text-amber-800 bg-amber-50 rounded-lg px-2 py-1.5 leading-snug">
           Al importar del SIAGIE se excluyen alumnos con estado <b>TRASLADADO</b>. Solo ingresan matrículas <b>DEFINITIVA</b> (ej. 150 en el CSV → 148 activos).
