@@ -3478,6 +3478,14 @@ window.__IE_gradoOK = function(gradoVal) {
         // ============================================
         function renderizarResumen() {
             const container = document.getElementById('resumenRapido');
+            // En sesión docente no mostrar tarjetas globales (Progreso/Inicio/Proceso/Logrado).
+            // El detalle útil queda por área y competencia.
+            if (window.__IE_SES && window.__IE_SES.role === 'docente') {
+                container.innerHTML = '';
+                container.classList.add('hidden');
+                return;
+            }
+            container.classList.remove('hidden');
             let totalInicio = 0, totalProceso = 0, totalLogrado = 0, totalDestacado = 0;
             let competenciasLlenas = 0, totalCompetencias = 0;
             
