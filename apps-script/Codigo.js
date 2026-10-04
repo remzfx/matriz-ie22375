@@ -552,13 +552,12 @@ function hojaEstudiantes_() {
   return sh;
 }
 
-function leerBaseEstudiantes_(sh, oficial) {
+function leerVersionEstudiantes_(sh, clave) {
   const last = sh.getLastRow();
   if (last < 2) return null;
   const rows = sh.getRange(2, 1, last - 1, 3).getValues();
-  const clave = oficial ? 'BASE_OFICIAL' : 'BASE_ACTUAL';
   let pointer = null;
-  rows.forEach(function(row) { if (row[0] === clave) pointer = row; });
+  rows.forEach(function(row) { if (String(row[0]) === String(clave)) pointer = row; });
   if (!pointer) return null;
   const version = String(pointer[1]);
   const manifest = JSON.parse(pointer[2]);
@@ -574,6 +573,35 @@ function leerBaseEstudiantes_(sh, oficial) {
   const estudiantes = JSON.parse(raw);
   if (!Array.isArray(estudiantes)) throw new Error('Base privada inválida.');
   return {version: version, partes: manifest.partes, estudiantes: estudiantes};
+}
+
+function leerBaseEstudiantes_(sh, oficial) {
+  return leerVersionEstudiantes_(sh, oficial ? 'BASE_OFICIAL' : 'BASE_ACTUAL');
+}
+
+function normalizarBimestrePadron_(value) {
+  const bim = String(value || '').trim().toUpperCase();
+  return /^(I|II|III|IV)$/.test(bim) ? bim : '';
+}
+
+function leerPadronEstudiantes_(sh, bimestre) {
+  const bim = normalizarBimestrePadron_(bimestre);
+  return bim ? leerVersionEstudiantes_(sh, 'PADRON_' + bim) : null;
+}
+
+function escribirVersionEstudiantes_(sh, estudiantes, claves) {
+  const version = Utilities.getUuid();
+  const raw = JSON.stringify(estudiantes);
+  let partes = 0;
+  for (let i = 0; i < raw.length; i += 30000) {
+    sh.appendRow(['DATOS_' + version + '_' + partes++, version, raw.slice(i, i + 30000)]);
+  }
+  const manifest = JSON.stringify({partes: partes});
+  (claves || []).forEach(function(clave) {
+    sh.appendRow([clave, version, manifest]);
+  });
+  SpreadsheetApp.flush();
+  return {version: version, partes: partes, estudiantes: estudiantes};
 }
 
 function normalizarBaseEstudiantes_(body) {
@@ -598,7 +626,7 @@ function normalizarBaseEstudiantes_(body) {
   return out;
 }
 
-function respuestaEstudiantes_(base, acceso) {
+function respuestaEstudiantes_(base, acceso, meta) {
   const list = base ? base.estudiantes : [];
   const estudiantes = list.filter(function(al) {
     if (acceso.sesion.role === 'admin' || acceso.sesion.role === 'auxiliar') return true;
@@ -606,7 +634,13 @@ function respuestaEstudiantes_(base, acceso) {
   }).map(function(al) {
     return {nivel: al.nivel, grado: al.grado, seccion: al.seccion, orden: al.orden, nombre: al.nombre};
   });
-  return {ok: true, estudiantes: estudiantes, version: base ? base.version : '', inicializada: !!base};
+  meta = meta || {};
+  return {
+    ok: true, estudiantes: estudiantes, version: base ? base.version : '', inicializada: !!base,
+    bimestre: meta.bimestre || '',
+    padronInicializado: Object.prototype.hasOwnProperty.call(meta, 'padronInicializado') ? !!meta.padronInicializado : !!base,
+    fuentePadron: meta.fuentePadron || ''
+  };
 }
 
 function estudiantesRuta_(body) {
@@ -614,12 +648,10 @@ function estudiantesRuta_(body) {
   const lectura = action === 'loadstudents';
   const acceso = sesionLectura_(body.token, lectura ? ['admin', 'auxiliar', 'docente'] : ['admin']);
   if (!acceso) return {ok: false, code: 'SESSION', error: 'Sesión inválida o sin autorización para estudiantes.'};
-  // DocentesAcceso se valida antes de tomar el lock compartido, evitando bloqueos anidados.
   const lock = LockService.getScriptLock();
   lock.waitLock(5000);
   try {
     if (acceso.sesion.role === 'docente') {
-      // savedoc comparte este lock: verificar otra vez si cambió mientras esperábamos.
       const config = leerDocentesConfigSheets_();
       if (Number(acceso.sesion.permisosVersion) !== Number(config.ts)) {
         return {ok: false, code: 'SESSION', error: 'La sesión docente fue revocada.'};
@@ -627,39 +659,72 @@ function estudiantesRuta_(body) {
     }
     const sh = hojaEstudiantes_();
     const actual = leerBaseEstudiantes_(sh, false);
-    if (lectura) return respuestaEstudiantes_(actual, acceso);
+
+    if (lectura) {
+      const bim = normalizarBimestrePadron_(body.bimestre);
+      if (!bim) return respuestaEstudiantes_(actual, acceso, {padronInicializado: true, fuentePadron: 'actual'});
+      const padron = leerPadronEstudiantes_(sh, bim);
+      return respuestaEstudiantes_(padron || actual, acceso, {
+        bimestre: bim,
+        padronInicializado: !!padron,
+        fuentePadron: padron ? 'bimestre' : 'actual'
+      });
+    }
+
     if (String(body.version == null ? '' : body.version) !== (actual ? actual.version : '')) {
       return {ok: false, code: 'CONFLICT', error: 'La base cambió en otro dispositivo. Recarga antes de guardar.'};
     }
+
+    if (action === 'seedstudentsroster') {
+      if (!actual) throw new Error('Primero importa e inicializa la base oficial privada.');
+      const bim = normalizarBimestrePadron_(body.bimestre);
+      if (!bim) throw new Error('Selecciona un bimestre válido.');
+      const existente = leerPadronEstudiantes_(sh, bim);
+      if (existente) return respuestaEstudiantes_(existente, acceso, {
+        bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'
+      });
+      sh.appendRow(['PADRON_' + bim, actual.version, JSON.stringify({partes: actual.partes})]);
+      SpreadsheetApp.flush();
+      return respuestaEstudiantes_(actual, acceso, {
+        bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'
+      });
+    }
+
+    if (action === 'syncstudents') {
+      if (!actual) throw new Error('Primero importa e inicializa la base oficial privada.');
+      const bim = normalizarBimestrePadron_(body.bimestre);
+      if (!bim) throw new Error('Selecciona un bimestre válido.');
+      if (!bimestreAbierto_(bim)) {
+        return {ok: false, code: 'PERIOD_CLOSED', error: 'El bimestre ' + bim + ' no está abierto. Su padrón no se modificará.'};
+      }
+      const estudiantes = normalizarBaseEstudiantes_(body);
+      if (!estudiantes.length) throw new Error('La actualización SIAGIE no puede dejar la base vacía.');
+      const nueva = escribirVersionEstudiantes_(sh, estudiantes, ['BASE_ACTUAL', 'PADRON_' + bim]);
+      return respuestaEstudiantes_(nueva, acceso, {
+        bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'
+      });
+    }
+
     if (action === 'restorestudents') {
       const respaldo = leerBaseEstudiantes_(sh, true);
       if (!respaldo) throw new Error('Todavía no existe un respaldo oficial privado.');
-      // Nueva versión para detectar incluso cambios posteriores a una restauración (evita ABA).
-      body.base = {primaria: {estudiantes: respaldo.estudiantes.filter(function(a) { return a.nivel === 'primaria'; })},
-        secundaria: {estudiantes: respaldo.estudiantes.filter(function(a) { return a.nivel === 'secundaria'; })}};
+      body.base = {
+        primaria: {estudiantes: respaldo.estudiantes.filter(function(a) { return a.nivel === 'primaria'; })},
+        secundaria: {estudiantes: respaldo.estudiantes.filter(function(a) { return a.nivel === 'secundaria'; })}
+      };
     } else if (action === 'initstudents') {
       if (actual || leerBaseEstudiantes_(sh, true)) throw new Error('La base oficial ya está inicializada.');
     } else if (!actual) {
       throw new Error('Primero importa e inicializa la base oficial privada.');
     }
+
     const estudiantes = normalizarBaseEstudiantes_(body);
     if (action === 'initstudents' && !estudiantes.length) throw new Error('La base oficial inicial no puede estar vacía.');
-    const version = Utilities.getUuid();
-    const raw = JSON.stringify(estudiantes);
-    let partes = 0;
-    // Evita el límite de 50.000 caracteres por celda de Sheets.
-    for (let i = 0; i < raw.length; i += 30000) {
-      sh.appendRow(['DATOS_' + version + '_' + partes++, version, raw.slice(i, i + 30000)]);
-    }
-    const manifest = JSON.stringify({partes: partes});
-    // Publicar el puntero al final: una escritura parcial nunca reemplaza la base vigente.
-    if (action === 'initstudents') sh.appendRow(['BASE_OFICIAL', version, manifest]);
-    sh.appendRow(['BASE_ACTUAL', version, manifest]);
-    SpreadsheetApp.flush();
-    return respuestaEstudiantes_({version: version, estudiantes: estudiantes}, acceso);
+    const claves = action === 'initstudents' ? ['BASE_OFICIAL', 'BASE_ACTUAL'] : ['BASE_ACTUAL'];
+    const nueva = escribirVersionEstudiantes_(sh, estudiantes, claves);
+    return respuestaEstudiantes_(nueva, acceso, {padronInicializado: true, fuentePadron: 'actual'});
   } finally { lock.releaseLock(); }
 }
-
 
 function doGet(e) {
   try {
@@ -927,7 +992,7 @@ function doPost(e) {
       return doGet({ parameter: body });
     }
 
-    if (['loadstudents', 'savestudents', 'initstudents', 'restorestudents'].indexOf(action) >= 0) {
+    if (['loadstudents', 'savestudents', 'initstudents', 'restorestudents', 'seedstudentsroster', 'syncstudents'].indexOf(action) >= 0) {
       return responder_(estudiantesRuta_(body));
     }
 

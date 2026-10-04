@@ -211,9 +211,29 @@
           <pre id="migracionPreview-primaria" class="text-xs max-h-32 overflow-auto"></pre>
           <label class="block mt-2">SIAGIE Secundaria <input type="file" accept=".csv,.txt" onchange="IEMigrateStudents.importar(this,'secundaria')"></label>
           <pre id="migracionPreview-secundaria" class="text-xs max-h-32 overflow-auto"></pre>
-          <label class="block my-2"><input id="migracionRevisada" type="checkbox"> Revisé ambas exportaciones SIAGIE vigentes, aulas y matrícula; autorizo estas listas como base inicial y respaldo.</label>
-          <button class="btn btn-ghost text-sm" onclick="IEMigrateStudents.verificar()">Verificar backend y base privada</button>
-          <button class="btn btn-primary text-sm" onclick="IEMigrateStudents.inicializar()">Inicializar base privada desde SIAGIE revisado</button>
+          <label class="block my-2"><input id="migracionRevisada" type="checkbox"> Revisé ambas exportaciones SIAGIE vigentes, aulas y matrícula; autorizo estas listas como base oficial revisada.</label>
+          <div class="flex flex-wrap gap-2 mb-2">
+            <button class="btn btn-ghost text-sm" onclick="IEMigrateStudents.verificar()">Verificar backend y base privada</button>
+            <button class="btn btn-primary text-sm" onclick="IEMigrateStudents.inicializar()">Inicializar base privada desde SIAGIE revisado</button>
+          </div>
+          <div class="border border-emerald-200 bg-emerald-50 rounded-xl p-3 mt-3 space-y-2">
+            <div class="font-bold text-sm text-emerald-900">Padrón SIAGIE por bimestre</div>
+            <p class="text-xs text-emerald-900">Cada bimestre conserva su propia lista. Una actualización del padrón no modifica las notas ya guardadas: mantiene a quienes continúan, agrega los nuevos y deja de mostrar a quienes ya no aparecen en el SIAGIE de ese bimestre.</p>
+            <label class="block text-xs font-bold text-slate-600">Bimestre
+              <select id="migracionBimestre" class="mt-1">
+                <option value="I">I</option>
+                <option value="II">II</option>
+                <option value="III">III</option>
+                <option value="IV">IV</option>
+              </select>
+            </label>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn btn-ghost text-sm" onclick="IEMigrateStudents.verificarPadron()">Verificar padrón</button>
+              <button class="btn btn-ghost text-sm" onclick="IEMigrateStudents.crearPadron()">Crear padrón desde base vigente</button>
+              <button class="btn btn-ok text-sm" onclick="IEMigrateStudents.sincronizarPadron()">Actualizar base y padrón con estos CSV</button>
+            </div>
+            <p class="text-[11px] text-emerald-800">La actualización de un padrón existente solo se permite mientras ese bimestre esté abierto. Los bimestres cerrados quedan protegidos.</p>
+          </div>
           <p id="migracionEstado" role="status" class="text-sm text-sky-800 mt-2">La base pública y el flujo de importación/guardado actuales siguen activos. Esta preparación es manual y no activa la etapa B.</p>
         </details>
         <p class="text-sm text-slate-600">Acepta CSV del <b>SIAGIE</b> (listado de estudiantes) o JSON. Columnas sugeridas: <code class="bg-slate-100 px-1 rounded">nivel,grado,seccion,orden,nombre</code></p>
