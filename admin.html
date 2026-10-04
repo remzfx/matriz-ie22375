@@ -702,12 +702,17 @@ function parseCSV(text, options) {
     const orden = parseInt(row.orden || row.ord || row.n || row.numerodeorden || row.item || '0', 10) || 0;
     const nivelRaw = (row.nivel || row.descnivel || document.getElementById('importNivel').value || 'primaria').toLowerCase();
     const nivel = nivelRaw.includes('sec') ? 'secundaria' : 'primaria';
+    const idSiagie = row.id || row.idestudiante || row.idalumno || row.codigoid || '';
+    const codigoEstudiante = row.codigoestudiante || row['cód. estudiante'] || row.codestudiante || row.codigodelestudiante || row.codigosiagie || '';
     out.push({
       nivel,
       grado,
       seccion,
       orden,
-      nombre: nombre.toUpperCase()
+      nombre: nombre.toUpperCase(),
+      idSiagie: String(idSiagie || '').trim(),
+      codigoEstudiante: String(codigoEstudiante || '').trim(),
+      estadoMatricula: estado
     });
   }
   return out.filter(x => x.grado && x.nombre);
@@ -799,13 +804,19 @@ function procesarImport() {
 
 function mergeOrReplace(nivel, rows, modo) {
   if (!estado[nivel]) estado[nivel] = { estudiantes: [], docentes: [] };
-  const clean = rows.map(r => ({
-    nivel,
-    grado: +r.grado || 0,
-    seccion: r.seccion || 'Única',
-    orden: +r.orden || 0,
-    nombre: String(r.nombre || '').toUpperCase()
-  })).filter(r => r.grado && r.nombre);
+  const clean = rows.map(r => {
+    const out = {
+      nivel,
+      grado: +r.grado || 0,
+      seccion: r.seccion || 'Única',
+      orden: +r.orden || 0,
+      nombre: String(r.nombre || '').toUpperCase()
+    };
+    if (r.idSiagie) out.idSiagie = String(r.idSiagie);
+    if (r.codigoEstudiante) out.codigoEstudiante = String(r.codigoEstudiante);
+    if (r.estadoMatricula) out.estadoMatricula = String(r.estadoMatricula);
+    return out;
+  }).filter(r => r.grado && r.nombre);
   if (!clean.length) {
     alert('No se pudo leer alumnos para ' + nivel + ' (grado o nombre vacíos).');
     return;
@@ -1110,6 +1121,37 @@ async function renderAulasSiagie(){
     '</div>';
   }).join('');
 }
+function extraerIdentidadesMatrizSiagie(buf){
+  if(typeof XLSX==='undefined') return [];
+  const wb=XLSX.read(buf,{type:'array',cellDates:true});
+  for(const sn of wb.SheetNames){
+    const ws=wb.Sheets[sn];
+    if(!ws||!ws['!ref']) continue;
+    const a1=String((ws.A1||{}).v||'').trim().toUpperCase();
+    const b1=String((ws.B1||{}).v||'').trim().toUpperCase();
+    const c1=String((ws.C1||{}).v||'').trim().toUpperCase();
+    if(a1!=='ID'||b1.indexOf('ESTUDIANTE')<0||c1!=='NOMBRES') continue;
+    const range=XLSX.utils.decode_range(ws['!ref']), out=[];
+    for(let r=2;r<=range.e.r;r++){
+      const id=String(((ws[XLSX.utils.encode_cell({r,c:0})]||{}).v)||'').trim();
+      const codigo=String(((ws[XLSX.utils.encode_cell({r,c:1})]||{}).v)||'').trim();
+      const nombre=String(((ws[XLSX.utils.encode_cell({r,c:2})]||{}).v)||'').trim();
+      if(!nombre||(!id&&!codigo)) continue;
+      out.push({idSiagie:id,codigoEstudiante:codigo,nombre});
+    }
+    if(out.length) return out;
+  }
+  return [];
+}
+
+async function enriquecerIdentidadesDesdeMatriz(buf,nivel,bim,grado,seccion){
+  const identidades=extraerIdentidadesMatrizSiagie(buf);
+  if(!identidades.length) return {enriquecidosBase:0,enriquecidosPadron:0};
+  const actual=await IEStudents.load();
+  if(actual.offline||!actual.inicializada) throw new Error('No se pudo verificar la base privada para asociar los ID SIAGIE.');
+  return IEStudents.enrich(actual.version,bim,nivel,grado,seccion,identidades);
+}
+
 async function subirPlantillaAula(grado, seccion, inputId){
   const inp=document.getElementById(inputId);
   const msg=document.getElementById('msg_'+inputId);
@@ -1124,7 +1166,11 @@ async function subirPlantillaAula(grado, seccion, inputId){
   try{
     const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'savetpl',token:tokenSesionAdmin(),nivel,bimestre:bim,grado,seccion,filename:inp.files[0].name,b64:btoa(bin),ts:Date.now()})});
     const data=JSON.parse(await res.text());
-    if(msg) msg.textContent=data.ok?('Guardado: '+inp.files[0].name):(data.error||'Error');
+    if(!data.ok){ if(msg) msg.textContent=data.error||'Error'; return; }
+    let ids={enriquecidosBase:0,enriquecidosPadron:0};
+    try{ ids=await enriquecerIdentidadesDesdeMatriz(buf,nivel,bim,grado,seccion); }
+    catch(e){ if(msg) msg.textContent='Plantilla guardada, pero faltó asociar ID SIAGIE: '+e.message; renderAulasSiagie(); return; }
+    if(msg) msg.textContent='Guardado: '+inp.files[0].name+' · ID SIAGIE asociados: '+Math.max(ids.enriquecidosBase||0,ids.enriquecidosPadron||0);
     renderAulasSiagie();
   }catch(e){ if(msg) msg.textContent='No se pudo sincronizar con la nube. Verifique la conexión e intente nuevamente.'; }
 }
@@ -1189,7 +1235,12 @@ async function vaciarSiagieOficial(){
   const by={};
   items.forEach(it=>{ by[it.area]=it.payload||{}; });
   const alumnos=(estudiantesDe(ctx.nivel)||[]).filter(a=>String(a.grado)===String(ctx.grado)&&String(a.seccion)===String(ctx.seccion));
-  const idx={}; alumnos.forEach(al=>{ idx[normNomAdm(al.nombre)]=al.nombre; });
+  const idxNom={},idxId={},idxCod={};
+  alumnos.forEach(al=>{
+    idxNom[normNomAdm(al.nombre)]=al.nombre;
+    if(al.idSiagie) idxId[String(al.idSiagie).trim()]=al.nombre;
+    if(al.codigoEstudiante) idxCod[String(al.codigoEstudiante).trim()]=al.nombre;
+  });
   const wb=XLSX.read(buf,{type:'array',cellDates:true});
   let escritos=0;
   wb.SheetNames.forEach(sn=>{
@@ -1202,9 +1253,13 @@ async function vaciarSiagieOficial(){
     const use=map.only==null?comps:[comps[map.only]].filter(Boolean);
     const p=by[map.area];
     for(let r=range.s.r+2;r<=range.e.r;r++){
+      const cellId=ws[XLSX.utils.encode_cell({r:r,c:0})];
+      const cellCod=ws[XLSX.utils.encode_cell({r:r,c:1})];
       const cell=ws[XLSX.utils.encode_cell({r:r,c:2})];
+      const idX=cellId?String(cellId.v||'').trim():'';
+      const codX=cellCod?String(cellCod.v||'').trim():'';
       const nomX=cell?cell.v:'';
-      const nombre=idx[normNomAdm(nomX)];
+      const nombre=(idX&&idxId[idX])||(codX&&idxCod[codX])||idxNom[normNomAdm(nomX)];
       if(!nombre) continue;
       use.forEach((cp,i)=>{
         const letra=letraDesdePayload(p,ctx,map.area,cp,nombre);
