@@ -135,7 +135,7 @@ test('Revocation while waiting for the student lock is checked again without nes
   s.c.LockService.getScriptLock=()=>({waitLock(){assert.equal(s.state.held,false);s.state.held=true;s.tables.get('DocentesAcceso').rows[1][1]=2000;},releaseLock(){s.state.held=false;}});
   assert.equal(s.load(s.primary).ok,false);assert.equal(s.state.held,false);
 });
-for(const action of ['loadstudents','savestudents','initstudents','restorestudents'])test(action+': GET never exposes students or changes the private base',()=> {
+for(const action of ['loadstudents','savestudents','initstudents','restorestudents','seedstudentsroster','syncstudents'])test(action+': GET never exposes students or changes the private base',()=> {
   const s=studentsFixture(),before=s.state.writes,res=s.get({action,token:s.admin,base:s.base});
   assert.equal(res.ok,false);assert.equal('estudiantes' in res,false);assert.equal(s.state.writes,before);
 });
