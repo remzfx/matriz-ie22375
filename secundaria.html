@@ -1777,7 +1777,7 @@ window.__IE_gradoOK = function(gradoVal) {
                 el.disabled = locked;
             });
 
-            document.querySelectorAll('#competenciasContainer input, #docenteAreaInput').forEach(function(el){
+            document.querySelectorAll('#competenciasContainer input').forEach(function(el){
                 el.disabled = locked;
                 el.classList.toggle('solo-lectura-control', locked);
             });
@@ -2657,12 +2657,9 @@ window.__IE_gradoOK = function(gradoVal) {
                             <div class="${area.color} w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg flex-shrink-0">
                                 <i class="fas ${area.icon}"></i>
                             </div>
-                            <div>
+                            <div class="min-w-0">
                                 <h2 class="text-xl font-bold ${area.textColor}">${estado.areaActual}</h2>
                                 <p class="text-sm text-slate-500">${area.competencias.length} competencias • ${estado.grado} ${estado.seccion} • Bimestre ${estado.bimestre}</p>
-                                <p class="md:hidden mt-2 text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg px-2 py-1.5">
-                                    Docente responsable: ${docente || 'Sin registrar'}
-                                </p>
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-2">
@@ -2685,19 +2682,10 @@ window.__IE_gradoOK = function(gradoVal) {
                         </div>
                     </div>
                     
-                    <!-- DOCENTE DE ESTA ÁREA — grande y visible -->
-                    <div class="bg-sky-50 border-2 border-sky-300 rounded-2xl p-5">
-                        <label class="block text-sm font-bold text-sky-800 uppercase tracking-wider mb-2">
-                            <i class="fas fa-chalkboard-teacher mr-2 text-sky-600"></i>
-                            Docente responsable de esta área
-                        </label>
-                        <p class="text-xs text-sky-600 mb-3">Se guarda solo para <strong>${estado.areaActual}</strong> · ${estado.grado} ${estado.seccion} · Bimestre ${estado.bimestre}</p>
-                        <input type="text" id="docenteAreaInput"
-                               value="${docente.replace(/"/g, '&quot;')}"
-                               placeholder="Escribe el nombre completo del docente..."
-                               oninput="setDocenteArea(estado.areaActual, this.value)"
-                               ${periodoSoloLecturaActual() ? 'disabled' : ''}
-                               class="w-full bg-white border-2 border-sky-200 rounded-xl px-5 py-4 text-lg font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none shadow-sm ${periodoSoloLecturaActual() ? 'solo-lectura-control' : ''}">
+                    <!-- Docente asignado desde administración: informativo, no editable -->
+                    <div class="mx-auto w-full max-w-2xl text-center text-sm font-bold text-sky-800 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
+                        <i class="fas fa-chalkboard-teacher mr-1.5 text-sky-600"></i>
+                        Docente responsable: ${docente || 'Sin registrar'}
                     </div>
                 </div>
             `;
