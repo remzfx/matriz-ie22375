@@ -899,8 +899,38 @@
                 padding-bottom:2px;
             }
         }
+        .bim-card { background:#fff; border:2px solid #e2e8f0; border-radius:14px; padding:10px 8px 12px; text-align:center; min-width:0; }
+        .bim-card.active-bim { border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.22); background:#f0f9ff; }
+        .bim-label { font-size:13px; font-weight:800; color:#64748b; margin-bottom:8px; }
+        .bim-card.active-bim .bim-label { color:#0369a1; }
+        .bim-btn-inner { width:100%; min-height:44px; border:2px solid #e2e8f0; border-radius:10px; font-size:17px; font-weight:800; background:#f8fafc; color:#64748b; cursor:pointer; }
+        .bim-btn-inner:hover { border-color:#38bdf8; color:#0284c7; background:#e0f2fe; }
+        .bim-card.active-bim .bim-btn-inner { background:#0f172a; border-color:#0f172a; color:#fff; }
+        .bim-card.periodo-cerrado .bim-btn-inner,
+        .bim-card.periodo-bloqueado .bim-btn-inner {
+            background:#e2e8f0 !important;
+            color:#64748b !important;
+            border-color:#cbd5e1 !important;
+            box-shadow:none !important;
+        }
+        .bim-card.periodo-cerrado.active-bim .bim-btn-inner,
+        .bim-card.periodo-bloqueado.active-bim .bim-btn-inner {
+            background:#475569 !important;
+            color:#fff !important;
+            border-color:#475569 !important;
+        }
+        .solo-lectura-control {
+            opacity:.72 !important;
+            cursor:not-allowed !important;
+        }
+        #periodReadOnlyBanner {
+            border:1px solid #f59e0b;
+            background:#fffbeb;
+            color:#92400e;
+        }
 </style>
   <script src="students.js"></script>
+  <script src="matrix-teachers.js"></script>
 </head>
 <body class="text-slate-800">
 <script>window.__IE_NEED_['primaria','admin']=['primaria','admin'];</script>
@@ -1057,13 +1087,16 @@ window.__IE_gradoOK = function(gradoVal) {
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
                         <i class="fas fa-chalkboard-teacher mr-1.5 text-sky-600"></i>Docente responsable
                     </label>
-                    <input type="text" id="nombreDocente" placeholder="Nombre del docente" onchange="actualizarNombreDocente()" oninput="(function(){ const el=document.getElementById('nombreDocente'); if(el){ setNombreDocente(el.value); } })()"
+                    <input type="text" id="nombreDocente" readonly placeholder="Sin registrar"
                            class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none">
                 </div>
             </div>
         </div>
 
         <!-- RESUMEN RÁPIDO -->
+    <div id="periodReadOnlyBanner" class="hidden max-w-7xl mx-auto mt-4 px-4 py-3 rounded-xl text-sm font-bold no-print">
+        🔒 Bimestre cerrado por Administración · Solo lectura
+    </div>
         <div id="resumenRapido" class="grid grid-cols-2 md:grid-cols-4 gap-3 no-print"></div>
 
         <!-- ÁREAS -->
@@ -1421,6 +1454,13 @@ window.__IE_gradoOK = function(gradoVal) {
         };
 
         let baseOficialEstudiantes = [];
+        async function cargarDocentesOficialesMatriz() {
+            try { await IEMatrixTeachers.load(CLOUD_API_URL); }
+            catch(e) { mostrarToast('No se pudo actualizar el docente oficial desde Admin.', 'error'); }
+            syncInputDocente();
+            if (estado.areaActual) renderizarAreaHeader();
+        }
+
         function estadoEstudiantes(mensaje) {
             const el = document.getElementById('studentsStatus');
             if (el) el.textContent = mensaje;
@@ -1494,13 +1534,8 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function getNombreDocente() {
-            if (!estado.docentesPorAula) estado.docentesPorAula = {};
-            const k = claveAula();
-            if (Object.prototype.hasOwnProperty.call(estado.docentesPorAula, k)) {
-                return estado.docentesPorAula[k] || '';
-            }
-            // legado: un solo nombre global (solo si no hay por aula)
-            return estado.nombreDocente || '';
+            if (!IEMatrixTeachers.peek()) return 'Pendiente de verificar';
+            return IEMatrixTeachers.nombre('primaria', estado.grado) || 'Sin registrar';
         }
         function setNombreDocente(nombre, ts) {
             if (!estado.docentesPorAula) estado.docentesPorAula = {};
@@ -1514,7 +1549,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
         function syncInputDocente() {
             const el = document.getElementById('nombreDocente');
-            if (el) el.value = getNombreDocente();
+            if (el) { el.value = getNombreDocente(); el.readOnly = true; }
         }
         /** Docentes desde la nube: gana el registro con fecha más reciente */
         function aplicarDocentesDesdeNube(items) {
@@ -1602,6 +1637,88 @@ window.__IE_gradoOK = function(gradoVal) {
             } catch(e) { return false; }
         }
 
+        const PERIODOS_CLOUD_KEY = 'ie22375_periodos_cloud_v1';
+        let periodosAdminMatriz = null;
+
+        function estadoPeriodoAdmin(bim) {
+            if (!periodosAdminMatriz || !periodosAdminMatriz.bimestres) return 'desconocido';
+            return String(periodosAdminMatriz.bimestres[bim] || 'bloqueado').toLowerCase();
+        }
+
+        function periodoEditableActual() {
+            return estadoPeriodoAdmin(estado.bimestre) === 'abierto';
+        }
+
+        function periodoSoloLecturaActual() {
+            return !periodoEditableActual();
+        }
+
+        function impedirEdicionPeriodo(mostrar) {
+            if (!periodoSoloLecturaActual()) return false;
+            if (mostrar !== false && typeof mostrarToast === 'function') {
+                const st = estadoPeriodoAdmin(estado.bimestre);
+                mostrarToast('Bimestre ' + estado.bimestre + ' ' + (st === 'desconocido' ? 'sin configuración' : st) + ' · Solo lectura', 'error');
+            }
+            return true;
+        }
+
+        async function cargarPeriodosAdminMatriz() {
+            let cfg = null;
+            try {
+                const url = CLOUD_API_URL + '?action=loadperiodos&t=' + Date.now();
+                const r = await fetch(url, { cache:'no-store' });
+                const data = JSON.parse(await r.text());
+                if (data && data.ok && data.periodos && data.periodos.bimestres) {
+                    cfg = data.periodos;
+                    localStorage.setItem(PERIODOS_CLOUD_KEY, JSON.stringify(cfg));
+                }
+            } catch(e) {}
+
+            if (!cfg) {
+                try {
+                    const raw = localStorage.getItem(PERIODOS_CLOUD_KEY);
+                    if (raw) cfg = JSON.parse(raw);
+                } catch(e) {}
+            }
+
+            periodosAdminMatriz = (cfg && cfg.bimestres) ? cfg : null;
+            renderBimestre();
+            aplicarModoPeriodoActual();
+            return !!periodosAdminMatriz;
+        }
+
+        function aplicarModoPeriodoActual() {
+            const locked = periodoSoloLecturaActual();
+            const st = estadoPeriodoAdmin(estado.bimestre);
+            const banner = document.getElementById('periodReadOnlyBanner');
+            if (banner) {
+                if (locked) {
+                    banner.classList.remove('hidden');
+                    banner.textContent = '🔒 Bimestre ' + estado.bimestre + ' · ' +
+                        (st === 'desconocido' ? 'Configuración no disponible' : (st.charAt(0).toUpperCase()+st.slice(1))) +
+                        ' · Solo lectura';
+                } else {
+                    banner.classList.add('hidden');
+                }
+            }
+
+            document.querySelectorAll(
+                '[onclick^="subirNube"],[onclick^="limpiarTodo"],[onclick^="traerDesdeRegistro"]'
+            ).forEach(function(el){
+                el.disabled = locked;
+                el.classList.toggle('solo-lectura-control', locked);
+            });
+
+            document.querySelectorAll('input[type="file"]').forEach(function(el){
+                el.disabled = locked;
+            });
+
+            document.querySelectorAll('#competenciasContainer input').forEach(function(el){
+                el.disabled = locked;
+                el.classList.toggle('solo-lectura-control', locked);
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             // Registrar plugin de etiquetas si está disponible
             if (typeof ChartDataLabels !== 'undefined') {
@@ -1617,6 +1734,14 @@ window.__IE_gradoOK = function(gradoVal) {
             }
             
             cargarDatos();
+            try {
+                const rawPer = localStorage.getItem(PERIODOS_CLOUD_KEY);
+                if (rawPer) {
+                    const cfg = JSON.parse(rawPer);
+                    if (cfg && cfg.bimestres) periodosAdminMatriz = cfg;
+                }
+            } catch(e) {}
+
             // Pintar la respuesta autorizada local antes de iniciar cualquier red.
             cargarBaseOficialCache();
             actualizarBotonesSeleccion();
@@ -1625,17 +1750,36 @@ window.__IE_gradoOK = function(gradoVal) {
             
             syncInputTotalEstudiantes();
             syncInputDocente();
+            aplicarModoPeriodoActual();
+            cargarPeriodosAdminMatriz();
+            cargarDocentesOficialesMatriz();
             cargarBaseOficialEstudiantes();
         });
 
         // ============================================
         // BOTONES DE SELECCIÓN (Bimestre / Grado)
         // ============================================
+        function renderBimestre() {
+            const cont = document.getElementById('btnBimestre');
+            if (!cont) return;
+            const bims = ['I', 'II', 'III', 'IV'];
+            cont.innerHTML = bims.map(b => {
+                const active = estado.bimestre === b;
+                const st = estadoPeriodoAdmin(b);
+                const locked = st !== 'abierto';
+                const cls = locked ? (' periodo-' + (st === 'cerrado' ? 'cerrado' : 'bloqueado')) : '';
+                const icon = locked ? ' <i class="fas fa-lock text-[10px] ml-1"></i>' : '';
+                const title = locked ? ('Bimestre ' + b + ' · ' + (st === 'desconocido' ? 'solo lectura' : st)) : ('Bimestre ' + b + ' · abierto');
+                return `
+                <div class="bim-card ${active ? 'active-bim' : ''}${cls}">
+                    <div class="bim-label">Bimestre${icon}</div>
+                    <button type="button" class="bim-btn-inner" title="${title}" onclick="setBimestre('${b}')">${b}</button>
+                </div>`;
+            }).join('');
+        }
+
         function actualizarBotonesSeleccion() {
-            // Bimestre
-            document.querySelectorAll('#btnBimestre .sel-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.val === estado.bimestre);
-            });
+            renderBimestre();
             // Grado
             document.querySelectorAll('#btnGrado .sel-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.val === estado.grado);
@@ -1661,7 +1805,9 @@ window.__IE_gradoOK = function(gradoVal) {
             guardarDatos();
             renderizarAreas();
             renderizarResumen();
-            mostrarToast(`Bimestre ${val} — datos independientes`, 'success');
+            aplicarModoPeriodoActual();
+            const st = estadoPeriodoAdmin(val);
+            mostrarToast(`Bimestre ${val} · ${st === 'abierto' ? 'Editable' : 'Solo lectura'}`, st === 'abierto' ? 'success' : 'warning');
         }
 
         function setGrado(val) {
@@ -2348,6 +2494,7 @@ window.__IE_gradoOK = function(gradoVal) {
             return 'C';
         }
         function traerDesdeRegistro() {
+            if (impedirEdicionPeriodo()) return;
             let store = {};
             try { store = JSON.parse(localStorage.getItem('ie22375_registro_notas_v2') || '{}'); } catch(e) { store = {}; }
             const finales = store.finales || {};
@@ -2528,7 +2675,8 @@ window.__IE_gradoOK = function(gradoVal) {
                                     <input type="number" min="0" max="${maxCampo}" value="${dato[nivel.key]}"
                                            data-area="${estado.areaActual}" data-comp="${nombreComp}" data-nivel="${nivel.key}"
                                            oninput="actualizarDato(this)"
-                                           class="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-center text-xl font-extrabold focus:ring-2 outline-none"
+                                           ${periodoSoloLecturaActual() ? 'disabled' : ''}
+                                           class="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-center text-xl font-extrabold focus:ring-2 outline-none ${periodoSoloLecturaActual() ? 'solo-lectura-control' : ''}"
                                            style="color:${nivel.color}">
                                     <div class="pct-label text-center text-sm font-bold mt-1.5" style="color:${nivel.color}">
                                         ${dato[nivel.key]} est. · ${pct(dato[nivel.key])}%
@@ -2874,6 +3022,7 @@ window.__IE_gradoOK = function(gradoVal) {
         let _debounceGraficos = null;
 
         function actualizarDato(input) {
+            if (impedirEdicionPeriodo()) { renderizarCompetencias(); return; }
             const area = input.dataset.area;
             const comp = input.dataset.comp;
             const nivel = input.dataset.nivel;
@@ -2968,13 +3117,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
 
-        function actualizarNombreDocente(silencioso) {
-            const el = document.getElementById('nombreDocente');
-            const val = el ? el.value : '';
-            setNombreDocente(val);
-            guardarDatos();
-            if (!silencioso) mostrarToast('Docente guardado para este grado', 'success');
-        }
+        function actualizarNombreDocente() { syncInputDocente(); }
 
         function actualizarTotalEstudiantes() { syncInputTotalEstudiantes(); }
 
@@ -2983,56 +3126,11 @@ window.__IE_gradoOK = function(gradoVal) {
         // ============================================
         function renderizarResumen() {
             const container = document.getElementById('resumenRapido');
-            // En sesión docente no mostrar tarjetas globales (Progreso/Inicio/Proceso/Logrado).
-            // El detalle útil queda por área y competencia.
-            if (window.__IE_SES && window.__IE_SES.role === 'docente') {
-                container.innerHTML = '';
-                container.classList.add('hidden');
-                return;
-            }
-            container.classList.remove('hidden');
-            let totalInicio = 0, totalProceso = 0, totalLogrado = 0, totalDestacado = 0;
-            let competenciasLlenas = 0, totalCompetencias = 0;
-            
-            Object.keys(ESTRUCTURA_AREAS).forEach(area => {
-                ESTRUCTURA_AREAS[area].competencias.forEach(comp => {
-                    totalCompetencias++;
-                    const d = getDato(area, comp);
-                    const suma = d.inicio + d.proceso + d.previsto + d.destacado;
-                    if (suma > 0) competenciasLlenas++;
-                    totalInicio += d.inicio;
-                    totalProceso += d.proceso;
-                    totalLogrado += d.previsto;
-                    totalDestacado += d.destacado;
-                });
-            });
-            
-            const pctLlenado = totalCompetencias ? Math.round((competenciasLlenas / totalCompetencias) * 100) : 0;
-            const mostrarProgresoGeneral = !(window.__IE_SES && window.__IE_SES.role === 'docente');
-            
-            container.innerHTML = `
-                ${mostrarProgresoGeneral ? `
-                <div class="glass rounded-2xl p-4 shadow-md border-l-4 border-sky-500">
-                    <div class="text-xs font-semibold text-slate-500 uppercase">Progreso General</div>
-                    <div class="text-2xl font-bold text-sky-700 mt-1">${pctLlenado}%</div>
-                    <div class="text-xs text-slate-400 mt-1">${competenciasLlenas}/${totalCompetencias} competencias</div>
-                </div>` : ''}
-                <div class="glass rounded-2xl p-4 shadow-md border-l-4 border-red-500">
-                    <div class="text-xs font-semibold text-slate-500 uppercase">Inicio (C)</div>
-                    <div class="text-2xl font-bold text-red-600 mt-1">${totalInicio}</div>
-                    <div class="text-xs text-slate-400 mt-1">estudiantes</div>
-                </div>
-                <div class="glass rounded-2xl p-4 shadow-md border-l-4 border-yellow-500">
-                    <div class="text-xs font-semibold text-slate-500 uppercase">En Proceso (B)</div>
-                    <div class="text-2xl font-bold text-yellow-600 mt-1">${totalProceso}</div>
-                    <div class="text-xs text-slate-400 mt-1">estudiantes</div>
-                </div>
-                <div class="glass rounded-2xl p-4 shadow-md border-l-4 border-green-500">
-                    <div class="text-xs font-semibold text-slate-500 uppercase">Logrado (A+AD)</div>
-                    <div class="text-2xl font-bold text-green-600 mt-1">${totalLogrado + totalDestacado}</div>
-                    <div class="text-xs text-slate-400 mt-1">Logrado + Destacado</div>
-                </div>
-            `;
+            if (!container) return;
+            // Resumen global retirado para todos los roles: podía confundirse con
+            // indicadores de rendimiento. El análisis queda en Comparativo y Resumen del grado.
+            container.innerHTML = '';
+            container.classList.add('hidden');
         }
 
         // ============================================
@@ -3132,8 +3230,6 @@ window.__IE_gradoOK = function(gradoVal) {
             try {
             try { estado.ultimaModificacion = Date.now(); } catch(e) {}
             
-                const doc = document.getElementById('nombreDocente');
-                if (doc) setNombreDocente(doc.value);
                 
                 if (storageDisponible) {
                     try { estado.ultimaModificacion = Date.now(); } catch(e) {}
@@ -3184,6 +3280,7 @@ window.__IE_gradoOK = function(gradoVal) {
         let datosImportadosTemp = null;
 
         function importarDatos(event) {
+            if (impedirEdicionPeriodo()) { event.target.value=''; return; }
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
@@ -3277,6 +3374,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function aplicarImportacion(modo) {
+            if (impedirEdicionPeriodo()) return;
             if (!datosImportadosTemp) return;
             
             const imported = datosImportadosTemp;
@@ -3362,6 +3460,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function limpiarTodo() {
+            if (impedirEdicionPeriodo()) return;
             if (confirm('¿Borrar TODOS los datos de esta matriz?\\n\\nEsta acción no se puede deshacer (exporta antes si es necesario).')) {
                 estado.datos = {};
                 estado.areaActual = null;
@@ -3420,11 +3519,12 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         async function enviarAreaANube(area) {
+            if (impedirEdicionPeriodo()) return;
             const ctxKey = `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
             const areaData = (estado.datos[ctxKey] && estado.datos[ctxKey][area])
                 ? estado.datos[ctxKey][area]
                 : {};
-            const docenteArea = getNombreDocente() || (document.getElementById('nombreDocente') || {}).value || '';
+            const docenteArea = getNombreDocente();
             const payload = {
                 action: 'saveArea',
                 token: (window.__IE_SES || {}).token || '',
@@ -3458,6 +3558,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function subirNube() {
+            if (impedirEdicionPeriodo()) return;
             const areasDatos = areasConDatosDelGrado();
             const areaAct = estado.areaActual;
             const gradoLabel = estado.grado || '';
@@ -3501,6 +3602,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         async function ejecutarSubidaAreas(listaAreas) {
+            if (impedirEdicionPeriodo()) return;
             if (!listaAreas || !listaAreas.length) {
                 mostrarToast('No hay áreas para subir', 'error');
                 return;

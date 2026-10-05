@@ -170,9 +170,10 @@ test('UI refinements keep Registro Promedios compact and cloud actions explicit'
 });
 
 for (const file of ['primaria.html', 'secundaria.html']) {
-  test(file + ': teacher view hides aggregate summary cards and comparative has no redundant back controls', () => {
+  test(file + ': all roles hide aggregate summary cards and comparative has no redundant back controls', () => {
     const src = read(file);
-    assert.match(src, /window\.__IE_SES\.role === 'docente'/);
+    const summary = src.slice(src.indexOf('function renderizarResumen()'), src.indexOf('// VISTA TABLA CONSOLIDADA'));
+    assert.doesNotMatch(summary, /__IE_SES|Progreso General|Inicio \(C\)|En Proceso \(B\)|Logrado \(A\+AD\)/);
     assert.match(src, /container\.classList\.add\('hidden'\)/);
     assert.match(src, /container\.innerHTML = ''/);
     assert.doesNotMatch(src, /← Volver a áreas|>← Volver</);

@@ -141,6 +141,9 @@ GET y POST aplican la misma autorización. Los consumidores de la plataforma env
 | `loadaip` | Admin/PIP. |
 | `classroom` | Admin; conserva respuesta JSON/JSONP, sin exponer públicamente cursos de la cuenta de ejecución. No hay consumidor de lectura en la interfaz actual; el botón solo abre Classroom. |
 | `loaddoc` | Conserva POST solo Admin; GET siempre rechazado. |
+| `loadmatrixteachers` | POST con token: Admin ve todas las asignaciones; Docente solo las propias. Vista de `DOCENTE_ACCESOS` con nombres, nivel, grados y área→aula; nunca entrega `pass`, contraseñas ni usuarios. |
+
+Primaria y Secundaria usan esta vista para el docente responsable, con caché temporal ligada al token. Los nombres históricos de las matrices no sustituyen la asignación oficial. El código completo de esta ruta está en `Codigo.js`; requiere una actualización futura de la implementación existente para estar disponible en producción. Este PR no realiza merge ni despliegue.
 
 Para Primaria se filtran grados autorizados. Para Secundaria se exige la relación exacta área → aula de `asignaciones`; solo los registros antiguos sin ese mapa conservan el fallback explícito `areas`+`aulas`. Los filtros de la consulta solo reducen ese alcance: omitirlos o falsificarlos nunca concede otros contextos. Firma, expiración y revocación por `permisosVersion` se conservan. Los registros se filtran antes de retornar su payload; sus sesiones y mapas internos también se limitan al contexto de la fila. La forma de `payload.meta` permanece intacta.
 

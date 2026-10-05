@@ -1032,6 +1032,7 @@
         }
 </style>
   <script src="students.js"></script>
+  <script src="matrix-teachers.js"></script>
 </head>
 <body class="text-slate-800">
 <script>window.__IE_NEED_['secundaria','admin']=['secundaria','admin'];</script>
@@ -1613,6 +1614,12 @@ window.__IE_gradoOK = function(gradoVal) {
         ];
 
         let baseOficialEstudiantes = [];
+        async function cargarDocentesOficialesMatriz() {
+            try { await IEMatrixTeachers.load(CLOUD_API_URL); }
+            catch(e) { mostrarToast('No se pudo actualizar el docente oficial desde Admin.', 'error'); }
+            if (estado.areaActual) renderizarAreaHeader();
+        }
+
         function estadoEstudiantes(mensaje) {
             const el = document.getElementById('studentsStatus');
             if (el) el.textContent = mensaje;
@@ -1882,6 +1889,8 @@ window.__IE_gradoOK = function(gradoVal) {
             renderizarResumen();
             syncInputTotalEstudiantes();
             aplicarModoPeriodoActual();
+
+            cargarDocentesOficialesMatriz();
 
             // Refrescar nube y BD sin dejar la interfaz vacía mientras esperan.
             Promise.all([
@@ -2702,11 +2711,8 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function getDocenteArea(area) {
-            if (!area) return '';
-            const k = claveActual();
-            if (!estado.docentes) estado.docentes = {};
-            if (!estado.docentes[k]) estado.docentes[k] = {};
-            return estado.docentes[k][area] || '';
+            if (!IEMatrixTeachers.peek()) return 'Pendiente de verificar';
+            return IEMatrixTeachers.nombre('secundaria', estado.grado, estado.seccion, area) || 'Sin registrar';
         }
 
         function setDocenteArea(area, nombre) {
@@ -2723,9 +2729,7 @@ window.__IE_gradoOK = function(gradoVal) {
             const area = ESTRUCTURA_AREAS[estado.areaActual];
             const header = document.getElementById('areaHeader');
             const resumen = calcularResumenArea(estado.areaActual);
-            const sesionDocente = (window.__IE_SES && window.__IE_SES.role === 'docente')
-                ? (window.__IE_SES.label || window.__IE_SES.user || '') : '';
-            const docente = getDocenteArea(estado.areaActual) || sesionDocente;
+            const docente = getDocenteArea(estado.areaActual).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             
             header.innerHTML = `
                 <div class="w-full space-y-4">
