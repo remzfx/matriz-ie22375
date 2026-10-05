@@ -269,13 +269,29 @@ test('savereg: meta remains an object through save, loadreg and the unchanged cl
   assert.deepEqual(item.payload.meta, savedMeta);
 
   const store = {sessions: [], grades: {}, meta: {[response.clave]: {localField: true}}};
-  const context = vm.createContext({store, aliasesAula:()=>({}),metaRegistro:()=>store.meta[response.clave], cloudClaveReg: () => response.clave});
+  const context = vm.createContext({store, ctxBase:()=>({nivel:'primaria',bim:'I',grado:1,seccion:'Única'}),aliasesAula:()=>({}),metaRegistro:()=>store.meta[response.clave], cloudClaveReg: () => response.clave});
+  for(const name of ['tsDe','asisGet','asisCtxKey','mergeFechasAsistencia']) new vm.Script(clientFunction('registro.html',name)).runInContext(context);
   new vm.Script(clientFunction('registro.html', 'mergeRegistroPayload')).runInContext(context);
   context.mergeRegistroPayload(item.payload);
   assert.deepEqual(JSON.parse(JSON.stringify(store.meta[response.clave])), {
     localField: true, ...meta, docente: 'Test Primary', studentAliases: {}
   });
   assert.equal(Object.hasOwn(store.meta[response.clave], '0'), false);
+});
+
+test('savereg/loadreg: another device restores attendance dates, versions and marks through protected backend',()=>{
+  const s=setup(),ctx='primaria||I||1||Única',fecha='2026-10-05',key=ctx+'||'+fecha+'||Synthetic Student';
+  const payload={meta:{},asistencia:{[key]:{marca:'P',hora:'09:00',ts:200}},asisFechas:{[ctx]:[fecha,'2026-10-06']},asisFechasEstado:{[ctx+'||'+fecha]:{ts:100,borrado:false}}};
+  const saved=s.post(s.body('savereg',{token:s.primary,payload}));assert.equal(saved.ok,true);
+  const loaded=JSON.parse(s.c.doPost({postData:{contents:JSON.stringify({action:'loadreg',token:s.primary,nivel:'primaria',bimestre:'I',grado:1,seccion:'Única',area:'Comunicación'})}}).text);
+  assert.equal(loaded.ok,true);const restored=loaded.items.find(i=>i.clave===saved.clave).payload;
+  assert.deepEqual(restored.asisFechas,payload.asisFechas);assert.deepEqual(restored.asisFechasEstado,payload.asisFechasEstado);assert.deepEqual(restored.asistencia,payload.asistencia);
+  const store={sessions:[],grades:{},meta:{}};
+  const client=vm.createContext({store,ctxBase:()=>({nivel:'primaria',bim:'I',grado:1,seccion:'Única'}),aliasesAula:()=>({}),metaRegistro:()=>({}),cloudClaveReg:()=>saved.clave});
+  for(const name of ['tsDe','asisGet','asisCtxKey','getAsisFechas','mergeFechasAsistencia','mergeRegistroPayload'])new vm.Script(clientFunction('registro.html',name)).runInContext(client);
+  client.mergeRegistroPayload(restored);
+  assert.deepEqual(JSON.parse(JSON.stringify(client.getAsisFechas())),[fecha,'2026-10-06']);
+  assert.deepEqual(JSON.parse(JSON.stringify(client.asisGet(store.asistencia[key]))),{marca:'P',hora:'09:00'});assert.equal(store.asistencia[key].ts,200);
 });
 
 test('savereg: admin metadata object remains unchanged', () => {

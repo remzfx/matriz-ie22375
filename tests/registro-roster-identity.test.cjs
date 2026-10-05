@@ -19,7 +19,7 @@ function fixture(){
    function ctxBase(){return {nivel,bim:document.getElementById('selBim').value,grado:4,seccion:'B',area:areaActual};}
    function estudiantes(){return bdEstudiantes.secundaria.estudiantes;}
    function cloudClaveReg(){const c=ctxBase();return [c.nivel,c.bim,c.grado,c.seccion,c.area].join('||');}`);
- for(const name of ['alumnoIdentidad','identidadAlumno','aliasesAula','recordarPadron','leerNota','metaRegistro','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','cambiarBimestreRegistro','gradeKey','finalKey','concAreaKey','sliceRegistroArea','mergeRegistroPayload','bimCerradoDocente'])run(extract('registro.html',name));
+ for(const name of ['alumnoIdentidad','identidadAlumno','aliasesAula','recordarPadron','leerNota','metaRegistro','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','cambiarBimestreRegistro','gradeKey','finalKey','concAreaKey','asisCtxKey','asisGet','mergeFechasAsistencia','sliceRegistroArea','mergeRegistroPayload','bimCerradoDocente'])run(extract('registro.html',name));
  run("function prefijoReg(){return cloudClaveReg()+'||';}function tsDe(x){return x&&x.ts||0;}let savedBim='';function guardarTodo(){savedBim=ctxBase().bim;}function llenarAulasPadron(){}function onContexto(){}");
  return {c,run,roster,requests,alerts,el,main};
 }

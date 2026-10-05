@@ -87,6 +87,8 @@ function fixture() {
       finales: {[key + '||C1||Synthetic Student']: {nivel: 'A'}},
       concArea: {[key + '||Synthetic Student']: {texto: 'Synthetic'}},
       asistencia: {[key.split('||').slice(0,4).join('||') + '||2026-10-03||Synthetic Student']: {marca: 'P'}},
+      asisFechas: {[key.split('||').slice(0,4).join('||')]: ['2026-10-03']},
+      asisFechasEstado: {[key.split('||').slice(0,4).join('||') + '||2026-10-03']: {ts:1,borrado:false}},
       capsSel: {[key + '||2026-10-03']: ['Cap']}};
     s.tables.get('RegistroNotas').rows.push([key, c[0], 'I', ...c.slice(1), 'Synthetic Teacher', 1, JSON.stringify(payload)]);
     const grade = c[0] === 'primaria' ? ['PRIMERO', 'SEGUNDO', 'TERCERO'][Number(c[1])-1] : c[1] + '°';
@@ -153,11 +155,18 @@ test('loadreg: nested maps/sessions cannot leak another context; metadata object
   payload.sessions.push({nivel:'primaria',bim:'I',grado:2,seccion:'Única',area:'Comunicación'});
   for(const name of ['grades','finales','concArea','capsSel'])payload[name][forbidden+'||secret']= {test:'forbidden'};
   payload.asistencia['primaria||I||2||Única||secret']={test:'forbidden'};
+  payload.asisFechas['primaria||I||2||Única']=['2026-10-04'];
+  payload.asisFechas['primaria||II||1||Única']=['2026-10-04'];
+  payload.asisFechas['primaria||I||1||Única||extra']=['2026-10-04'];
+  payload.asisFechasEstado['primaria||I||2||Única||2026-10-04']={ts:2,borrado:false};
+  payload.asisFechasEstado['primaria||II||1||Única||2026-10-04']={ts:2,borrado:false};
   payload.unrecognizedAcademicBag={test:'forbidden'};
   row[8]=JSON.stringify(payload);
   const res=s.get({action:'loadreg',token:s.primary,grado:1}); const p=res.items[0].payload;
   assert.equal(p.sessions.length,1); assert.deepEqual(p.meta,payload.meta);
   for(const name of ['grades','finales','concArea','asistencia','capsSel'])assert.ok(Object.keys(p[name]).every(k=>k.includes('||1||')));
+  assert.deepEqual(p.asisFechas,{'primaria||I||1||Única':['2026-10-03']});
+  assert.deepEqual(p.asisFechasEstado,{'primaria||I||1||Única||2026-10-03':{ts:1,borrado:false}});
   assert.equal(p.unrecognizedAcademicBag,undefined);
   const complete=s.get({action:'loadreg',token:s.admin,grado:1,nivel:'primaria'});
   assert.deepEqual(complete.items[0].payload,payload);

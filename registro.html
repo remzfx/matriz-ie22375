@@ -540,6 +540,7 @@ function loadStore() {
   if (!store.meta) store.meta = {};
   if (!store.asistencia) store.asistencia = {}; // key ctx||fecha||nombre -> 'P'|'F'|'T'|'J'|''
   if (!store.asisFechas) store.asisFechas = {}; // key ctx -> [fechas]
+  if (!store.asisFechasEstado) store.asisFechasEstado = {}; // key ctx||fecha -> {ts, borrado}
   if (!store.finales) store.finales = {};
   if (!store.concArea) store.concArea = {};
   if (!store.capsSel) store.capsSel = {};
@@ -583,7 +584,10 @@ function sliceRegistroArea() {
   Object.keys(store.concArea || {}).forEach(k => { if (k.indexOf(pref) === 0) concArea[k] = store.concArea[k]; });
   const asisPref = [c.nivel, c.bim, c.grado, c.seccion].join('||');
   const asistencia = {};
-  Object.keys(store.asistencia || {}).forEach(k => { if (k.indexOf(asisPref) === 0) asistencia[k] = store.asistencia[k]; });
+  Object.keys(store.asistencia || {}).forEach(k => { if (k.startsWith(asisPref + '||')) asistencia[k] = store.asistencia[k]; });
+  const asisFechas = {[asisPref]: (store.asisFechas && store.asisFechas[asisPref] || []).slice()};
+  const asisFechasEstado = {};
+  Object.keys(store.asisFechasEstado || {}).forEach(k => { if (k.startsWith(asisPref + '||')) asisFechasEstado[k] = store.asisFechasEstado[k]; });
   return {
     ts: Date.now(),
     sessions: sessions,
@@ -591,6 +595,8 @@ function sliceRegistroArea() {
     finales: finales,
     concArea: concArea,
     asistencia: asistencia,
+    asisFechas: asisFechas,
+    asisFechasEstado: asisFechasEstado,
     capsSel: store.capsSel || {},
     meta: metaRegistro()
   };
@@ -628,9 +634,11 @@ function mergeRegistroPayload(p) {
   });
   if (!store.asistencia) store.asistencia = {};
   Object.keys(p.asistencia || {}).forEach(k => {
-    store.asistencia[k] = p.asistencia[k];
-    n++;
+    const incoming = p.asistencia[k], prev = store.asistencia[k];
+    // Sin ts no conocemos la antigüedad: versión 0; en empate se conserva lo local.
+    if (prev == null || tsDe(incoming) > tsDe(prev)) { store.asistencia[k] = incoming; n++; }
   });
+  mergeFechasAsistencia(p);
   if (p.meta && typeof p.meta === 'object') {
     const aliases = aliasesAula();
     Object.entries(p.meta.studentAliases || {}).forEach(([id,nombres]) => {
@@ -710,6 +718,8 @@ async function bajarRegistroNube() {
     }
     try { renderSesiones(); } catch (e) {}
     try { renderStudents(); } catch (e) {}
+    const panelAsis = document.getElementById('panelAsistencia');
+    if (panelAsis && panelAsis.classList.contains('on')) renderAsistencia();
     toast(items.length ? ('Nube: ' + items.length + ' bloque(s)') : 'Nube: no hay notas de este aula/área');
   } catch (e) {
     toast('No se pudo bajar. Actualice el Apps Script.');
@@ -2643,8 +2653,8 @@ function horaAhora() {
   return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
 }
 function asisGet(rec) {
-  // soporta formato viejo "P" y nuevo {marca, hora}
-  if (!rec) return { marca: '', hora: '' };
+  // soporta "P", {marca, hora}, versiones con ts y marcas retiradas.
+  if (!rec || rec.borrado) return { marca: '', hora: '' };
   if (typeof rec === 'string') return { marca: rec, hora: '' };
   return { marca: rec.marca || '', hora: rec.hora || '' };
 }
@@ -2652,8 +2662,33 @@ function asisSet(nombre, marca) {
   if (registroSoloLectura()) return false;
   if (document.getElementById('selBim').value !== padronBimestre) return;
   const k = asisMarkKey(asisFechaActiva, nombre);
-  if (!marca) delete store.asistencia[k];
-  else store.asistencia[k] = { marca: marca, hora: horaAhora() };
+  const ts = Math.max(Date.now(), tsDe(store.asistencia[k]) + 1);
+  store.asistencia[k] = marca ? {marca:marca, hora:horaAhora(), ts:ts} : {marca:'', hora:'', borrado:true, ts:ts};
+}
+
+function mergeFechasAsistencia(payload) {
+  store.asisFechas = store.asisFechas || {};
+  store.asisFechasEstado = store.asisFechasEstado || {};
+  const ctx = asisCtxKey(), pref = ctx + '||';
+  const fechas = new Set(store.asisFechas[ctx] || []);
+  // Arrays antiguos se unen sin borrar las fechas que existen solo localmente.
+  const recibidas = (payload.asisFechas || {})[ctx];
+  if (Array.isArray(recibidas)) recibidas.forEach(f => { if (/^\d{4}-\d{2}-\d{2}$/.test(f)) fechas.add(f); });
+  const estados = payload.asisFechasEstado || {};
+  Object.keys(estados).forEach(k => {
+    if (!k.startsWith(pref) || !/^\d{4}-\d{2}-\d{2}$/.test(k.slice(pref.length))) return;
+    const incoming = estados[k], prev = store.asisFechasEstado[k];
+    if (incoming && typeof incoming === 'object' && (!prev || tsDe(incoming) > tsDe(prev))) store.asisFechasEstado[k] = incoming;
+    fechas.add(k.slice(pref.length));
+  });
+  // Payloads previos no incluían fechas: recuperarlas de las marcas ya fusionadas.
+  Object.keys(store.asistencia || {}).forEach(k => {
+    if (!k.startsWith(pref) || !asisGet(store.asistencia[k]).marca) return;
+    const fecha = k.slice(pref.length).split('||')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) fechas.add(fecha);
+  });
+  Object.keys(store.asisFechasEstado).forEach(k => { if (k.startsWith(pref)) fechas.add(k.slice(pref.length)); });
+  store.asisFechas[ctx] = [...fechas].filter(f => !(store.asisFechasEstado[pref + f] || {}).borrado).sort();
 }
 
 function getAsisFechas() {
@@ -2672,6 +2707,9 @@ function agregarFechaAsis() {
   if (!arr.includes(f)) {
     arr.push(f);
     arr.sort();
+    store.asisFechasEstado = store.asisFechasEstado || {};
+    const key = asisCtxKey() + '||' + f;
+    store.asisFechasEstado[key] = {ts:Math.max(Date.now(), tsDe(store.asisFechasEstado[key]) + 1), borrado:false};
     saveStore();
   }
   asisFechaActiva = f;
@@ -2715,9 +2753,12 @@ function borrarFechaAsis(fecha) {
   if (!confirm('¿Quitar la fecha ' + fecha + ' y sus marcas de asistencia?')) return;
   const arr = getAsisFechas().filter(x => x !== fecha);
   store.asisFechas[asisCtxKey()] = arr;
+  store.asisFechasEstado = store.asisFechasEstado || {};
+  const fechaKey = asisCtxKey() + '||' + fecha;
+  store.asisFechasEstado[fechaKey] = {ts:Math.max(Date.now(), tsDe(store.asisFechasEstado[fechaKey]) + 1), borrado:true};
   const prefix = asisCtxKey() + '||' + fecha + '||';
   Object.keys(store.asistencia).forEach(k => {
-    if (k.startsWith(prefix)) delete store.asistencia[k];
+    if (k.startsWith(prefix)) store.asistencia[k] = {marca:'', hora:'', borrado:true, ts:Math.max(Date.now(), tsDe(store.asistencia[k]) + 1)};
   });
   if (asisFechaActiva === fecha) asisFechaActiva = arr.length ? arr[arr.length-1] : null;
   saveStore();

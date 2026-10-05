@@ -121,7 +121,7 @@ test('Late server refresh preserves the active local session, notes and unfinish
 test('Local attendance is editable while server verification is still pending',async()=>{
  const s=fixture();await s.c.IEStudents.loadRoster('III');let release;
  s.c.fetch=async()=>({ok:true,json:()=>new Promise(r=>release=r)});const task=s.c.cargarPadronRegistro('III');await s.tick(0);
- s.run("let asisFechaActiva='2026-10-05';function asisMarkKey(f,n){return f+':'+n};function horaAhora(){return '10:00'}");s.run(extract('asisSet'));
+ s.run("let asisFechaActiva='2026-10-05';function asisMarkKey(f,n){return f+':'+n};function horaAhora(){return '10:00'}");s.run(extract('tsDe'));s.run(extract('asisSet'));
  s.c.asisSet('id:42','P');assert.equal(s.run("store.asistencia['2026-10-05:id:42'].marca"),'P');
  assert.notEqual(s.c.guardarTodo(),false);assert.equal(s.c.registroNubeNoVerificada(),true);release(s.response());await task;
 });
