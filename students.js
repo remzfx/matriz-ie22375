@@ -14,14 +14,17 @@
     try { return JSON.parse(sessionStorage.getItem('ie22375_session_v1') || localStorage.getItem('ie22375_session_v1') || 'null'); }
     catch (e) { return null; }
   }
+  function tokenExpiryMs(token) {
+    try {
+      const p = String(token || '').split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
+      const claims = JSON.parse(atob(p));
+      return Number(claims.exp) || 0;
+    } catch (e) { return 0; }
+  }
   function validToken() {
     const s = session();
     if (!s || !s.token) return '';
-    try {
-      const p = s.token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/');
-      const claims = JSON.parse(atob(p));
-      return Number(claims.exp) > Date.now() ? s.token : '';
-    } catch (e) { return ''; }
+    return tokenExpiryMs(s.token) > Date.now() ? s.token : '';
   }
   function clear() {
     memory = null;
@@ -62,6 +65,8 @@
     let until = Date.now() + TTL;
     try {
       const s = session();
+      const exp = s && s.token ? tokenExpiryMs(s.token) : 0;
+      if (exp) until = Math.min(until, exp);
       if (s && Number(s.tokenExp)) until = Math.min(until, Number(s.tokenExp));
     } catch(e) {}
     const record = {token: token, scope: scope, until: until, base: JSON.parse(JSON.stringify(base))};
