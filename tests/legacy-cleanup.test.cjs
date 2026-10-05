@@ -335,3 +335,16 @@ test('Registro resolves primary responsible teacher after initial area becomes a
   assert.match(src, /function docenteAsignadoAdmin\(\)[\s\S]*d\.nivel !== c\.nivel/);
   assert.match(src, /Array\.isArray\(d\.grados\) && d\.grados\.map\(Number\)\.includes\(Number\(c\.grado\)\)/);
 });
+
+
+test('Login retries once and distinguishes transient backend failures', () => {
+  const src = read('index.html');
+  assert.match(src, /for \(let intento = 1; intento <= 2; intento\+\+\)/);
+  assert.match(src, /await esperar\(900\)/);
+  assert.match(src, /code = 'TIMEOUT'/);
+  assert.match(src, /code = 'NETWORK'/);
+  assert.match(src, /INVALID_RESPONSE/);
+  assert.match(src, /mensajeErrorLogin\(e\)/);
+  assert.match(src, /ie22375_login_error_v1/);
+  assert.match(src, /retryCount: perfil\.__retryCount \|\| 0/);
+});
