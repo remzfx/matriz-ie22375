@@ -264,6 +264,7 @@
 
   <main class="max-w-3xl mx-auto px-3 py-3 space-y-3" style="padding-bottom:110px">
     <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
+<button type="button" id="retryRoster" class="btn btn-ghost text-sm" hidden onclick="reintentarPadronRegistro()">Reintentar</button>
     <!-- Área -->
     <div class="card p-3">
       <div class="text-[10px] font-bold text-slate-500 mb-2">ÁREA</div>
@@ -296,7 +297,7 @@
         </div>
         <div class="flex flex-wrap gap-2 text-[11px] font-bold" id="finResumen"></div>
         <div id="finLista" class="fin-wrap"></div>
-        <button type="button" class="btn btn-primary w-full text-sm" onclick="guardarFinales(); toast('Promedios guardados')">Guardar promedios</button>
+        <button type="button" class="btn btn-primary w-full text-sm" data-reg-write onclick="guardarFinales(); toast('Promedios guardados')">Guardar promedios</button>
       </div>
     </div>
 
@@ -313,8 +314,8 @@
             <label class="text-[10px] font-bold text-slate-500">Fecha</label>
             <input type="date" id="inpAsisFecha">
           </div>
-          <button type="button" class="btn btn-primary text-sm" onclick="agregarFechaAsis()">Agregar fecha</button>
-          <button type="button" class="btn btn-ghost text-sm" onclick="guardarAsistencia(); toast('Asistencia guardada')">Guardar</button>
+          <button type="button" class="btn btn-primary text-sm" data-reg-write onclick="agregarFechaAsis()">Agregar fecha</button>
+          <button type="button" class="btn btn-ghost text-sm" data-reg-write onclick="guardarAsistencia(); toast('Asistencia guardada')">Guardar</button>
           <button type="button" class="btn btn-ghost text-sm" onclick="compartirAsisWhatsApp()">WhatsApp</button>
         </div>
         <div>
@@ -382,7 +383,7 @@
         <label class="text-[10px] font-bold text-slate-500">Capacidad / evidencia a evaluar</label>
         <input type="text" id="inpCapacidad" placeholder="Escribe la capacidad o evidencia…" onchange="onSesionChange()" onblur="onSesionChange()">
       </div>
-      <button type="button" class="btn btn-primary w-full text-sm" onclick="activarSesion()">Agregar a la grilla</button>
+      <button type="button" class="btn btn-primary w-full text-sm" data-reg-write onclick="activarSesion()">Agregar a la grilla</button>
     </div>
     <div class="card p-3" id="wrapSesiones">
       <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS</div>
@@ -419,9 +420,9 @@
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
       <div class="grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex">
-        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#16a34a;color:#fff" onclick="subirRegistroNube()">Nube Subir</button>
+        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-write onclick="subirRegistroNube()">Nube Subir</button>
         <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#0284c7;color:#fff" onclick="bajarRegistroNube()">Nube Bajar</button>
-        <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" onclick="guardarTodo(); toast('Guardado local')">Guardar</button>
+        <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" data-reg-write onclick="guardarTodo(); toast('Guardado local')">Guardar</button>
       </div>
     </div>
   </div>
@@ -435,7 +436,7 @@
     <textarea id="modalText" rows="4" placeholder="Describe el logro del estudiante…"></textarea>
     <div class="flex gap-2 mt-3">
       <button type="button" class="btn btn-ghost flex-1" onclick="cerrarModal(false)">Cancelar</button>
-      <button type="button" class="btn btn-primary flex-1" onclick="cerrarModal(true)">Guardar</button>
+      <button type="button" class="btn btn-primary flex-1" data-reg-write onclick="cerrarModal(true)">Guardar</button>
     </div>
   </div>
 </div>
@@ -644,6 +645,7 @@ function mergeRegistroPayload(p) {
   return n;
 }
 async function subirRegistroNube() {
+  if (registroSoloLectura()) return false;
   if (!nivel || !areaActual) { toast('Elija área primero'); return; }
   if (guardarTodo() === false) { toast('Espera a que cargue el padrón del bimestre.'); return; }
   toast('Guardado local. Subiendo a la nube…');
@@ -797,69 +799,80 @@ function metaRegistro() {
   const old = store.meta[cloudClaveReg()];
   return Object.assign({}, typeof old === 'object' ? old : {docente: old || ''}, {studentAliases: aliasesAula()});
 }
-let padronBimestre = '', solicitudPadron = 0, padronVerificadoServidor = false;
+let padronBimestre = '', solicitudPadron = 0, padronVerificadoServidor = false, tokenPadron = '', vencimientoCachePadron;
+function registroSoloLectura() {
+  return !padronVerificadoServidor || !padronBimestre || document.getElementById('selBim').value !== padronBimestre ||
+    !tokenPadron || IEStudents.validToken() !== tokenPadron;
+}
+function sincronizarEdicionRegistro() {
+  const main = document.querySelector('main');
+  if (!main) return;
+  main.inert = false;
+  main.setAttribute('aria-busy', cargandoEstudiantes ? 'true' : 'false');
+  document.querySelectorAll('[data-reg-write],[data-delfecha],[data-adel],[data-an]').forEach(el => { el.disabled = registroSoloLectura(); });
+  document.querySelectorAll('.cal-nota,.fin-nota,.av-conc,#modalText').forEach(el => { if (registroSoloLectura()) el.readOnly = true; });
+}
+function estadoPadron(message, retry) {
+  const st = document.getElementById('studentsStatus'); if (st) st.textContent = message;
+  const button = document.getElementById('retryRoster'); if (button) { button.hidden = !retry; button.disabled = cargandoEstudiantes; }
+  sincronizarEdicionRegistro();
+}
 function bloquearRegistroMientrasValida(bloquear) {
   padronVerificadoServidor = !bloquear;
-  const main = document.querySelector('main');
-  if (main) {
-    main.inert = !!bloquear;
-    main.setAttribute('aria-busy', bloquear ? 'true' : 'false');
-  }
+  sincronizarEdicionRegistro();
 }
 function pintarPadronInmediato(base, bimestre, desdeCache) {
   bdEstudiantes = base; padronBimestre = bimestre;
   recordarPadron(base); saveStore();
-  try {
-    llenarAulasPadron(nivel);
-    // Con caché válida, pintar también el contexto académico local mientras
-    // el servidor verifica. La edición continúa bloqueada por main.inert.
-    if (desdeCache) onContexto({permitirDuranteCarga:true, localOnly:true});
-    else onContexto();
-  } catch (e) {
-    try { renderStudents(); renderSesiones(); } catch (_) {}
-  }
+  llenarAulasPadron(nivel);
+  onContexto({localOnly:desdeCache});
+  sincronizarEdicionRegistro();
+}
+function vigilarCachePadron(bimestre, solicitud) {
+  clearTimeout(vencimientoCachePadron);
+  vencimientoCachePadron = setTimeout(function comprobar() {
+    if (solicitud !== solicitudPadron || padronVerificadoServidor) return;
+    if (!IEStudents.peekRoster(bimestre) || IEStudents.validToken() !== tokenPadron) {
+      bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
+      ['finLista','avanceBox','asisLista'].forEach(id => { const el=document.getElementById(id); if(el)el.innerHTML=''; });
+      estadoPadron('La caché o sesión venció. Reintenta con conexión.',true);
+    } else vencimientoCachePadron = setTimeout(comprobar,15000);
+  },15000);
 }
 async function cargarPadronRegistro(bimestre) {
   const solicitud = ++solicitudPadron;
-  cargandoEstudiantes = true;
+  tokenPadron = IEStudents.validToken(); cargandoEstudiantes = true;
   bloquearRegistroMientrasValida(true);
-  recordarPadron(bdEstudiantes);
-  sesionActiva = null; notas = {};
-  ['finLista','avanceBox','asisLista'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
-
-  const cache = IEStudents.peekRoster ? IEStudents.peekRoster(bimestre) : null;
-  if (cache) {
-    pintarPadronInmediato(cache, bimestre, true);
-    const st = document.getElementById('studentsStatus');
-    if (st) st.textContent = 'Padrón cargado. Verificando con el servidor…';
-  } else {
-    bdEstudiantes = IEStudents.empty();
-    renderStudents();
-  }
-
+  recordarPadron(bdEstudiantes); sesionActiva = null; notas = {};
+  const cache = IEStudents.peekRoster(bimestre);
+  if (cache) pintarPadronInmediato(cache,bimestre,true);
+  else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
+    ['finLista','avanceBox','asisLista'].forEach(id => { const el=document.getElementById(id); if(el)el.innerHTML=''; }); }
+  estadoPadron(cache ? 'Padrón visible en solo lectura. Verificando servidor…' : 'Cargando padrón. La consulta tiene reintento automático…',false);
+  if (cache) vigilarCachePadron(bimestre,solicitud);
   try {
     const base = await IEStudents.loadRoster(bimestre);
     if (solicitud !== solicitudPadron) return false;
-    pintarPadronInmediato(base, bimestre, false);
-    if (base.offline) {
-      const st = document.getElementById('studentsStatus');
-      if (st) st.textContent = 'Sin conexión: padrón temporal en modo solo lectura.';
-      alert('Sin conexión: se muestra el último padrón válido, pero Registro queda en solo lectura hasta verificar el servidor.');
-      return true;
-    }
-    bloquearRegistroMientrasValida(false);
-    if (!base.padronInicializado) toast('Padrón pendiente: el servidor entregó la base actual autorizada.');
+    if (IEStudents.validToken() !== tokenPadron) throw Object.assign(new Error('La sesión cambió.'),{code:'SESSION'});
+    cargandoEstudiantes = false;
+    bloquearRegistroMientrasValida(!!base.offline);
+    pintarPadronInmediato(base,bimestre,!!base.offline);
+    if (!base.offline) clearTimeout(vencimientoCachePadron);
+    else vigilarCachePadron(bimestre,solicitud);
+    estadoPadron(base.offline ? (base.verificationError === 'API_INCOMPATIBLE' ? 'El backend no reconoce la lectura POST de estudiantes. Verifique la implementación. Padrón en solo lectura.' : 'No se pudo verificar el servidor. Padrón en solo lectura; puedes navegar y reintentar.') :
+      (!base.padronInicializado ? 'Servidor verificado. Padrón pendiente: base actual autorizada.' : 'Padrón verificado con el servidor.'),!!base.offline);
     return true;
   } catch(e) {
-    if (solicitud === solicitudPadron) {
-      if (!cache) padronBimestre = '';
-      const st = document.getElementById('studentsStatus');
-      if (st && cache) st.textContent = 'No se pudo verificar el servidor. Padrón visible en modo solo lectura.';
-      alert(e.message);
-    }
-    return !!cache;
+    if (solicitud !== solicitudPadron) return false;
+    cargandoEstudiantes = false;
+    const vigente = e.retryable && IEStudents.validToken() === tokenPadron && IEStudents.peekRoster(bimestre);
+    if (vigente) pintarPadronInmediato(vigente,bimestre,true);
+    else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
+      ['finLista','avanceBox','asisLista'].forEach(id => { const el=document.getElementById(id); if(el)el.innerHTML=''; }); }
+    estadoPadron(e.message + (vigente ? ' Padrón visible en solo lectura.' : ' Puedes reintentar.'),true);
+    return !!vigente;
   } finally {
-    if (solicitud === solicitudPadron) cargandoEstudiantes = false;
+    if (solicitud === solicitudPadron) { cargandoEstudiantes = false; sincronizarEdicionRegistro(); }
   }
 }
 async function cambiarBimestreRegistro() {
@@ -867,7 +880,15 @@ async function cambiarBimestreRegistro() {
   if (padronBimestre && !cargandoEstudiantes) {
     sel.value = padronBimestre; guardarTodo(); sel.value = solicitado;
   }
-  if (await cargarPadronRegistro(solicitado)) { llenarAulasPadron(nivel); onContexto(); }
+  await cargarPadronRegistro(solicitado);
+}
+async function reintentarPadronRegistro() {
+  if (cargandoEstudiantes) return;
+  let periodos = loadPeriodosAdmin();
+  if (!periodos) { await sincronizarPeriodosNube(); periodos = loadPeriodosAdmin(); pintarBimestresRegistro(periodos); }
+  const bimestre = document.getElementById('selBim').value;
+  if (!bimestre) { estadoPadron('No se pudo obtener la configuración de bimestres. Reintenta con conexión.',true); return; }
+  await cambiarBimestreRegistro();
 }
 
 function gradeKey(nombre) {
@@ -908,8 +929,7 @@ function loadPeriodosAdmin() {
 
 async function sincronizarPeriodosNube() {
   try {
-    const r = await fetch(CLOUD_API_URL + '?action=loadperiodos&t=' + Date.now(), { cache:'no-store' });
-    const data = JSON.parse(await r.text());
+    const data = await IEStudents.fetchJSON(CLOUD_API_URL + '?action=loadperiodos&t=' + Date.now(), {cache:'no-store'},8000);
     if (data && data.ok && data.periodos && data.periodos.bimestres) {
       localStorage.setItem(PERIODOS_CLOUD_KEY, JSON.stringify(data.periodos));
       return true;
@@ -1196,7 +1216,9 @@ async function entrarNivel(n) {
     periodosIniciales = loadPeriodosAdmin();
   }
   pintarBimestresRegistro(periodosIniciales);
-  if (!await cargarPadronRegistro(document.getElementById('selBim').value)) return;
+  const inicial = document.getElementById('selBim').value;
+  if (inicial) cargarPadronRegistro(inicial);
+  else estadoPadron('No se pudo obtener bimestres. Reintenta con conexión.',true);
   llenarAulasPadron(n);
 
   document.getElementById('inpFecha').value = hoyISO();
@@ -1264,7 +1286,7 @@ function llenarAulasPadron(n) {
   selGrado.innerHTML = grados.map(g => `<option value="${g}">${g}°</option>`).join('');
 
   if (!grados.length) {
-    alert('No hay grados/secciones asignados a su usuario. Contacte al administrador.');
+    estadoPadron('No hay estudiantes disponibles para este contexto.',!padronVerificadoServidor);
   }
 
   if (grados.some(g => String(g) === anteriorGrado)) selGrado.value = anteriorGrado;
@@ -1292,7 +1314,7 @@ function onGrado() {
 
 function onContexto(options) {
   options = options || {};
-  if (cargandoEstudiantes && !options.permitirDuranteCarga) return;
+
   if (document.getElementById('selBim').value !== padronBimestre) {
     if (!options.localOnly) cambiarBimestreRegistro();
     return;
@@ -1325,6 +1347,7 @@ function onContexto(options) {
   else if (av && av.classList.contains('on')) renderAvance();
   else if (asis && asis.classList.contains('on')) renderAsistencia();
   if (!options.localOnly) consultarEstadoSiagie();
+  sincronizarEdicionRegistro();
 }
 
 function guardarMeta() {
@@ -1458,6 +1481,7 @@ function onSesionChange() {
 }
 
 function activarSesion() {
+  if (registroSoloLectura()) return false;
   const bim = document.getElementById('selBim').value;
   const sLogin = getLoginSession();
   const esAdmin = sLogin && (sLogin.role === 'admin' || sLogin.user === 'admin');
@@ -1502,6 +1526,7 @@ function activarSesion() {
 }
 
 function recolectarPantalla() {
+  if (registroSoloLectura()) return false;
   try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
   document.querySelectorAll('.cal-nota').forEach(inp => {
     if (inp.readOnly) return;
@@ -1542,6 +1567,7 @@ function recolectarPantalla() {
   }
 }
 function guardarTodo() {
+  if (registroSoloLectura()) return false;
   if (cargandoEstudiantes || !padronBimestre || document.getElementById('selBim').value !== padronBimestre) return false;
   recolectarPantalla();
   if (sesionActiva) {
@@ -1600,6 +1626,7 @@ function renderSesiones() {
     }
     abrirSesionFecha(b.dataset.fecha);
   };
+  sincronizarEdicionRegistro();
 }
 function abrirSesionFecha(fecha) {
   const c = ctxBase();
@@ -1626,6 +1653,7 @@ function abrirSesionFecha(fecha) {
   renderStudents();
 }
 function borrarSesionFecha(fecha) {
+  if (registroSoloLectura()) return false;
   const c = ctxBase();
   const n = (store.sessions || []).filter(s =>
     s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
@@ -1668,6 +1696,7 @@ function setModoCalif(m) {
 }
 
 function cerrarModal(ok) {
+  if (ok && registroSoloLectura()) ok = false;
   if (ok && modalCtx) {
     const text = document.getElementById('modalText').value.trim();
     const nombre = modalCtx.nombre;
@@ -1701,12 +1730,14 @@ function loadCapsElegidas() {
   capsElegidas = (store.capsSel[keyCapsHoy()] || []).map(x => normCapItem(x, fb)).filter(Boolean);
 }
 function saveCapsElegidas() {
+  if (registroSoloLectura()) return false;
   if (!store.capsSel) store.capsSel = {};
   store.capsSel[keyCapsHoy()] = capsElegidas.slice();
   saveStore();
 }
 function renderChipsCaps() { /* las columnas de la grilla ya muestran competencia y capacidad */ }
 function quitarCapGrilla(i) {
+  if (registroSoloLectura()) return false;
   const col = capsElegidas[i];
   if (!col) return;
   const fecha = (document.getElementById('inpFecha')||{}).value || '';
@@ -1744,6 +1775,7 @@ function capKeyHoy(comp, cap, nombre) {
   return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, cap, fecha, identidadAlumno(nombre)].join('||');
 }
 function upsertSesionCap(comp, cap) {
+  if (registroSoloLectura()) return false;
   const c = ctxBase();
   const fecha = document.getElementById('inpFecha').value || hoyISO();
   const unidad = (document.getElementById('selUnidad')||{}).value || '';
@@ -1781,7 +1813,7 @@ function renderStudents() {
   let head = '<th class="fin-nom">Estudiante</th>';
   cols.forEach((col, i) => {
     head += '<th>C'+(i+1)+
-      ' <button type="button" title="Borrar esta capacidad" onclick="quitarCapGrilla('+i+')" style="border:0;background:#fecaca;color:#991b1b;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0;margin-left:4px">×</button>'+
+      ' <button type="button" title="Borrar esta capacidad" data-reg-write onclick="quitarCapGrilla('+i+')" style="border:0;background:#fecaca;color:#991b1b;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0;margin-left:4px">×</button>'+
       '<div class="fin-caps">'+(col.comp||'')+'<br>'+(col.cap||'')+'</div></th>';
   });
 
@@ -1819,6 +1851,7 @@ function renderStudents() {
 
   box.querySelectorAll('.cal-nota').forEach(inp => {
     inp.addEventListener('change', function() {
+      if (registroSoloLectura()) return;
       if (inp.readOnly) return;
       const nombre = decodeURIComponent(inp.dataset.nom);
       const cap = decodeURIComponent(inp.dataset.cap);
@@ -1842,6 +1875,7 @@ function renderStudents() {
   });
   box.querySelectorAll('.fin-cell button[data-val]').forEach(btn => {
     btn.addEventListener('click', function() {
+      if (registroSoloLectura()) return;
       if (btn.disabled) return;
       const cell = btn.closest('[data-nom]');
       if (!cell) return;
@@ -1864,6 +1898,7 @@ function renderStudents() {
       renderStudents();
     });
   });
+  sincronizarEdicionRegistro();
 }
 
 function actualizarContadores() {
@@ -2336,6 +2371,7 @@ function showPanel(which) {
     cal.classList.add('on');
     tCal.className = 'btn btn-primary flex-1 text-sm';
   }
+  sincronizarEdicionRegistro();
 }
 
 function finalKey(comp, nombre) {
@@ -2374,7 +2410,7 @@ function bimCerradoDocente() {
   const bim = document.getElementById('selBim').value;
   const sL = getLoginSession();
   const esAdmin = sL && (sL.role === 'admin' || sL.user === 'admin');
-  return cargandoEstudiantes || !padronBimestre || bim !== padronBimestre || (!bimestreHabilitado(bim) && !esAdmin);
+  return registroSoloLectura() || (!bimestreHabilitado(bim) && !esAdmin);
 }
 
 function capsDeComp(comp) {
@@ -2479,6 +2515,7 @@ function renderFinales() {
 
   box.querySelectorAll('.fin-nota').forEach(inp => {
     inp.addEventListener('change', function() {
+      if (registroSoloLectura()) return;
       const cell = inp.closest('[data-fin]');
       if (!cell || inp.readOnly) return;
       const nombre = decodeURIComponent(cell.dataset.fin);
@@ -2501,6 +2538,7 @@ function renderFinales() {
   });
   box.querySelectorAll('.fin-cell button[data-val]').forEach(btn => {
     btn.addEventListener('click', function() {
+      if (registroSoloLectura()) return;
       if (btn.disabled) return;
       const cell = btn.closest('[data-fin]');
       if (!cell) return;
@@ -2520,9 +2558,11 @@ function renderFinales() {
       renderFinales();
     });
   });
+  sincronizarEdicionRegistro();
 }
 
 function guardarFinales() {
+  if (registroSoloLectura()) return false;
   if (bimCerradoDocente()) { alert('Bimestre cerrado por administración'); return; }
   document.querySelectorAll('#finLista [data-fin][data-comp]').forEach(cell => {
     const inp = cell.querySelector('.fin-nota');
@@ -2557,6 +2597,7 @@ function asisGet(rec) {
   return { marca: rec.marca || '', hora: rec.hora || '' };
 }
 function asisSet(nombre, marca) {
+  if (registroSoloLectura()) return false;
   if (cargandoEstudiantes || document.getElementById('selBim').value !== padronBimestre) return;
   const k = asisMarkKey(asisFechaActiva, nombre);
   if (!marca) delete store.asistencia[k];
@@ -2572,6 +2613,7 @@ function getAsisFechas() {
 let asisFechaActiva = null;
 
 function agregarFechaAsis() {
+  if (registroSoloLectura()) return false;
   const f = document.getElementById('inpAsisFecha').value;
   if (!f) { alert('Elige una fecha'); return; }
   const arr = getAsisFechas();
@@ -2586,6 +2628,7 @@ function agregarFechaAsis() {
 }
 
 function guardarAsistencia() {
+  if (registroSoloLectura()) return false;
   saveStore();
 }
 
@@ -2616,6 +2659,7 @@ function compartirAsisWhatsApp() {
 }
 
 function borrarFechaAsis(fecha) {
+  if (registroSoloLectura()) return false;
   if (!confirm('¿Quitar la fecha ' + fecha + ' y sus marcas de asistencia?')) return;
   const arr = getAsisFechas().filter(x => x !== fecha);
   store.asisFechas[asisCtxKey()] = arr;
@@ -2697,6 +2741,7 @@ function renderAsistencia() {
   document.getElementById('aJ').textContent = cJ;
 
   lista.onclick = function(ev) {
+    if (registroSoloLectura()) return;
     const b = ev.target.closest('button[data-an]');
     if (!b) return;
     const nombre = decodeURIComponent(b.dataset.an);
@@ -2708,6 +2753,7 @@ function renderAsistencia() {
     saveStore();
     renderAsistencia();
   };
+  sincronizarEdicionRegistro();
 }
 
 function promedioNums(arr) {
@@ -2822,6 +2868,7 @@ function renderAvance() {
   box.innerHTML = '<div class="fin-wrap"><table class="fin-grid"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
   box.querySelectorAll('.av-conc').forEach(el => {
     el.addEventListener('change', function() {
+      if (registroSoloLectura()) return;
       if (!store.concArea) store.concArea = {};
       const nom = decodeURIComponent(el.dataset.nom);
       const k = concAreaKey(nom);
@@ -2831,6 +2878,7 @@ function renderAvance() {
       saveStore();
     });
   });
+  sincronizarEdicionRegistro();
 }
 
 const MOBILE_APP_STORES = {

@@ -803,6 +803,7 @@ function doGet(e) {
     const p = (e && e.parameter) || {};
     const action = String(p.action || '').toLowerCase();
     const nivel = String(p.nivel || '').toLowerCase();
+    if (action === 'loadstudents') return responder_({ok:false,code:'METHOD_NOT_ALLOWED',error:'La lectura de estudiantes requiere POST con token en el cuerpo.'});
     const rolesLectura = {
       loadreg: ['admin', 'docente'], loadnivel: ['admin', 'docente'], load: ['admin', 'docente'],
       loadtpl: ['admin'], loadtplstatus: ['admin', 'docente'],
@@ -1385,5 +1386,3 @@ function listarClassroom_() {
     return { ok: false, error: 'Classroom no está habilitado o esta cuenta no es docente. ' + err };
   }
 }
-
-

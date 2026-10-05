@@ -19,7 +19,7 @@ function fixture(role='admin'){
   const calls=[],elements=new Map(),alerts=[];
   function el(id){if(!elements.has(id))elements.set(id,{value:'',style:{},textContent:'',innerHTML:'',classList:{add(){},remove(){}}});return elements.get(id);}
   const c=vm.createContext({window:{},sessionStorage:storage,localStorage:storage,atob,console,Date,
-    document:{getElementById:el,querySelector:sel=>sel==='main'?{inert:false,setAttribute(){}}:null},alert:v=>alerts.push(v),confirm:()=>true,setTimeout:()=>0,
+    document:{getElementById:el,querySelectorAll:()=>[],querySelector:sel=>sel==='main'?{inert:false,setAttribute(){},querySelectorAll:()=>[]}:null},alert:v=>alerts.push(v),confirm:()=>true,setTimeout:(fn,ms)=>{if(ms<2000)queueMicrotask(fn);return 0;},clearTimeout(){},
     fetch:async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({ok:true,version:'synthetic-current',inicializada:true,estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',orden:1,nombre:'Synthetic Primary'},{nivel:'secundaria',grado:1,seccion:'A',orden:1,nombre:'Synthetic Secondary'}]})};}
   });
   new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;
@@ -52,15 +52,15 @@ for(const file of ['auxiliar.html','photochecks.html'])test(file+': real loader 
 });
 test('Registro startup uses cached period configuration without waiting for the first cloud refresh',async()=>{
   const s=fixture('docente');
-  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;
+  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,tokenPadron='',vencimientoCachePadron,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;
     function recordarPadron(){};function saveStore(){};function toast(){};function bloquearRegistroMientrasValida(){};function pintarPadronInmediato(base,b){bdEstudiantes=base;padronBimestre=b;};
     function nivelPermitido(){return 'primaria'};function loadStore(){};function loadPeriodosAdmin(){return {bimestres:{I:'cerrado',II:'cerrado',III:'abierto',IV:'bloqueado'}}};
     function pintarBimestresRegistro(){document.getElementById('selBim').value='III'};function gradosPermitidos(){return [1]};function aulasPermitidas(){return null};
-    function hoyISO(){return '2026-10-04'};function aplicarDocenteSesion(){};function onGrado(){};function areas(){return ['Comunicación']};function renderAreas(){};
+    function hoyISO(){return '2026-10-04'};function aplicarDocenteSesion(){};function cargarDocentesAdminLocal(){};function refrescarDocentesAdminRegistro(){};function actualizarDocenteResponsable(){};;function onGrado(){};function areas(){return ['Comunicación']};function renderAreas(){};
     function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};function fillCaps(){};
     function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};function onContexto(){};let periodFetches=0;
     function sincronizarPeriodosNube(){periodFetches++;return new Promise(()=>{});} `);
-  for(const name of ['loadBD','llenarAulasPadron','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  for(const name of ['loadBD','llenarAulasPadron','registroSoloLectura','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
   const p=s.c.entrarNivel('primaria');
   await new Promise(r=>setTimeout(r,0));
   assert.equal(s.run('padronBimestre'),'III');
@@ -70,15 +70,15 @@ test('Registro startup uses cached period configuration without waiting for the 
 
 test('Registro enters its current flow only after protected students are loaded',async()=>{
   const s=fixture('docente');
-  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;function recordarPadron(){};function saveStore(){};function toast(){};
+  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,tokenPadron='',vencimientoCachePadron,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;function recordarPadron(){};function saveStore(){};function toast(){};
     function nivelPermitido(){return 'primaria'};function loadStore(){};function pintarBimestresRegistro(){document.getElementById('selBim').value='III'};function loadPeriodosAdmin(){};
     function gradosPermitidos(){return [1]};function aulasPermitidas(){return null};function hoyISO(){return '2026-10-03'};
-    function aplicarDocenteSesion(){};function onGrado(){};function areas(){return ['Comunicación']};function renderAreas(){};
+    function aplicarDocenteSesion(){};function cargarDocentesAdminLocal(){};function refrescarDocentesAdminRegistro(){};function actualizarDocenteResponsable(){};;function onGrado(){};function areas(){return ['Comunicación']};function renderAreas(){};
     function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};
     function fillCaps(){};function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};
     function sincronizarPeriodosNube(){return Promise.resolve()};function onContexto(){};`);
-  for(const name of ['loadBD','llenarAulasPadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
-  await s.c.entrarNivel('primaria');checkRequest(s,'III');
+  for(const name of ['loadBD','llenarAulasPadron','registroSoloLectura','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  await s.c.entrarNivel('primaria');await new Promise(r=>setTimeout(r,0));checkRequest(s,'III');
   assert.match(s.elements.get('selGrado').innerHTML,/value="1"/);
   assert.equal(s.c.loadBD().primaria.estudiantes[0].nombre,'Synthetic Primary');
 });
