@@ -2,7 +2,7 @@
 (function (global) {
   'use strict';
   const KEY = 'ie22375_students_session_v1';
-  const TTL = 10 * 60 * 1000;
+  const TTL = 24 * 60 * 60 * 1000;
   const API = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
   let memory = null;
   const pending = new Map();
@@ -26,6 +26,7 @@
   function clear() {
     memory = null;
     try { sessionStorage.removeItem(KEY); } catch (e) {}
+    try { localStorage.removeItem(KEY); } catch (e) {}
   }
   function empty() { return {primaria: {estudiantes: [], docentes: []}, secundaria: {estudiantes: [], docentes: []}}; }
   function toBase(response) {
@@ -44,7 +45,9 @@
     const token = validToken();
     if (!token) { clear(); return null; }
     try {
-      const saved = memory || JSON.parse(sessionStorage.getItem(KEY) || 'null');
+      const saved = memory ||
+        JSON.parse(sessionStorage.getItem(KEY) || 'null') ||
+        JSON.parse(localStorage.getItem(KEY) || 'null');
       if (saved && saved.token !== token) { clear(); return null; }
       const cached = saved && ((saved.entries || {})[scope] || saved);
       if (cached && cached.scope === scope && cached.until > Date.now()) return JSON.parse(JSON.stringify(cached.base));
@@ -53,13 +56,19 @@
   }
   function remember(base, token, scope) {
     let prior = memory;
-    try { prior = prior || JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch(e) {}
+    try { prior = prior || JSON.parse(sessionStorage.getItem(KEY) || 'null') || JSON.parse(localStorage.getItem(KEY) || 'null'); } catch(e) {}
     const entries = prior && prior.token === token ? Object.assign({}, prior.entries || {}, prior.scope ? {[prior.scope]: {token:prior.token,scope:prior.scope,until:prior.until,base:prior.base}} : {}) : {};
     Object.keys(entries).forEach(k => { if (entries[k].until <= Date.now()) delete entries[k]; });
-    const record = {token: token, scope: scope, until: Date.now() + TTL, base: JSON.parse(JSON.stringify(base))};
+    let until = Date.now() + TTL;
+    try {
+      const s = session();
+      if (s && Number(s.tokenExp)) until = Math.min(until, Number(s.tokenExp));
+    } catch(e) {}
+    const record = {token: token, scope: scope, until: until, base: JSON.parse(JSON.stringify(base))};
     entries[scope] = record;
     memory = Object.assign({}, record, {entries:entries});
     try { sessionStorage.setItem(KEY, JSON.stringify(memory)); } catch (e) {}
+    try { localStorage.setItem(KEY, JSON.stringify(memory)); } catch (e) {}
     return base;
   }
   function error(code, message, retryable) {
