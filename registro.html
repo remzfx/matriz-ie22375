@@ -963,6 +963,108 @@ function getLoginSession() {
   } catch (e) { return null; }
 }
 
+const REG_DOCENTES_KEY = 'ie22375_docentes_v1';
+let registroDocentesAdmin = [];
+
+function nombreDocenteTexto(v) {
+  if (!v) return '';
+  if (typeof v === 'string') return v.trim();
+  if (typeof v === 'object') {
+    return String(v.nombre || v.label || v.docente || v.user || '').trim();
+  }
+  return String(v).trim();
+}
+
+function cargarDocentesAdminLocal() {
+  try {
+    const raw = localStorage.getItem(REG_DOCENTES_KEY);
+    registroDocentesAdmin = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(registroDocentesAdmin)) registroDocentesAdmin = [];
+  } catch (e) { registroDocentesAdmin = []; }
+}
+
+async function refrescarDocentesAdminRegistro() {
+  const s = getLoginSession();
+  if (!s || !(s.role === 'admin' || s.user === 'admin') || !s.token) return;
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action:'loaddoc', token:s.token })
+    });
+    const data = JSON.parse(await res.text());
+    if (!data.ok || !Array.isArray(data.docentes)) return;
+    registroDocentesAdmin = data.docentes;
+    try { localStorage.setItem(REG_DOCENTES_KEY, JSON.stringify(registroDocentesAdmin)); } catch(e) {}
+    actualizarDocenteResponsable();
+  } catch(e) {}
+}
+
+function docenteAsignadoAdmin() {
+  const s = getLoginSession();
+  if (!s || !(s.role === 'admin' || s.user === 'admin')) return '';
+  const c = ctxBase();
+  const aula = aulaKey(c.grado, c.seccion);
+  const nombres = [];
+  (registroDocentesAdmin || []).forEach(function(d) {
+    if (!d || d.nivel !== c.nivel) return;
+    let ok = false;
+    if (c.nivel === 'primaria') {
+      ok = Array.isArray(d.grados) && d.grados.map(Number).includes(Number(c.grado));
+    } else {
+      const mapa = d.asignaciones && typeof d.asignaciones === 'object' ? d.asignaciones : null;
+      if (mapa && Array.isArray(mapa[c.area])) {
+        ok = mapa[c.area].some(function(k) {
+          const p = String(k).split('|');
+          return aulaKey(p[0], p[1]) === aula;
+        });
+      } else {
+        ok = Array.isArray(d.areas) && d.areas.includes(c.area) &&
+          Array.isArray(d.aulas) && d.aulas.some(function(k) {
+            const p = String(k).split('|');
+            return aulaKey(p[0], p[1]) === aula;
+          });
+      }
+    }
+    const nom = nombreDocenteTexto(d.nombre || d.label || d.user);
+    if (ok && nom && !nombres.includes(nom)) nombres.push(nom);
+  });
+  return nombres.join(' / ');
+}
+
+function actualizarDocenteResponsable() {
+  const inp = document.getElementById('inpDocente');
+  if (!inp || !nivel || !areaActual) return;
+  const s = getLoginSession();
+  const c = ctxBase();
+  const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
+
+  if (s && s.role === 'docente') {
+    inp.value = nombreDocenteTexto(s.label || s.nombre || s.user);
+    inp.readOnly = true;
+    inp.style.background = '#f1f5f9';
+    inp.title = 'Definido por administración';
+    return;
+  }
+
+  if (s && (s.role === 'admin' || s.user === 'admin')) {
+    const asignado = docenteAsignadoAdmin();
+    const meta = store.meta && store.meta[mk];
+    const previo = (meta && typeof meta === 'object') ? meta.docente : meta;
+    inp.value = asignado || nombreDocenteTexto(previo) || 'Sin docente asignado';
+    inp.readOnly = true;
+    inp.style.background = '#f1f5f9';
+    inp.title = 'Definido en Admin · Docentes y accesos';
+    return;
+  }
+
+  const meta = store.meta && store.meta[mk];
+  const previo = (meta && typeof meta === 'object') ? meta.docente : meta;
+  inp.value = nombreDocenteTexto(previo);
+  inp.readOnly = false;
+  inp.style.background = '#fff';
+}
+
 /** Nivel permitido: primaria | secundaria | admin | null */
 function nivelPermitido() {
   var s = getLoginSession();
@@ -1059,23 +1161,7 @@ function aplicarRestriccionNivel() {
 }
 
 function aplicarDocenteSesion() {
-  const inp = document.getElementById('inpDocente');
-  if (!inp) return;
-  const s = getLoginSession();
-  if (s && s.role === 'docente' && s.label) {
-    inp.value = s.label;
-    inp.readOnly = true;
-    inp.style.background = '#f1f5f9';
-    inp.title = 'Definido por administración';
-  } else if (s && (s.role === 'nivel' || s.user === 'primaria' || s.user === 'secundaria')) {
-    // nivel general: editable
-    inp.readOnly = false;
-    inp.style.background = '#fff';
-    // no pisar si ya hay meta guardada
-  } else {
-    inp.readOnly = false;
-    inp.style.background = '#fff';
-  }
+  actualizarDocenteResponsable();
 }
 
 async function entrarNivel(n) {
@@ -1092,6 +1178,8 @@ async function entrarNivel(n) {
 
   nivel = n;
   loadStore();
+  cargarDocentesAdminLocal();
+  refrescarDocentesAdminRegistro();
 
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
@@ -1215,13 +1303,7 @@ function onContexto(options) {
 
   const c = ctxBase();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
-  const s = getLoginSession();
-  if (s && s.role === 'docente' && s.label) {
-    document.getElementById('inpDocente').value = s.label;
-  } else {
-    document.getElementById('inpDocente').value = ((store.meta[mk] && typeof store.meta[mk] === 'object') ? store.meta[mk].docente : store.meta[mk]) || '';
-  }
-  aplicarDocenteSesion();
+  actualizarDocenteResponsable();
   // Al cambiar contexto: limpiar capacidad (fecha la elige el docente)
   fillCaps();
   loadCapsElegidas();
@@ -1243,6 +1325,8 @@ function onContexto(options) {
 }
 
 function guardarMeta() {
+  const s = getLoginSession();
+  if (s && (s.role === 'admin' || s.user === 'admin' || s.role === 'docente')) return;
   const c = ctxBase();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
   store.meta[mk] = Object.assign({}, metaRegistro(), {docente: document.getElementById('inpDocente').value.trim()});
