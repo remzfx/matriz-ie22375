@@ -309,3 +309,10 @@ test('Admin schedule panel removes obsolete JSON download/import controls and le
   assert.doesNotMatch(src, /descargue el JSON y súbalo a GitHub como/);
   assert.match(src, /onclick="guardarHorario\(\)">Guardar horario/);
 });
+
+
+test('Admin labels backup section clearly', () => {
+  const src = read('admin.html');
+  assert.match(src, />Respaldo<\/button>/);
+  assert.match(src, /<h2 class="font-black text-lg">Respaldo y exportación<\/h2>/);
+});
