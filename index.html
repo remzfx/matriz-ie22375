@@ -123,7 +123,7 @@ function esperar(ms) {
 }
 async function loginBackendUnaVez(tipo, usuario, password) {
   const t0 = performance.now();
-  const r = await fetchConTiempo(CLOUD_API_URL, 12000, {
+  const r = await fetchConTiempo(CLOUD_API_URL, 18000, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action:'login', tipo:tipo, usuario:usuario, password:password })
@@ -148,7 +148,7 @@ async function loginBackendUnaVez(tipo, usuario, password) {
   };
   return data;
 }
-async function loginBackend(tipo, usuario, password) {
+async function loginBackend(tipo, usuario, password, onRetry) {
   let ultimoError = null;
   for (let intento = 1; intento <= 2; intento++) {
     try {
@@ -157,14 +157,17 @@ async function loginBackend(tipo, usuario, password) {
       return data;
     } catch (e) {
       ultimoError = e;
-      if (intento === 1) await esperar(900);
+      if (intento === 1) {
+        if (typeof onRetry === 'function') onRetry(e);
+        await esperar(1200);
+      }
     }
   }
   throw ultimoError || errorLogin('UNKNOWN', 'No fue posible completar el acceso.');
 }
 function mensajeErrorLogin(e) {
   const code = e && e.code ? e.code : 'UNKNOWN';
-  if (code === 'TIMEOUT') return 'El servidor está tardando demasiado. Se intentó nuevamente y no respondió a tiempo.';
+  if (code === 'TIMEOUT') return 'El servidor está demorando más de lo normal. Se hicieron 2 intentos y no respondió a tiempo.';
   if (code === 'HTTP') return 'El servidor respondió con un error' + (e.status ? ' (HTTP ' + e.status + ')' : '') + '. Inténtalo nuevamente en unos segundos.';
   if (code === 'INVALID_RESPONSE') return 'El servidor respondió de forma inesperada. Inténtalo nuevamente en unos segundos.';
   if (code === 'NETWORK') return 'No se pudo establecer conexión con el servidor. Revisa tu conexión e inténtalo nuevamente.';
@@ -256,7 +259,10 @@ async function intentarLogin() {
   err.classList.remove('hidden');
   let perfil;
   try {
-    perfil = await loginBackend(tipo, usuario, pass);
+    perfil = await loginBackend(tipo, usuario, pass, function(e) {
+      err.textContent = 'El servidor no respondió al primer intento. Reintentando automáticamente…';
+      err.classList.remove('hidden');
+    });
   } catch (e) {
     registrarFalloLogin(e);
     err.textContent = mensajeErrorLogin(e);
