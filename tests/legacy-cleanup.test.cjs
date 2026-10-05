@@ -348,3 +348,12 @@ test('Login retries once and distinguishes transient backend failures', () => {
   assert.match(src, /ie22375_login_error_v1/);
   assert.match(src, /retryCount: perfil\.__retryCount \|\| 0/);
 });
+
+
+test('Admin shows authorized cached student base immediately while refreshing server data', () => {
+  const src = read('admin.html');
+  assert.match(src, /IEStudents\.peek \? IEStudents\.peek\(\) : null/);
+  assert.match(src, /Base reciente mostrada al instante\. Verificando datos con el servidor/);
+  assert.match(src, /cargarEstudiantesAdmin\(\{forceNetwork:true\}\)/);
+  assert.match(src, /const fresca = await IEStudents\.load\(\)/);
+});
