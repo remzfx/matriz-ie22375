@@ -293,3 +293,10 @@ test('Admin top actions center link and button labels consistently', () => {
   assert.match(src, /\.mobile-top-actions > a, \.mobile-top-actions > button \{/);
   assert.match(src, /display:inline-flex; align-items:center; justify-content:center; text-align:center; line-height:1\.15/);
 });
+
+
+test('Admin no longer shows obsolete note that transferred students are omitted', () => {
+  const src = read('admin.html');
+  assert.doesNotMatch(src, /Nota: solo se cuentan alumnos con matrícula/);
+  assert.doesNotMatch(src, /Los <b>TRASLADADOS<\/b> del SIAGIE se omiten/);
+});
