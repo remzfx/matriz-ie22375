@@ -316,3 +316,14 @@ test('Admin labels backup section clearly', () => {
   assert.match(src, />Respaldo<\/button>/);
   assert.match(src, /<h2 class="font-black text-lg">Respaldo y exportación<\/h2>/);
 });
+
+
+test('Admin register resolves responsible teacher from admin assignments and locks field', () => {
+  const src = read('registro.html');
+  assert.match(src, /function nombreDocenteTexto/);
+  assert.match(src, /function docenteAsignadoAdmin/);
+  assert.match(src, /function actualizarDocenteResponsable/);
+  assert.match(src, /Definido en Admin · Docentes y accesos/);
+  assert.match(src, /inp\.readOnly = true/);
+  assert.doesNotMatch(src, /inp\.value = \(\(store\.meta\[mk\]/);
+});
