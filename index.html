@@ -97,25 +97,49 @@ async function fetchConTiempo(url, ms, options) {
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
     const opts = Object.assign({ cache: 'no-store' }, options || {}, { signal: ctrl.signal });
-    const r = await fetch(url, opts);
-    return r;
+    return await fetch(url, opts);
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      const err = new Error('El servidor tardó demasiado en responder.');
+      err.code = 'TIMEOUT';
+      throw err;
+    }
+    const err = new Error('No se pudo establecer conexión con el servidor.');
+    err.code = 'NETWORK';
+    throw err;
   } finally { clearTimeout(t); }
 }
 function normalizarUsuarioDocente(v) {
   return String(v || '').trim().toLowerCase().replace(/^@+/, '');
 }
-async function loginBackend(tipo, usuario, password) {
+function errorLogin(code, message, extra) {
+  const e = new Error(message || 'Error de acceso');
+  e.code = code || 'UNKNOWN';
+  if (extra) Object.assign(e, extra);
+  return e;
+}
+function esperar(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+async function loginBackendUnaVez(tipo, usuario, password) {
   const t0 = performance.now();
-  const r = await fetchConTiempo(CLOUD_API_URL, 12000, {
+  const r = await fetchConTiempo(CLOUD_API_URL, 18000, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action:'login', tipo:tipo, usuario:usuario, password:password })
   });
   const t1 = performance.now();
-  if (!r || !r.ok) throw new Error('Respuesta HTTP ' + (r ? r.status : 'sin respuesta'));
+  if (!r || !r.ok) {
+    throw errorLogin('HTTP', 'El servidor respondió con un error.', { status: r ? r.status : 0 });
+  }
   const raw = await r.text();
   const t2 = performance.now();
-  let data = JSON.parse(raw);
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    throw errorLogin('INVALID_RESPONSE', 'El servidor devolvió una respuesta no válida.');
+  }
   data = data && typeof data === 'object' ? data : {};
   data.__timing = {
     totalMs: Math.round(t2 - t0),
@@ -123,6 +147,40 @@ async function loginBackend(tipo, usuario, password) {
     parseMs: Math.round(t2 - t1)
   };
   return data;
+}
+async function loginBackend(tipo, usuario, password, onRetry) {
+  let ultimoError = null;
+  for (let intento = 1; intento <= 2; intento++) {
+    try {
+      const data = await loginBackendUnaVez(tipo, usuario, password);
+      data.__retryCount = intento - 1;
+      return data;
+    } catch (e) {
+      ultimoError = e;
+      if (intento === 1) {
+        if (typeof onRetry === 'function') onRetry(e);
+        await esperar(1200);
+      }
+    }
+  }
+  throw ultimoError || errorLogin('UNKNOWN', 'No fue posible completar el acceso.');
+}
+function mensajeErrorLogin(e) {
+  const code = e && e.code ? e.code : 'UNKNOWN';
+  if (code === 'TIMEOUT') return 'El servidor está demorando más de lo normal. Se hicieron 2 intentos y no respondió a tiempo.';
+  if (code === 'HTTP') return 'El servidor respondió con un error' + (e.status ? ' (HTTP ' + e.status + ')' : '') + '. Inténtalo nuevamente en unos segundos.';
+  if (code === 'INVALID_RESPONSE') return 'El servidor respondió de forma inesperada. Inténtalo nuevamente en unos segundos.';
+  if (code === 'NETWORK') return 'No se pudo establecer conexión con el servidor. Revisa tu conexión e inténtalo nuevamente.';
+  return 'No se pudo completar el acceso. Inténtalo nuevamente.';
+}
+function registrarFalloLogin(e) {
+  try {
+    sessionStorage.setItem('ie22375_login_error_v1', JSON.stringify({
+      ts: Date.now(),
+      code: (e && e.code) || 'UNKNOWN',
+      status: (e && e.status) || 0
+    }));
+  } catch (_) {}
 }
 let loginPrecalentado = false;
 function precalentarLoginBackend() {
@@ -201,9 +259,13 @@ async function intentarLogin() {
   err.classList.remove('hidden');
   let perfil;
   try {
-    perfil = await loginBackend(tipo, usuario, pass);
+    perfil = await loginBackend(tipo, usuario, pass, function(e) {
+      err.textContent = 'El servidor no respondió al primer intento. Reintentando automáticamente…';
+      err.classList.remove('hidden');
+    });
   } catch (e) {
-    err.textContent = 'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo nuevamente.';
+    registrarFalloLogin(e);
+    err.textContent = mensajeErrorLogin(e);
     if (btnLogin) { btnLogin.disabled = false; btnLogin.textContent = 'Ingresar'; }
     return;
   }
@@ -220,7 +282,8 @@ async function intentarLogin() {
         role: perfil.role,
         totalMs: perfil.__timing.totalMs,
         fetchMs: perfil.__timing.fetchMs,
-        parseMs: perfil.__timing.parseMs
+        parseMs: perfil.__timing.parseMs,
+        retryCount: perfil.__retryCount || 0
       }));
     } catch (e) {}
   }
