@@ -88,8 +88,14 @@ function obtenerDocentesConfig_() {
   }
 }
 
-function leerDocentesConfigSheets_() {
-  const sh = asegurarDoc_();
+function obtenerDocentesConfigLectura_() {
+  // No publicar un miss: savedoc podría invalidar la caché durante esta lectura.
+  return leerDocentesConfigCache_() || leerDocentesConfigSheets_(true);
+}
+
+function leerDocentesConfigSheets_(soloLectura) {
+  const sh = soloLectura ? SpreadsheetApp.getActiveSpreadsheet().getSheetByName('DocentesAcceso') : asegurarDoc_();
+  if (!sh) return { docentes: [], ts: 0 };
   const last = sh.getLastRow();
   if (last < 2) return { docentes: [], ts: 0 };
   const data = sh.getRange(2, 1, last - 1, 3).getValues();
@@ -457,7 +463,7 @@ function sesionLectura_(token, roles) {
   const sesion = validarToken_(token, null, false);
   if (!sesion || roles.indexOf(sesion.role) < 0) return null;
   if (sesion.role !== 'docente') return { sesion: sesion };
-  const config = obtenerDocentesConfig_();
+  const config = obtenerDocentesConfigLectura_();
   if (Number(sesion.permisosVersion) !== Number(config.ts)) return null;
   const user = normalizarUsuario_(sesion.user);
   const docente = config.docentes.find(function (item) {
@@ -567,22 +573,43 @@ function leerFilasEstudiantes_(sh) {
 }
 
 function leerVersionEstudiantes_(sh, clave, filas) {
-  const rows = filas || leerFilasEstudiantes_(sh);
-  if (!rows.length) return null;
+  // Las versiones/punteros se agregan, nunca se modifican: el número de filas
+  // evita reutilizar un índice anterior incluso ante escrituras externas.
+  const last = sh.getLastRow();
+  const indexKey = ESTUDIANTES_CACHE_PREFIX + 'INDEX_' + clave + '_' + last;
+  let rows = filas;
   let pointer = null;
-  rows.forEach(function(row) { if (String(row[0]) === String(clave)) pointer = row; });
-  if (!pointer) return null;
+  try { pointer = JSON.parse(CacheService.getScriptCache().get(indexKey) || 'null'); } catch (err) {}
+  if (!Array.isArray(pointer)) pointer = null;
+  if (!pointer) {
+    rows = rows || leerFilasEstudiantes_(sh);
+    rows.forEach(function(row) { if (String(row[0]) === String(clave)) pointer = row; });
+    if (pointer) cachePunteroEstudiantes_(sh, pointer, last);
+    else {
+      // Ausencia cacheada solo para esta instantánea; seed/import cambia last.
+      try { CacheService.getScriptCache().put(indexKey, '[]', ESTUDIANTES_CACHE_TTL_SECONDS); } catch (err) {}
+    }
+  }
+  if (!pointer || !pointer.length) return null;
   const version = String(pointer[1]);
   // La versión forma parte de la clave: un puntero nuevo jamás puede resolver
   // a los datos reconstruidos de una versión anterior.
-  const cacheKey = ESTUDIANTES_CACHE_PREFIX + String(clave) + '_' + version;
+  const cacheKey = ESTUDIANTES_CACHE_PREFIX + 'CHUNKS_' + version;
   try {
-    const cached = CacheService.getScriptCache().get(cacheKey);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (parsed && parsed.version === version && Array.isArray(parsed.estudiantes)) return parsed;
+    const cache = CacheService.getScriptCache();
+    const meta = JSON.parse(cache.get(cacheKey) || 'null');
+    if (meta && meta.version === version && Number.isInteger(meta.chunks) && meta.chunks > 0) {
+      let rawCache = '';
+      for (let i = 0; i < meta.chunks; i++) {
+        const part = cache.get(cacheKey + '_' + i);
+        if (part == null) throw new Error('Caché parcial.');
+        rawCache += part;
+      }
+      const estudiantes = JSON.parse(rawCache);
+      if (Array.isArray(estudiantes)) return {version: version, partes: meta.partes, estudiantes: estudiantes};
     }
   } catch (err) { /* Reconstruir desde Sheets si la caché no está disponible. */ }
+  rows = rows || leerFilasEstudiantes_(sh);
   const manifest = JSON.parse(pointer[2]);
   if (!Number.isInteger(manifest.partes) || manifest.partes < 1) throw new Error('Base privada incompleta.');
   const chunks = {};
@@ -597,9 +624,19 @@ function leerVersionEstudiantes_(sh, clave, filas) {
   if (!Array.isArray(estudiantes)) throw new Error('Base privada inválida.');
   const result = {version: version, partes: manifest.partes, estudiantes: estudiantes};
   try {
-    CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), ESTUDIANTES_CACHE_TTL_SECONDS);
-  } catch (err) { /* Bases grandes pueden exceder CacheService; Sheets sigue siendo fuente. */ }
+    const cache = CacheService.getScriptCache();
+    // 20 000 unidades UTF-16 ocupan como máximo 80 KB UTF-8 (<100 KB/entrada).
+    let count = 0;
+    for (let i = 0; i < raw.length; i += 20000) cache.put(cacheKey + '_' + count++, raw.slice(i, i + 20000), ESTUDIANTES_CACHE_TTL_SECONDS);
+    cache.put(cacheKey, JSON.stringify({version: version, partes: manifest.partes, chunks: count}), ESTUDIANTES_CACHE_TTL_SECONDS);
+  } catch (err) { /* Evicción, límite total o fallo: reconstruir desde Sheets. */ }
   return result;
+}
+
+function cachePunteroEstudiantes_(sh, pointer, last) {
+  try {
+    CacheService.getScriptCache().put(ESTUDIANTES_CACHE_PREFIX + 'INDEX_' + pointer[0] + '_' + (last == null ? sh.getLastRow() : last), JSON.stringify(pointer), ESTUDIANTES_CACHE_TTL_SECONDS);
+  } catch (err) { /* Sin índice disponible se consulta Sheets. */ }
 }
 
 function leerBaseEstudiantes_(sh, oficial, filas) {
@@ -628,6 +665,7 @@ function escribirVersionEstudiantes_(sh, estudiantes, claves) {
     sh.appendRow([clave, version, manifest]);
   });
   SpreadsheetApp.flush();
+  (claves || []).forEach(function(clave) { cachePunteroEstudiantes_(sh, [clave, version, manifest]); });
   return {version: version, partes: partes, estudiantes: estudiantes};
 }
 
@@ -720,25 +758,25 @@ function enriquecerListaIdentidades_(estudiantes, body) {
 }
 
 function estudiantesRuta_(body) {
+  const inicio = Date.now();
   const action = String(body.action).toLowerCase();
   const lectura = action === 'loadstudents';
   const acceso = sesionLectura_(body.token, lectura ? ['admin', 'auxiliar', 'docente'] : ['admin']);
+  const authMs = Date.now() - inicio;
   if (!acceso) return {ok: false, code: 'SESSION', error: 'Sesión inválida o sin autorización para estudiantes.'};
   // loadstudents es estrictamente de lectura y no espera el lock global.
   if (lectura) {
-    const inicio = Date.now();
     const shLectura = hojaEstudiantes_();
-    // Una sola instantánea de EstudiantesBase resuelve BASE_ACTUAL y el padrón.
-    const filasLectura = leerFilasEstudiantes_(shLectura);
-    const actualLectura = leerBaseEstudiantes_(shLectura, false, filasLectura);
     const bimLectura = normalizarBimestrePadron_(body.bimestre);
-    const padronLectura = bimLectura ? leerPadronEstudiantes_(shLectura, bimLectura, filasLectura) : null;
-    const respuesta = respuestaEstudiantes_(padronLectura || actualLectura, acceso, bimLectura ? {
+    const padronLectura = bimLectura ? leerPadronEstudiantes_(shLectura, bimLectura) : null;
+    const baseLectura = padronLectura || leerBaseEstudiantes_(shLectura, false);
+    const respuesta = respuestaEstudiantes_(baseLectura, acceso, bimLectura ? {
       bimestre: bimLectura, padronInicializado: !!padronLectura,
       fuentePadron: padronLectura ? 'bimestre' : 'actual'
     } : {padronInicializado: true, fuentePadron: 'actual'});
     // Diagnóstico agregado, sin identidades, credenciales ni tokens.
-    respuesta.timing = {totalMs: Date.now() - inicio};
+    const totalMs = Date.now() - inicio;
+    respuesta.timing = {authMs: authMs, studentsMs: totalMs - authMs, totalMs: totalMs};
     return respuesta;
   }
   const lock = LockService.getScriptLock();
@@ -780,6 +818,7 @@ function estudiantesRuta_(body) {
       });
       sh.appendRow(['PADRON_' + bim, actual.version, JSON.stringify({partes: actual.partes})]);
       SpreadsheetApp.flush();
+      cachePunteroEstudiantes_(sh, ['PADRON_' + bim, actual.version, JSON.stringify({partes: actual.partes})]);
       return respuestaEstudiantes_(actual, acceso, {
         bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'
       });

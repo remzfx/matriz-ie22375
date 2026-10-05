@@ -40,7 +40,7 @@ test('Admin real loader consumes the protected backend response',async()=>{
 });
 for(const file of ['primaria.html','secundaria.html'])test(file+': real matrix loader derives student totals from protected data',async()=>{
   const s=fixture('docente');s.run("let baseOficialEstudiantes=[];let estado={grado:'PRIMERO'};function mostrarToast(){};function syncInputTotalEstudiantes(){};function renderizarAreas(){};function renderizarResumen(){}");
-  s.run(extract(file,'cargarBaseOficialEstudiantes'));await s.c.cargarBaseOficialEstudiantes();checkRequest(s);
+  s.run(extract(file,'estadoEstudiantes'));s.run(extract(file,'cargarBaseOficialCache'));s.run(extract(file,'cargarBaseOficialEstudiantes'));await s.c.cargarBaseOficialEstudiantes();checkRequest(s);
   assert.equal(s.run('baseOficialEstudiantes.length'),1);
   if(file==='primaria.html'){s.run(extract(file,'getTotalEstudiantes'));assert.equal(s.c.getTotalEstudiantes(),1);s.run('estado.grado="SEGUNDO"');assert.equal(s.c.getTotalEstudiantes(),0);}
   else{s.run(extract(file,'normalizarSeccionBD'));s.run(extract(file,'totalEstudiantesDesdeBD'));assert.equal(s.c.totalEstudiantesDesdeBD('1°','A'),1);assert.equal(s.c.totalEstudiantesDesdeBD('2°','B'),0);}
@@ -213,4 +213,36 @@ test('Authorization removal in another tab invalidates memory cache and pending 
  const pending=s.c.IEStudents.load();const rejected=assert.rejects(pending,e=>e.code==='SESSION');for(let i=0;i<10;i++)await Promise.resolve();
  changed({key:'ie22375_students_session_v1',newValue:null});
  release({ok:true,inicializada:true,estudiantes:[]});await rejected;assert.equal(s.c.IEStudents.peek(),null);
+});
+
+
+for (const file of ['primaria.html','secundaria.html']) test(file+': reuses Registro PADRON_III without network before slow refresh and changes period safely',async()=>{
+  const s=fixture('docente');
+  s.run(`let bdEstudiantes=IEStudents.empty(),padronBimestre='',solicitudPadron=0,tokenPadron='',cargandoEstudiantes=false,sesionActiva=null,notas={},padronVerificadoServidor=false;
+    function registroSoloLectura(){return true};function guardarTodo(){return true};function bloquearRegistroMientrasValida(){};function recordarPadron(){};function renderStudents(){};
+    function pintarPadronInmediato(base,b){bdEstudiantes=base;padronBimestre=b};function estadoPadron(){};function vigilarCachePadron(){};function sincronizarEdicionRegistro(){}`);
+  s.run(extract('registro.html','cargarPadronRegistro'));
+  assert.equal(await s.c.cargarPadronRegistro('III'),true);checkRequest(s,'III');
+  // Reload the shared client as a new page: only persisted session cache remains.
+  s.run(read('students.js'));s.c.IEStudents=s.c.window.IEStudents;
+  s.run(`let baseOficialEstudiantes=[];let estado={bimestre:'III',areaActual:null};
+    function mostrarToast(){};function syncInputTotalEstudiantes(){};function renderizarAreas(){};function renderizarResumen(){};function renderizarCompetencias(){};function renderizarAreaHeader(){}`);
+  for(const name of ['estadoEstudiantes','cargarBaseOficialCache','cargarBaseOficialEstudiantes']) s.run(extract(file,name));
+  const before=s.calls.length;
+  assert.equal(s.c.cargarBaseOficialCache(),true);assert.equal(s.run('baseOficialEstudiantes.length'),1);assert.equal(s.calls.length,before);
+  const pending=new Map();
+  s.c.fetch=async(url,options)=>{const bim=JSON.parse(options.body).bimestre;return {ok:true,json:()=>new Promise(resolve=>pending.set(bim,resolve))}};
+  const third=s.c.cargarBaseOficialEstudiantes();
+  assert.equal(s.run('baseOficialEstudiantes.length'),1); // slow server cannot delay local paint
+  s.run("estado.bimestre='II'");assert.equal(s.c.cargarBaseOficialCache(),false);
+  assert.equal(s.run('baseOficialEstudiantes.length'),0);
+  const second=s.c.cargarBaseOficialEstudiantes();
+  await new Promise(r=>setTimeout(r,0));
+  const level=file==='primaria.html'?'primaria':'secundaria';
+  const reply=(bimestre,nombre)=>({ok:true,inicializada:true,bimestre,version:'v-'+bimestre,padronInicializado:true,estudiantes:[{nivel:level,grado:1,seccion:'A',orden:1,nombre}]});
+  pending.get('III')(reply('III','Synthetic Old III'));await third;
+  assert.equal(s.run('baseOficialEstudiantes.length'),0);
+  pending.get('II')(reply('II','Synthetic New II'));await second;
+  assert.equal(s.run('baseOficialEstudiantes[0].nombre'),'Synthetic New II');
+  assert.match(extract(file,'setBimestre'),/estado.bimestre = val;[\s\S]*cargarBaseOficialCache\(\);[\s\S]*cargarBaseOficialEstudiantes\(\);/);
 });

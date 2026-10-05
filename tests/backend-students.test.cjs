@@ -14,7 +14,7 @@ function setup() {
     {user: 'test-legacy', nombre: 'Test Legacy', nivel: 'secundaria', areas: ['Matemática'], aulas: ['2|B']},
     {user: 'test-empty', nivel: 'secundaria', areas: [], aulas: []}
   ];
-  const state = {writes: 0, held: false};
+  const state = {writes: 0, held: false, reads: []};
   const tables = new Map();
   const cacheEntries = new Map();
   function sheet(name, rows) {
@@ -25,6 +25,7 @@ function setup() {
       appendRow(row) {state.writes++; rows.push([...row]);},
       setFrozenRows() {},
       getRange(r, c, nr = 1, nc = 1) {
+        state.reads.push({name, r, c, nr, nc});
         return {
           getValues: () => Array.from({length: nr}, (_, i) => Array.from({length: nc}, (_, j) => rows[r - 1 + i]?.[c - 1 + j] ?? '')),
           setValue(value) {state.writes++; rows[r - 1] ||= []; rows[r - 1][c - 1] = value; return this;},
@@ -42,7 +43,7 @@ function setup() {
   const props = {IE22375_TOKEN_SECRET: 'synthetic-test-secret'};
   const c = vm.createContext({
     SpreadsheetApp: {getActiveSpreadsheet: () => ({getSheetByName: name => tables.get(name), insertSheet: name => sheet(name, [])}), flush() {}},
-    CacheService: {getScriptCache: () => ({get: key => cacheEntries.get(key) || null, put: (key, value, ttl) => { if (key === 'IE22375_DOCENTE_ACCESOS_V1') assert.equal(state.held, true); assert.ok([600,21600].includes(ttl)); cacheEntries.set(key, value);}, remove: key => {assert.equal(state.held, true); cacheEntries.delete(key);}})},
+    CacheService: {getScriptCache: () => ({get: key => cacheEntries.get(key) || null, put: (key, value, ttl) => { if (key === 'IE22375_DOCENTE_ACCESOS_V1') assert.equal(state.held, true); assert.ok([600,21600].includes(ttl)); assert.ok(Buffer.byteLength(value, 'utf8') < 100000); cacheEntries.set(key, value);}, remove: key => {assert.equal(state.held, true); cacheEntries.delete(key);}})},
     LockService: {getScriptLock: () => ({waitLock() {assert.equal(state.held, false); state.held = true;}, releaseLock() {assert.equal(state.held, true); state.held = false;}})},
     PropertiesService: {getScriptProperties: () => ({getProperty: key => props[key], setProperty: (key, value) => props[key] = value})},
     Utilities: {
@@ -138,9 +139,16 @@ for(const kind of ['missing','expired','tampered','revoked','removed','pip','mal
   const before=s.state.writes,res=s.load(token);
   assert.equal(res.ok,false);assert.equal('estudiantes' in res,false);assert.equal(s.state.writes,before);
 });
-test('loadstudents never requests the global write lock and reuses cached DocentesAcceso',()=> {
+test('loadstudents with COLD teacher cache never requests ScriptLock',()=> {
+  const s=studentsFixture();
+  assert.equal(s.cacheEntries.has('IE22375_DOCENTE_ACCESOS_V1'),false);
+  s.c.LockService.getScriptLock=()=>assert.fail('cold teacher read requested ScriptLock');
+  assert.equal(s.load(s.primary).ok,true);
+  assert.ok(s.state.reads.some(r=>r.name==='DocentesAcceso'));
+});
+
+test('loadstudents reuses cached DocentesAcceso without lock',()=> {
   const s=studentsFixture();s.c.obtenerDocentesConfig_();
-  // The warm request populated the teacher cache while holding its write lock.
   s.c.LockService.getScriptLock=()=>({waitLock(){assert.fail('loadstudents must not request ScriptLock');},releaseLock(){assert.fail('no lock was acquired');}});
   const original=s.c.leerDocentesConfigSheets_;
   s.c.leerDocentesConfigSheets_=()=>assert.fail('cached teacher config must avoid a second Sheets read');
@@ -298,4 +306,57 @@ test('Student save/load preserves SIAGIE ID, student code and enrollment status 
   assert.equal(saved.ok,true);
   const al=s.load(s.admin).estudiantes.find(a=>a.nombre==='Synthetic Student 0');
   assert.equal(al.idSiagie,'25084489');assert.equal(al.codigoEstudiante,'00000062165159');assert.equal(al.estadoMatricula,'DEFINITIVA');
+});
+
+
+test('student cache hit performs no EstudiantesBase getRange, including a frozen roster',()=> {
+  const s=studentsFixture();
+  assert.equal(s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'III'}).ok,true);
+  s.load(s.primary,{bimestre:'III'});s.state.reads=[];
+  assert.equal(s.load(s.primary,{bimestre:'III'}).version,s.init.version);
+  assert.equal(s.state.reads.filter(r=>r.name==='EstudiantesBase').length,0);
+});
+
+test('Admin version change publishes new pointer and frozen periods retain their version',()=> {
+  const s=studentsFixture();
+  s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'III'});
+  s.load(s.admin,{bimestre:'III'});s.load(s.admin);
+  const next=s.post({action:'savestudents',token:s.admin,version:s.init.version,base:s.base});
+  assert.equal(next.ok,true);assert.notEqual(next.version,s.init.version);
+  assert.equal(s.load(s.admin).version,next.version);
+  assert.equal(s.load(s.admin,{bimestre:'III'}).version,s.init.version);
+});
+
+test('large unicode bases use bounded cache chunks and partial eviction safely reconstructs',()=> {
+  const s=studentsFixture();
+  s.base.primaria.estudiantes=Array.from({length:1500},(_,i)=>({grado:1,seccion:'Única',orden:i+1,nombre:'Synthetic '+i+' 漢'.repeat(30)}));
+  const next=s.post({action:'savestudents',token:s.admin,version:s.init.version,base:s.base});assert.equal(next.ok,true);
+  const first=s.load(s.admin);assert.equal(first.estudiantes.length,1504);
+  s.state.reads=[];assert.equal(s.load(s.admin).estudiantes.length,1504);
+  assert.equal(s.state.reads.filter(r=>r.name==='EstudiantesBase').length,0);
+  const part=[...s.cacheEntries.keys()].find(k=>k.includes('CHUNKS_'+next.version+'_0'));assert.ok(part);
+  s.cacheEntries.delete(part);s.state.reads=[];
+  assert.equal(s.load(s.admin).estudiantes.length,1504);
+  assert.ok(s.state.reads.some(r=>r.name==='EstudiantesBase'));
+});
+
+test('timing total includes cold authorization, pointer lookup and student reconstruction',()=> {
+  const s=studentsFixture();let now=100000;
+  s.c.Date={now:()=>now};
+  const auth=s.c.sesionLectura_,read=s.c.leerVersionEstudiantes_;
+  s.c.sesionLectura_=(...args)=>{now+=45;return auth(...args)};
+  s.c.leerVersionEstudiantes_=(...args)=>{now+=25;return read(...args)};
+  const result=s.load(s.primary);
+  assert.equal(result.ok,true);
+  assert.deepEqual(result.timing,{authMs:45,studentsMs:25,totalMs:70});
+});
+
+
+test('cached absent roster avoids full reads and seeding invalidates its absence index',()=> {
+  const s=studentsFixture();const first=s.load(s.admin,{bimestre:'III'});
+  assert.equal(first.padronInicializado,false);s.state.reads=[];
+  assert.equal(s.load(s.admin,{bimestre:'III'}).version,s.init.version);
+  assert.equal(s.state.reads.filter(r=>r.name==='EstudiantesBase').length,0);
+  assert.equal(s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'III'}).ok,true);
+  assert.equal(s.load(s.admin,{bimestre:'III'}).padronInicializado,true);
 });

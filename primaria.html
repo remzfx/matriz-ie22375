@@ -1426,20 +1426,27 @@ window.__IE_gradoOK = function(gradoVal) {
             if (el) el.textContent = mensaje;
         }
         function cargarBaseOficialCache() {
-            const db = IEStudents.peek();
-            if (!db || !db.primaria || !Array.isArray(db.primaria.estudiantes)) return false;
+            const db = estado.bimestre ? IEStudents.peekRoster(estado.bimestre) : IEStudents.peek();
+            if (!db || !db.primaria || !Array.isArray(db.primaria.estudiantes)) {
+                baseOficialEstudiantes = [];
+                estadoEstudiantes('Cargando padrón del bimestre…');
+                return false;
+            }
             baseOficialEstudiantes = db.primaria.estudiantes;
             estadoEstudiantes('Mostrando datos locales · actualizando nube…');
             return true;
         }
         async function cargarBaseOficialEstudiantes() {
             const actualizarEstado = mensaje => { const el = document.getElementById('studentsStatus'); if (el) el.textContent = mensaje; };
-            const habiaCache = baseOficialEstudiantes.length > 0;
+            const bimestre = estado.bimestre;
+            const habiaCache = cargarBaseOficialCache();
             try {
-                const db = await IEStudents.load();
+                const db = await (bimestre ? IEStudents.loadRoster(bimestre) : IEStudents.load());
+                if (estado.bimestre !== bimestre) return;
                 baseOficialEstudiantes = db.primaria.estudiantes;
                 actualizarEstado(db.offline ? 'Modo local · sincronización pendiente' : 'Datos actualizados');
             } catch(e) {
+                if (estado.bimestre !== bimestre) return;
                 // Una red lenta nunca sustituye una respuesta autorizada local por una lista vacía.
                 if (!habiaCache) baseOficialEstudiantes = [];
                 actualizarEstado(habiaCache ? 'Modo local · sincronización pendiente' : 'No se pudo cargar estudiantes · Reintenta con conexión');
@@ -1638,6 +1645,8 @@ window.__IE_gradoOK = function(gradoVal) {
         function setBimestre(val) {
             estado.bimestre = val;
             estado.areaActual = null;
+            cargarBaseOficialCache();
+            cargarBaseOficialEstudiantes();
             syncInputTotalEstudiantes();
             syncInputDocente();
             
