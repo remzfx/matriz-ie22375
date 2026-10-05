@@ -1205,6 +1205,9 @@ async function entrarNivel(n) {
   areaActual = areas()[0] || null;
   renderAreas();
   fillComps();
+  // onGrado() puede ejecutar el contexto antes de que exista un área activa.
+  // Resolver nuevamente el docente cuando el área inicial ya quedó definida.
+  actualizarDocenteResponsable();
 
   sesionActiva = null;
   notas = {};
@@ -1360,6 +1363,7 @@ function setArea(a) {
   areaActual = a;
   renderAreas();
   fillComps();
+  actualizarDocenteResponsable();
   onContexto();
 }
 
