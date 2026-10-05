@@ -286,3 +286,10 @@ test('Registro preserves original grade when switching scoring modes', () => {
   assert.match(src, /origen: 'letra'/);
   assert.match(src, /Se conserva la calificación original/);
 });
+
+
+test('Admin top actions center link and button labels consistently', () => {
+  const src = read('admin.html');
+  assert.match(src, /\.mobile-top-actions > a, \.mobile-top-actions > button \{/);
+  assert.match(src, /display:inline-flex; align-items:center; justify-content:center; text-align:center; line-height:1\.15/);
+});
