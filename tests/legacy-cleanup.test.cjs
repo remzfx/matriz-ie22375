@@ -340,7 +340,7 @@ test('Registro resolves primary responsible teacher after initial area becomes a
 test('Login retries once and distinguishes transient backend failures', () => {
   const src = read('index.html');
   assert.match(src, /for \(let intento = 1; intento <= 2; intento\+\+\)/);
-  assert.match(src, /await esperar\(900\)/);
+  assert.match(src, /await esperar\(1200\)/);
   assert.match(src, /code = 'TIMEOUT'/);
   assert.match(src, /code = 'NETWORK'/);
   assert.match(src, /INVALID_RESPONSE/);
@@ -356,4 +356,12 @@ test('Admin shows authorized cached student base immediately while refreshing se
   assert.match(src, /Base reciente mostrada al instante\. Verificando datos con el servidor/);
   assert.match(src, /cargarEstudiantesAdmin\(\{forceNetwork:true\}\)/);
   assert.match(src, /const fresca = await IEStudents\.load\(\)/);
+});
+
+
+test('Login tolerates slower Apps Script cold starts and reports automatic retry', () => {
+  const src = read('index.html');
+  assert.match(src, /fetchConTiempo\(CLOUD_API_URL, 18000/);
+  assert.match(src, /Reintentando automáticamente/);
+  assert.match(src, /Se hicieron 2 intentos/);
 });
