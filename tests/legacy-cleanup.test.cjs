@@ -300,3 +300,12 @@ test('Admin no longer shows obsolete note that transferred students are omitted'
   assert.doesNotMatch(src, /Nota: solo se cuentan alumnos con matrícula/);
   assert.doesNotMatch(src, /Los <b>TRASLADADOS<\/b> del SIAGIE se omiten/);
 });
+
+
+test('Admin schedule panel removes obsolete JSON download/import controls and legacy GitHub instruction', () => {
+  const src = read('admin.html');
+  assert.doesNotMatch(src, /Descargar horario_ingreso\.json/);
+  assert.doesNotMatch(src, /Importar JSON<input type="file"/);
+  assert.doesNotMatch(src, /descargue el JSON y súbalo a GitHub como/);
+  assert.match(src, /onclick="guardarHorario\(\)">Guardar horario/);
+});
