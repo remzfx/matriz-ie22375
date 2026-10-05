@@ -1534,14 +1534,18 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function getNombreDocente() {
-            if (!IEMatrixTeachers.peek()) return 'Pendiente de verificar';
-            return IEMatrixTeachers.nombre('primaria', estado.grado) || 'Sin registrar';
+            return typeof IEMatrixTeachers === 'undefined' ? '' : IEMatrixTeachers.nombre('primaria', estado.grado);
+        }
+        function nombreDocenteParaSubir() {
+            if (typeof IEMatrixTeachers === 'undefined') throw new Error('Espera mientras se verifica el docente responsable');
+            return IEMatrixTeachers.exigirNombre('primaria', estado.grado);
         }
         function setNombreDocente(nombre, ts) {
             if (!estado.docentesPorAula) estado.docentesPorAula = {};
             if (!estado.docentesPorAulaTs) estado.docentesPorAulaTs = {};
             const k = claveAula();
             nombre = (nombre || '').trim();
+            if (/^(Pendiente de verificar|Sin registrar)$/i.test(nombre)) return;
             estado.docentesPorAula[k] = nombre;
             estado.docentesPorAulaTs[k] = (ts != null ? Number(ts) : Date.now());
             estado.nombreDocente = nombre; // sincroniza legado / firmas
@@ -1549,7 +1553,10 @@ window.__IE_gradoOK = function(gradoVal) {
         }
         function syncInputDocente() {
             const el = document.getElementById('nombreDocente');
-            if (el) { el.value = getNombreDocente(); el.readOnly = true; }
+            if (el) {
+                el.value = getNombreDocente() || (typeof IEMatrixTeachers !== 'undefined' && IEMatrixTeachers.peek() ? 'Sin registrar' : 'Pendiente de verificar');
+                el.readOnly = true;
+            }
         }
         /** Docentes desde la nube: gana el registro con fecha más reciente */
         function aplicarDocentesDesdeNube(items) {
@@ -1559,7 +1566,7 @@ window.__IE_gradoOK = function(gradoVal) {
             const best = {};
             (items || []).forEach(it => {
                 const nombre = (it.docente || '').toString().trim();
-                if (!nombre) return;
+                if (!nombre || /^(Pendiente de verificar|Sin registrar)$/i.test(nombre)) return;
                 const ctxKey = `${it.bimestre}|${it.grado}|${it.seccion || 'UNICA'}`;
                 const ts = parseCloudTime(it.actualizado) || 0;
                 if (!best[ctxKey] || ts >= (best[ctxKey].ts || 0)) {
@@ -3524,7 +3531,7 @@ window.__IE_gradoOK = function(gradoVal) {
             const areaData = (estado.datos[ctxKey] && estado.datos[ctxKey][area])
                 ? estado.datos[ctxKey][area]
                 : {};
-            const docenteArea = getNombreDocente();
+            const docenteArea = nombreDocenteParaSubir();
             const payload = {
                 action: 'saveArea',
                 token: (window.__IE_SES || {}).token || '',
@@ -3559,6 +3566,8 @@ window.__IE_gradoOK = function(gradoVal) {
 
         function subirNube() {
             if (impedirEdicionPeriodo()) return;
+            try { nombreDocenteParaSubir(); }
+            catch(e) { mostrarToast(e.message, 'error'); return; }
             const areasDatos = areasConDatosDelGrado();
             const areaAct = estado.areaActual;
             const gradoLabel = estado.grado || '';

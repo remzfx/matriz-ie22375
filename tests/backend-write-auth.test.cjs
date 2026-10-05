@@ -230,6 +230,7 @@ for (const [file, name, action] of [
       cloudClaveReg: () => 'forged-key', cloudClave: () => 'forged-key',
       estado: {bimestre: 'I', grado: secondary ? '1°' : 'PRIMERO', seccion: secondary ? 'A' : 'UNICA', areaActual: secondary ? 'Matemática' : 'Comunicación', datos: {}},
       getNombreDocente: () => 'Forged Name', getDocenteArea: () => 'Forged Name', getTotalEstudiantes: () => 1,
+      nombreDocenteParaSubir: () => 'Test Primary', docenteAreaParaSubir: () => 'Test Secondary',
       registroSoloLectura:()=>false,registroNubeNoVerificada:()=>false,guardarTodo() {}, toast() {}, alert() {}, mostrarToast() {}, saveEstado() {}, initPeriodosUI() {},
       impedirEdicionPeriodo: () => false, storageDisponible: false,
       loadDocentes: () => s.docentes, loadPeriodos: () => ({bimestres: {I: 'abierto'}}),

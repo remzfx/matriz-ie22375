@@ -88,7 +88,7 @@ for(const role of ['admin','docente']) test('Secundaria '+role+': area and aula 
   assert.ok(f.node('areaHeader').innerHTML.includes('Docente responsable: Test Secondary'));
   assert.doesNotMatch(f.node('areaHeader').innerHTML,/<input|oninput|onchange/);
   f.run("estado.grado='5°';estado.seccion='ÚNICA'");assert.equal(f.c.getDocenteArea('Ciencia y Tecnología'),'Test Secondary');
-  assert.equal(f.c.getDocenteArea('Matemática'),'Sin registrar');
+  assert.equal(f.c.getDocenteArea('Matemática'),'');
 });
 test('two secondary teachers in the same area resolve independently for A and B',async()=>{
   const s=backend(),f=frontend(s,'admin','admin');await f.c.IEMatrixTeachers.load('synthetic-api');
@@ -157,3 +157,65 @@ for(const role of ['admin','docente']) test('Primaria removes four quick-summary
   assert.doesNotMatch(extract('primaria.html','renderizarResumen'),/Progreso General|Inicio \(C\)|En Proceso \(B\)|Logrado \(A\+AD\)/);
   assert.match(read('primaria.html'),/function abrirComparativo/);
 });
+
+function uploadFixture(file) {
+  const s=backend(),primary=file==='primaria.html',level=primary?'primaria':'secundaria';
+  const f=frontend(s,'docente',primary?'test-primary':'test-secondary'),payloads=[],messages=[];
+  f.c.window.__IE_SES={token:f.c.IEStudents.validToken(),label:'Immediate login label'};
+  f.c.console={error(){},warn(){}};
+  f.c.mostrarToast=message=>messages.push(message);
+  f.c.getTotalEstudiantes=()=>1;
+  f.c.impedirEdicionPeriodo=()=>false;f.c.renderizarAreaHeader=()=>{};
+  f.c.storageDisponible=false;
+  f.c.CLOUD_API_URL='synthetic-api';f.c.CLOUD_NIVEL=level;
+  f.c.cloudClave=()=>[level,'I',primary?'PRIMERO':'1°',primary?'UNICA':'A','Matemática'].join('|');
+  f.c.fetch=async(url,options)=>{const body=JSON.parse(options.body);payloads.push(body);return {text:async()=>JSON.stringify(s.post(body))}};
+  f.c.renderizarTablaConsolidada=()=>{};f.node('vistaTabla').scrollIntoView=()=>{};
+  f.run(`let estado={bimestre:'I',grado:${JSON.stringify(primary?'PRIMERO':'1°')},seccion:${JSON.stringify(primary?'UNICA':'A')},areaActual:'Matemática',datos:{},docentes:{'I|1°|A':{'Matemática':'Pendiente de verificar'}}};
+    const ESTRUCTURA_AREAS={'Matemática':{competencias:[],color:'',textColor:'',icon:''}};
+    function calcularResumenArea(){return {inicio:0,proceso:0,previsto:0,destacado:0}};`);
+  const names=primary?['getNombreDocente','nombreDocenteParaSubir','syncInputDocente','enviarAreaANube']:
+    ['getDocenteArea','docenteAreaParaSubir','renderizarAreaHeader'];
+  for(const name of [...names,'cargarDocentesOficialesMatriz','subirNube','mostrarVistaTabla'])f.run(extract(file,name));
+  return {...f,s,payloads,messages,send:()=>primary?f.c.enviarAreaANube('Matemática'):f.c.subirNube()};
+}
+for(const file of ['primaria.html','secundaria.html']) {
+  test(file+': slow teacher verification blocks upload; after reconnection it uses the official name',async()=>{
+    const f=uploadFixture(file);let resolve;
+    f.c.IEStudents.fetchJSON=()=>new Promise(r=>{resolve=r});
+    const pending=f.c.cargarDocentesOficialesMatriz();
+    await f.c.subirNube();assert.equal(f.payloads.length,0);
+    assert.ok(f.messages.some(message=>message.includes('Espera mientras se verifica el docente responsable')));
+    resolve(f.s.post({action:'loadmatrixteachers',token:f.c.IEStudents.validToken()}));await pending;
+    await f.send();assert.equal(f.payloads.length,1);assert.equal(f.payloads[0].action,'saveArea');
+    assert.equal(f.payloads[0].docente,file==='primaria.html'?'Test Primary':'Test Secondary');
+  });
+  test(file+': official cache permits upload while a teacher refresh is slow',async()=>{
+    const f=uploadFixture(file);await f.c.IEMatrixTeachers.load('synthetic-api');let resolve;
+    f.c.IEStudents.fetchJSON=()=>new Promise(r=>{resolve=r});const refresh=f.c.cargarDocentesOficialesMatriz();
+    await f.send();assert.equal(f.payloads.length,1);
+    assert.equal(f.payloads[0].docente,file==='primaria.html'?'Test Primary':'Test Secondary');
+    resolve(f.s.post({action:'loadmatrixteachers',token:f.c.IEStudents.validToken()}));await refresh;
+  });
+  test(file+': neither Sin registrar nor Pendiente de verificar can become an upload name',async()=>{
+    const f=uploadFixture(file),user=file==='primaria.html'?'test-primary':'test-secondary';
+    for(const text of ['Sin registrar','Pendiente de verificar']) {
+      f.s.docentes.find(d=>d.user===user).nombre=text;
+      f.s.tables.get('DocentesAcceso').rows[1][2]=JSON.stringify(f.s.docentes);f.s.cacheEntries.clear();
+      await f.c.IEMatrixTeachers.load('synthetic-api');
+      if(file==='primaria.html') await assert.rejects(f.send(),/No hay docente responsable registrado/);
+      else await f.send();
+      assert.equal(f.payloads.length,0);
+    }
+    f.run(file==='primaria.html'?"estado.grado='SEGUNDO'":"estado.seccion='B'");
+    assert.equal(f.c.IEMatrixTeachers.nombre(file==='primaria.html'?'primaria':'secundaria','2°','B','Other'),'');
+  });
+  test(file+': print/PDF never signs with a temporary or historical teacher name',async()=>{
+    const f=uploadFixture(file);f.c.mostrarVistaTabla();
+    assert.doesNotMatch(f.node('tablaInfoDocente').textContent,/Pendiente de verificar|Sin registrar|Immediate login label/);
+    assert.equal(f.node('firmaDocente').textContent,'');
+    await f.c.cargarDocentesOficialesMatriz();f.c.mostrarVistaTabla();
+    assert.ok(f.node('tablaInfoDocente').textContent.includes(file==='primaria.html'?'Test Primary':'Test Secondary'));
+    assert.doesNotMatch(f.node('tablaInfoDocente').textContent,/Pendiente de verificar|Sin registrar/);
+  });
+}

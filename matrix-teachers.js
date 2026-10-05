@@ -60,7 +60,14 @@
         return parts.length === 2 && grado(parts[0]) === g && seccion(parts[1]) === sec;
       });
     });
-    return found ? found.nombre : '';
+    const name = found ? String(found.nombre || '').trim() : '';
+    return /^(Pendiente de verificar|Sin registrar)$/i.test(name) ? '' : name;
   }
-  global.IEMatrixTeachers = {peek:peek,load:load,nombre:nombre};
+  function exigirNombre(nivel, value, section, area) {
+    if (!peek()) throw new Error('Espera mientras se verifica el docente responsable');
+    const name = nombre(nivel, value, section, area);
+    if (!name) throw new Error('No hay docente responsable registrado para esta asignación');
+    return name;
+  }
+  global.IEMatrixTeachers = {peek:peek,load:load,nombre:nombre,exigirNombre:exigirNombre};
 })(window);
