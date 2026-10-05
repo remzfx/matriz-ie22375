@@ -4,7 +4,7 @@
   const KEY = 'ie22375_students_session_v1';
   const TTL = 24 * 60 * 60 * 1000;
   const API = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
-  let memory = null;
+  let memory = null, authorizationEpoch = 0;
   const pending = new Map();
   function status(message) {
     const el = document.getElementById('studentsStatus');
@@ -27,10 +27,15 @@
     return tokenExpiryMs(s.token) > Date.now() ? s.token : '';
   }
   function clear() {
+    authorizationEpoch++;
     memory = null;
     try { sessionStorage.removeItem(KEY); } catch (e) {}
     try { localStorage.removeItem(KEY); } catch (e) {}
   }
+  // Propagar retirada de autorización entre pestañas sin borrar notas locales.
+  if (typeof global.addEventListener === 'function') global.addEventListener('storage', function(e) {
+    if ((e.key === KEY && !e.newValue) || e.key === 'ie22375_session_v1') clear();
+  });
   function empty() { return {primaria: {estudiantes: [], docentes: []}, secundaria: {estudiantes: [], docentes: []}}; }
   function toBase(response) {
     const base = empty();
@@ -53,7 +58,7 @@
         JSON.parse(localStorage.getItem(KEY) || 'null');
       if (saved && saved.token !== token) { clear(); return null; }
       const cached = saved && ((saved.entries || {})[scope] || saved);
-      if (cached && cached.scope === scope && cached.until > Date.now()) return JSON.parse(JSON.stringify(cached.base));
+      if (cached && cached.token === token && cached.scope === scope && cached.until > Date.now() && cached.base.inicializada !== false) return JSON.parse(JSON.stringify(cached.base));
     } catch (e) {}
     return null;
   }
@@ -100,26 +105,29 @@
     data = data || {};
     const token = validToken(), scope = 'students:' + (data.bimestre || 'actual');
     if (!token) { clear(); throw error('SESSION','Sesión ausente o vencida. Vuelve a iniciar sesión.'); }
+    const epoch = authorizationEpoch;
     const read = action === 'loadstudents', attempts = read ? 2 : 1;
     let last;
     for (let attempt = 0; attempt < attempts; attempt++) {
-      if (validToken() !== token) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
+      if (validToken() !== token || epoch !== authorizationEpoch) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
       try {
         const response = await fetchJSON(API, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
           body:JSON.stringify(Object.assign({},data,{action:action,token:token})),cache:'no-store'});
-        if (validToken() !== token) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
+        if (validToken() !== token || epoch !== authorizationEpoch) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
         if (!response || typeof response.ok !== 'boolean') throw error('INVALID_RESPONSE','Respuesta del servidor no válida.',true);
         if (!response.ok) {
-          // Un backend antiguo/método incorrecto no verifica permisos. Solo lectura, nunca escritura.
+          // Un backend antiguo/método incorrecto no verifica permisos. Solo trabajo local previamente autorizado; nunca habilita subida a la nube.
           if (response.code === 'METHOD_NOT_ALLOWED' || /acción no válida/i.test(response.error || ''))
             throw error('API_INCOMPATIBLE','El backend no reconoce la lectura de estudiantes. Verifique la implementación de Apps Script.',true);
           throw error('DENIED',response.error || 'Sesión inválida o sin autorización.');
         }
         if (!Array.isArray(response.estudiantes)) throw error('INVALID_RESPONSE','Respuesta de estudiantes inválida.',true);
+        if (read && data.bimestre && response.bimestre !== data.bimestre)
+          throw error('INVALID_RESPONSE','El servidor no confirmó el bimestre solicitado.',true);
         return remember(toBase(response),token,scope);
       } catch(e) {
         last = e;
-        if (validToken() !== token) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
+        if (validToken() !== token || epoch !== authorizationEpoch) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
         if (!e.retryable) { clear(); status(e.message); throw e; }
         if (attempt + 1 < attempts) await new Promise(resolve => setTimeout(resolve,1200));
       }
@@ -129,7 +137,7 @@
     throw last;
   }
   function readOnce(data) {
-    const key = validToken() + ':' + ((data || {}).bimestre || 'actual');
+    const key = authorizationEpoch + ':' + validToken() + ':' + ((data || {}).bimestre || 'actual');
     if (!pending.has(key)) {
       const task = checkedLoad(data).finally(() => { if (pending.get(key) === task) pending.delete(key); });
       pending.set(key,task);

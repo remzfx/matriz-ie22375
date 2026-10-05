@@ -18,7 +18,7 @@ function fixture(){
  c.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>response()};};
  new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;
  const run=code=>new vm.Script(code).runInContext(c);
- run(`let nivel='secundaria',bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,tokenPadron='',vencimientoCachePadron,sesionActiva=null,notas={},areaActual='Matemática',store={meta:{}},renders=0;
+ run(`let nivel='secundaria',bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,tokenPadron='',vencimientoCachePadron,sesionActiva=null,notas={},areaActual='Matemática',store={meta:{},grades:{},asistencia:{}},renders=0;
  function recordarPadron(){};function saveStore(){};function renderStudents(){renders++;};function llenarAulasPadron(){};
  function ctxBase(){return {nivel,bim:document.getElementById('selBim').value,grado:4,seccion:'B',area:areaActual}};
  function getLoginSession(){return IEStudents.session()};function loadPeriodosAdmin(){return {bimestres:{III:'abierto'}}};
@@ -27,7 +27,7 @@ function fixture(){
  function renderSesiones(){renders++};function renderFinales(){};function renderAvance(){};function renderAsistencia(){};
  function consultarEstadoSiagie(){};function recolectarPantalla(){};function guardarMeta(){};function saveCapsElegidas(){};`);
  for(const name of ['registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','bloquearRegistroMientrasValida','pintarPadronInmediato','vigilarCachePadron','cargarPadronRegistro','cambiarBimestreRegistro','reintentarPadronRegistro','onContexto','guardarTodo'])run(extract(name));
- return {c,run,main,writes,cloud,element,tick,calls,alerts,response,storage,timers};
+ return {c,run,main,writes,cloud,element,tick,calls,alerts,response,storage,timers,now:()=>now};
 }
 test('Fast server verifies the exact roster/session and enables writing without inert',async()=>{
  const s=fixture();assert.equal(await s.c.cargarPadronRegistro('III'),true);assert.equal(s.c.registroSoloLectura(),false);assert.equal(s.main.inert,false);assert.ok(s.writes.every(x=>!x.disabled));
@@ -83,7 +83,7 @@ test('Concurrent reads of the same token/bimestre share a single server verifica
 
 test('Expired local-first cache is withdrawn and local writes become blocked',async()=>{
  const s=fixture();await s.c.IEStudents.loadRoster('III');s.c.fetch=async()=>{throw Error('down');};
- const task=s.c.cargarPadronRegistro('III');await s.tick(1200);await task;await s.tick(610000);
+ const task=s.c.cargarPadronRegistro('III');await s.tick(1200);await task;await s.tick(3615000);
  assert.equal(s.run('bdEstudiantes.secundaria.estudiantes.length'),0);assert.equal(s.c.guardarTodo(),false);assert.equal(s.element('retryRoster').hidden,false);
 });
 
@@ -103,4 +103,93 @@ test('Login body timeout stays inside the original attempt budget instead of han
  const request=s.c.leerRespuestaLoginConTiempo({text:()=>new Promise(()=>{})},300);
  const rejected=assert.rejects(request,e=>e.code==='TIMEOUT');await s.tick(300);await rejected;
  assert.match(source,/18000 - \(performance.now\(\) - t0\)/);
+});
+
+test('Late server refresh preserves the active local session, notes and unfinished conclusion',async()=>{
+ const s=fixture();await s.c.IEStudents.loadRoster('III');let release;
+ s.c.fetch=async()=>({ok:true,json:()=>new Promise(r=>release=r)});
+ const task=s.c.cargarPadronRegistro('III');await s.tick(0);
+ s.run("sesionActiva={comp:'Synthetic competency',capacidad:'Synthetic capacity',fecha:'2026-10-05'};notas={'id:42':{nota20:12,conclusion:'Synthetic conclusion'}};function gradeKey(n){return 'saved:'+n};function recolectarPantalla(){store.grades['saved:id:42']={nota20:18,ts:2}};");
+ s.element('modalText').value='Synthetic unfinished draft';s.element('selCap').value='Synthetic capacity';
+ release(s.response('Synthetic Corrected Name'));await task;
+ assert.equal(s.run('sesionActiva.capacidad'),'Synthetic capacity');assert.equal(s.run("notas['id:42'].conclusion"),'Synthetic conclusion');
+ assert.equal(s.run("store.grades['saved:id:42'].nota20"),18);assert.equal(s.run("store.grades['saved:id:42'].conclusion"),'Synthetic conclusion');
+ assert.equal(s.element('modalText').value,'Synthetic unfinished draft');assert.equal(s.element('selCap').value,'Synthetic capacity');
+ assert.equal(s.run('bdEstudiantes.secundaria.estudiantes[0].nombre'),'Synthetic Corrected Name');assert.equal(s.c.registroNubeNoVerificada(),false);
+});
+
+test('Local attendance is editable while server verification is still pending',async()=>{
+ const s=fixture();await s.c.IEStudents.loadRoster('III');let release;
+ s.c.fetch=async()=>({ok:true,json:()=>new Promise(r=>release=r)});const task=s.c.cargarPadronRegistro('III');await s.tick(0);
+ s.run("let asisFechaActiva='2026-10-05';function asisMarkKey(f,n){return f+':'+n};function horaAhora(){return '10:00'}");s.run(extract('asisSet'));
+ s.c.asisSet('id:42','P');assert.equal(s.run("store.asistencia['2026-10-05:id:42'].marca"),'P');
+ assert.notEqual(s.c.guardarTodo(),false);assert.equal(s.c.registroNubeNoVerificada(),true);release(s.response());await task;
+});
+
+test('Switching bimestre during slow verification saves the local work in the previous bimestre',async()=>{
+ const s=fixture();await s.c.IEStudents.loadRoster('III');const release={};
+ s.c.fetch=async(url,options)=>({ok:true,json:()=>new Promise(r=>release[JSON.parse(options.body).bimestre]=r)});
+ const old=s.c.cargarPadronRegistro('III');await s.tick(0);
+ s.run("let savedContexts=[];function recolectarPantalla(){savedContexts.push(ctxBase().bim)}");
+ s.element('selBim').value='IV';const current=s.c.cambiarBimestreRegistro();await s.tick(0);
+ assert.equal(s.run("savedContexts.includes('III')"),true);
+ release.IV(s.response('Synthetic IV','IV'));await current;release.III(s.response());await old;
+ assert.equal(s.run('padronBimestre'),'IV');
+});
+
+test('A pending read cannot deliver the roster after the token changes',async()=>{
+ const s=fixture();let release;s.c.fetch=async()=>({ok:true,json:()=>new Promise(r=>release=r)});
+ const task=s.c.cargarPadronRegistro('III');await s.tick(0);s.storage.removeItem('ie22375_session_v1');
+ release(s.response());assert.equal(await task,false);assert.equal(s.c.registroSoloLectura(),true);assert.equal(s.c.registroNubeNoVerificada(),true);
+ assert.equal(s.run('bdEstudiantes.secundaria.estudiantes.length'),0);
+});
+
+test('Verified sessions also lose local authorization at actual token expiry',async()=>{
+ const s=fixture();await s.c.cargarPadronRegistro('III');await s.tick(3615000);
+ assert.equal(s.run('bdEstudiantes.secundaria.estudiantes.length'),0);assert.equal(s.run('padronVerificadoServidor'),false);assert.equal(s.c.guardarTodo(),false);
+});
+
+test('UI permission updates never unlock a pre-existing academic readonly input',async()=>{
+ const s=fixture();await s.c.cargarPadronRegistro('III');const academic={readOnly:true};const query=s.c.document.querySelectorAll;
+ s.c.document.querySelectorAll=sel=>sel==='.cal-nota,.fin-nota,.av-conc'?[academic]:query(sel);
+ s.c.sincronizarEdicionRegistro();assert.equal(academic.readOnly,true);
+});
+
+test('Local-first upload guard prevents any backend write before fresh verification',async()=>{
+ const s=fixture();await s.c.IEStudents.loadRoster('III');s.c.fetch=async()=>{throw Error('down')};
+ const task=s.c.cargarPadronRegistro('III');await s.tick(1200);await task;
+ s.c.toast=()=>{};s.run(extract('subirRegistroNube'));const before=s.calls.length;
+ assert.equal(await s.c.subirRegistroNube(),false);assert.equal(s.calls.length,before);
+});
+
+test('Explicit upload authorization rejection removes local authorization but preserves saved notes',async()=>{
+ const s=fixture();await s.c.cargarPadronRegistro('III');s.run("store.grades.history={nota20:17}");s.run(extract('retirarVerificacionNube'));
+ s.c.retirarVerificacionNube(s.c.IEStudents.validToken(),'III',{ok:false,error:'Sesión inválida o sin autorización para este registro.'});
+ assert.equal(s.c.IEStudents.peekRoster('III'),null);assert.equal(s.c.guardarTodo(),false);assert.equal(s.run('store.grades.history.nota20'),17);
+});
+
+test('Failed cloud confirmation blocks further uploads until retry, without revoking authorized local work',async()=>{
+ const s=fixture();await s.c.cargarPadronRegistro('III');s.run(extract('retirarVerificacionNube'));
+ s.c.retirarVerificacionNube(s.c.IEStudents.validToken(),'III');assert.equal(s.c.registroNubeNoVerificada(),true);assert.equal(s.c.registroSoloLectura(),false);
+});
+
+test('Two simultaneous Registro loads share verification and leave the last load usable',async()=>{
+ const s=fixture();let release;s.c.fetch=async(url,options)=>{s.calls.push({url,options});return {ok:true,json:()=>new Promise(r=>release=r)}};
+ const a=s.c.cargarPadronRegistro('III'),b=s.c.cargarPadronRegistro('III');await s.tick(0);assert.equal(s.calls.length,1);
+ release(s.response());await Promise.all([a,b]);assert.equal(s.run('cargandoEstudiantes'),false);assert.equal(s.c.registroNubeNoVerificada(),false);
+});
+
+test('Storage failure during late refresh preserves the visible draft and reports that local save failed',async()=>{
+ const s=fixture();await s.c.IEStudents.loadRoster('III');let release;
+ s.c.fetch=async()=>({ok:true,json:()=>new Promise(r=>release=r)});const task=s.c.cargarPadronRegistro('III');await s.tick(0);
+ s.element('modalText').value='Synthetic unsaved draft';const rendered=s.run('renders');s.run("function saveStore(){throw Error('Synthetic quota exceeded')}");
+ release(s.response('Synthetic Updated'));await task;
+ assert.equal(s.run('renders'),rendered);assert.equal(s.element('modalText').value,'Synthetic unsaved draft');
+ assert.equal(s.c.guardarTodo(),false);assert.equal(s.c.registroNubeNoVerificada(),true);assert.match(s.element('studentsStatus').textContent,/No se pudo guardar/);
+});
+
+test('Unavailable storage during initial cached render terminates loading with a recoverable state',async()=>{
+ const s=fixture();await s.c.IEStudents.loadRoster('III');s.run("function saveStore(){throw Error('Synthetic quota exceeded')}");
+ await s.c.cargarPadronRegistro('III');assert.equal(s.run('cargandoEstudiantes'),false);assert.equal(s.element('retryRoster').hidden,false);
+ assert.equal(s.c.guardarTodo(),false);assert.equal(s.main.inert,false);
 });
