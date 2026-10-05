@@ -238,7 +238,7 @@
           </div>
           <p id="migracionEstado" role="status" class="text-sm text-sky-800 mt-2">Los padrones se actualizan solo mediante una confirmación SIAGIE explícita. Las notas históricas se conservan.</p>
         </details>
-        <button class="btn btn-ghost text-sm" onclick="cargarEstudiantesAdmin()">Recargar base privada</button>
+        <button class="btn btn-ghost text-sm" onclick="cargarEstudiantesAdmin({forceNetwork:true})">Recargar base privada</button>
         <p class="text-sm text-slate-600">Acepta CSV del <b>SIAGIE</b> (listado de estudiantes) o JSON. Columnas sugeridas: <code class="bg-slate-100 px-1 rounded">nivel,grado,seccion,orden,nombre</code></p>
         <p class="text-[11px] text-amber-800 bg-amber-50 rounded-lg px-2 py-1.5 leading-snug">
           Se incluyen todos los estudiantes del CSV SIAGIE vigente, también quienes figuren como <b>TRASLADADO</b>. Se conserva su estado de matrícula.
@@ -493,12 +493,33 @@ function aplicarBaseServidor(base) {
   estadoBD(base.offline ? 'Sin conexión: lista temporal de esta sesión (máximo 10 minutos).'
     : baseInicializada ? 'Base oficial cargada desde el servidor.' : 'Base privada pendiente de inicialización. Importa la base oficial y confírmala abajo.');
 }
-async function cargarEstudiantesAdmin() {
+async function cargarEstudiantesAdmin(options) {
+  options = options || {};
   if (bdGuardando) return;
   if (bdPendiente && !confirm('Hay cambios sin guardar. ¿Descartarlos y recargar la base del servidor?')) return;
-  estadoBD('Cargando estudiantes con la sesión Admin…');
-  try { aplicarBaseServidor(await IEStudents.load()); }
-  catch(e) { baseCargada = false; estadoBD(e.message); }
+
+  // La caché está ligada al token exacto y vence a los 10 minutos.
+  // Se usa solo para pintar el panel de inmediato; el servidor sigue siendo autoritativo.
+  const cached = !options.forceNetwork && IEStudents.peek ? IEStudents.peek() : null;
+  if (cached && cached.inicializada) {
+    aplicarBaseServidor(cached);
+    estadoBD('Base reciente mostrada al instante. Verificando datos con el servidor…');
+  } else {
+    estadoBD('Cargando estudiantes con la sesión Admin…');
+  }
+
+  try {
+    const fresca = await IEStudents.load();
+    aplicarBaseServidor(fresca);
+  } catch(e) {
+    if (cached && cached.inicializada) {
+      baseCargada = true;
+      estadoBD('Mostrando la última base autorizada de esta sesión. No se pudo actualizar ahora.');
+      return;
+    }
+    baseCargada = false;
+    estadoBD(e.message);
+  }
 }
 window.addEventListener('beforeunload', function(e) {
   if (bdPendiente) { e.preventDefault(); e.returnValue = ''; }
@@ -1695,6 +1716,10 @@ function entrarAppAdmin() {
 }
 loadEstado();
 if (sesionIndexAdmin()) {
+  const baseRapida = IEStudents.peek ? IEStudents.peek() : null;
+  if (baseRapida && baseRapida.inicializada) {
+    aplicarBaseServidor(baseRapida);
+  }
   entrarAppAdmin();
   cargarEstudiantesAdmin();
 }
