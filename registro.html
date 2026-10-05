@@ -263,7 +263,10 @@
   </div>
 
   <main class="max-w-3xl mx-auto px-3 py-3 space-y-3" style="padding-bottom:110px">
-    <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
+    <div class="flex flex-wrap items-center gap-2">
+      <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
+      <button type="button" id="btnReintentarPadron" class="hidden btn btn-ghost text-xs !py-1.5 !px-2" onclick="reintentarPadronActual()">Reintentar</button>
+    </div>
     <!-- Área -->
     <div class="card p-3">
       <div class="text-[10px] font-bold text-slate-500 mb-2">ÁREA</div>
@@ -799,12 +802,24 @@ function metaRegistro() {
 }
 let padronBimestre = '', solicitudPadron = 0, padronVerificadoServidor = false;
 function bloquearRegistroMientrasValida(bloquear) {
+  // Local-first: la verificación de red nunca congela la interfaz.
+  // El backend sigue siendo autoridad al sincronizar/escribir en nube.
   padronVerificadoServidor = !bloquear;
   const main = document.querySelector('main');
   if (main) {
-    main.inert = !!bloquear;
+    main.inert = false;
     main.setAttribute('aria-busy', bloquear ? 'true' : 'false');
   }
+}
+function mostrarReintentoPadron(mostrar) {
+  const b = document.getElementById('btnReintentarPadron');
+  if (b) b.classList.toggle('hidden', !mostrar);
+}
+function reintentarPadronActual() {
+  const bim = (document.getElementById('selBim') || {}).value || padronBimestre;
+  if (!bim || cargandoEstudiantes) return;
+  mostrarReintentoPadron(false);
+  cargarPadronRegistro(bim, {forzar:true});
 }
 function pintarPadronInmediato(base, bimestre, desdeCache) {
   bdEstudiantes = base; padronBimestre = bimestre;
@@ -819,7 +834,8 @@ function pintarPadronInmediato(base, bimestre, desdeCache) {
     try { renderStudents(); renderSesiones(); } catch (_) {}
   }
 }
-async function cargarPadronRegistro(bimestre) {
+async function cargarPadronRegistro(bimestre, options) {
+  options = options || {};
   const solicitud = ++solicitudPadron;
   cargandoEstudiantes = true;
   bloquearRegistroMientrasValida(true);
@@ -827,7 +843,7 @@ async function cargarPadronRegistro(bimestre) {
   sesionActiva = null; notas = {};
   ['finLista','avanceBox','asisLista'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
 
-  const cache = IEStudents.peekRoster ? IEStudents.peekRoster(bimestre) : null;
+  const cache = !options.forzar && IEStudents.peekRoster ? IEStudents.peekRoster(bimestre) : (IEStudents.peekRoster ? IEStudents.peekRoster(bimestre) : null);
   if (cache) {
     pintarPadronInmediato(cache, bimestre, true);
     const st = document.getElementById('studentsStatus');
@@ -843,19 +859,26 @@ async function cargarPadronRegistro(bimestre) {
     pintarPadronInmediato(base, bimestre, false);
     if (base.offline) {
       const st = document.getElementById('studentsStatus');
-      if (st) st.textContent = 'Sin conexión: padrón temporal en modo solo lectura.';
-      alert('Sin conexión: se muestra el último padrón válido, pero Registro queda en solo lectura hasta verificar el servidor.');
+      if (st) st.textContent = 'Modo local: puedes seguir trabajando. Sincronización pendiente.';
+      mostrarReintentoPadron(true);
+      bloquearRegistroMientrasValida(false);
       return true;
     }
+    mostrarReintentoPadron(false);
     bloquearRegistroMientrasValida(false);
     if (!base.padronInicializado) toast('Padrón pendiente: el servidor entregó la base actual autorizada.');
     return true;
   } catch(e) {
     if (solicitud === solicitudPadron) {
-      if (!cache) padronBimestre = '';
       const st = document.getElementById('studentsStatus');
-      if (st && cache) st.textContent = 'No se pudo verificar el servidor. Padrón visible en modo solo lectura.';
-      alert(e.message);
+      if (cache) {
+        if (st) st.textContent = 'Modo local: puedes seguir trabajando. Sincronización pendiente.';
+        bloquearRegistroMientrasValida(false);
+      } else {
+        padronBimestre = '';
+        if (st) st.textContent = 'No se pudo cargar el padrón. Pulsa Reintentar cuando tengas conexión.';
+      }
+      mostrarReintentoPadron(true);
     }
     return !!cache;
   } finally {
@@ -1542,7 +1565,7 @@ function recolectarPantalla() {
   }
 }
 function guardarTodo() {
-  if (cargandoEstudiantes || !padronBimestre || document.getElementById('selBim').value !== padronBimestre) return false;
+  if (!padronBimestre || document.getElementById('selBim').value !== padronBimestre) return false;
   recolectarPantalla();
   if (sesionActiva) {
     Object.keys(notas).forEach(nombre => {
