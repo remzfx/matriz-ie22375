@@ -12,7 +12,7 @@ function fixture(){
  const token=Buffer.from(JSON.stringify({role:'docente',exp:now+3600000})).toString('base64url')+'.synthetic';
  const values=new Map([['ie22375_session_v1',JSON.stringify({role:'docente',token,tokenExp:now+3600000})]]),storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
  const els=new Map(),element=id=>{if(!els.has(id)){const classes=new Set();els.set(id,{value:id==='selBim'?'III':id==='selGrado'?'4':id==='selSeccion'?'B':'',innerHTML:'',textContent:'',disabled:false,hidden:false,classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)}});}return els.get(id);};
- const writes=[element('save'),element('upload')],main={inert:false,setAttribute(){},querySelectorAll:sel=>sel.includes('data-reg-write')?writes:[]};
+ const writes=[element('save')],cloud=[element('upload')],main={inert:false,setAttribute(){},querySelectorAll:sel=>sel.includes('data-reg-cloud')?cloud:sel.includes('data-reg-write')?writes:[]};
  const calls=[],alerts=[],c=vm.createContext({window:{},Date:class extends Date{static now(){return now;}},AbortController,atob,setTimeout:timer,clearTimeout:key=>timers.delete(key),sessionStorage:storage,localStorage:storage,document:{getElementById:element,querySelectorAll:sel=>main.querySelectorAll(sel),querySelector:()=>main},alert:m=>alerts.push(m),console});
  const response=(name='Synthetic Verified',bimestre='III')=>({ok:true,inicializada:true,version:'v',bimestre,padronInicializado:true,estudiantes:[{nivel:'secundaria',grado:4,seccion:'B',idSiagie:'42',nombre:name}]});
  c.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>response()};};
@@ -26,18 +26,18 @@ function fixture(){
  function fillCaps(){};function loadCapsElegidas(){};function renderChipsCaps(){};function markClean(){};function updateHdr(){};
  function renderSesiones(){renders++};function renderFinales(){};function renderAvance(){};function renderAsistencia(){};
  function consultarEstadoSiagie(){};function recolectarPantalla(){};function guardarMeta(){};function saveCapsElegidas(){};`);
- for(const name of ['registroSoloLectura','sincronizarEdicionRegistro','estadoPadron','bloquearRegistroMientrasValida','pintarPadronInmediato','vigilarCachePadron','cargarPadronRegistro','cambiarBimestreRegistro','reintentarPadronRegistro','onContexto','guardarTodo'])run(extract(name));
- return {c,run,main,writes,element,tick,calls,alerts,response,storage,timers};
+ for(const name of ['registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','bloquearRegistroMientrasValida','pintarPadronInmediato','vigilarCachePadron','cargarPadronRegistro','cambiarBimestreRegistro','reintentarPadronRegistro','onContexto','guardarTodo'])run(extract(name));
+ return {c,run,main,writes,cloud,element,tick,calls,alerts,response,storage,timers};
 }
 test('Fast server verifies the exact roster/session and enables writing without inert',async()=>{
  const s=fixture();assert.equal(await s.c.cargarPadronRegistro('III'),true);assert.equal(s.c.registroSoloLectura(),false);assert.equal(s.main.inert,false);assert.ok(s.writes.every(x=>!x.disabled));
  assert.equal(JSON.parse(s.calls[0].options.body).action,'loadstudents');assert.equal(s.calls[0].options.method,'POST');assert.equal(s.alerts.length,0);
 });
-test('Slow server shows authorized cache immediately and allows changing area while blocking all writes',async()=>{
+test('Slow server shows authorized cache immediately and allows local work while cloud upload stays blocked',async()=>{
  const s=fixture();await s.c.IEStudents.loadRoster('III');let release;s.c.fetch=async()=>({ok:true,json:()=>new Promise(r=>release=r)});
  const task=s.c.cargarPadronRegistro('III');await s.tick(0);
- assert.equal(s.run('bdEstudiantes.secundaria.estudiantes.length'),1);assert.equal(s.main.inert,false);assert.ok(s.writes.every(x=>x.disabled));
- s.run("areaActual='Comunicación'");s.c.onContexto();assert.equal(s.run('areaActual'),'Comunicación');assert.ok(s.run('renders')>1);assert.equal(s.c.guardarTodo(),false);
+ assert.equal(s.run('bdEstudiantes.secundaria.estudiantes.length'),1);assert.equal(s.main.inert,false);assert.ok(s.writes.every(x=>!x.disabled));assert.ok(s.cloud.every(x=>x.disabled));
+ s.run("areaActual='Comunicación'");s.c.onContexto();assert.equal(s.run('areaActual'),'Comunicación');assert.ok(s.run('renders')>1);assert.notEqual(s.c.guardarTodo(),false);
  release(s.response('Synthetic Fresh'));await task;assert.equal(s.run('bdEstudiantes.secundaria.estudiantes[0].nombre'),'Synthetic Fresh');assert.equal(s.c.registroSoloLectura(),false);
 });
 test('Transient first failure retries automatically on the same canonical POST route',async()=>{
@@ -45,10 +45,10 @@ test('Transient first failure retries automatically on the same canonical POST r
  const task=s.c.cargarPadronRegistro('III');await s.tick(1200);assert.equal(await task,true);assert.equal(count,2);assert.equal(s.c.registroSoloLectura(),false);
  assert.ok(s.calls.every(x=>x.options.method==='POST'&&JSON.parse(x.options.body).action==='loadstudents'));
 });
-test('Cached roster plus server outage remains navigable read-only; later retry replaces cache without page reload',async()=>{
+test('Cached roster plus server outage remains locally editable; later retry replaces cache without page reload',async()=>{
  const s=fixture();await s.c.IEStudents.loadRoster('III');s.c.fetch=async()=>{throw Error('down');};
  const task=s.c.cargarPadronRegistro('III');await s.tick(1200);assert.equal(await task,true);
- assert.equal(s.run('cargandoEstudiantes'),false);assert.equal(s.main.inert,false);assert.equal(s.c.registroSoloLectura(),true);assert.equal(s.element('retryRoster').hidden,false);
+ assert.equal(s.run('cargandoEstudiantes'),false);assert.equal(s.main.inert,false);assert.equal(s.c.registroSoloLectura(),false);assert.equal(s.c.registroNubeNoVerificada(),true);assert.equal(s.element('retryRoster').hidden,false);
  s.c.fetch=async()=>({ok:true,json:async()=>s.response('Synthetic Recovery')});await s.c.reintentarPadronRegistro();
  assert.equal(s.run('bdEstudiantes.secundaria.estudiantes[0].nombre'),'Synthetic Recovery');assert.equal(s.c.registroSoloLectura(),false);assert.equal(s.element('retryRoster').hidden,true);
 });
@@ -67,9 +67,9 @@ test('Late request for a previous bimestre cannot overwrite the active roster or
  release.IV(s.response('Synthetic IV','IV'));await current;release.III(s.response('Synthetic III','III'));await old;
  assert.equal(s.run('padronBimestre'),'IV');assert.equal(s.run('bdEstudiantes.secundaria.estudiantes[0].nombre'),'Synthetic IV');assert.equal(s.c.registroSoloLectura(),false);
 });
-test('API incompatibility never grants write permission; manual retry stays available',async()=>{
+test('API incompatibility allows only local work; cloud upload remains blocked and retry stays available',async()=>{
  const s=fixture();await s.c.IEStudents.loadRoster('III');s.c.fetch=async()=>({ok:true,json:async()=>({ok:false,error:'Acción no válida'})});
- const task=s.c.cargarPadronRegistro('III');await s.tick(1200);await task;assert.equal(s.c.registroSoloLectura(),true);assert.equal(s.main.inert,false);assert.equal(s.element('retryRoster').hidden,false);
+ const task=s.c.cargarPadronRegistro('III');await s.tick(1200);await task;assert.equal(s.c.registroSoloLectura(),false);assert.equal(s.c.registroNubeNoVerificada(),true);assert.equal(s.main.inert,false);assert.equal(s.element('retryRoster').hidden,false);
 });
 test('Changing the token immediately disables write guards even after a successful verification',async()=>{
  const s=fixture();await s.c.cargarPadronRegistro('III');s.storage.removeItem('ie22375_session_v1');assert.equal(s.c.guardarTodo(),false);assert.equal(s.c.registroSoloLectura(),true);
@@ -81,18 +81,18 @@ test('Concurrent reads of the same token/bimestre share a single server verifica
  release(s.response());await Promise.all([a,b]);
 });
 
-test('Expired read-only cache is withdrawn, and writes remain blocked',async()=>{
+test('Expired local-first cache is withdrawn and local writes become blocked',async()=>{
  const s=fixture();await s.c.IEStudents.loadRoster('III');s.c.fetch=async()=>{throw Error('down');};
  const task=s.c.cargarPadronRegistro('III');await s.tick(1200);await task;await s.tick(610000);
  assert.equal(s.run('bdEstudiantes.secundaria.estudiantes.length'),0);assert.equal(s.c.guardarTodo(),false);assert.equal(s.element('retryRoster').hidden,false);
 });
 
-test('Read-only mode allows Calificar, Promedios, Resumen and Asistencia tabs',async()=>{
+test('Local-first mode allows Calificar, Promedios, Resumen and Asistencia tabs plus local save',async()=>{
  const s=fixture();await s.c.IEStudents.loadRoster('III');s.c.fetch=async()=>{throw Error('down');};
  const task=s.c.cargarPadronRegistro('III');await s.tick(1200);await task;
  s.run('function esVistaAdmin(){return false}');s.run(extract('showPanel'));
  for(const [tab,panel] of [['cal','panelCalificar'],['fin','panelFinales'],['av','panelAvance'],['as','panelAsistencia']]){
-   s.c.showPanel(tab);assert.equal(s.element(panel).classList.contains('on'),true);assert.equal(s.main.inert,false);assert.equal(s.c.guardarTodo(),false);
+   s.c.showPanel(tab);assert.equal(s.element(panel).classList.contains('on'),true);assert.equal(s.main.inert,false);assert.notEqual(s.c.guardarTodo(),false);
  }
 });
 
