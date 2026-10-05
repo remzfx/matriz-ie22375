@@ -420,7 +420,7 @@
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
       <div class="grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex">
-        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-write onclick="subirRegistroNube()">Nube Subir</button>
+        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="subirRegistroNube()">Nube Subir</button>
         <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#0284c7;color:#fff" onclick="bajarRegistroNube()">Nube Bajar</button>
         <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" data-reg-write onclick="guardarTodo(); toast('Guardado local')">Guardar</button>
       </div>
@@ -645,7 +645,10 @@ function mergeRegistroPayload(p) {
   return n;
 }
 async function subirRegistroNube() {
-  if (registroSoloLectura()) return false;
+  if (registroNubeNoVerificada()) {
+    toast('Sincronización pendiente: pulsa Reintentar y espera la verificación del servidor.');
+    return false;
+  }
   if (!nivel || !areaActual) { toast('Elija área primero'); return; }
   if (guardarTodo() === false) { toast('Espera a que cargue el padrón del bimestre.'); return; }
   toast('Guardado local. Subiendo a la nube…');
@@ -801,16 +804,23 @@ function metaRegistro() {
 }
 let padronBimestre = '', solicitudPadron = 0, padronVerificadoServidor = false, tokenPadron = '', vencimientoCachePadron;
 function registroSoloLectura() {
-  return !padronVerificadoServidor || !padronBimestre || document.getElementById('selBim').value !== padronBimestre ||
-    !tokenPadron || IEStudents.validToken() !== tokenPadron;
+  // Solo bloquea edición local si ya no existe un padrón autorizado para esta misma sesión/bimestre.
+  return !padronBimestre || document.getElementById('selBim').value !== padronBimestre ||
+    !tokenPadron || IEStudents.validToken() !== tokenPadron || !IEStudents.peekRoster(padronBimestre);
+}
+function registroNubeNoVerificada() {
+  // La nube sigue siendo más estricta: subir requiere verificación vigente del servidor.
+  return registroSoloLectura() || !padronVerificadoServidor;
 }
 function sincronizarEdicionRegistro() {
   const main = document.querySelector('main');
   if (!main) return;
   main.inert = false;
   main.setAttribute('aria-busy', cargandoEstudiantes ? 'true' : 'false');
-  document.querySelectorAll('[data-reg-write],[data-delfecha],[data-adel],[data-an]').forEach(el => { el.disabled = registroSoloLectura(); });
-  document.querySelectorAll('.cal-nota,.fin-nota,.av-conc,#modalText').forEach(el => { if (registroSoloLectura()) el.readOnly = true; });
+  const bloquearLocal = registroSoloLectura();
+  document.querySelectorAll('[data-reg-write],[data-delfecha],[data-adel],[data-an]').forEach(el => { el.disabled = bloquearLocal; });
+  document.querySelectorAll('[data-reg-cloud]').forEach(el => { el.disabled = registroNubeNoVerificada(); });
+  document.querySelectorAll('.cal-nota,.fin-nota,.av-conc,#modalText').forEach(el => { el.readOnly = bloquearLocal; });
 }
 function estadoPadron(message, retry) {
   const st = document.getElementById('studentsStatus'); if (st) st.textContent = message;
@@ -848,7 +858,7 @@ async function cargarPadronRegistro(bimestre) {
   if (cache) pintarPadronInmediato(cache,bimestre,true);
   else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
     ['finLista','avanceBox','asisLista'].forEach(id => { const el=document.getElementById(id); if(el)el.innerHTML=''; }); }
-  estadoPadron(cache ? 'Padrón visible en solo lectura. Verificando servidor…' : 'Cargando padrón. La consulta tiene reintento automático…',false);
+  estadoPadron(cache ? 'Modo local listo. Verificando servidor en segundo plano…' : 'Cargando padrón. La consulta tiene reintento automático…',false);
   if (cache) vigilarCachePadron(bimestre,solicitud);
   try {
     const base = await IEStudents.loadRoster(bimestre);
@@ -859,7 +869,7 @@ async function cargarPadronRegistro(bimestre) {
     pintarPadronInmediato(base,bimestre,!!base.offline);
     if (!base.offline) clearTimeout(vencimientoCachePadron);
     else vigilarCachePadron(bimestre,solicitud);
-    estadoPadron(base.offline ? (base.verificationError === 'API_INCOMPATIBLE' ? 'El backend no reconoce la lectura POST de estudiantes. Verifique la implementación. Padrón en solo lectura.' : 'No se pudo verificar el servidor. Padrón en solo lectura; puedes navegar y reintentar.') :
+    estadoPadron(base.offline ? (base.verificationError === 'API_INCOMPATIBLE' ? 'Modo local activo. El backend no reconoce la lectura POST; puedes seguir trabajando y reintentar la sincronización.' : 'Modo local activo: puedes trabajar y guardar aquí. Sincronización de nube pendiente.') :
       (!base.padronInicializado ? 'Servidor verificado. Padrón pendiente: base actual autorizada.' : 'Padrón verificado con el servidor.'),!!base.offline);
     return true;
   } catch(e) {
@@ -869,7 +879,7 @@ async function cargarPadronRegistro(bimestre) {
     if (vigente) pintarPadronInmediato(vigente,bimestre,true);
     else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
       ['finLista','avanceBox','asisLista'].forEach(id => { const el=document.getElementById(id); if(el)el.innerHTML=''; }); }
-    estadoPadron(e.message + (vigente ? ' Padrón visible en solo lectura.' : ' Puedes reintentar.'),true);
+    estadoPadron(e.message + (vigente ? ' Modo local activo: puedes seguir trabajando; nube pendiente.' : ' Puedes reintentar.'),true);
     return !!vigente;
   } finally {
     if (solicitud === solicitudPadron) { cargandoEstudiantes = false; sincronizarEdicionRegistro(); }
