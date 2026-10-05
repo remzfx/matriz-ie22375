@@ -93,13 +93,14 @@ test('Admin edits cannot mutate the authorized cache before server save',async()
   const s=fixture(),base=await s.c.IEStudents.load();base.primaria.estudiantes[0].nombre='Unsaved Synthetic Edit';
   assert.equal(s.c.IEStudents.peek().primaria.estudiantes[0].nombre,'Synthetic Primary');
 });
-test('Offline fallback expires after ten minutes and keeps the same scope',async()=>{
+test('Offline fallback persists locally but never outlives the signed token and keeps the same scope',async()=>{
   const s=fixture();await s.c.IEStudents.load();s.c.fetch=async()=>{throw Error('offline');};
   const offline=await s.c.IEStudents.load();assert.equal(offline.offline,true);
   assert.equal(offline.primaria.estudiantes[0].nombre,'Synthetic Primary');
-  const cache=JSON.parse(s.memory.get('ie22375_students_session_v1'));assert.ok(cache.until<=Date.now()+600000);
-  s.c.Date={now:()=>Date.now()+600001};
-  await assert.rejects(s.c.IEStudents.load(),/conectar/);
+  const cache=JSON.parse(s.memory.get('ie22375_students_session_v1'));const exp=JSON.parse(Buffer.from(s.session.token.split('.')[0],'base64url').toString()).exp;
+  assert.ok(cache.until<=exp);assert.ok(cache.until>Date.now()+600000);
+  s.c.Date={now:()=>exp+1};
+  await assert.rejects(s.c.IEStudents.load(),/Sesión ausente o vencida|conectar/);
   assert.equal(s.c.IEStudents.peek(),null);
 });
 test('Network failure without a session-bound cache does not load legacy data',async()=>{
