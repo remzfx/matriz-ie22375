@@ -2,7 +2,7 @@
 (function (global) {
   'use strict';
   const KEY = 'ie22375_students_session_v1';
-  const TTL = 10 * 60 * 1000;
+  const TTL = 24 * 60 * 60 * 1000;
   const API = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
   let memory = null;
   function status(message) {
@@ -25,6 +25,7 @@
   function clear() {
     memory = null;
     try { sessionStorage.removeItem(KEY); } catch (e) {}
+    try { localStorage.removeItem(KEY); } catch (e) {}
   }
   function empty() { return {primaria: {estudiantes: [], docentes: []}, secundaria: {estudiantes: [], docentes: []}}; }
   function toBase(response) {
@@ -43,16 +44,45 @@
     const token = validToken();
     if (!token) { clear(); return null; }
     try {
-      const cached = memory || JSON.parse(sessionStorage.getItem(KEY) || 'null');
-      if (cached && cached.token === token && cached.scope === scope && cached.until > Date.now()) return JSON.parse(JSON.stringify(cached.base));
+      const cached = memory ||
+        JSON.parse(sessionStorage.getItem(KEY) || 'null') ||
+        JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (cached && cached.token === token && cached.scope === scope && cached.until > Date.now()) {
+        memory = cached;
+        return JSON.parse(JSON.stringify(cached.base));
+      }
     } catch (e) {}
     clear();
     return null;
   }
   function remember(base, token, scope) {
-    memory = {token: token, scope: scope, until: Date.now() + TTL, base: JSON.parse(JSON.stringify(base))};
+    let until = Date.now() + TTL;
+    try {
+      const s = session();
+      if (s && Number(s.tokenExp)) until = Math.min(until, Number(s.tokenExp));
+    } catch (e) {}
+    memory = {token: token, scope: scope, until: until, base: JSON.parse(JSON.stringify(base))};
     try { sessionStorage.setItem(KEY, JSON.stringify(memory)); } catch (e) {}
+    try { localStorage.setItem(KEY, JSON.stringify(memory)); } catch (e) {}
     return base;
+  }
+  function sleep(ms) { return new Promise(function(resolve){ setTimeout(resolve, ms); }); }
+  async function fetchJsonConTiempo(payload, ms) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(function(){ ctrl.abort(); }, ms);
+    try {
+      const r = await fetch(API, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain;charset=utf-8'},
+        body: JSON.stringify(payload),
+        cache: 'no-store',
+        signal: ctrl.signal
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } finally {
+      clearTimeout(timer);
+    }
   }
   async function request(action, data) {
     data = data || {};
@@ -64,19 +94,37 @@
     }
     if (action === 'loadstudents') status('Cargando estudiantes con tu sesión…');
     let response;
+    const payload = Object.assign({}, data, {action: action, token: token});
     try {
-      const r = await fetch(API, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'},
-        body: JSON.stringify(Object.assign({}, data, {action: action, token: token})), cache: 'no-store'});
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      response = await r.json();
+      if (action === 'loadstudents') {
+        let lastErr = null;
+        for (let intento = 1; intento <= 2; intento++) {
+          try {
+            response = await fetchJsonConTiempo(payload, intento === 1 ? 12000 : 18000);
+            if (response && response.ok === false && /Acción no válida/i.test(String(response.error || ''))) {
+              throw new Error('BACKEND_VERSION_MISMATCH');
+            }
+            break;
+          } catch (e) {
+            lastErr = e;
+            if (intento === 1) {
+              status('Servidor lento. Reintentando en segundo plano…');
+              await sleep(900);
+            }
+          }
+        }
+        if (!response) throw lastErr || new Error('Sin respuesta');
+      } else {
+        response = await fetchJsonConTiempo(payload, 18000);
+      }
     } catch (e) {
       const cached = action === 'loadstudents' ? peek(scope) : null;
       if (cached) {
-        status('Sin conexión: lista temporal de esta sesión (máximo 10 minutos).');
-        return Object.assign({}, cached, {offline: true});
+        status('Trabajando con la última lista autorizada. Sincronización pendiente.');
+        return Object.assign({}, cached, {offline: true, pendingSync: true});
       }
-      status('No se pudo conectar. Revisa la conexión y recarga para cargar estudiantes.');
-      throw new Error('No se pudo conectar para cargar/guardar estudiantes. Reintenta con conexión.');
+      status('No se pudo cargar el padrón. Usa Reintentar cuando tengas conexión.');
+      throw new Error('No se pudo cargar el padrón desde el servidor.');
     }
     // Nunca usar un fallback ante una denegación, ni guardar datos de una sesión que cambió.
     if (validToken() !== token || !response.ok) {
