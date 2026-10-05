@@ -15,6 +15,8 @@ const AUXILIAR_PASS_PROPERTY = 'IE22375_AUXILIAR_PASS';
 const PIP_PASS_PROPERTY = 'IE22375_PIP_PASS';
 const DOCENTES_CACHE_KEY = 'IE22375_DOCENTE_ACCESOS_V1';
 const DOCENTES_CACHE_TTL_SECONDS = 21600;
+const ESTUDIANTES_CACHE_PREFIX = 'IE22375_ESTUDIANTES_V1_';
+const ESTUDIANTES_CACHE_TTL_SECONDS = 21600;
 
 function asegurarAsis_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -154,7 +156,7 @@ function compararSeguro_(a, b) {
   return diff === 0;
 }
 
-function validarToken_(token, role) {
+function validarToken_(token, role, docentesConfig) {
   const parts = String(token || '').split('.');
   if (parts.length !== 2) return null;
   const firma = Utilities.base64EncodeWebSafe(
@@ -167,8 +169,8 @@ function validarToken_(token, role) {
   } catch (err) { return null; }
   if (!claims || Number(claims.exp) <= Date.now()) return null;
   if (role && String(claims.role) !== String(role)) return null;
-  if (claims.role === 'docente') {
-    const config = obtenerDocentesConfig_();
+  if (claims.role === 'docente' && docentesConfig !== false) {
+    const config = docentesConfig || obtenerDocentesConfig_();
     if (Number(claims.permisosVersion) !== Number(config.ts)) return null;
   }
   return claims;
@@ -450,7 +452,9 @@ function responder_(obj) {
 }
 
 function sesionLectura_(token, roles) {
-  const sesion = validarToken_(token);
+  // La validación y la búsqueda del perfil comparten una sola lectura cacheada
+  // de DOCENTE_ACCESOS durante esta solicitud.
+  const sesion = validarToken_(token, null, false);
   if (!sesion || roles.indexOf(sesion.role) < 0) return null;
   if (sesion.role !== 'docente') return { sesion: sesion };
   const config = obtenerDocentesConfig_();
@@ -557,14 +561,28 @@ function hojaEstudiantes_() {
   return sh;
 }
 
-function leerVersionEstudiantes_(sh, clave) {
+function leerFilasEstudiantes_(sh) {
   const last = sh.getLastRow();
-  if (last < 2) return null;
-  const rows = sh.getRange(2, 1, last - 1, 3).getValues();
+  return last < 2 ? [] : sh.getRange(2, 1, last - 1, 3).getValues();
+}
+
+function leerVersionEstudiantes_(sh, clave, filas) {
+  const rows = filas || leerFilasEstudiantes_(sh);
+  if (!rows.length) return null;
   let pointer = null;
   rows.forEach(function(row) { if (String(row[0]) === String(clave)) pointer = row; });
   if (!pointer) return null;
   const version = String(pointer[1]);
+  // La versión forma parte de la clave: un puntero nuevo jamás puede resolver
+  // a los datos reconstruidos de una versión anterior.
+  const cacheKey = ESTUDIANTES_CACHE_PREFIX + String(clave) + '_' + version;
+  try {
+    const cached = CacheService.getScriptCache().get(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.version === version && Array.isArray(parsed.estudiantes)) return parsed;
+    }
+  } catch (err) { /* Reconstruir desde Sheets si la caché no está disponible. */ }
   const manifest = JSON.parse(pointer[2]);
   if (!Number.isInteger(manifest.partes) || manifest.partes < 1) throw new Error('Base privada incompleta.');
   const chunks = {};
@@ -577,11 +595,15 @@ function leerVersionEstudiantes_(sh, clave) {
   }
   const estudiantes = JSON.parse(raw);
   if (!Array.isArray(estudiantes)) throw new Error('Base privada inválida.');
-  return {version: version, partes: manifest.partes, estudiantes: estudiantes};
+  const result = {version: version, partes: manifest.partes, estudiantes: estudiantes};
+  try {
+    CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), ESTUDIANTES_CACHE_TTL_SECONDS);
+  } catch (err) { /* Bases grandes pueden exceder CacheService; Sheets sigue siendo fuente. */ }
+  return result;
 }
 
-function leerBaseEstudiantes_(sh, oficial) {
-  return leerVersionEstudiantes_(sh, oficial ? 'BASE_OFICIAL' : 'BASE_ACTUAL');
+function leerBaseEstudiantes_(sh, oficial, filas) {
+  return leerVersionEstudiantes_(sh, oficial ? 'BASE_OFICIAL' : 'BASE_ACTUAL', filas);
 }
 
 function normalizarBimestrePadron_(value) {
@@ -589,9 +611,9 @@ function normalizarBimestrePadron_(value) {
   return /^(I|II|III|IV)$/.test(bim) ? bim : '';
 }
 
-function leerPadronEstudiantes_(sh, bimestre) {
+function leerPadronEstudiantes_(sh, bimestre, filas) {
   const bim = normalizarBimestrePadron_(bimestre);
-  return bim ? leerVersionEstudiantes_(sh, 'PADRON_' + bim) : null;
+  return bim ? leerVersionEstudiantes_(sh, 'PADRON_' + bim, filas) : null;
 }
 
 function escribirVersionEstudiantes_(sh, estudiantes, claves) {
@@ -702,28 +724,28 @@ function estudiantesRuta_(body) {
   const lectura = action === 'loadstudents';
   const acceso = sesionLectura_(body.token, lectura ? ['admin', 'auxiliar', 'docente'] : ['admin']);
   if (!acceso) return {ok: false, code: 'SESSION', error: 'Sesión inválida o sin autorización para estudiantes.'};
+  // loadstudents es estrictamente de lectura y no espera el lock global.
+  if (lectura) {
+    const inicio = Date.now();
+    const shLectura = hojaEstudiantes_();
+    // Una sola instantánea de EstudiantesBase resuelve BASE_ACTUAL y el padrón.
+    const filasLectura = leerFilasEstudiantes_(shLectura);
+    const actualLectura = leerBaseEstudiantes_(shLectura, false, filasLectura);
+    const bimLectura = normalizarBimestrePadron_(body.bimestre);
+    const padronLectura = bimLectura ? leerPadronEstudiantes_(shLectura, bimLectura, filasLectura) : null;
+    const respuesta = respuestaEstudiantes_(padronLectura || actualLectura, acceso, bimLectura ? {
+      bimestre: bimLectura, padronInicializado: !!padronLectura,
+      fuentePadron: padronLectura ? 'bimestre' : 'actual'
+    } : {padronInicializado: true, fuentePadron: 'actual'});
+    // Diagnóstico agregado, sin identidades, credenciales ni tokens.
+    respuesta.timing = {totalMs: Date.now() - inicio};
+    return respuesta;
+  }
   const lock = LockService.getScriptLock();
   lock.waitLock(5000);
   try {
-    if (acceso.sesion.role === 'docente') {
-      const config = leerDocentesConfigSheets_();
-      if (Number(acceso.sesion.permisosVersion) !== Number(config.ts)) {
-        return {ok: false, code: 'SESSION', error: 'La sesión docente fue revocada.'};
-      }
-    }
     const sh = hojaEstudiantes_();
     const actual = leerBaseEstudiantes_(sh, false);
-
-    if (lectura) {
-      const bim = normalizarBimestrePadron_(body.bimestre);
-      if (!bim) return respuestaEstudiantes_(actual, acceso, {padronInicializado: true, fuentePadron: 'actual'});
-      const padron = leerPadronEstudiantes_(sh, bim);
-      return respuestaEstudiantes_(padron || actual, acceso, {
-        bimestre: bim,
-        padronInicializado: !!padron,
-        fuentePadron: padron ? 'bimestre' : 'actual'
-      });
-    }
 
     if (String(body.version == null ? '' : body.version) !== (actual ? actual.version : '')) {
       return {ok: false, code: 'CONFLICT', error: 'La base cambió en otro dispositivo. Recarga antes de guardar.'};

@@ -1613,14 +1613,27 @@ window.__IE_gradoOK = function(gradoVal) {
         ];
 
         let baseOficialEstudiantes = [];
-        function cargarBaseOficialCache() { return baseOficialEstudiantes; }
+        function estadoEstudiantes(mensaje) {
+            const el = document.getElementById('studentsStatus');
+            if (el) el.textContent = mensaje;
+        }
+        function cargarBaseOficialCache() {
+            const db = IEStudents.peek();
+            if (!db || !db.secundaria || !Array.isArray(db.secundaria.estudiantes)) return false;
+            baseOficialEstudiantes = db.secundaria.estudiantes;
+            estadoEstudiantes('Mostrando datos locales · actualizando nube…');
+            return true;
+        }
         async function cargarBaseOficialEstudiantes() {
+            const actualizarEstado = mensaje => { const el = document.getElementById('studentsStatus'); if (el) el.textContent = mensaje; };
+            const habiaCache = baseOficialEstudiantes.length > 0;
             try {
                 const db = await IEStudents.load();
                 baseOficialEstudiantes = db.secundaria.estudiantes;
-                if (db.offline) mostrarToast('Sin conexión: lista temporal de esta sesión (10 minutos máximo).', 'error');
+                actualizarEstado(db.offline ? 'Modo local · sincronización pendiente' : 'Datos actualizados');
             } catch(e) {
-                baseOficialEstudiantes = [];
+                if (!habiaCache) baseOficialEstudiantes = [];
+                actualizarEstado(habiaCache ? 'Modo local · sincronización pendiente' : 'No se pudo cargar estudiantes · Reintenta con conexión');
                 mostrarToast(e.message, 'error');
             }
             return baseOficialEstudiantes;
@@ -1688,7 +1701,7 @@ window.__IE_gradoOK = function(gradoVal) {
                 const sec = estado.seccion === 'ÚNICA' ? 'Única' : estado.seccion;
                 fuente.textContent = n > 0
                     ? (estado.grado + ' ' + sec + ' · Base oficial')
-                    : 'Sin estudiantes en base oficial';
+                    : (baseOficialEstudiantes.length ? 'Sin estudiantes en base oficial' : 'Cargando estudiantes…');
             }
         }
         function parseCloudTime(v) {

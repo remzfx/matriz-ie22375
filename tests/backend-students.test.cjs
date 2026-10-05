@@ -42,7 +42,7 @@ function setup() {
   const props = {IE22375_TOKEN_SECRET: 'synthetic-test-secret'};
   const c = vm.createContext({
     SpreadsheetApp: {getActiveSpreadsheet: () => ({getSheetByName: name => tables.get(name), insertSheet: name => sheet(name, [])}), flush() {}},
-    CacheService: {getScriptCache: () => ({get: key => cacheEntries.get(key) || null, put: (key, value, ttl) => {assert.equal(state.held, true); assert.equal(ttl, 600); cacheEntries.set(key, value);}, remove: key => {assert.equal(state.held, true); cacheEntries.delete(key);}})},
+    CacheService: {getScriptCache: () => ({get: key => cacheEntries.get(key) || null, put: (key, value, ttl) => { if (key === 'IE22375_DOCENTE_ACCESOS_V1') assert.equal(state.held, true); assert.ok([600,21600].includes(ttl)); cacheEntries.set(key, value);}, remove: key => {assert.equal(state.held, true); cacheEntries.delete(key);}})},
     LockService: {getScriptLock: () => ({waitLock() {assert.equal(state.held, false); state.held = true;}, releaseLock() {assert.equal(state.held, true); state.held = false;}})},
     PropertiesService: {getScriptProperties: () => ({getProperty: key => props[key], setProperty: (key, value) => props[key] = value})},
     Utilities: {
@@ -138,10 +138,34 @@ for(const kind of ['missing','expired','tampered','revoked','removed','pip','mal
   const before=s.state.writes,res=s.load(token);
   assert.equal(res.ok,false);assert.equal('estudiantes' in res,false);assert.equal(s.state.writes,before);
 });
-test('Revocation while waiting for the student lock is checked again without nested locks',()=> {
+test('loadstudents never requests the global write lock and reuses cached DocentesAcceso',()=> {
   const s=studentsFixture();s.c.obtenerDocentesConfig_();
-  s.c.LockService.getScriptLock=()=>({waitLock(){assert.equal(s.state.held,false);s.state.held=true;s.tables.get('DocentesAcceso').rows[1][1]=2000;},releaseLock(){s.state.held=false;}});
-  assert.equal(s.load(s.primary).ok,false);assert.equal(s.state.held,false);
+  // The warm request populated the teacher cache while holding its write lock.
+  s.c.LockService.getScriptLock=()=>({waitLock(){assert.fail('loadstudents must not request ScriptLock');},releaseLock(){assert.fail('no lock was acquired');}});
+  const original=s.c.leerDocentesConfigSheets_;
+  s.c.leerDocentesConfigSheets_=()=>assert.fail('cached teacher config must avoid a second Sheets read');
+  assert.equal(s.load(s.primary).ok,true);
+  s.c.leerDocentesConfigSheets_=original;
+});
+
+test('student reconstruction cache is version-bound and a changed roster pointer cannot reuse old data',()=> {
+  const s=studentsFixture();
+  s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'I'});
+  const first=s.load(s.admin,{bimestre:'I'});assert.equal(first.version,s.init.version);
+  const sh=s.tables.get('EstudiantesBase'), next='external-version';
+  const changed=s.rows.concat({nivel:'primaria',grado:1,seccion:'Única',orden:99,nombre:'Synthetic Added'});
+  sh.rows.push(['DATOS_'+next+'_0',next,JSON.stringify(changed)]);
+  sh.rows.push(['PADRON_I',next,JSON.stringify({partes:1})]);
+  const second=s.load(s.admin,{bimestre:'I'});
+  assert.equal(second.version,next);assert.equal(second.estudiantes.length,8);
+});
+
+test('Admin still receives a complete synthetic base of 415 students',()=> {
+  const s=studentsFixture();
+  s.base.primaria.estudiantes=Array.from({length:415},(_,i)=>({nivel:'primaria',grado:i%6+1,seccion:'Única',orden:i+1,nombre:'Synthetic '+i}));
+  s.base.secundaria.estudiantes=[];
+  const saved=s.post({action:'savestudents',token:s.admin,version:s.init.version,base:s.base});
+  assert.equal(saved.ok,true);assert.equal(s.load(s.admin).estudiantes.length,415);
 });
 for(const action of ['loadstudents','savestudents','initstudents','restorestudents','seedstudentsroster','syncstudents','enrichstudents'])test(action+': GET never exposes students or changes the private base',()=> {
   const s=studentsFixture(),before=s.state.writes,res=s.get({action,token:s.admin,base:s.base});
