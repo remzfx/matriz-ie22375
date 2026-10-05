@@ -6,6 +6,7 @@
   const API = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
   let memory = null, authorizationEpoch = 0;
   const pending = new Map();
+  const latestRequest = new Map();
   function status(message) {
     const el = document.getElementById('studentsStatus');
     if (el) el.textContent = message;
@@ -106,6 +107,8 @@
     const token = validToken(), scope = 'students:' + (data.bimestre || 'actual');
     if (!token) { clear(); throw error('SESSION','Sesión ausente o vencida. Vuelve a iniciar sesión.'); }
     const epoch = authorizationEpoch;
+    const requestId = (latestRequest.get(scope) || 0) + 1;
+    latestRequest.set(scope, requestId);
     const read = action === 'loadstudents', attempts = read ? 2 : 1;
     let last;
     for (let attempt = 0; attempt < attempts; attempt++) {
@@ -124,6 +127,8 @@
         if (!Array.isArray(response.estudiantes)) throw error('INVALID_RESPONSE','Respuesta de estudiantes inválida.',true);
         if (read && data.bimestre && response.bimestre !== data.bimestre)
           throw error('INVALID_RESPONSE','El servidor no confirmó el bimestre solicitado.',true);
+        // Una respuesta anterior nunca debe borrar datos que una petición más reciente ya confirmó.
+        if (requestId !== latestRequest.get(scope)) return peek(scope) || toBase(response);
         return remember(toBase(response),token,scope);
       } catch(e) {
         last = e;

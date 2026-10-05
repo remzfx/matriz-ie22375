@@ -1421,13 +1421,35 @@ window.__IE_gradoOK = function(gradoVal) {
         };
 
         let baseOficialEstudiantes = [];
-        async function cargarBaseOficialEstudiantes() {
-            try {
-                const db = await IEStudents.load();
-                baseOficialEstudiantes = db.primaria.estudiantes;
-                if (db.offline) mostrarToast('Sin conexión: lista temporal de esta sesión (10 minutos máximo).', 'error');
-            } catch(e) {
+        function estadoEstudiantes(mensaje) {
+            const el = document.getElementById('studentsStatus');
+            if (el) el.textContent = mensaje;
+        }
+        function cargarBaseOficialCache() {
+            const db = estado.bimestre ? IEStudents.peekRoster(estado.bimestre) : IEStudents.peek();
+            if (!db || !db.primaria || !Array.isArray(db.primaria.estudiantes)) {
                 baseOficialEstudiantes = [];
+                estadoEstudiantes('Cargando padrón del bimestre…');
+                return false;
+            }
+            baseOficialEstudiantes = db.primaria.estudiantes;
+            estadoEstudiantes('Mostrando datos locales · actualizando nube…');
+            return true;
+        }
+        async function cargarBaseOficialEstudiantes() {
+            const actualizarEstado = mensaje => { const el = document.getElementById('studentsStatus'); if (el) el.textContent = mensaje; };
+            const bimestre = estado.bimestre;
+            const habiaCache = cargarBaseOficialCache();
+            try {
+                const db = await (bimestre ? IEStudents.loadRoster(bimestre) : IEStudents.load());
+                if (estado.bimestre !== bimestre) return;
+                baseOficialEstudiantes = db.primaria.estudiantes;
+                actualizarEstado(db.offline ? 'Modo local · sincronización pendiente' : 'Datos actualizados');
+            } catch(e) {
+                if (estado.bimestre !== bimestre) return;
+                // Una red lenta nunca sustituye una respuesta autorizada local por una lista vacía.
+                if (!habiaCache) baseOficialEstudiantes = [];
+                actualizarEstado(habiaCache ? 'Modo local · sincronización pendiente' : 'No se pudo cargar estudiantes · Reintenta con conexión');
                 mostrarToast(e.message, 'error');
             }
             syncInputTotalEstudiantes();
@@ -1595,6 +1617,8 @@ window.__IE_gradoOK = function(gradoVal) {
             }
             
             cargarDatos();
+            // Pintar la respuesta autorizada local antes de iniciar cualquier red.
+            cargarBaseOficialCache();
             actualizarBotonesSeleccion();
             renderizarAreas();
             renderizarResumen();
@@ -1621,6 +1645,8 @@ window.__IE_gradoOK = function(gradoVal) {
         function setBimestre(val) {
             estado.bimestre = val;
             estado.areaActual = null;
+            cargarBaseOficialCache();
+            cargarBaseOficialEstudiantes();
             syncInputTotalEstudiantes();
             syncInputDocente();
             
