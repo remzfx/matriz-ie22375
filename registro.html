@@ -404,6 +404,7 @@
         </div>
       </div>
       <p class="scale-hint" id="lblEscala">0–20 → letra: 18–20 AD · 14–17 A · 11–13 B · 0–10 C</p>
+      <p class="text-[10px] text-slate-400 mt-1">Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas.</p>
       <div id="stuList" class="mt-2"></div>
     </div>
     </div><!-- /panelCalificar -->
@@ -1437,7 +1438,7 @@ function recolectarPantalla() {
     const k = finalKey(cp, nombre);
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
-    store.finales[k] = { nota20: n, nivel: numToLetter(n), ts: Date.now() };
+    store.finales[k] = { nota20: n, nivel: numToLetter(n), origen: 'numero', ts: Date.now() };
   });
   document.querySelectorAll('.av-conc').forEach(el => {
     if (!store.concArea) store.concArea = {};
@@ -1747,7 +1748,7 @@ function renderStudents() {
       upsertSesionCap(cp, cap);
       const k = capKeyHoy(cp, cap, nombre);
       if (n === '') store.grades[k] = {borrado:true,ts:Date.now()};
-      else store.grades[k] = { nota20: n, nivel: letra, ts: Date.now() };
+      else store.grades[k] = { nota20: n, nivel: letra, origen: 'numero', ts: Date.now() };
       saveStore();
     });
   });
@@ -1760,13 +1761,17 @@ function renderStudents() {
       const cap = decodeURIComponent(cell.dataset.cap);
       const cp = decodeURIComponent(cell.dataset.comp || '');
       const val = btn.dataset.val;
-      const mismo = btn.classList.contains('on');
-      const letra = mismo ? '' : val;
-      const n = letra ? letterToNum(letra) : '';
-      upsertSesionCap(cp, cap);
       const k = capKeyHoy(cp, cap, nombre);
-      if (!letra) store.grades[k] = {borrado:true,ts:Date.now()};
-      else store.grades[k] = { nota20: n, nivel: letra, ts: Date.now() };
+      const previo = leerNota(store.grades, k) || {};
+      const letraPrevia = previo.nivel || ((previo.nota20!=='' && previo.nota20!=null) ? numToLetter(previo.nota20) : '');
+      // Tocar la misma letra no reemplaza ni borra una nota exacta ya guardada.
+      if (letraPrevia === val) {
+        toast('Se conserva la calificación original');
+        return;
+      }
+      const n = letterToNum(val);
+      upsertSesionCap(cp, cap);
+      store.grades[k] = { nota20: n, nivel: val, origen: 'letra', ts: Date.now() };
       saveStore();
       renderStudents();
     });
@@ -2402,7 +2407,7 @@ function renderFinales() {
       if (n !== '') inp.value = pad2(n);
       const k = finalKey(comp, nombre);
       if (n === '') store.finales[k] = {borrado: true, ts: Date.now()};
-      else store.finales[k] = { nota20: n, nivel: letra, ts: Date.now() };
+      else store.finales[k] = { nota20: n, nivel: letra, origen: 'numero', ts: Date.now() };
       saveStore();
     });
   });
@@ -2414,11 +2419,15 @@ function renderFinales() {
       const nombre = decodeURIComponent(cell.dataset.fin);
       const comp = decodeURIComponent(cell.dataset.comp);
       const val = btn.dataset.val;
-      const mismo = btn.classList.contains('on');
-      const letra = mismo ? '' : val;
       const k = finalKey(comp, nombre);
-      if (!letra) store.finales[k] = {borrado: true, ts: Date.now()};
-      else store.finales[k] = { nota20: letterToNum(letra), nivel: letra, ts: Date.now() };
+      const previo = leerNota(store.finales, k) || {};
+      const letraPrevia = previo.nivel || ((previo.nota20!=='' && previo.nota20!=null) ? numToLetter(previo.nota20) : '');
+      // La misma letra conserva el valor numérico exacto previo si existía.
+      if (letraPrevia === val) {
+        toast('Se conserva la calificación original');
+        return;
+      }
+      store.finales[k] = { nota20: letterToNum(val), nivel: val, origen: 'letra', ts: Date.now() };
       saveStore();
       renderFinales();
     });
