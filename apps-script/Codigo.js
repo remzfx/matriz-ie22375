@@ -496,6 +496,29 @@ function puedeLeerContexto_(acceso, ctx) {
     Array.isArray(docente.aulas) && docente.aulas.some(function (aula) { return aulaEscritura_(aula, ctx); });
 }
 
+function docentesMatrizRuta_(body) {
+  const acceso = sesionLectura_(body.token, ['admin', 'docente']);
+  if (!acceso) return {ok: false, code: 'SESSION', error: 'Sesión inválida o sin autorización.'};
+  const lista = acceso.docente ? [acceso.docente] : obtenerDocentesConfigLectura_().docentes;
+  return {ok: true, docentes: lista.map(function(doc) {
+    // Lista explícita de campos: nunca propagar pass, usuario u otras credenciales.
+    const out = {nombre: String(doc.nombre || ''), nivel: String(doc.nivel || '').toLowerCase(),
+      grados: Array.isArray(doc.grados) ? doc.grados.map(gradoEscritura_) : []};
+    if (doc.asignaciones != null) {
+      out.asignaciones = {};
+      if (typeof doc.asignaciones === 'object' && !Array.isArray(doc.asignaciones)) {
+        Object.keys(doc.asignaciones).forEach(function(area) {
+          out.asignaciones[area] = Array.isArray(doc.asignaciones[area]) ? doc.asignaciones[area].map(String) : [];
+        });
+      }
+    } else {
+      out.areas = Array.isArray(doc.areas) ? doc.areas.map(String) : [];
+      out.aulas = Array.isArray(doc.aulas) ? doc.aulas.map(String) : [];
+    }
+    return out;
+  })};
+}
+
 function contextoFilaLectura_(row) {
   return {
     nivel: String(row[1] || '').toLowerCase(), bimestre: String(row[2] || ''),
@@ -1132,6 +1155,8 @@ function doPost(e) {
     }
 
     if (action === 'login') return responder_(responderLogin_(body));
+
+    if (action === 'loadmatrixteachers') return responder_(docentesMatrizRuta_(body));
 
     if (action === 'loaddoc') {
       const sesion = validarToken_(body.token, 'admin');

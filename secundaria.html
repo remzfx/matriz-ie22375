@@ -1032,6 +1032,7 @@
         }
 </style>
   <script src="students.js"></script>
+  <script src="matrix-teachers.js"></script>
 </head>
 <body class="text-slate-800">
 <script>window.__IE_NEED_['secundaria','admin']=['secundaria','admin'];</script>
@@ -1613,6 +1614,12 @@ window.__IE_gradoOK = function(gradoVal) {
         ];
 
         let baseOficialEstudiantes = [];
+        async function cargarDocentesOficialesMatriz() {
+            try { await IEMatrixTeachers.load(CLOUD_API_URL); }
+            catch(e) { mostrarToast('No se pudo actualizar el docente oficial desde Admin.', 'error'); }
+            if (estado.areaActual) renderizarAreaHeader();
+        }
+
         function estadoEstudiantes(mensaje) {
             const el = document.getElementById('studentsStatus');
             if (el) el.textContent = mensaje;
@@ -1882,6 +1889,8 @@ window.__IE_gradoOK = function(gradoVal) {
             renderizarResumen();
             syncInputTotalEstudiantes();
             aplicarModoPeriodoActual();
+
+            cargarDocentesOficialesMatriz();
 
             // Refrescar nube y BD sin dejar la interfaz vacía mientras esperan.
             Promise.all([
@@ -2702,16 +2711,17 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function getDocenteArea(area) {
-            if (!area) return '';
-            const k = claveActual();
-            if (!estado.docentes) estado.docentes = {};
-            if (!estado.docentes[k]) estado.docentes[k] = {};
-            return estado.docentes[k][area] || '';
+            return typeof IEMatrixTeachers === 'undefined' ? '' : IEMatrixTeachers.nombre('secundaria', estado.grado, estado.seccion, area);
+        }
+        function docenteAreaParaSubir(area) {
+            if (typeof IEMatrixTeachers === 'undefined') throw new Error('Espera mientras se verifica el docente responsable');
+            return IEMatrixTeachers.exigirNombre('secundaria', estado.grado, estado.seccion, area);
         }
 
         function setDocenteArea(area, nombre) {
             if (impedirEdicionPeriodo()) { renderizarAreaHeader(); return; }
             if (!area) return;
+            if (/^(Pendiente de verificar|Sin registrar)$/i.test(String(nombre || '').trim())) return;
             const k = claveActual();
             if (!estado.docentes) estado.docentes = {};
             if (!estado.docentes[k]) estado.docentes[k] = {};
@@ -2723,9 +2733,8 @@ window.__IE_gradoOK = function(gradoVal) {
             const area = ESTRUCTURA_AREAS[estado.areaActual];
             const header = document.getElementById('areaHeader');
             const resumen = calcularResumenArea(estado.areaActual);
-            const sesionDocente = (window.__IE_SES && window.__IE_SES.role === 'docente')
-                ? (window.__IE_SES.label || window.__IE_SES.user || '') : '';
-            const docente = getDocenteArea(estado.areaActual) || sesionDocente;
+            const nombreVisual = getDocenteArea(estado.areaActual) || (typeof IEMatrixTeachers !== 'undefined' && IEMatrixTeachers.peek() ? 'Sin registrar' : 'Pendiente de verificar');
+            const docente = nombreVisual.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             
             header.innerHTML = `
                 <div class="w-full space-y-4">
@@ -3772,9 +3781,10 @@ window.__IE_gradoOK = function(gradoVal) {
             document.getElementById('tablaInfoGrado').textContent = `GRADO: ${estado.grado}  |  SECCIÓN: ${estado.seccion}`;
             document.getElementById('tablaInfoBimestre').textContent = `${estado.bimestre} Bimestre  •  ${getTotalEstudiantes() > 0 ? getTotalEstudiantes() + " estudiantes" : "N° est. sin definir"}`;
             // Listar docentes por área (si hay)
-            const k = claveActual();
-            const docs = (estado.docentes && estado.docentes[k]) ? estado.docentes[k] : {};
-            const listaDocs = Object.entries(docs).filter(([,n]) => n && n.trim()).map(([a,n]) => `${a}: ${n}`);
+            const listaDocs = Object.keys(ESTRUCTURA_AREAS).map(area => {
+                const nombre = getDocenteArea(area);
+                return nombre ? `${area}: ${nombre}` : '';
+            }).filter(Boolean);
             document.getElementById('tablaInfoDocente').textContent = listaDocs.length ? listaDocs.slice(0,3).join(' · ') + (listaDocs.length > 3 ? '…' : '') : 'Docentes por área';
             document.getElementById('firmaDocente').textContent = listaDocs.length ? 'Ver docentes por área en el sistema' : '';
             document.getElementById('fechaGeneracion').textContent = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric' });
@@ -4145,10 +4155,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     ? estado.datos[ctxKey][area]
                     : {};
 
-                let docenteArea = '';
-                try {
-                    if (typeof getDocenteArea === 'function') docenteArea = getDocenteArea(area) || '';
-                } catch(e) {}
+                const docenteArea = docenteAreaParaSubir(area);
 
                 const payload = {
                     action: 'saveArea',
