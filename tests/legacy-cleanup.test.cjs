@@ -277,3 +277,61 @@ test('Areas actions stack title above and keep buttons in one horizontal row', (
     assert.match(src, /mt-2 text-xs text-slate-500">Haz clic en un área para editar/);
   }
 });
+
+
+test('Registro preserves original grade when switching scoring modes', () => {
+  const src = read('registro.html');
+  assert.match(src, /Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas/);
+  assert.match(src, /origen: 'numero'/);
+  assert.match(src, /origen: 'letra'/);
+  assert.match(src, /Se conserva la calificación original/);
+});
+
+
+test('Admin top actions center link and button labels consistently', () => {
+  const src = read('admin.html');
+  assert.match(src, /\.mobile-top-actions > a, \.mobile-top-actions > button \{/);
+  assert.match(src, /display:inline-flex; align-items:center; justify-content:center; text-align:center; line-height:1\.15/);
+});
+
+
+test('Admin no longer shows obsolete note that transferred students are omitted', () => {
+  const src = read('admin.html');
+  assert.doesNotMatch(src, /Nota: solo se cuentan alumnos con matrícula/);
+  assert.doesNotMatch(src, /Los <b>TRASLADADOS<\/b> del SIAGIE se omiten/);
+});
+
+
+test('Admin schedule panel removes obsolete JSON download/import controls and legacy GitHub instruction', () => {
+  const src = read('admin.html');
+  assert.doesNotMatch(src, /Descargar horario_ingreso\.json/);
+  assert.doesNotMatch(src, /Importar JSON<input type="file"/);
+  assert.doesNotMatch(src, /descargue el JSON y súbalo a GitHub como/);
+  assert.match(src, /onclick="guardarHorario\(\)">Guardar horario/);
+});
+
+
+test('Admin labels backup section clearly', () => {
+  const src = read('admin.html');
+  assert.match(src, />Respaldo<\/button>/);
+  assert.match(src, /<h2 class="font-black text-lg">Respaldo y exportación<\/h2>/);
+});
+
+
+test('Admin register resolves responsible teacher from admin assignments and locks field', () => {
+  const src = read('registro.html');
+  assert.match(src, /function nombreDocenteTexto/);
+  assert.match(src, /function docenteAsignadoAdmin/);
+  assert.match(src, /function actualizarDocenteResponsable/);
+  assert.match(src, /Definido en Admin · Docentes y accesos/);
+  assert.match(src, /inp\.readOnly = true/);
+  assert.doesNotMatch(src, /inp\.value = \(\(store\.meta\[mk\]/);
+});
+
+
+test('Registro resolves primary responsible teacher after initial area becomes active', () => {
+  const src = read('registro.html');
+  assert.match(src, /areaActual = areas\(\)\[0\] \|\| null;[\s\S]*actualizarDocenteResponsable\(\);/);
+  assert.match(src, /function docenteAsignadoAdmin\(\)[\s\S]*d\.nivel !== c\.nivel/);
+  assert.match(src, /Array\.isArray\(d\.grados\) && d\.grados\.map\(Number\)\.includes\(Number\(c\.grado\)\)/);
+});

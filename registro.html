@@ -404,6 +404,7 @@
         </div>
       </div>
       <p class="scale-hint" id="lblEscala">0–20 → letra: 18–20 AD · 14–17 A · 11–13 B · 0–10 C</p>
+      <p class="text-[10px] text-slate-400 mt-1">Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas.</p>
       <div id="stuList" class="mt-2"></div>
     </div>
     </div><!-- /panelCalificar -->
@@ -962,6 +963,108 @@ function getLoginSession() {
   } catch (e) { return null; }
 }
 
+const REG_DOCENTES_KEY = 'ie22375_docentes_v1';
+let registroDocentesAdmin = [];
+
+function nombreDocenteTexto(v) {
+  if (!v) return '';
+  if (typeof v === 'string') return v.trim();
+  if (typeof v === 'object') {
+    return String(v.nombre || v.label || v.docente || v.user || '').trim();
+  }
+  return String(v).trim();
+}
+
+function cargarDocentesAdminLocal() {
+  try {
+    const raw = localStorage.getItem(REG_DOCENTES_KEY);
+    registroDocentesAdmin = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(registroDocentesAdmin)) registroDocentesAdmin = [];
+  } catch (e) { registroDocentesAdmin = []; }
+}
+
+async function refrescarDocentesAdminRegistro() {
+  const s = getLoginSession();
+  if (!s || !(s.role === 'admin' || s.user === 'admin') || !s.token) return;
+  try {
+    const res = await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action:'loaddoc', token:s.token })
+    });
+    const data = JSON.parse(await res.text());
+    if (!data.ok || !Array.isArray(data.docentes)) return;
+    registroDocentesAdmin = data.docentes;
+    try { localStorage.setItem(REG_DOCENTES_KEY, JSON.stringify(registroDocentesAdmin)); } catch(e) {}
+    actualizarDocenteResponsable();
+  } catch(e) {}
+}
+
+function docenteAsignadoAdmin() {
+  const s = getLoginSession();
+  if (!s || !(s.role === 'admin' || s.user === 'admin')) return '';
+  const c = ctxBase();
+  const aula = aulaKey(c.grado, c.seccion);
+  const nombres = [];
+  (registroDocentesAdmin || []).forEach(function(d) {
+    if (!d || d.nivel !== c.nivel) return;
+    let ok = false;
+    if (c.nivel === 'primaria') {
+      ok = Array.isArray(d.grados) && d.grados.map(Number).includes(Number(c.grado));
+    } else {
+      const mapa = d.asignaciones && typeof d.asignaciones === 'object' ? d.asignaciones : null;
+      if (mapa && Array.isArray(mapa[c.area])) {
+        ok = mapa[c.area].some(function(k) {
+          const p = String(k).split('|');
+          return aulaKey(p[0], p[1]) === aula;
+        });
+      } else {
+        ok = Array.isArray(d.areas) && d.areas.includes(c.area) &&
+          Array.isArray(d.aulas) && d.aulas.some(function(k) {
+            const p = String(k).split('|');
+            return aulaKey(p[0], p[1]) === aula;
+          });
+      }
+    }
+    const nom = nombreDocenteTexto(d.nombre || d.label || d.user);
+    if (ok && nom && !nombres.includes(nom)) nombres.push(nom);
+  });
+  return nombres.join(' / ');
+}
+
+function actualizarDocenteResponsable() {
+  const inp = document.getElementById('inpDocente');
+  if (!inp || !nivel || !areaActual) return;
+  const s = getLoginSession();
+  const c = ctxBase();
+  const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
+
+  if (s && s.role === 'docente') {
+    inp.value = nombreDocenteTexto(s.label || s.nombre || s.user);
+    inp.readOnly = true;
+    inp.style.background = '#f1f5f9';
+    inp.title = 'Definido por administración';
+    return;
+  }
+
+  if (s && (s.role === 'admin' || s.user === 'admin')) {
+    const asignado = docenteAsignadoAdmin();
+    const meta = store.meta && store.meta[mk];
+    const previo = (meta && typeof meta === 'object') ? meta.docente : meta;
+    inp.value = asignado || nombreDocenteTexto(previo) || 'Sin docente asignado';
+    inp.readOnly = true;
+    inp.style.background = '#f1f5f9';
+    inp.title = 'Definido en Admin · Docentes y accesos';
+    return;
+  }
+
+  const meta = store.meta && store.meta[mk];
+  const previo = (meta && typeof meta === 'object') ? meta.docente : meta;
+  inp.value = nombreDocenteTexto(previo);
+  inp.readOnly = false;
+  inp.style.background = '#fff';
+}
+
 /** Nivel permitido: primaria | secundaria | admin | null */
 function nivelPermitido() {
   var s = getLoginSession();
@@ -1058,23 +1161,7 @@ function aplicarRestriccionNivel() {
 }
 
 function aplicarDocenteSesion() {
-  const inp = document.getElementById('inpDocente');
-  if (!inp) return;
-  const s = getLoginSession();
-  if (s && s.role === 'docente' && s.label) {
-    inp.value = s.label;
-    inp.readOnly = true;
-    inp.style.background = '#f1f5f9';
-    inp.title = 'Definido por administración';
-  } else if (s && (s.role === 'nivel' || s.user === 'primaria' || s.user === 'secundaria')) {
-    // nivel general: editable
-    inp.readOnly = false;
-    inp.style.background = '#fff';
-    // no pisar si ya hay meta guardada
-  } else {
-    inp.readOnly = false;
-    inp.style.background = '#fff';
-  }
+  actualizarDocenteResponsable();
 }
 
 async function entrarNivel(n) {
@@ -1091,6 +1178,8 @@ async function entrarNivel(n) {
 
   nivel = n;
   loadStore();
+  cargarDocentesAdminLocal();
+  refrescarDocentesAdminRegistro();
 
   document.getElementById('viewHome').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
@@ -1116,6 +1205,9 @@ async function entrarNivel(n) {
   areaActual = areas()[0] || null;
   renderAreas();
   fillComps();
+  // onGrado() puede ejecutar el contexto antes de que exista un área activa.
+  // Resolver nuevamente el docente cuando el área inicial ya quedó definida.
+  actualizarDocenteResponsable();
 
   sesionActiva = null;
   notas = {};
@@ -1214,13 +1306,7 @@ function onContexto(options) {
 
   const c = ctxBase();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
-  const s = getLoginSession();
-  if (s && s.role === 'docente' && s.label) {
-    document.getElementById('inpDocente').value = s.label;
-  } else {
-    document.getElementById('inpDocente').value = ((store.meta[mk] && typeof store.meta[mk] === 'object') ? store.meta[mk].docente : store.meta[mk]) || '';
-  }
-  aplicarDocenteSesion();
+  actualizarDocenteResponsable();
   // Al cambiar contexto: limpiar capacidad (fecha la elige el docente)
   fillCaps();
   loadCapsElegidas();
@@ -1242,6 +1328,8 @@ function onContexto(options) {
 }
 
 function guardarMeta() {
+  const s = getLoginSession();
+  if (s && (s.role === 'admin' || s.user === 'admin' || s.role === 'docente')) return;
   const c = ctxBase();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
   store.meta[mk] = Object.assign({}, metaRegistro(), {docente: document.getElementById('inpDocente').value.trim()});
@@ -1275,6 +1363,7 @@ function setArea(a) {
   areaActual = a;
   renderAreas();
   fillComps();
+  actualizarDocenteResponsable();
   onContexto();
 }
 
@@ -1437,7 +1526,7 @@ function recolectarPantalla() {
     const k = finalKey(cp, nombre);
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
-    store.finales[k] = { nota20: n, nivel: numToLetter(n), ts: Date.now() };
+    store.finales[k] = { nota20: n, nivel: numToLetter(n), origen: 'numero', ts: Date.now() };
   });
   document.querySelectorAll('.av-conc').forEach(el => {
     if (!store.concArea) store.concArea = {};
@@ -1747,7 +1836,7 @@ function renderStudents() {
       upsertSesionCap(cp, cap);
       const k = capKeyHoy(cp, cap, nombre);
       if (n === '') store.grades[k] = {borrado:true,ts:Date.now()};
-      else store.grades[k] = { nota20: n, nivel: letra, ts: Date.now() };
+      else store.grades[k] = { nota20: n, nivel: letra, origen: 'numero', ts: Date.now() };
       saveStore();
     });
   });
@@ -1760,13 +1849,17 @@ function renderStudents() {
       const cap = decodeURIComponent(cell.dataset.cap);
       const cp = decodeURIComponent(cell.dataset.comp || '');
       const val = btn.dataset.val;
-      const mismo = btn.classList.contains('on');
-      const letra = mismo ? '' : val;
-      const n = letra ? letterToNum(letra) : '';
-      upsertSesionCap(cp, cap);
       const k = capKeyHoy(cp, cap, nombre);
-      if (!letra) store.grades[k] = {borrado:true,ts:Date.now()};
-      else store.grades[k] = { nota20: n, nivel: letra, ts: Date.now() };
+      const previo = leerNota(store.grades, k) || {};
+      const letraPrevia = previo.nivel || ((previo.nota20!=='' && previo.nota20!=null) ? numToLetter(previo.nota20) : '');
+      // Tocar la misma letra no reemplaza ni borra una nota exacta ya guardada.
+      if (letraPrevia === val) {
+        toast('Se conserva la calificación original');
+        return;
+      }
+      const n = letterToNum(val);
+      upsertSesionCap(cp, cap);
+      store.grades[k] = { nota20: n, nivel: val, origen: 'letra', ts: Date.now() };
       saveStore();
       renderStudents();
     });
@@ -2402,7 +2495,7 @@ function renderFinales() {
       if (n !== '') inp.value = pad2(n);
       const k = finalKey(comp, nombre);
       if (n === '') store.finales[k] = {borrado: true, ts: Date.now()};
-      else store.finales[k] = { nota20: n, nivel: letra, ts: Date.now() };
+      else store.finales[k] = { nota20: n, nivel: letra, origen: 'numero', ts: Date.now() };
       saveStore();
     });
   });
@@ -2414,11 +2507,15 @@ function renderFinales() {
       const nombre = decodeURIComponent(cell.dataset.fin);
       const comp = decodeURIComponent(cell.dataset.comp);
       const val = btn.dataset.val;
-      const mismo = btn.classList.contains('on');
-      const letra = mismo ? '' : val;
       const k = finalKey(comp, nombre);
-      if (!letra) store.finales[k] = {borrado: true, ts: Date.now()};
-      else store.finales[k] = { nota20: letterToNum(letra), nivel: letra, ts: Date.now() };
+      const previo = leerNota(store.finales, k) || {};
+      const letraPrevia = previo.nivel || ((previo.nota20!=='' && previo.nota20!=null) ? numToLetter(previo.nota20) : '');
+      // La misma letra conserva el valor numérico exacto previo si existía.
+      if (letraPrevia === val) {
+        toast('Se conserva la calificación original');
+        return;
+      }
+      store.finales[k] = { nota20: letterToNum(val), nivel: val, origen: 'letra', ts: Date.now() };
       saveStore();
       renderFinales();
     });

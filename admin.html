@@ -32,7 +32,10 @@
   input, select, textarea { border:1px solid #cbd5e1; border-radius:10px; padding:.55rem .75rem; width:100%; }
   input:focus, select:focus, textarea:focus { outline:2px solid #7dd3fc; border-color:#0ea5e9; }
   .mobile-safe-header { padding-top: env(safe-area-inset-top, 0px); }
-  .mobile-top-actions > a, .mobile-top-actions > button,
+  .mobile-top-actions > a, .mobile-top-actions > button {
+    min-height:44px; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18);
+    display:inline-flex; align-items:center; justify-content:center; text-align:center; line-height:1.15;
+  }
   .mobile-nav-scroll > button { min-height:44px; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18); }
   @media (max-width:640px) {
     .mobile-top-row { align-items:flex-start !important; }
@@ -95,7 +98,7 @@
       <button class="navbtn chip chip-off" data-tab="import" onclick="showTab('import')">Importar</button>
       <button class="navbtn chip chip-off" data-tab="whatsapp" onclick="showTab('whatsapp')">WhatsApp</button>
       <button class="navbtn chip chip-off" data-tab="docentes" onclick="showTab('docentes')">Docentes</button>
-      <button class="navbtn chip chip-off" data-tab="config" onclick="showTab('config')">Config</button>
+      <button class="navbtn chip chip-off" data-tab="config" onclick="showTab('config')">Respaldo</button>
     </nav>
   </header>
 
@@ -155,9 +158,7 @@
       <div class="card p-4 mt-3">
         <div class="font-bold text-sm text-slate-600 mb-2">Resumen rápido</div>
         <div id="resumenRapido" class="text-sm text-slate-700 space-y-1"></div>
-        <p class="text-[11px] text-slate-500 mt-2 leading-snug">
-          Nota: solo se cuentan alumnos con matrícula <b>DEFINITIVA</b>. Los <b>TRASLADADOS</b> del SIAGIE se omiten (por eso el total puede ser menor al del reporte oficial).
-        </p>
+
       </div>
     </section>
 
@@ -352,10 +353,7 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <button class="btn btn-primary text-sm" onclick="guardarHorario()">Guardar horario</button>
-          <button class="btn btn-ghost text-sm" onclick="exportarHorario()">Descargar horario_ingreso.json</button>
-          <label class="btn btn-ghost text-sm">Importar JSON<input type="file" accept=".json" hidden onchange="importarHorario(this)"></label>
         </div>
-        <p class="text-[11px] text-slate-500">Para que el auxiliar en otro equipo use el mismo horario: descargue el JSON y súbalo a GitHub como <b>horario_ingreso.json</b>.</p>
       </div>
     </section>
 
@@ -456,7 +454,7 @@
 
     <section id="tab-config" class="tab hidden">
       <div class="card p-4 space-y-3">
-        <h2 class="font-black text-lg">Configuración</h2>
+        <h2 class="font-black text-lg">Respaldo y exportación</h2>
         <button class="btn btn-ghost text-sm" onclick="exportarJSON()">Descargar respaldo JSON completo</button>
         <button class="btn btn-ghost text-sm" onclick="exportarCSV()">Descargar CSV del nivel filtrado</button>
       </div>
