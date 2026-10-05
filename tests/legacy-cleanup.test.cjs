@@ -277,3 +277,12 @@ test('Areas actions stack title above and keep buttons in one horizontal row', (
     assert.match(src, /mt-2 text-xs text-slate-500">Haz clic en un área para editar/);
   }
 });
+
+
+test('Registro preserves original grade when switching scoring modes', () => {
+  const src = read('registro.html');
+  assert.match(src, /Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas/);
+  assert.match(src, /origen: 'numero'/);
+  assert.match(src, /origen: 'letra'/);
+  assert.match(src, /Se conserva la calificación original/);
+});
