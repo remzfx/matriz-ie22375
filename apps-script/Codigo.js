@@ -521,12 +521,12 @@ function payloadRegistroLectura_(payload, acceso, ctx) {
       gradoEscritura_(grado) === ctx.numero && seccionEscritura_(seccion) === seccionEscritura_(ctx.seccion) &&
       (area == null || String(area) === ctx.area);
   }
-  function mapaContexto(mapa, conArea) {
+  function mapaContexto(mapa, conArea, soloAula) {
     const out = {};
     if (!mapa || typeof mapa !== 'object' || Array.isArray(mapa)) return out;
     Object.keys(mapa).forEach(function (key) {
       const parts = key.split('||');
-      if (parts.length > (conArea ? 5 : 4) && mismoContexto(parts[0], parts[1], parts[2], parts[3], conArea ? parts[4] : null)) out[key] = mapa[key];
+      if ((soloAula ? parts.length === 4 : parts.length > (conArea ? 5 : 4)) && mismoContexto(parts[0], parts[1], parts[2], parts[3], conArea ? parts[4] : null)) out[key] = mapa[key];
     });
     return out;
   }
@@ -537,6 +537,7 @@ function payloadRegistroLectura_(payload, acceso, ctx) {
     }) : [],
     grades: mapaContexto(payload.grades, true), finales: mapaContexto(payload.finales, true),
     concArea: mapaContexto(payload.concArea, true), asistencia: mapaContexto(payload.asistencia, false),
+    asisFechas: mapaContexto(payload.asisFechas, false, true), asisFechasEstado: mapaContexto(payload.asisFechasEstado, false),
     capsSel: mapaContexto(payload.capsSel, true), meta: payload.meta || {}
   };
 }
@@ -803,6 +804,7 @@ function doGet(e) {
     const p = (e && e.parameter) || {};
     const action = String(p.action || '').toLowerCase();
     const nivel = String(p.nivel || '').toLowerCase();
+    if (action === 'loadstudents') return responder_({ok:false,code:'METHOD_NOT_ALLOWED',error:'La lectura de estudiantes requiere POST con token en el cuerpo.'});
     const rolesLectura = {
       loadreg: ['admin', 'docente'], loadnivel: ['admin', 'docente'], load: ['admin', 'docente'],
       loadtpl: ['admin'], loadtplstatus: ['admin', 'docente'],
@@ -1385,5 +1387,3 @@ function listarClassroom_() {
     return { ok: false, error: 'Classroom no está habilitado o esta cuenta no es docente. ' + err };
   }
 }
-
-

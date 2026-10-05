@@ -82,6 +82,14 @@ function studentsFixture() {
   return {...s,rows,base,init,load,get};
 }
 
+test('loadstudents uses canonical protected POST; accidental GET reports method mismatch without leaking students',()=>{
+  const s=studentsFixture();
+  assert.equal(s.post({action:'loadstudents',token:s.primary,bimestre:'I'}).ok,true);
+  const get=JSON.parse(s.c.doGet({parameter:{action:'loadstudents',token:s.admin}}).text);
+  assert.equal(get.ok,false);assert.equal(get.code,'METHOD_NOT_ALLOWED');assert.notEqual(get.error,'Acción no válida');assert.equal(get.estudiantes,undefined);
+  const missing=s.post({action:'loadstudents',bimestre:'I'});assert.equal(missing.ok,false);assert.notEqual(missing.error,'Acción no válida');
+});
+
 test('Admin reads the complete private base and optional SIAGIE identifiers without leaking unrelated fields',()=> {
   const s=studentsFixture(),res=s.load(s.admin);
   assert.equal(res.ok,true);assert.equal(res.estudiantes.length,7);

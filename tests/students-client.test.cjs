@@ -19,8 +19,8 @@ function fixture(role='admin'){
   const calls=[],elements=new Map(),alerts=[];
   function el(id){if(!elements.has(id))elements.set(id,{value:'',style:{},textContent:'',innerHTML:'',classList:{add(){},remove(){}}});return elements.get(id);}
   const c=vm.createContext({window:{},sessionStorage:storage,localStorage:storage,atob,console,Date,
-    document:{getElementById:el,querySelector:sel=>sel==='main'?{inert:false,setAttribute(){}}:null},alert:v=>alerts.push(v),confirm:()=>true,setTimeout:()=>0,
-    fetch:async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({ok:true,version:'synthetic-current',inicializada:true,estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',orden:1,nombre:'Synthetic Primary'},{nivel:'secundaria',grado:1,seccion:'A',orden:1,nombre:'Synthetic Secondary'}]})};}
+    document:{getElementById:el,querySelectorAll:()=>[],querySelector:sel=>sel==='main'?{inert:false,setAttribute(){},querySelectorAll:()=>[]}:null},alert:v=>alerts.push(v),confirm:()=>true,setTimeout:(fn,ms)=>{if(ms<2000)queueMicrotask(fn);return 0;},clearTimeout(){},
+    fetch:async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({ok:true,version:'synthetic-current',bimestre:JSON.parse(options.body).bimestre || '',inicializada:true,estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',orden:1,nombre:'Synthetic Primary'},{nivel:'secundaria',grado:1,seccion:'A',orden:1,nombre:'Synthetic Secondary'}]})};}
   });
   new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;
   const run=code=>new vm.Script(code).runInContext(c);
@@ -52,15 +52,15 @@ for(const file of ['auxiliar.html','photochecks.html'])test(file+': real loader 
 });
 test('Registro startup uses cached period configuration without waiting for the first cloud refresh',async()=>{
   const s=fixture('docente');
-  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;
-    function recordarPadron(){};function saveStore(){};function toast(){};function bloquearRegistroMientrasValida(){};function pintarPadronInmediato(base,b){bdEstudiantes=base;padronBimestre=b;};
+  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,tokenPadron='',vencimientoCachePadron,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;
+    function ctxBase(){return {nivel,bim:document.getElementById('selBim').value}};function recordarPadron(){};function saveStore(){};function toast(){};function bloquearRegistroMientrasValida(){};function pintarPadronInmediato(base,b){bdEstudiantes=base;padronBimestre=b;};
     function nivelPermitido(){return 'primaria'};function loadStore(){};function loadPeriodosAdmin(){return {bimestres:{I:'cerrado',II:'cerrado',III:'abierto',IV:'bloqueado'}}};
     function pintarBimestresRegistro(){document.getElementById('selBim').value='III'};function gradosPermitidos(){return [1]};function aulasPermitidas(){return null};
-    function hoyISO(){return '2026-10-04'};function aplicarDocenteSesion(){};function onGrado(){};function areas(){return ['Comunicación']};function renderAreas(){};
+    function hoyISO(){return '2026-10-04'};function aplicarDocenteSesion(){};function cargarDocentesAdminLocal(){};function refrescarDocentesAdminRegistro(){};function actualizarDocenteResponsable(){};;function onGrado(){};function areas(){return ['Comunicación']};function renderAreas(){};
     function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};function fillCaps(){};
     function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};function onContexto(){};let periodFetches=0;
     function sincronizarPeriodosNube(){periodFetches++;return new Promise(()=>{});} `);
-  for(const name of ['loadBD','llenarAulasPadron','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  for(const name of ['loadBD','llenarAulasPadron','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
   const p=s.c.entrarNivel('primaria');
   await new Promise(r=>setTimeout(r,0));
   assert.equal(s.run('padronBimestre'),'III');
@@ -70,15 +70,15 @@ test('Registro startup uses cached period configuration without waiting for the 
 
 test('Registro enters its current flow only after protected students are loaded',async()=>{
   const s=fixture('docente');
-  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;function recordarPadron(){};function saveStore(){};function toast(){};
-    function nivelPermitido(){return 'primaria'};function loadStore(){};function pintarBimestresRegistro(){document.getElementById('selBim').value='III'};function loadPeriodosAdmin(){};
+  s.run(`let bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,tokenPadron='',vencimientoCachePadron,nivel,areaActual,sesionActiva,notas,dirty,modoCalif;function recordarPadron(){};function saveStore(){};function toast(){};
+    function ctxBase(){return {nivel,bim:document.getElementById('selBim').value}};function nivelPermitido(){return 'primaria'};function loadStore(){};function pintarBimestresRegistro(){document.getElementById('selBim').value='III'};function loadPeriodosAdmin(){};
     function gradosPermitidos(){return [1]};function aulasPermitidas(){return null};function hoyISO(){return '2026-10-03'};
-    function aplicarDocenteSesion(){};function onGrado(){};function areas(){return ['Comunicación']};function renderAreas(){};
+    function aplicarDocenteSesion(){};function cargarDocentesAdminLocal(){};function refrescarDocentesAdminRegistro(){};function actualizarDocenteResponsable(){};;function onGrado(){};function areas(){return ['Comunicación']};function renderAreas(){};
     function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};
     function fillCaps(){};function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};
     function sincronizarPeriodosNube(){return Promise.resolve()};function onContexto(){};`);
-  for(const name of ['loadBD','llenarAulasPadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
-  await s.c.entrarNivel('primaria');checkRequest(s,'III');
+  for(const name of ['loadBD','llenarAulasPadron','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  await s.c.entrarNivel('primaria');await new Promise(r=>setTimeout(r,0));checkRequest(s,'III');
   assert.match(s.elements.get('selGrado').innerHTML,/value="1"/);
   assert.equal(s.c.loadBD().primaria.estudiantes[0].nombre,'Synthetic Primary');
 });
@@ -93,13 +93,14 @@ test('Admin edits cannot mutate the authorized cache before server save',async()
   const s=fixture(),base=await s.c.IEStudents.load();base.primaria.estudiantes[0].nombre='Unsaved Synthetic Edit';
   assert.equal(s.c.IEStudents.peek().primaria.estudiantes[0].nombre,'Synthetic Primary');
 });
-test('Offline fallback expires after ten minutes and keeps the same scope',async()=>{
+test('Offline fallback persists locally but never outlives the signed token and keeps the same scope',async()=>{
   const s=fixture();await s.c.IEStudents.load();s.c.fetch=async()=>{throw Error('offline');};
   const offline=await s.c.IEStudents.load();assert.equal(offline.offline,true);
   assert.equal(offline.primaria.estudiantes[0].nombre,'Synthetic Primary');
-  const cache=JSON.parse(s.memory.get('ie22375_students_session_v1'));assert.ok(cache.until<=Date.now()+600000);
-  s.c.Date={now:()=>Date.now()+600001};
-  await assert.rejects(s.c.IEStudents.load(),/conectar/);
+  const cache=JSON.parse(s.memory.get('ie22375_students_session_v1'));const exp=JSON.parse(Buffer.from(s.session.token.split('.')[0],'base64url').toString()).exp;
+  assert.ok(cache.until<=exp);assert.ok(cache.until>Date.now()+600000);
+  s.c.Date={now:()=>exp+1};
+  await assert.rejects(s.c.IEStudents.load(),/Sesión ausente o vencida|conectar/);
   assert.equal(s.c.IEStudents.peek(),null);
 });
 test('Network failure without a session-bound cache does not load legacy data',async()=>{
@@ -161,4 +162,55 @@ test('Initial inspection remains manual and can inspect an empty private base wi
   const s=fixture();s.c.fetch=async()=>({ok:true,json:async()=>({ok:true,inicializada:false,version:'',estudiantes:[]})});
   assert.equal((await s.c.IEStudents.inspect()).inicializada,false);
   await assert.rejects(s.c.IEStudents.load(),/no inicializada/);assert.equal(s.c.IEStudents.peek(),null);
+});
+
+test('Persistent authorized roster survives a new page session only for the exact token and bimestre',async()=>{
+ const s=fixture('docente');await s.c.IEStudents.loadRoster('III');
+ const tabs=new Map([['ie22375_session_v1',JSON.stringify(s.session)]]);
+ s.c.sessionStorage={getItem:k=>tabs.get(k)||null,setItem:(k,v)=>tabs.set(k,v),removeItem:k=>tabs.delete(k)};
+ s.c.window={};new vm.Script(read('students.js')).runInContext(s.c);s.c.IEStudents=s.c.window.IEStudents;
+ assert.equal(s.c.IEStudents.peekRoster('III').primaria.estudiantes.length,1);assert.equal(s.c.IEStudents.peekRoster('IV'),null);
+ s.c.sessionStorage.setItem('ie22375_session_v1',JSON.stringify({...s.session,token:Buffer.from(JSON.stringify({exp:Date.now()+600000})).toString('base64url')+'.new'}));
+ assert.equal(s.c.IEStudents.peekRoster('III'),null);
+});
+
+test('Cache lifetime is capped at 24 hours even when signed token lifetime is longer',async()=>{
+ const s=fixture();const now=Date.now();s.c.Date={now:()=>now};
+ s.storage.setItem('ie22375_session_v1',JSON.stringify({role:'admin',token:Buffer.from(JSON.stringify({exp:now+48*3600000})).toString('base64url')+'.synthetic'}));
+ await s.c.IEStudents.load();assert.equal(JSON.parse(s.memory.get('ie22375_students_session_v1')).until,now+24*3600000);
+ s.c.Date={now:()=>now+24*3600000};assert.equal(s.c.IEStudents.peek(),null);
+});
+
+test('Untrusted session tokenExp cannot extend cache beyond the signed exp',async()=>{
+ const s=fixture();s.storage.setItem('ie22375_session_v1',JSON.stringify({...s.session,tokenExp:Date.now()+48*3600000}));
+ await s.c.IEStudents.load();const signed=JSON.parse(Buffer.from(s.session.token.split('.')[0],'base64url').toString()).exp;
+ assert.equal(JSON.parse(s.memory.get('ie22375_students_session_v1')).until,signed);
+});
+
+test('Explicit denial invalidates outstanding reads of other bimestres; a late success cannot resurrect cache',async()=>{
+ const s=fixture('docente');await s.c.IEStudents.load();let release;
+ s.c.fetch=async(url,options)=>({ok:true,json:()=>JSON.parse(options.body).bimestre==='III'?new Promise(r=>release=r):Promise.resolve({ok:false,code:'SESSION',error:'Synthetic revoked session'})});
+ const old=s.c.IEStudents.loadRoster('III');const rejected=assert.rejects(old,e=>e.code==='SESSION');
+ await Promise.resolve();await assert.rejects(s.c.IEStudents.loadRoster('IV'),/revoked/);
+ release({ok:true,inicializada:true,bimestre:'III',estudiantes:[]});await rejected;
+ assert.equal(s.c.IEStudents.peek(),null);assert.equal(s.c.IEStudents.peekRoster('III'),null);
+});
+
+test('A server reply for another bimestre is never cached or treated as verification',async()=>{
+ const s=fixture('docente');s.c.fetch=async()=>({ok:true,json:async()=>({ok:true,inicializada:true,bimestre:'IV',estudiantes:[]})});
+ await assert.rejects(s.c.IEStudents.loadRoster('III'),/bimestre solicitado/);assert.equal(s.c.IEStudents.peekRoster('III'),null);
+});
+
+test('Student write requests are never retried after network failure',async()=>{
+ const s=fixture();let count=0;s.c.fetch=async()=>{count++;throw Error('down')};
+ await assert.rejects(s.c.IEStudents.save(s.c.IEStudents.empty(),'v'),/conectar/);assert.equal(count,1);
+});
+
+test('Authorization removal in another tab invalidates memory cache and pending verification',async()=>{
+ const s=fixture();let changed;s.c.window={addEventListener:(name,fn)=>{if(name==='storage')changed=fn}};
+ new vm.Script(read('students.js')).runInContext(s.c);s.c.IEStudents=s.c.window.IEStudents;await s.c.IEStudents.load();
+ let release;s.c.fetch=async()=>({ok:true,json:()=>new Promise(r=>release=r)});
+ const pending=s.c.IEStudents.load();const rejected=assert.rejects(pending,e=>e.code==='SESSION');for(let i=0;i<10;i++)await Promise.resolve();
+ changed({key:'ie22375_students_session_v1',newValue:null});
+ release({ok:true,inicializada:true,estudiantes:[]});await rejected;assert.equal(s.c.IEStudents.peek(),null);
 });

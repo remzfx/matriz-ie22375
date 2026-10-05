@@ -223,7 +223,7 @@ for (const [role, property] of [['auxiliar', 'IE22375_AUXILIAR_PASS'], ['pip', '
     const context = vm.createContext({
       document: {getElementById: id => elements[id]}, sessionStorage: storage,
       localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
-      setTimeout, clearTimeout, AbortController,
+      setTimeout, clearTimeout, AbortController, performance, console,
       fetch: async (url, options) => {const body = JSON.parse(options.body); requests.push(body); return {ok: true, text: async () => JSON.stringify(s.post(body))};}
     });
     const script = [...clientSource('index.html').matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
@@ -240,4 +240,3 @@ for (const [role, property] of [['auxiliar', 'IE22375_AUXILIAR_PASS'], ['pip', '
     }
   });
 }
-

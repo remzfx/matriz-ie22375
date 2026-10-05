@@ -121,6 +121,14 @@ function errorLogin(code, message, extra) {
 function esperar(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+async function leerRespuestaLoginConTiempo(response, ms) {
+  let timer;
+  try {
+    return await Promise.race([response.text(), new Promise((_, reject) => {
+      timer = setTimeout(() => reject(errorLogin('TIMEOUT','El servidor tardó demasiado en responder.')),ms);
+    })]);
+  } finally { clearTimeout(timer); }
+}
 async function loginBackendUnaVez(tipo, usuario, password) {
   const t0 = performance.now();
   const r = await fetchConTiempo(CLOUD_API_URL, 18000, {
@@ -132,7 +140,7 @@ async function loginBackendUnaVez(tipo, usuario, password) {
   if (!r || !r.ok) {
     throw errorLogin('HTTP', 'El servidor respondió con un error.', { status: r ? r.status : 0 });
   }
-  const raw = await r.text();
+  const raw = await leerRespuestaLoginConTiempo(r,Math.max(1,18000 - (performance.now() - t0)));
   const t2 = performance.now();
   let data;
   try {
