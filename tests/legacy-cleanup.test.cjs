@@ -365,3 +365,30 @@ test('Login tolerates slower Apps Script cold starts and reports automatic retry
   assert.match(src, /Reintentando automáticamente/);
   assert.match(src, /Se hicieron 2 intentos/);
 });
+
+
+test('Students roster cache persists locally and stays token-bound for local-first use', () => {
+  const src = read('students.js');
+  assert.match(src, /const TTL = 24 \* 60 \* 60 \* 1000/);
+  assert.match(src, /localStorage\.setItem\(KEY, JSON\.stringify\(memory\)\)/);
+  assert.match(src, /cached\.token === token/);
+  assert.match(src, /Servidor lento\. Reintentando en segundo plano/);
+  assert.match(src, /pendingSync: true/);
+});
+
+test('Registro stays navigable and locally writable while server verification is pending', () => {
+  const src = read('registro.html');
+  assert.match(src, /main\.inert = false/);
+  assert.match(src, /Modo local: puedes seguir trabajando\. Sincronización pendiente/);
+  assert.match(src, /id="btnReintentarPadron"/);
+  assert.match(src, /function reintentarPadronActual/);
+  assert.doesNotMatch(src, /if \(cargandoEstudiantes \|\| !padronBimestre/);
+});
+
+test('Service worker never falls back to index.html for scripts and precaches Registro core', () => {
+  const src = read('sw.js');
+  assert.match(src, /\.\/registro\.html/);
+  assert.match(src, /\.\/students\.js/);
+  assert.match(src, /req\.mode === 'navigate'/);
+  assert.match(src, /req\.destination === 'script'/);
+});
