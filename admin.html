@@ -32,7 +32,10 @@
   input, select, textarea { border:1px solid #cbd5e1; border-radius:10px; padding:.55rem .75rem; width:100%; }
   input:focus, select:focus, textarea:focus { outline:2px solid #7dd3fc; border-color:#0ea5e9; }
   .mobile-safe-header { padding-top: env(safe-area-inset-top, 0px); }
-  .mobile-top-actions > a, .mobile-top-actions > button,
+  .mobile-top-actions > a, .mobile-top-actions > button {
+    min-height:44px; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18);
+    display:inline-flex; align-items:center; justify-content:center; text-align:center; line-height:1.15;
+  }
   .mobile-nav-scroll > button { min-height:44px; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18); }
   @media (max-width:640px) {
     .mobile-top-row { align-items:flex-start !important; }
