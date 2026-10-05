@@ -327,3 +327,11 @@ test('Admin register resolves responsible teacher from admin assignments and loc
   assert.match(src, /inp\.readOnly = true/);
   assert.doesNotMatch(src, /inp\.value = \(\(store\.meta\[mk\]/);
 });
+
+
+test('Registro resolves primary responsible teacher after initial area becomes active', () => {
+  const src = read('registro.html');
+  assert.match(src, /areaActual = areas\(\)\[0\] \|\| null;[\s\S]*actualizarDocenteResponsable\(\);/);
+  assert.match(src, /function docenteAsignadoAdmin\(\)[\s\S]*d\.nivel !== c\.nivel/);
+  assert.match(src, /Array\.isArray\(d\.grados\) && d\.grados\.map\(Number\)\.includes\(Number\(c\.grado\)\)/);
+});
