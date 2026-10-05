@@ -60,7 +60,7 @@ test('Registro startup uses cached period configuration without waiting for the 
     function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};function fillCaps(){};
     function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};function onContexto(){};let periodFetches=0;
     function sincronizarPeriodosNube(){periodFetches++;return new Promise(()=>{});} `);
-  for(const name of ['loadBD','llenarAulasPadron','registroSoloLectura','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  for(const name of ['loadBD','llenarAulasPadron','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
   const p=s.c.entrarNivel('primaria');
   await new Promise(r=>setTimeout(r,0));
   assert.equal(s.run('padronBimestre'),'III');
@@ -77,7 +77,7 @@ test('Registro enters its current flow only after protected students are loaded'
     function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};
     function fillCaps(){};function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};
     function sincronizarPeriodosNube(){return Promise.resolve()};function onContexto(){};`);
-  for(const name of ['loadBD','llenarAulasPadron','registroSoloLectura','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  for(const name of ['loadBD','llenarAulasPadron','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
   await s.c.entrarNivel('primaria');await new Promise(r=>setTimeout(r,0));checkRequest(s,'III');
   assert.match(s.elements.get('selGrado').innerHTML,/value="1"/);
   assert.equal(s.c.loadBD().primaria.estudiantes[0].nombre,'Synthetic Primary');
