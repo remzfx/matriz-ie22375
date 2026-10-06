@@ -122,7 +122,9 @@
           // Un backend antiguo/método incorrecto no verifica permisos. Solo trabajo local previamente autorizado; nunca habilita subida a la nube.
           if (response.code === 'METHOD_NOT_ALLOWED' || /acción no válida/i.test(response.error || ''))
             throw error('API_INCOMPATIBLE','El backend no reconoce la lectura de estudiantes. Verifique la implementación de Apps Script.',true);
-          throw error('DENIED',response.error || 'Sesión inválida o sin autorización.');
+          const denied = error('DENIED',response.error || 'Sesión inválida o sin autorización.');
+          denied.authorizationRejected = response.code === 'SESSION' || /sesión.*(?:inválida|vencida|autorización)/i.test(response.error || '');
+          throw denied;
         }
         if (!Array.isArray(response.estudiantes)) throw error('INVALID_RESPONSE','Respuesta de estudiantes inválida.',true);
         if (read && data.bimestre && response.bimestre !== data.bimestre)
