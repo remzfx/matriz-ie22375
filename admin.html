@@ -48,6 +48,7 @@
   <script src="login-bridge.js"></script>
   <script src="students.js"></script>
 <script src="student-identity.js"></script>
+<script src="transversales-client.js"></script>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['admin'];</script>
@@ -425,6 +426,7 @@
             </p>
             <div id="docAsignacionesBox" class="space-y-3"></div>
           </div>
+          <div id="docTutorWrap" class="mt-4 hidden"><label class="font-bold text-sm">Tutor de aula</label><p class="text-xs text-slate-500">Máximo un tutor activo por aula de Secundaria.</p><div id="docTutorBox" class="flex flex-wrap gap-2 mt-2"></div></div>
         </div>
 
         <input type="hidden" id="docEditId" value="">
@@ -1300,7 +1302,7 @@ async function vaciarSiagieOficial(){
   let items=[];
   try{ items=await fetchRegAula(ctx); }
   catch(e){ alert('No hay notas en la nube de este aula.'); return; }
-  const areas=areasDeNivel(ctx.nivel);
+  const areas=areasDeNivel(ctx.nivel).filter(a=>ctx.nivel!=='secundaria'||a!=='Competencias Transversales');
   const faltan=areas.filter(ar=>!items.some(it=>it.area===ar));
   if(faltan.length){
     if(!confirm('Faltan en la nube:\n- '+faltan.join('\n- ')+'\n\n¿Vaciar igual las áreas que sí están?')) return;
@@ -1320,6 +1322,11 @@ async function vaciarSiagieOficial(){
   }catch(e){ alert('No se pudo bajar la plantilla. Verifique la conexión e intente nuevamente.'); return; }
   const by={};
   items.forEach(it=>{ by[it.area]=it.payload||{}; });
+  let transversales=null;
+  if(ctx.nivel==='secundaria'){
+    try{transversales=await IETransversales.request('loadtransversalexport',{bimestre:ctx.bim,grado:ctx.grado,seccion:ctx.seccion});}
+    catch(e){alert('No se pudo verificar la consolidación transversal: '+e.message);return;}
+  }
   let padron;
   try { padron=await IEStudents.loadRoster(ctx.bim); } catch(e) { alert(e.message); return; }
   if(padron.offline){alert('Exportación SIAGIE requiere el padrón del servidor con conexión.');return;}
@@ -1332,10 +1339,11 @@ async function vaciarSiagieOficial(){
     if(al.codigoEstudiante) idxCod[String(al.codigoEstudiante).trim()]=al;
   });
   const wb=XLSX.read(buf,{type:'array',cellDates:true});
-  let escritos=0;
+  let escritos=0;const pendientesTrans=[];
   wb.SheetNames.forEach(sn=>{
     const map=areaDeHojaAdm(sn);
-    if(!map||!by[map.area]) return;
+    const transversal=ctx.nivel==='secundaria'&&map&&map.area==='Competencias Transversales';
+    if(!map||(!transversal&&!by[map.area])) return;
     const ws=wb.Sheets[sn];
     if(!ws||!ws['!ref']) return;
     const range=XLSX.utils.decode_range(ws['!ref']);
@@ -1353,24 +1361,36 @@ async function vaciarSiagieOficial(){
       if(!nombre) continue;
       use.forEach((cp,i)=>{
         const permitirNombre=alumnos.filter(a=>normNomAdm(a.nombre)===normNomAdm(nombre.nombre)).length===1;
-        const letra=letraDesdePayload(p,ctx,map.area,cp,nombre,permitirNombre);
+        const compTrans=map.only===1?'autonomia':map.only===0?'tic':i===0?'tic':'autonomia';
+        const resultTrans=transversal?((transversales.resultados[studentKey(nombre)]||{})[compTrans]):null;
+        const letra=transversal?(resultTrans&&resultTrans.listo?resultTrans.final.nivel:''):letraDesdePayload(p,ctx,map.area,cp,nombre,permitirNombre);
+        if(transversal) delete ws[XLSX.utils.encode_cell({r:r,c:4+i*2})];
+        if(transversal&&!letra){
+          // Una plantilla puede contener una nota antigua: nunca exportarla como consolidado vigente.
+          delete ws[XLSX.utils.encode_cell({r:r,c:3+i*2})];delete ws[XLSX.utils.encode_cell({r:r,c:4+i*2})];
+          pendientesTrans.push(nombre.nombre+' · '+cp+' · '+(resultTrans?resultTrans.estado:'Sin calificación final'));
+        }
         if(!letra) return;
         ws[XLSX.utils.encode_cell({r:r,c:3+i*2})]={t:'s',v:letra};
         escritos++;
         const need=ctx.nivel==='primaria'?(letra==='B'||letra==='C'):(letra==='C');
         if(need){
-          const txt=concDesdePayload(p,ctx,map.area,nombre,permitirNombre);
+          const txt=transversal?resultTrans.final.justificacion:concDesdePayload(p,ctx,map.area,nombre,permitirNombre);
           if(txt) ws[XLSX.utils.encode_cell({r:r,c:4+i*2})]={t:'s',v:txt};
         }
       });
     }
   });
+  if(transversales){
+    try{const vigente=await IETransversales.request('loadtransversalexport',{bimestre:ctx.bim,grado:ctx.grado,seccion:ctx.seccion});if(vigente.version!==transversales.version||vigente.versionAportes!==transversales.versionAportes){alert('La consolidación cambió durante el vaciado. Recargue y exporte nuevamente.');return;}}
+    catch(e){alert('No se pudo confirmar la versión transversal para exportar.');return;}
+  }
   const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   a.download=filename;
   a.click();
-  msg.textContent='Registro oficial listo · '+escritos+' notas. Suba este archivo a SIAGIE.';
+  msg.textContent='Registro oficial listo · '+escritos+' notas.'+(pendientesTrans.length?' Transversales pendientes: '+pendientesTrans.join(' · '):' Suba este archivo a SIAGIE.');
 }
 
 function loadDocentes() {
@@ -1434,13 +1454,15 @@ function toggleDocFiltros() {
   document.getElementById('docAreasWrap').classList.remove('hidden');
   renderAreasDocente();
   renderAsignacionesDocente();
+  const tutor=document.getElementById('docTutorWrap');if(tutor)tutor.classList.toggle('hidden',n!=='secundaria');
+  const box=document.getElementById('docTutorBox');if(box&&!box.children.length)box.innerHTML=aulasSecundariaDisponibles().map(a=>'<label class="text-sm border rounded-lg px-3 py-3"><input class="doc-tutor" type="checkbox" value="'+a+'"> '+a.replace('|','° ')+'</label>').join('');
 }
 
 function renderAreasDocente() {
   const box = document.getElementById('docAreasBox'), nivel = document.getElementById('docNivel').value;
   if (!box || box.__nivelAreas === nivel) return;
   box.__nivelAreas = nivel;
-  box.innerHTML = areasDeNivel(nivel).map(a => '<label class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 inline-flex items-center gap-2">' +
+  box.innerHTML = areasDeNivel(nivel).filter(a=>nivel!=='secundaria'||a!=='Competencias Transversales').map(a => '<label class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 inline-flex items-center gap-2">' +
     '<input type="checkbox" class="doc-area" value="' + a.replace(/"/g,'&quot;') + '"> ' + a + '</label>').join(' ');
   document.getElementById('docAsignacionesBox').innerHTML = '';
 }
@@ -1512,6 +1534,7 @@ function limpiarFormDocente() {
   document.getElementById('docNivel').value = 'primaria';
   document.querySelectorAll('.doc-grado').forEach(c => c.checked = false);
   document.querySelectorAll('.doc-area').forEach(c => c.checked = false);
+  document.querySelectorAll('.doc-tutor').forEach(c => c.checked = false);
   const asigBox = document.getElementById('docAsignacionesBox');
   if (asigBox) asigBox.innerHTML = '';
   toggleDocFiltros();
@@ -1533,6 +1556,7 @@ function guardarDocente() {
   const grados = [...document.querySelectorAll('.doc-grado:checked')].map(c => parseInt(c.value,10));
   const areas = [...document.querySelectorAll('.doc-area:checked')].map(c => c.value);
   const asignaciones = leerAsignacionesFormulario();
+  const tutorAulas=nivel==='secundaria'?[...document.querySelectorAll('.doc-tutor:checked')].map(c=>c.value):[];
 
   if (nivel === 'primaria' && !grados.length) { alert('Marca al menos un grado'); return; }
   if (!areas.length) { alert('Marca al menos un área'); return; }
@@ -1552,14 +1576,21 @@ function guardarDocente() {
   const aulas = [...new Set(Object.values(asignaciones).flat())];
 
   const list = loadDocentes();
+  if(tutorAulas.some(a=>list.some(d=>d.id!==id&&d.activo!==false&&(d.tutorAulas||[]).includes(a)))){alert('Ya hay un tutor activo en esa aula');return;}
+  const anterior=list.find(d=>d.id===id);
+  if(nivel==='secundaria'&&anterior&&anterior.asignaciones&&anterior.asignaciones['Competencias Transversales'])asignaciones['Competencias Transversales']=anterior.asignaciones['Competencias Transversales'].slice();
+  if(nivel==='secundaria'&&anterior&&(anterior.areas||[]).includes('Competencias Transversales')){
+    if(!asignaciones['Competencias Transversales'])asignaciones['Competencias Transversales']=(anterior.aulas||[]).slice();
+    areas.push('Competencias Transversales');
+  }
   if (id) {
     const i = list.findIndex(d => d.id === id);
-    if (i >= 0) list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas, aulas, asignaciones, ts:Date.now() };
+    if (i >= 0) list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas, aulas, asignaciones, tutorAulas, ts:Date.now() };
   } else {
     if (list.some(d => d.user === user)) { alert('Ese usuario ya existe'); return; }
     list.push({
       id: 'd' + Date.now(),
-      user, pass, nombre, nivel, grados, areas, aulas, asignaciones,
+      user, pass, nombre, nivel, grados, areas, aulas, asignaciones, tutorAulas,
       ts: Date.now()
     });
   }
@@ -1584,6 +1615,7 @@ function editarDocente(id) {
   document.querySelectorAll('.doc-grado').forEach(c => {
     c.checked = (d.grados || []).includes(parseInt(c.value,10));
   });
+  document.querySelectorAll('.doc-tutor').forEach(c=>{c.checked=(d.tutorAulas||[]).includes(c.value);});
   document.querySelectorAll('.doc-area').forEach(c => {
     c.checked = d.nivel === 'primaria' && (!d.asignaciones || !Object.keys(d.asignaciones).length)
       ? c.value !== 'Educación Física' : (d.asignaciones ? Object.keys(d.asignaciones) : d.areas || []).includes(c.value);
@@ -1629,7 +1661,7 @@ function renderDocentes() {
              ((d.aulas&&d.aulas.length) ? (' · Aulas: ' + d.aulas.map(a=>a.replace('|','° ')).join(', ')) : '')));
     return '<div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2" data-doc-id="'+d.id+'">' +
       '<div><div class="font-bold">' + (d.nombre||d.user) + ' <span class="text-slate-400 font-normal">(@'+d.user+')</span></div>' +
-      '<div class="text-xs text-slate-500">' + d.nivel + ' · ' + filtro + '</div>' +
+      '<div class="text-xs text-slate-500">' + d.nivel + ' · ' + filtro + ((d.tutorAulas||[]).length?' · Tutor: '+d.tutorAulas.join(', '):'') + '</div>' +
       '<div class="text-xs text-slate-400">Clave: ' + d.pass + '</div></div>' +
       '<div class="flex gap-1">' +
       '<button type="button" class="btn btn-ghost text-xs !py-1 btn-doc-edit">Editar</button>' +

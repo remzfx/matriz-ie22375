@@ -10,6 +10,7 @@
   let bridge = null;
   function startBridge() {
     if (!document.body && typeof document.addEventListener === 'function') return null;
+    if (!session() || !['admin','docente','auxiliar'].includes(session().role)) return null;
     if (!bridge && validToken() && global.IELoginBridge) {
       try { bridge = global.IELoginBridge.create(API,'students'); } catch(e) {}
     }

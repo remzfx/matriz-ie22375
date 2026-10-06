@@ -4,7 +4,7 @@
   const CHANNEL = 'IE22375_LOGIN_BRIDGE_V1';
   const PARENTS = ['https://matriz.biblioteca360.com','https://biblioteca360.com','https://www.biblioteca360.com','https://remzfx.github.io'];
   function create(api, mode = 'login') {
-    if (!['login','students'].includes(mode)) return null;
+    if (!['login','students','transversales'].includes(mode)) return null;
     if (!PARENTS.includes(global.location.origin) || !global.crypto || !global.crypto.getRandomValues) return null;
     const random = new Uint8Array(16); global.crypto.getRandomValues(random);
     const nonce = Array.from(random, n => n.toString(16).padStart(2,'0')).join('');
@@ -70,7 +70,8 @@
         const timer=setTimeout(()=>done(false),12000);waiters.add(done);
       }),
       login:(tipo,usuario,password)=>mode === 'login' ? send('login',{tipo,usuario,password}) : Promise.reject(fault('BRIDGE_UNAVAILABLE')),
-      loadStudents:body=>mode === 'students' ? send('students',{token:body.token,bimestre:body.bimestre || ''}) : Promise.reject(fault('BRIDGE_UNAVAILABLE'))
+      loadStudents:body=>mode === 'students' ? send('students',{token:body.token,bimestre:body.bimestre || ''}) : Promise.reject(fault('BRIDGE_UNAVAILABLE')),
+      transversales:body=>mode === 'transversales' ? send('transversales',body) : Promise.reject(fault('BRIDGE_UNAVAILABLE'))
     };
   }
   global.IELoginBridge = {create:create};

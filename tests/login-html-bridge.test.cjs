@@ -26,7 +26,7 @@ function bridgeFixture(server=backend(),mode='login') {
   const c=vm.createContext({window:parent,URL,Uint8Array,setTimeout:(fn,ms)=>{const id=timers.size+1;timers.set(id,{fn,ms});return id},clearTimeout:id=>timers.delete(id)});
   vm.runInContext(read('login-bridge.js'),c);const api=parent.IELoginBridge.create(API,mode);
   const config={origin:ORIGIN,nonce:new URL(frame.src).searchParams.get('nonce'),mode};
-  const runner={withSuccessHandler:fn=>{success=fn;return runner},withFailureHandler:fn=>{failure=fn;return runner},loginBridgeAutenticar:body=>{rpc.push(clone(body));callbacks.push(success);if(!blocked)success(server.c.loginBridgeAutenticar(body))},studentsBridgeCargar:body=>{rpc.push(clone(body));callbacks.push(success);if(!blocked)success(server.c.studentsBridgeCargar(body))}};
+  const runner={withSuccessHandler:fn=>{success=fn;return runner},withFailureHandler:fn=>{failure=fn;return runner},loginBridgeAutenticar:body=>{rpc.push(clone(body));callbacks.push(success);if(!blocked)success(server.c.loginBridgeAutenticar(body))},transversalesBridgeEjecutar:body=>{rpc.push(clone(body));callbacks.push(success);if(!blocked)success(server.c.transversalesBridgeEjecutar(body))},studentsBridgeCargar:body=>{rpc.push(clone(body));callbacks.push(success);if(!blocked)success(server.c.studentsBridgeCargar(body))}};
   const inner=vm.createContext({window:child,google:{script:{run:runner}}});
   const start=()=>vm.runInContext('('+server.c.loginBridgeFrame_.toString()+')('+JSON.stringify(config)+')',inner);
   const msg=(type,extra={})=>({channel:CHANNEL,nonce:config.nonce,type,...extra});
