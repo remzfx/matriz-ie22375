@@ -69,7 +69,9 @@
       if(String(e.id)!==el.dataset.transEntry||el.readOnly)return;
       const id=el.dataset.transId,comp=el.dataset.transComp,k=el.dataset.transKey,raw={modo:'num',valor:el.value};
       const prev=k?(e.evidence.grades[k]||{})[id]:(e.evidence.directos[id]||{})[comp],v=core.valor(raw);
-      if(raw.valor===''&&!prev)return;if(v&&prev&&v.modo===prev.modo&&v.valor===prev.valor)return;
+      if(raw.valor===''&&!prev)return;
+      if(prev&&String(raw.valor)===String(prev.nota20!=null?prev.nota20:core.letterToNum(prev.nivel)))return;
+      if(v&&prev&&v.modo===prev.modo&&v.valor===prev.valor)return;
       if(k)setGrade(e,k,id,raw);else setDirect(e,id,comp,raw);
     });
   }
