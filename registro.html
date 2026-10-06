@@ -657,16 +657,41 @@ function mergeRegistroPayload(p) {
   return n;
 }
 async function subirRegistroNube() {
+  if (subirRegistroNube.pending) return subirRegistroNube.pending;
+  const tarea = (async()=>{
   if (registroNubeNoVerificada()) {
     toast('Sincronización pendiente: pulsa Reintentar y espera la verificación del servidor.');
     return false;
   }
   if (!nivel || !areaActual) { toast('Elija área primero'); return; }
+  const ses = getLoginSession() || {}, integral = nivel==='secundaria' && ses.role==='docente';
+  if (integral && typeof IERegistroTransversales==='undefined') { toast('No se envió el área completa. Las competencias transversales están pendientes. Corrige o reintenta.'); return false; }
+  if (integral) IERegistroTransversales.capture();
+  const invalidas = Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!=='' && (!Number.isFinite(Number(inp.value)) || Number(inp.value)<0 || Number(inp.value)>20));
+  if (invalidas) { toast('Hay notas académicas inválidas. Corrige los valores antes de enviar el área.'); return false; }
   if (guardarTodo() === false) { toast('Espera a que cargue el padrón del bimestre.'); return; }
   toast('Guardado local. Subiendo a la nube…');
   const c = ctxBase();
-  const payload = sliceRegistroArea();
+  let payload = sliceRegistroArea();
   const tokenSubida = (getLoginSession() || {}).token || '';
+  const contextoSubida = JSON.stringify(c);
+  if (integral) {
+    if (!await IERegistroTransversales.syncForUpload()) {
+      toast('No se envió el área completa. Las competencias transversales están pendientes. Corrige o reintenta.');
+      return false;
+    }
+    if (registroNubeNoVerificada() || tokenSubida!==((getLoginSession()||{}).token||'') || contextoSubida!==JSON.stringify(ctxBase())) {
+      toast('Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Reintenta.');
+      return false;
+    }
+    // Recolectar también lo escrito mientras se verificaba el aporte transversal.
+    const invalidasAhora = Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!=='' && (!Number.isFinite(Number(inp.value)) || Number(inp.value)<0 || Number(inp.value)>20));
+    if (invalidasAhora || guardarTodo()===false) {
+      toast('Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Corrige las notas y reintenta.');
+      return false;
+    }
+    payload = sliceRegistroArea();
+  }
   try {
     const res = await fetch(CLOUD_API_URL, {
       method: 'POST',
@@ -687,12 +712,26 @@ async function subirRegistroNube() {
     });
     if (res.status === 401 || res.status === 403) retirarVerificacionNube(tokenSubida, c.bim, {code:'SESSION'});
     const data = JSON.parse(await res.text());
+    if (res.status>=400) data.ok=false;
     if (!data.ok) retirarVerificacionNube(tokenSubida, c.bim, data);
-    toast(data.ok ? 'Notas en la nube (' + c.area + ')' : (data.error || 'Error al subir'));
+    if (data.ok && integral) {
+      IERegistroTransversales.capture();
+      const aporte = IERegistroTransversales.current();
+      if (!aporte || aporte.dirty || tokenSubida!==((getLoginSession()||{}).token||'') || contextoSubida!==JSON.stringify(ctxBase())) {
+        toast('El envío confirmó la versión anterior. Hay cambios posteriores pendientes; vuelve a enviar el área.');
+        return false;
+      }
+    }
+    toast(data.ok ? (integral ? 'Área enviada correctamente · Notas académicas y competencias transversales sincronizadas.' : 'Notas en la nube (' + c.area + ')') : (integral ? 'Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Reintenta.' : (data.error || 'Error al subir')));
+    return !!data.ok;
   } catch (e) {
     retirarVerificacionNube(tokenSubida, c.bim);
-    toast('No se pudo confirmar la subida. Notas conservadas localmente; verifica el servidor antes de volver a subir.');
+    toast(integral ? 'Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Reintenta.' : 'No se pudo confirmar la subida. Notas conservadas localmente; verifica el servidor antes de volver a subir.');
+    return false;
   }
+  })();
+  subirRegistroNube.pending=tarea;
+  try { return await tarea; } finally { subirRegistroNube.pending=null; }
 }
 async function bajarRegistroNube() {
   if (!nivel) { toast('Elija nivel'); return; }
@@ -1633,8 +1672,11 @@ function recolectarPantalla() {
     if (n !== '') n = Math.round(n);
     upsertSesionCap(comp, cap);
     const k = capKeyHoy(comp, cap, nombre);
+    const previo = leerNota(store.grades, k);
+    if (n === '' && previo && previo.origen==='letra') return;
+    if (previo && previo.origen!=='letra' && n!=='' && Number(previo.nota20)===n) return;
     if (n === '') store.grades[k] = {borrado:true,ts:Date.now()};
-    else store.grades[k] = { nota20: n, nivel: numToLetter(n), ts: Date.now() };
+    else store.grades[k] = { nota20: n, nivel: numToLetter(n), origen:'numero', ts: Date.now() };
   });
   document.querySelectorAll('#finLista [data-fin][data-comp]').forEach(cell => {
     const inp = cell.querySelector('.fin-nota');
@@ -1643,6 +1685,9 @@ function recolectarPantalla() {
     const cp = decodeURIComponent(cell.dataset.comp);
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(cp, nombre);
+    const previo = leerNota(store.finales, k);
+    if (nraw === '' && previo && previo.origen==='letra') return;
+    if (previo && previo.origen!=='letra' && nraw!=='' && Number(previo.nota20)===Math.round(nraw)) return;
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
     store.finales[k] = { nota20: n, nivel: numToLetter(n), origen: 'numero', ts: Date.now() };
@@ -1762,7 +1807,7 @@ function borrarSesionFecha(fecha) {
   const n = (store.sessions || []).filter(s =>
     s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
     s.seccion === c.seccion && s.area === c.area && s.fecha === fecha
-  ).length;
+  ).length + (typeof IERegistroTransversales!=='undefined' ? IERegistroTransversales.columns(fecha).length : 0);
   if (!confirm('¿Borrar la sesión del ' + fecha + ' y sus notas?\n(' + n + ' capacidad(es))\n\nNo se puede deshacer.')) return;
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.removeDate(fecha);
   store.sessions = (store.sessions || []).filter(s =>
@@ -1932,7 +1977,7 @@ function renderStudents() {
       if(col.origen==='transversal'){tds+=IERegistroTransversales.cell(al,col,fecha);return;}
       const k = capKeyHoy(col.comp, col.cap, studentKey(al));
       const g = leerNota(store.grades, k) || {};
-      let nota = (g.nota20!=='' && g.nota20!=null) ? g.nota20 : '';
+      let nota = (g.origen!=='letra' && g.nota20!=='' && g.nota20!=null) ? g.nota20 : '';
       let letra = g.nivel || (nota!=='' ? numToLetter(nota) : '');
       if (letra==='AD') cAD++; else if (letra==='A') cA++; else if (letra==='B') cB++; else if (letra==='C') cC++;
       const encN = encodeURIComponent(studentKey(al));
@@ -2572,7 +2617,7 @@ function renderFinales() {
 
   res.innerHTML = (bloqueado
     ? '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>'
-    : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">0–20 · columna con evidencias = solo lectura</span>');
+    : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">'+(modoCalif==='letra'?'Letras':'0–20')+' · Promedio directo prevalece sobre evidencias</span>');
 
   let cAD=0,cA=0,cB=0,cC=0,cV=0,cTot=0;
   let head = '<th class="fin-nom">Estudiante</th>';
@@ -2592,7 +2637,8 @@ function renderFinales() {
       const ev = notaDesdeSesiones(cp, studentKey(al));
       const ofi = notaCompAlumno(cp, studentKey(al));
       let nota='', letra='';
-      if (dir.nota !== '' && dir.nota != null) { nota = dir.nota; letra = dir.letra; }
+      const original = leerNota(store.finales, finalKey(cp, studentKey(al))) || {};
+      if (dir.nota !== '' && dir.nota != null) { nota = original.origen==='letra'?'':dir.nota; letra = dir.letra; }
       if (ofi.letra==='AD') cAD++; else if (ofi.letra==='A') cA++; else if (ofi.letra==='B') cB++; else if (ofi.letra==='C') cC++;
       if (ofi.letra) cV++;
       cTot++;
@@ -2682,9 +2728,12 @@ function guardarFinales() {
     const comp = decodeURIComponent(cell.dataset.comp);
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(comp, nombre);
+    const previo = leerNota(store.finales, k);
+    if (nraw === '' && previo && previo.origen==='letra') return;
+    if (previo && previo.origen!=='letra' && nraw!=='' && Number(previo.nota20)===Math.round(nraw)) return;
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
-    store.finales[k] = { nota20: n, nivel: numToLetter(n), ts: Date.now() };
+    store.finales[k] = { nota20: n, nivel: numToLetter(n), origen:'numero', ts: Date.now() };
   });
   saveStore();
 }
@@ -2961,7 +3010,8 @@ function renderAvance() {
         }
       });
       const ofi = notaCompAlumno(comp, studentKey(al));
-      return { prom: ofi.nota===''?null:Number(ofi.nota), letra: ofi.letra };
+      const original = leerNota(store.finales, finalKey(comp, studentKey(al))) || {};
+      return { prom: ofi.nota===''?null:Number(ofi.nota), letra: ofi.letra, letraOriginal: ofi.src==='P' && original.origen==='letra' };
     });
     aula[comp] = {
       caps: evidencias,
@@ -2989,7 +3039,7 @@ function renderAvance() {
       const r = data[comp][i];
       if (r.prom!=null && r.prom!=='') nums.push(Number(r.prom));
       tds += '<td><div class="fin-cell">' +
-        (modoCalif==='num' && r.prom!=null ? '<div style="font-weight:800;font-size:16px">'+pad2(r.prom)+'</div>' : '') +
+        (modoCalif==='num' && r.prom!=null && !r.letraOriginal ? '<div style="font-weight:800;font-size:16px">'+pad2(r.prom)+'</div>' : '') +
         '<span class="eq-letter '+(r.letra?eqClass(r.letra):'eq-none')+'">'+(r.letra||'—')+'</span></div></td>';
     });
     const pg = promedioNums(nums);

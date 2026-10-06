@@ -11,7 +11,7 @@ function device(){
  let now=1000;const elements=new Map(),el=id=>{if(!elements.has(id))elements.set(id,{value:id==='selBim'?'III':date,classList:{contains:()=>id==='panelAsistencia'}});return elements.get(id)};
  const store={sessions:[],grades:{},finales:{},concArea:{},meta:{},asistencia:{},asisFechas:{},asisFechasEstado:{}};
  const requests=[],messages=[];
- const c=vm.createContext({store,Date:class extends Date{static now(){return now}},document:{getElementById:el},console,confirm:()=>true,alert:m=>messages.push(m),toast:m=>messages.push(m),
+ const c=vm.createContext({store,Date:class extends Date{static now(){return now}},document:{getElementById:el,querySelectorAll:()=>[]},console,confirm:()=>true,alert:m=>messages.push(m),toast:m=>messages.push(m),
    ctxBase:()=>({nivel:'secundaria',bim:'III',grado:4,seccion:'B',area:'Matemática'}),identidadAlumno:x=>x,
    sessionId:s=>JSON.stringify(s),aliasesAula:()=>({}),metaRegistro:()=>({}),cloudClaveReg:()=>ctx+'||Matemática',prefijoReg:()=>ctx+'||Matemática||',
    registroSoloLectura:()=>false,registroNubeNoVerificada:()=>false,getLoginSession:()=>({token:'synthetic-token'}),guardarTodo(){},saveStore(){},renderSesiones(){},renderStudents(){},estudiantes:()=>[],
