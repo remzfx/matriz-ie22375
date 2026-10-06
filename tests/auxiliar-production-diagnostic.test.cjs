@@ -19,7 +19,7 @@ function fixture(nivel){
   const local=new Map(),localStorage={getItem:k=>local.get(k)||null,setItem:(k,v)=>local.set(k,v),removeItem:k=>local.delete(k)};
   const stored=new Map(),storage={getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)};
   const elements=new Map(),el=id=>{
-    if(!elements.has(id))elements.set(id,{value:id==='inpTipo'?'auxiliar':id==='inpDocUser'?'diagnostic-aux':id==='inpPass'?'synthetic-pass':id==='selNivel'?'primaria':'',checked:false,textContent:id==='studentsStatus'?'Cargando estudiantes…':'',innerHTML:'',classList:{add(){},remove(){}}});
+    if(!elements.has(id))elements.set(id,{value:id==='inpTipo'?'auxiliar':id==='inpDocUser'?'diagnostic-aux':id==='inpPass'?'synthetic-pass':id==='selNivel'?'primaria':'',checked:false,textContent:id==='studentsStatus'?'Cargando estudiantes…':'',innerHTML:'',classList:{add(){},remove(){},toggle(){}}});
     return elements.get(id);
   };
   const calls=[],context=vm.createContext({window:{},document:{getElementById:el},sessionStorage:storage,localStorage,atob,Date,URL,URLSearchParams,AbortController,performance,setTimeout,clearTimeout,console:{info(){}},
@@ -31,7 +31,8 @@ function fixture(nivel){
   run([...read('index.html').matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1]);context.mostrarHub=()=>{};
   run(read('students.js'));context.IEStudents=context.window.IEStudents;
   run(read('auxiliar-permissions.js'));context.IEAuxPermissions=context.window.IEAuxPermissions;
-  run('let BD=null,cargandoEstudiantesAux=false;function toast(){};function onNivel(){}');run(extract('retirarSesionAuxiliar'));run(extract('ensureBD'));
+  run("let BD=null,cargandoEstudiantesAux=false;const auxiliarInicio=performance.now(),WA_KEY='ie22375_wa_grupos_v1';function toast(){};function onNivel(){}");
+  for(const name of ['hoyISO','medirAuxiliar','loadGruposWa','enviarGruposHoy','actualizarGradosGrupos','pintarBaseAuxiliar','retirarSesionAuxiliar','ensureBD'])run(extract(name));
   return {server,configure,context,run,el,stored,local,calls};
 }
 
@@ -90,7 +91,7 @@ test('Every production Web App endpoint uses the verified deployment ID',()=>{
   const urls=[];
   for(const file of fs.readdirSync(path.join(__dirname,'..')).filter(f=>/\.(?:html|js)$/.test(f)))
     urls.push(...Array.from(read(file).matchAll(/https:\/\/script\.google\.com\/macros\/s\/[^\s"'<>]+/g),m=>m[0]));
-  assert.equal(urls.length,8);
+  assert.equal(urls.length,9);
   assert.deepEqual([...new Set(urls)],['https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec']);
 });
 
@@ -144,8 +145,8 @@ test('HTTP login diagnostics contain only status, origin, MIME and redirect meta
 
 test('Secondary schedule and WhatsApp reads have bounded deadlines without gating students',async()=>{
   const s=fixture('primaria');await s.context.intentarLogin();
-  s.run("let HORARIO_CFG={},HORARIO_KEY='synthetic-horario',horarioVerificado=false;const WA_KEY='synthetic-wa';function horarioDefecto(){return {defaults:{}}};function tokenSesionAuxiliar(){return IEStudents.validToken();}");
-  s.run(extract('ensureHorario'));s.run(extract('bajarGruposWa'));
+  s.run("let HORARIO_CFG={},HORARIO_KEY='synthetic-horario',horarioVerificado=false,horarioPendiente=null,waPendiente=null,waToken='',waActualizado=0;function horarioDefecto(){return {defaults:{}}};function tokenSesionAuxiliar(){return IEStudents.validToken();}");
+  for(const name of ['ensureHorario','cargarHorarioAuxiliar','bajarGruposWa','cargarGruposWaAuxiliar'])s.run(extract(name));
   const reads=[];s.context.IEStudents.fetchJSON=async(url,options,timeout)=>{reads.push({url,options,timeout});throw Error('synthetic timeout');};
   await s.context.ensureHorario();await s.context.bajarGruposWa();
   assert.equal(reads.length,2);assert.ok(reads.every(r=>r.timeout===8000));assert.ok(s.context.getSession());
