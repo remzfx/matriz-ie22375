@@ -157,6 +157,7 @@
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
 <script src="student-identity.js"></script>
+<script src="registro-evaluation.js"></script><script src="transversales-client.js"></script>
 </head>
 <body class="min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['primaria','secundaria','admin'];</script>
@@ -264,6 +265,8 @@
   </div>
 
   <main class="max-w-3xl mx-auto px-3 py-3 space-y-3" style="padding-bottom:110px">
+    <style>.trans-evidence-grid th,.trans-evidence-grid td{padding:8px;border:1px solid #cbd5e1;vertical-align:middle;text-align:center}.trans-evidence-grid input,.trans-evidence-grid select{min-height:44px;min-width:76px}.trans-evidence-grid small{display:block}</style>
+    <section id="registroTransversales" class="card p-3" hidden><h2 class="font-bold">COMPETENCIAS TRANSVERSALES</h2><p class="text-sm">Aporta desde tu área autorizada. La decisión consolidada se revisa por Tutor y AIP.</p><button class="btn" type="button" onclick="abrirTransversalesRegistro()">Evaluar transversales</button><a href="transversales.html" id="registroTutorLink" hidden>Consolidación Tutor/AIP</a><p id="registroTransStatus" role="status"></p><div id="registroTransRows"></div></section>
     <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
 <button type="button" id="retryRoster" class="btn btn-ghost text-sm" hidden onclick="reintentarPadronRegistro()">Reintentar</button>
     <!-- Área -->
@@ -731,6 +734,7 @@ function estructura() { return nivel === 'primaria' ? EST_PRIM : EST_SEC; }
 function areas() {
   let all = Object.keys(estructura());
   const ses = getLoginSession();
+  if(nivel==='secundaria'&&ses&&ses.role==='docente')all=all.filter(a=>a!=='Competencias Transversales');
 
   if (ses && ses.role === 'docente') {
     const gEl = document.getElementById('selGrado');
@@ -928,6 +932,7 @@ async function cargarPadronRegistro(bimestre) {
   }
 }
 async function cambiarBimestreRegistro() {
+  if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   const sel = document.getElementById('selBim'), solicitado = sel.value;
   if (padronBimestre) {
     sel.value = padronBimestre;
@@ -1242,6 +1247,7 @@ function aplicarDocenteSesion() {
 }
 
 async function entrarNivel(n) {
+  if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   // Bloquear cruce de nivel si la sesión no lo permite
   var perm = nivelPermitido();
   if (perm === 'primaria' && n !== 'primaria') {
@@ -1352,6 +1358,7 @@ function llenarAulasPadron(n) {
   if (lista.some(a => String(a.grado) === selGrado.value && a.seccion === anteriorSeccion)) document.getElementById('selSeccion').value = anteriorSeccion;
 }
 function onGrado(options) {
+  if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   const bd = loadBD();
   const g = parseInt(document.getElementById('selGrado').value, 10);
   const list = ((bd[nivel] && bd[nivel].estudiantes) || []).filter(a => a.grado === g);
@@ -1370,6 +1377,7 @@ function onGrado(options) {
 }
 
 function onContexto(options) {
+  if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   options = options || {};
 
   if (document.getElementById('selBim').value !== padronBimestre) {
@@ -1427,6 +1435,25 @@ function updateHdr() {
   document.getElementById('hdrSub').textContent = 'Bimestre ' + b + (areaActual ? ' · ' + areaActual : '');
   document.getElementById('lblN').textContent = estudiantes().length;
   fixHdrHeight();
+  const trans=document.getElementById('registroTransversales');if(trans){const ses=getLoginSession();trans.hidden=nivel!=='secundaria'||!ses||ses.role!=='docente'||!areaActual||areaActual==='Competencias Transversales';const link=document.getElementById('registroTutorLink');if(link)link.hidden=!(ses&&(ses.tutorAulas||[]).includes(aulaKey(g,s)));}
+}
+
+let registroTransSolicitud=0,registroTransEditor=null,registroTransContexto=null;
+function cerrarTransversalesRegistro(){
+  if(registroTransEditor&&registroTransEditor.dirty()&&!confirm('Hay aportes transversales sin guardar. ¿Descartarlos?')){
+    if(registroTransContexto){const c=registroTransContexto;document.getElementById('selBim').value=c.bim;document.getElementById('selGrado').value=c.grado;document.getElementById('selSeccion').value=c.seccion;areaActual=c.area;}
+    return false;
+  }
+  registroTransSolicitud++;registroTransEditor=null;registroTransContexto=null;
+  const box=document.getElementById('registroTransRows');if(box)box.innerHTML='';return true;
+}
+async function abrirTransversalesRegistro(){
+  if(!cerrarTransversalesRegistro())return;
+  const c=ctxBase(),seq=++registroTransSolicitud,msg=document.getElementById('registroTransStatus'),box=document.getElementById('registroTransRows');
+  if(c.nivel!=='secundaria'||!areas().includes(c.area))return;
+  box.innerHTML='';msg.textContent='Cargando aportes del área…';
+  try{const ctx={bimestre:c.bim,grado:c.grado,seccion:c.seccion,area:c.area},data=await IETransversales.request('loadtransversales',ctx);if(seq!==registroTransSolicitud)return;registroTransEditor=IETransversales.editor(box,data,ctx,false);registroTransContexto=c;msg.textContent=data.abierto?'Aporte independiente de '+c.area:'Bimestre cerrado/bloqueado · Solo lectura';}
+  catch(e){if(seq===registroTransSolicitud)msg.textContent=e.message;}
 }
 
 function renderAreas() {
@@ -1439,6 +1466,7 @@ function renderAreas() {
 }
 
 function setArea(a) {
+  if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   if (!areas().includes(a)) {
     toast('Esta área no está asignada al docente en el aula seleccionada');
     return;

@@ -48,6 +48,8 @@ function setup() {
     PropertiesService: {getScriptProperties: () => ({getProperty: key => props[key], setProperty: (key, value) => props[key] = value})},
     Utilities: {
       Charset: {UTF_8: 'utf8'},
+      DigestAlgorithm: {SHA_256: 'sha256'},
+      computeDigest: (algorithm,value,charset) => [...crypto.createHash(algorithm).update(value,charset).digest()],
       newBlob: value => ({getBytes: () => [...Buffer.from(value)], getDataAsString: () => Buffer.from(value).toString('utf8')}),
       base64EncodeWebSafe: value => Buffer.from(value).toString('base64url'),
       base64DecodeWebSafe: value => [...Buffer.from(value, 'base64url')],

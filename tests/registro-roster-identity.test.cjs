@@ -123,6 +123,7 @@ for(const file of ['admin.html','registro.html'])test(file+': real SIAGIE export
  s.c.fetchRegAula=async()=>[{area:'Matemática',payload:s.c.sliceRegistroArea()}];s.c.IEStudents.loadRoster=async b=>{assert.equal(b,'III');return s.c.base;};
  s.c.fetchLecturaNube=async()=>({text:async()=>JSON.stringify({ok:true,b64:Buffer.from('synthetic').toString('base64')})});
  s.c.CLOUD_API_URL='synthetic';s.c.informeSiagie=()=>({ok:true});s.c.getLoginSession=()=>({role:'admin'});s.c.siagieTplMeta=null;
+ s.c.IETransversales={request:async()=>({version:0,versionAportes:'synthetic',resultados:{}})};
  const names=file==='admin.html'?['letraDesdePayload','concDesdePayload','vaciarSiagieOficial']:['letraEnArea','concEnArea','rellenarSiagieExcel'];
  for(const name of names)s.run(extract(file,name));
  await s.c[names[2]]();assert.equal(ws.D3.v,'AD','ID must win over another matching code/name');assert.equal(ws.D4.v,'AD');assert.equal(ws.D5.v,'AD');

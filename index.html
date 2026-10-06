@@ -400,11 +400,11 @@ function cerrarSesion() {
   iniciarPuenteLogin();
 }
 function modsDe(s) {
-  if (s.role === 'admin' || s.user === 'admin') return ['admin_bd','registro','auxiliar','wa_grupos','matriz_pri','matriz_sec','aip'];
+  if (s.role === 'admin' || s.user === 'admin') return ['admin_bd','registro','auxiliar','wa_grupos','matriz_pri','matriz_sec','aip','transversales'];
   if (s.role === 'auxiliar' || s.user === 'auxiliar') return ['auxiliar','wa_grupos'];
-  if (s.role === 'pip' || s.user === 'pip') return ['aip'];
+  if (s.role === 'pip' || s.user === 'pip') return ['aip','transversales'];
   if (s.nivel === 'primaria') return ['registro','matriz_pri'];
-  if (s.nivel === 'secundaria') return ['registro','matriz_sec'];
+  if (s.nivel === 'secundaria') return (s.tutorAulas||[]).length?['registro','matriz_sec','transversales']:['registro','matriz_sec'];
   return ['registro'];
 }
 function irModulo(href) {
@@ -431,6 +431,7 @@ function mostrarHub() {
     auxiliar: { href:'auxiliar.html', title:'Asistencia de ingreso', desc:'Puerta · QR · lista del aula', badge:'AUXILIAR' },
     wa_grupos: { href:'auxiliar.html?vista=masivo', title:'Envío masivo', desc:'Listas de asistencia a los grupos de WhatsApp', badge:'WHATSAPP' },
     aip: { href:'aula_innovacion.html', title:'Aula de innovación (AIP)', desc:'Horario mensual · competencia 28', badge:'Innovación' }
+    ,transversales: {href:'transversales.html',title:'Competencias transversales',desc:'Aportes · consolidación Tutor + AIP',badge:'SECUNDARIA'}
   };
   const keys = modsDe(s).filter(m => catalog[m]);
   document.getElementById('modulos').innerHTML = keys.map(key => {

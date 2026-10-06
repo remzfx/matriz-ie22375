@@ -297,6 +297,7 @@ function responderLogin_(body) {
         areas: nivel === 'primaria' ? Object.keys(primaria) : (docente.areas || []),
         aulas: nivel === 'primaria' ? aulasPrimaria : (docente.aulas || []),
         asignaciones: nivel === 'primaria' ? primaria : (docente.asignaciones || null),
+        tutorAulas: nivel === 'secundaria' ? tutorAulas_(docente) : [],
         mods: nivel === 'primaria' ? ['registro', 'matriz_pri'] : ['registro', 'matriz_sec']
       };
     }
@@ -332,10 +333,11 @@ function studentsBridgeCargar(body) {
   return estudiantesRuta_({action:'loadstudents',token:body.token,bimestre:body.bimestre || ''});
 }
 
+function transversalesBridgeEjecutar(body) { return transversalesRuta_(body || {}); }
 function loginBridgeVista_(p) {
   const origins = ['https://matriz.biblioteca360.com','https://biblioteca360.com','https://www.biblioteca360.com','https://remzfx.github.io'];
   if (origins.indexOf(p.parentOrigin) < 0 || !/^[a-f0-9]{32}$/.test(String(p.nonce || ''))) return responder_({ok:false,error:'Bridge inválido.'});
-  const config = JSON.stringify({origin:p.parentOrigin,nonce:p.nonce,mode:p.bridge === 'students-v1' ? 'students' : 'login'});
+  const config = JSON.stringify({origin:p.parentOrigin,nonce:p.nonce,mode:p.bridge === 'students-v1' ? 'students' : p.bridge === 'transversales-v1' ? 'transversales' : 'login'});
   return HtmlService.createHtmlOutput('<!doctype html><html><head><meta charset="utf-8"></head><body><script>(' +
     loginBridgeFrame_.toString() + ')(' + config + ');</script></body></html>')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).setTitle('Acceso IE22375');
@@ -360,15 +362,17 @@ function loginBridgeFrame_(config) {
     if (parent && event.source !== parent) return;
     if (data.type === 'init' && !parent) { parent=event.source;reply('ack');return; }
     const students = config.mode === 'students';
-    if (!parent || data.type !== (students ? 'students' : 'login') || (!students && busy) || !Number.isSafeInteger(data.id) || data.id <= lastId) return;
+    const transversal = config.mode === 'transversales';
+    if (!parent || data.type !== (transversal ? 'transversales' : students ? 'students' : 'login') || (!students && !transversal && busy) || !Number.isSafeInteger(data.id) || data.id <= lastId) return;
     const body = data.body;
-    if (!body || (students ? typeof body.token !== 'string' || typeof body.bimestre !== 'string' : typeof body.tipo !== 'string' || typeof body.usuario !== 'string' || typeof body.password !== 'string')) return;
+    if (!body || (transversal ? typeof body.token !== 'string' || typeof body.action !== 'string' : students ? typeof body.token !== 'string' || typeof body.bimestre !== 'string' : typeof body.tipo !== 'string' || typeof body.usuario !== 'string' || typeof body.password !== 'string')) return;
     lastId=data.id;busy=true;
     const id=data.id;
     try {
       const runner = google.script.run.withSuccessHandler(function(result) { busy=false;reply('result',id,result); })
         .withFailureHandler(function() { busy=false;reply('error',id); });
-      if (students) runner.studentsBridgeCargar({token:body.token,bimestre:body.bimestre});
+      if (transversal) runner.transversalesBridgeEjecutar(body);
+      else if (students) runner.studentsBridgeCargar({token:body.token,bimestre:body.bimestre});
       else runner.loginBridgeAutenticar({tipo:body.tipo,usuario:body.usuario,password:body.password});
     } catch(e) { busy=false;reply('error',id); }
   });
@@ -448,6 +452,7 @@ function autorizarEscritura_(body, ctx) {
     return { role: 'admin', user: sesion.user, docente: String(body.docente || '') };
   }
   if (sesion.role !== 'docente') return null;
+  if (ctx.nivel === 'secundaria' && ctx.area === 'Competencias Transversales') return null;
   const config = obtenerDocentesConfig_();
   if (Number(sesion.permisosVersion) !== Number(config.ts)) return null;
   const usuario = normalizarUsuario_(sesion.user);
@@ -1034,10 +1039,233 @@ function estudiantesRuta_(body) {
   } finally { lock.releaseLock(); }
 }
 
+function tutorAulas_(doc) {
+  if (String(doc.nivel).toLowerCase() !== 'secundaria' || doc.activo === false || !Array.isArray(doc.tutorAulas)) return [];
+  return [...new Set(doc.tutorAulas.map(function(a) {
+    const p=String(a).split('|'), g=gradoEscritura_(p[0]), s=seccionEscritura_(p[1]);
+    return p.length===2 && g>=1 && g<=5 && s ? g+'|'+s : '';
+  }).filter(Boolean))];
+}
+function validarTutores_(list) {
+  const duenos={};
+  for (const doc of list) for (const aula of tutorAulas_(doc)) {
+    if (duenos[aula]) return false;
+    duenos[aula]=true;
+  }
+  return true;
+}
+function registroEvaluacion_() {
+  function numToLetter(n) { n=Number(n);if(isNaN(n)||n<0||n>20)return '';return n>=18?'AD':n>=14?'A':n>=11?'B':'C'; }
+  function letterToNum(L) { return ({AD:19,A:15,B:12,C:8})[L] ?? ''; }
+  function promedioNums(arr) { const v=arr.filter(x=>x!==''&&x!=null&&!isNaN(Number(x))).map(Number);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null; }
+  function valor(raw) {
+    if(!raw||!['letra','num'].includes(raw.modo))return null;
+    if(raw.modo==='letra')return ['AD','A','B','C'].includes(raw.valor)?{modo:'letra',valor:raw.valor,nivel:raw.valor}:null;
+    if(raw.valor===''||raw.valor==null||(typeof raw.valor!=='number'&&typeof raw.valor!=='string'))return null;
+    const entrada=Number(raw.valor);if(!Number.isFinite(entrada)||entrada<0||entrada>20)return null;
+    const n=Math.round(entrada);return {modo:'num',valor:n,nota20:n,nivel:numToLetter(n)};
+  }
+  const COMP={tic:'Se desenvuelve en los entornos virtuales generados por las TIC',autonomia:'Gestiona su aprendizaje de manera autónoma'};
+  const CAPS={tic:['Personaliza entornos virtuales','Gestiona información del entorno virtual','Interactúa en entornos virtuales','Crea objetos virtuales en diversos formatos'],autonomia:['Define metas de aprendizaje','Organiza acciones estratégicas para alcanzar sus metas de aprendizaje','Monitorea y ajusta su desempeño durante el proceso de aprendizaje']};
+  function sessionKey(s) { return JSON.stringify([s.fecha,s.comp,s.capacidad]); }
+  function resultados(evidencia,ids) {
+    const valores={},estadisticas={};
+    ids.forEach(id=>{valores[id]={};estadisticas[id]={};Object.keys(COMP).forEach(comp=>{
+      const nums=[],caps=new Set();let evidencias=0;
+      (evidencia.sessions||[]).filter(s=>s.comp===comp).forEach(s=>{
+        const g=((evidencia.grades||{})[sessionKey(s)]||{})[id];if(!g)return;
+        const n=g.nota20!=null&&g.nota20!==''?Number(g.nota20):letterToNum(g.nivel);
+        if(n!==''&&Number.isFinite(n)){nums.push(n);caps.add(s.capacidad);evidencias++;}
+      });
+      const promedio=promedioNums(nums);
+      if(promedio!=null)valores[id][comp]={modo:'num',valor:promedio,nota20:promedio,nivel:numToLetter(promedio)};
+      estadisticas[id][comp]={evidencias,capacidades:[...caps],totalCapacidades:CAPS[comp].length};
+    });});
+    return {valores,estadisticas};
+  }
+  return {numToLetter,letterToNum,promedioNums,valor,COMP,CAPS,sessionKey,resultados};
+}
+function transversalValor_(raw) { return registroEvaluacion_().valor(raw); }
+function transversalEvidencia_(raw,ctx,acceso,ids,ts,previo) {
+  const core=registroEvaluacion_(),obj=x=>x&&typeof x==='object'&&!Array.isArray(x);
+  if(!obj(raw)||raw.schema!==1||!Array.isArray(raw.sessions)||!obj(raw.grades))throw new Error('Guarda sesiones y capacidades, no una valoración directa.');
+  const sessions=[],grades={},seen=new Set(),anteriores=previo&&previo.evidencia;
+  raw.sessions.forEach(s=>{
+    if(!obj(s)||!Object.prototype.hasOwnProperty.call(core.CAPS,s.comp)||!core.CAPS[s.comp].includes(s.capacidad))throw new Error('Competencia o capacidad no autorizada.');
+    const fecha=String(s.fecha||''),p=fecha.split('-').map(Number),dias=[31,p[0]%4===0&&(p[0]%100!==0||p[0]%400===0)?29:28,31,30,31,30,31,31,30,31,30,31];
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha)||p[0]<1||p[1]<1||p[1]>12||p[2]<1||p[2]>dias[p[1]-1])throw new Error('Fecha de sesión inválida.');
+    const id=core.sessionKey(s);if(seen.has(id))throw new Error('La capacidad ya está en esa sesión/fecha.');seen.add(id);
+    const old=anteriores&&(anteriores.sessions||[]).find(x=>core.sessionKey(x)===id);
+    sessions.push({id,fecha,comp:s.comp,capacidad:s.capacidad,nivel:'secundaria',bimestre:ctx.bimestre,grado:ctx.numero,seccion:ctx.seccion,area:ctx.area,user:normalizarUsuario_(acceso.sesion.user),docente:old?old.docente:(acceso.docente.nombre||acceso.sesion.user),ts:old?old.ts:ts});
+  });
+  Object.keys(raw.grades).forEach(key=>{
+    if(!seen.has(key)||!obj(raw.grades[key]))throw new Error('Calificación sin sesión/capacidad válida.');grades[key]={};
+    Object.keys(raw.grades[key]).forEach(id=>{
+      if(!ids.has(id))throw new Error('Estudiante ajeno al padrón del aula.');const v=core.valor(raw.grades[key][id]);if(!v)throw new Error('Calificación inválida.');
+      const old=anteriores&&((anteriores.grades||{})[key]||{})[id];grades[key][id]=Object.assign({},v,{ts:old&&old.modo===v.modo&&old.valor===v.valor?old.ts:ts});
+    });
+  });
+  const evidencia={schema:1,sessions,grades};evidencia.finales=core.resultados(evidencia,[...ids]).valores;return evidencia;
+}
+function transversalIdentidad_(al) {
+  return String(al.idSiagie||'').trim() ? 'id:'+encodeURIComponent(String(al.idSiagie).trim()) : String(al.codigoEstudiante||'').trim() ? 'cod:'+encodeURIComponent(String(al.codigoEstudiante).trim()) : 'nom:'+encodeURIComponent(normalizarNombreIdentidad_(String(al.nombre||'').replace(/,/g,' ')));
+}
+function transversalFilas_(nombre) {
+  const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(nombre);
+  if(!sh||sh.getLastRow()<2)return [];
+  const col=nombre==='TransversalesAportes'?8:6,rows=sh.getRange(2,1,sh.getLastRow()-1,col+1).getValues(),parts=new Map();
+  rows.forEach(row=>{const raw=JSON.parse(row[col]);if(raw._ieTransversalParte===1)parts.set(String(row[0]),raw.data);});
+  return rows.filter(row=>JSON.parse(row[col])._ieTransversalParte!==1).map(row=>{
+    const raw=JSON.parse(row[col]);if(raw._ieTransversalBloque!==1)return row;
+    const joined=[];for(let i=0;i<raw.partes;i++){const key=String(row[0])+'||@parte||'+row[col-1]+'||'+i;if(!parts.has(key))throw new Error('Bloque transversal incompleto. No se puede confirmar ni exportar.');joined.push(parts.get(key));}
+    const out=row.slice();out[col]=joined.join('');return out;
+  });
+}
+function transversalAppend_(nombre,row) {
+  const ss=SpreadsheetApp.getActiveSpreadsheet();let sh=ss.getSheetByName(nombre);
+  if(!sh){sh=ss.insertSheet(nombre);sh.appendRow(nombre==='TransversalesAportes'?['clave','bimestre','grado','seccion','areaOrigen','docente','user','ts','json']:['clave','bimestre','grado','seccion','versionAportes','ts','json']);}
+  const col=nombre==='TransversalesAportes'?8:6,raw=String(row[col]);
+  if(raw.length<=45000){sh.appendRow(row);return;}
+  const n=Math.ceil(raw.length/7000);
+  for(let i=0;i<n;i++){const part=row.slice();part[0]=String(row[0])+'||@parte||'+row[col-1]+'||'+i;part[col]=JSON.stringify({_ieTransversalParte:1,data:raw.slice(i*7000,(i+1)*7000)});sh.appendRow(part);}
+  // Las partes deben estar visibles antes del marcador final; los fragmentos sin marcador nunca son una versión.
+  SpreadsheetApp.flush();const commit=row.slice();commit[col]=JSON.stringify({_ieTransversalBloque:1,partes:n});sh.appendRow(commit);
+}
+function transversalContexto_(body) {
+  const g=gradoEscritura_(body.grado), s=seccionEscritura_(body.seccion), b=String(body.bimestre||'');
+  return g>=1 && g<=5 && s && ['I','II','III','IV'].includes(b) && (!body.nivel || body.nivel==='secundaria') ? {nivel:'secundaria',numero:g,grado:g,seccion:s,bimestre:b,area:String(body.area||'')} : null;
+}
+function transversalTutor_(acceso,ctx) { return acceso.docente && tutorAulas_(acceso.docente).includes(ctx.numero+'|'+ctx.seccion); }
+function transversalAcad_(acceso,ctx) { return ctx.area!=='Competencias Transversales' && acceso.sesion.role==='docente' && puedeLeerContexto_(acceso,ctx); }
+function transversalDatos_(ctx,config) {
+  const sh=hojaEstudiantes_(), padron=leerPadronEstudiantes_(sh,ctx.bimestre)||leerBaseEstudiantes_(sh,false);
+  if (!padron) throw new Error('Base privada no inicializada.');
+  const estudiantes=padron.estudiantes.filter(a=>a.nivel==='secundaria' && gradoEscritura_(a.grado)===ctx.numero && seccionEscritura_(a.seccion)===ctx.seccion).map(a=>{
+    const out={id:transversalIdentidad_(a),nombre:a.nombre,orden:a.orden};if(a.idSiagie)out.idSiagie=a.idSiagie;if(a.codigoEstudiante)out.codigoEstudiante=a.codigoEstudiante;return out;
+  });
+  if (new Set(estudiantes.map(a=>a.id)).size!==estudiantes.length) throw new Error('Identidad ambigua: revise el padrón antes de evaluar.');
+  const clave=['secundaria',ctx.bimestre,ctx.numero,ctx.seccion].join('||'), actuales={}, areas=new Set(),asignaciones=[],tutores=[];
+  const aula=ctx.numero+'|'+ctx.seccion;
+  config.docentes.forEach(doc=>{
+    if (doc.nivel!=='secundaria') return;
+    if(tutorAulas_(doc).includes(aula))tutores.push(normalizarUsuario_(doc.user));
+    const mapa=doc.asignaciones, lista=mapa && Object.keys(mapa).length?Object.keys(mapa):(doc.areas||[]);
+    lista.filter(a=>a!=='Competencias Transversales').forEach(area=>{
+      if(puedeLeerContexto_({sesion:{role:'docente'},docente:doc},Object.assign({},ctx,{area}))){areas.add(area);asignaciones.push(JSON.stringify([area,normalizarUsuario_(doc.user),aula]));}
+    });
+  });
+  // Solo relaciones académicas de esta aula: el orden, nombres y contraseñas no son versiones académicas.
+  const configAula=JSON.stringify([clave,[...new Set(asignaciones)].sort(),[...new Set(tutores)].sort()]);
+  const fingerprint=Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,configAula,Utilities.Charset.UTF_8)).replace(/=+$/,'');
+  let version=0;
+  transversalFilas_('TransversalesAportes').forEach(row=>{
+    if (String(row[1])!==ctx.bimestre || gradoEscritura_(row[2])!==ctx.numero || seccionEscritura_(row[3])!==ctx.seccion) return;
+    const ts=Number(row[7])||0;version=Math.max(version,ts);
+    if (!actuales[row[0]] || ts>actuales[row[0]].ts){const payload=JSON.parse(row[8]);actuales[row[0]]={area:String(row[4]),docente:String(row[5]),user:String(row[6]),ts,version:ts,evidencia:payload.schema===1?payload:null,legacyValores:payload.schema===1?null:payload,valores:{}};}
+  });
+  const aportes=Object.values(actuales).filter(a=>{
+    const doc=config.docentes.find(d=>normalizarUsuario_(d.user)===normalizarUsuario_(a.user));
+    return doc && a.area!=='Competencias Transversales' && puedeLeerContexto_({sesion:{role:'docente'},docente:doc},Object.assign({},ctx,{area:a.area}));
+  });
+  // Identidad vigente por ID/código; nombres solo sin homónimos. No reescribir filas originales.
+  const alias={};estudiantes.forEach(al=>{
+    const keys=[al.id];if(al.codigoEstudiante)keys.push('cod:'+encodeURIComponent(String(al.codigoEstudiante).trim()));
+    if(estudiantes.filter(x=>transversalIdentidad_({nombre:x.nombre})===transversalIdentidad_({nombre:al.nombre})).length===1)keys.push(transversalIdentidad_({nombre:al.nombre}));alias[al.id]=keys;
+  });
+  aportes.forEach(a=>{
+    if(!a.evidencia)return;const grades={};
+    Object.keys(a.evidencia.grades||{}).forEach(key=>{grades[key]={};estudiantes.forEach(al=>{const source=a.evidencia.grades[key],id=alias[al.id].find(k=>Object.prototype.hasOwnProperty.call(source,k));if(id)grades[key][al.id]=source[id];});});
+    a.evidencia.grades=grades;const result=registroEvaluacion_().resultados(a.evidencia,estudiantes.map(a=>a.id));
+    a.valores=result.valores;a.estadisticas=result.estadisticas;a.evidencia.finales=result.valores;
+  });
+  let consolidado={version:0,finales:{}};
+  transversalFilas_('TransversalesConsolidado').forEach(row=>{if(String(row[0])===clave && Number(row[5])>consolidado.version)consolidado={version:Number(row[5]),finales:JSON.parse(row[6])};});
+  return {clave,estudiantes,areas:[...areas].sort(),aportes,consolidado,versionTs:version,versionAportes:'evidencias-v1:'+fingerprint+':'+version+':'+padron.version};
+}
+function transversalResumen_(datos,id,comp) {
+  const porArea={};datos.aportes.forEach(a=>{const v=(a.valores[id]||{})[comp];if(v && (!porArea[a.area]||a.ts>porArea[a.area].ts))porArea[a.area]={area:a.area,docente:a.docente,ts:a.ts,valor:v};});
+  const aportes=Object.values(porArea),conteo={AD:0,A:0,B:0,C:0};aportes.forEach(a=>conteo[a.valor.nivel]++);
+  const max=Math.max(...Object.values(conteo)), ganadores=Object.keys(conteo).filter(k=>conteo[k]===max), sugerencia=max && ganadores.length===1?ganadores[0]:null;
+  const orden=['C','B','A','AD'],indices=aportes.map(a=>orden.indexOf(a.valor.nivel)), faltan=datos.areas.filter(a=>!porArea[a]);
+  const empate=max>0 && ganadores.length>1, dispersion=indices.length>1 && Math.max(...indices)-Math.min(...indices)>=2;
+  return {aportes,conteo,recibidos:aportes.length,sugerencia,empate,dispersion,faltan,alerta:empate||dispersion||faltan.length>0};
+}
+function transversalConclusionPendiente_(final) { return !!(final && final.nivel==='C' && !String(final.conclusion||'').trim()); }
+function transversalListo_(final,version) { return !!(final && final.nivel && !transversalConclusionPendiente_(final) && final.versionAportes===version && final.tutor && final.aip); }
+function transversalVista_(datos,acceso,ctx) {
+  const coord=['admin','pip'].includes(acceso.sesion.role)||transversalTutor_(acceso,ctx), resultados={};
+  if(coord) datos.estudiantes.forEach(al=>{resultados[al.id]={};['tic','autonomia'].forEach(comp=>{
+    const final=(datos.consolidado.finales[al.id]||{})[comp]||null, resumen=transversalResumen_(datos,al.id,comp);
+    const obsoleto=!!final && final.versionAportes!==datos.versionAportes;
+    resultados[al.id][comp]={resumen,final,listo:transversalListo_(final,datos.versionAportes),estado:transversalConclusionPendiente_(final)?'Conclusión descriptiva obligatoria para nivel C':obsoleto?'Requiere nueva confirmación':!final||!final.tutor?'Pendiente de confirmación del Tutor':!final.aip?'Pendiente de confirmación del AIP':'✓ Consolidación confirmada · Lista para SIAGIE'};
+  });});
+  return {ok:true,estudiantes:datos.estudiantes,areas:datos.areas,versionAportes:datos.versionAportes,version:datos.consolidado.version,
+    aportes:coord?datos.aportes:datos.aportes.filter(a=>normalizarUsuario_(a.user)===normalizarUsuario_(acceso.sesion.user)&&a.area===ctx.area),resultados,
+    puedeFinal:acceso.sesion.role==='pip'||transversalTutor_(acceso,ctx),puedeTutor:!!transversalTutor_(acceso,ctx),puedeAip:acceso.sesion.role==='pip',abierto:bimestreAbierto_(ctx.bimestre)};
+}
+function transversalesRuta_(body) {
+  const action=String(body.action||'').toLowerCase(), actions=['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','confirmtransversaltutor','confirmtransversalaip','loadtransversalexport'];
+  if(!actions.includes(action))return {ok:false,code:'METHOD',error:'Acción transversal no válida.'};
+  const escritura=action.startsWith('save')||action.startsWith('confirm'),lock=escritura?LockService.getScriptLock():null;
+  if(lock)lock.waitLock(5000);
+  try {
+    const acceso=sesionLectura_(body.token,['admin','docente','pip']);
+    if(!acceso || (acceso.docente && acceso.docente.nivel!=='secundaria'))return {ok:false,code:'SESSION',error:'Sesión inválida o sin autorización transversal.'};
+    const config=obtenerDocentesConfigLectura_();
+    if(action==='loadtransversalesaulas') {
+      if(acceso.docente&&!tutorAulas_(acceso.docente).length)return {ok:false,code:'DENIED',error:'Solo Tutor, AIP o Admin pueden entrar a consolidar.'};
+      const sh=hojaEstudiantes_(),base=leerBaseEstudiantes_(sh,false),aulas=new Set();
+      if(base)base.estudiantes.filter(a=>a.nivel==='secundaria').forEach(a=>{const ctx={numero:gradoEscritura_(a.grado),seccion:seccionEscritura_(a.seccion)};if(['admin','pip'].includes(acceso.sesion.role)||transversalTutor_(acceso,ctx))aulas.add(ctx.numero+'|'+ctx.seccion);});
+      return {ok:true,aulas:[...aulas].sort(),periodos:obtenerPeriodosConfig_(),puedeTutor:acceso.sesion.role==='docente',puedeAip:acceso.sesion.role==='pip'};
+    }
+    const ctx=transversalContexto_(body);
+    if(!ctx)return {ok:false,code:'CONTEXT',error:'Aula o bimestre inválido.'};
+    const coord=['admin','pip'].includes(acceso.sesion.role)||transversalTutor_(acceso,ctx),acad=transversalAcad_(acceso,ctx);
+    if((action==='loadtransversales'&&!coord&&!acad)||(action==='loadtransversalexport'&&acceso.sesion.role!=='admin') || (action==='savetransversalaporte'&&!acad) || (action==='savetransversalfinal'&&acceso.sesion.role!=='pip'&&!transversalTutor_(acceso,ctx)) || (action==='confirmtransversaltutor'&&!transversalTutor_(acceso,ctx)) || (action==='confirmtransversalaip'&&acceso.sesion.role!=='pip'))return {ok:false,code:'DENIED',error:'Acción no autorizada para esta aula y área.'};
+    if(escritura&&!bimestreAbierto_(ctx.bimestre))return {ok:false,code:'PERIOD',error:'Bimestre cerrado o bloqueado: solo lectura.'};
+    const datos=transversalDatos_(ctx,config), ids=new Set(datos.estudiantes.map(a=>a.id));
+    if(action==='savetransversalaporte') {
+      const key=datos.clave+'||'+ctx.area+'||'+normalizarUsuario_(acceso.sesion.user), previo=datos.aportes.find(a=>a.area===ctx.area&&normalizarUsuario_(a.user)===normalizarUsuario_(acceso.sesion.user));
+      if(Number(body.version)!==Number(previo?previo.version:0))return {ok:false,code:'CONFLICT',error:'El aporte cambió en otro dispositivo. Recarga.'};
+      const ts=Math.max(Date.now(),datos.versionTs+1),evidencia=transversalEvidencia_(body.evidencia,ctx,acceso,ids,ts,previo);
+      transversalAppend_('TransversalesAportes',[key,ctx.bimestre,ctx.numero,ctx.seccion,ctx.area,acceso.docente.nombre||acceso.sesion.user,normalizarUsuario_(acceso.sesion.user),ts,JSON.stringify(evidencia)]);
+    } else if(escritura) {
+      if(Number(body.version)!==datos.consolidado.version || body.versionAportes!==datos.versionAportes)return {ok:false,code:'CONFLICT',error:'La decisión o los aportes cambiaron. Recarga antes de guardar o confirmar.'};
+      const finales=JSON.parse(JSON.stringify(datos.consolidado.finales)),ts=Math.max(Date.now(),datos.consolidado.version+1);
+      if(action==='savetransversalfinal') {
+        if(!body.finales||typeof body.finales!=='object'||Array.isArray(body.finales))throw new Error('Decisiones inválidas.');
+        Object.keys(body.finales).forEach(id=>{
+          if(!ids.has(id))throw new Error('Estudiante ajeno al padrón.');finales[id]=finales[id]||{};
+          Object.keys(body.finales[id]).forEach(comp=>{
+            if(!['tic','autonomia'].includes(comp))throw new Error('Competencia inválida.');
+            const raw=body.finales[id][comp],valor=transversalValor_(raw),resumen=transversalResumen_(datos,id,comp),justificacion=String(raw.justificacion||'').trim(),conclusion=String(raw.conclusion||'').trim();
+            if(!valor)throw new Error('La calificación final es inválida.');
+            if((resumen.alerta||!resumen.sugerencia||valor.nivel!==resumen.sugerencia)&&justificacion.length<5)throw new Error('Se requiere una justificación breve para esta decisión.');
+            if(justificacion.length>2000)throw new Error('Justificación demasiado extensa.');
+            if(conclusion.length>2000)throw new Error('Conclusión descriptiva demasiado extensa.');
+            const previo=finales[id][comp],igual=previo&&previo.modo===valor.modo&&previo.valor===valor.valor&&previo.justificacion===justificacion&&String(previo.conclusion||'')===conclusion&&previo.versionAportes===datos.versionAportes;
+            if(!igual)finales[id][comp]=Object.assign({},valor,{justificacion,conclusion,sugerencia:resumen.sugerencia,conteo:resumen.conteo,alerta:resumen.alerta,versionAportes:datos.versionAportes,user:acceso.sesion.user,role:acceso.sesion.role,ts,tutor:null,aip:null});
+          });
+        });
+      } else {
+        let n=0;Object.keys(finales).forEach(id=>{if(!ids.has(id))return;['tic','autonomia'].forEach(comp=>{
+          const f=finales[id][comp];if(!f)return;
+          if(f.versionAportes!==datos.versionAportes)throw new Error('Requiere nueva confirmación: revisa y guarda la decisión con los aportes actuales.');
+          if(transversalConclusionPendiente_(f))throw new Error('Conclusión descriptiva obligatoria para nivel C');
+          f[action==='confirmtransversaltutor'?'tutor':'aip']={user:acceso.sesion.user,role:acceso.sesion.role,ts};n++;
+        });});if(!n)throw new Error('Primero guarda una calificación final.');
+      }
+      transversalAppend_('TransversalesConsolidado',[datos.clave,ctx.bimestre,ctx.numero,ctx.seccion,datos.versionAportes,ts,JSON.stringify(finales)]);
+    }
+    return transversalVista_(escritura?transversalDatos_(ctx,config):datos,acceso,ctx);
+  } catch(e) { return {ok:false,code:'VALIDATION',error:e.message||'No se pudo completar la operación transversal.'}; }
+  finally { if(lock) {try{SpreadsheetApp.flush();}finally{lock.releaseLock();}} }
+}
+
 function doGet(e) {
   try {
     const p = (e && e.parameter) || {};
-    if (p.bridge === 'login-v1' || p.bridge === 'students-v1') return loginBridgeVista_(p);
+    if (p.bridge === 'login-v1' || p.bridge === 'students-v1' || p.bridge === 'transversales-v1') return loginBridgeVista_(p);
     const action = String(p.action || '').toLowerCase();
     const nivel = String(p.nivel || '').toLowerCase();
     if (action === 'loadstudents') return responder_({ok:false,code:'METHOD_NOT_ALLOWED',error:'La lectura de estudiantes requiere POST con token en el cuerpo.'});
@@ -1301,6 +1529,7 @@ function doPost(e) {
     }
     const body = JSON.parse(e.postData.contents);
     const action = String(body.action || 'saveArea').toLowerCase();
+    if (['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','confirmtransversaltutor','confirmtransversalaip','loadtransversalexport'].includes(action)) return responder_(transversalesRuta_(body));
 
     if (['loadreg', 'loadnivel', 'load', 'loadasis', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
       return doGet({ parameter: body });
@@ -1532,6 +1761,7 @@ function doPost(e) {
         // Invalidar antes de escribir; si falla, no guardar con una caché obsoleta.
         CacheService.getScriptCache().remove(DOCENTES_CACHE_KEY);
         const list = Array.isArray(body.docentes) ? body.docentes : [];
+        if (!validarTutores_(list)) return responder_({ok:false,error:'Solo puede existir un tutor activo por aula.'});
         const sh = asegurarDoc_();
         const last = sh.getLastRow();
         let fila = -1;
@@ -1542,7 +1772,7 @@ function doPost(e) {
           }
         }
         if (fila < 0) fila = sh.getLastRow() + 1;
-        const ts = body.ts || Date.now();
+        const ts = Math.max(Number(body.ts)||Date.now(),Number(obtenerDocentesConfigLectura_().ts||0)+1);
         sh.getRange(fila, 1).setValue('DOCENTE_ACCESOS');
         sh.getRange(fila, 2).setValue(ts);
         sh.getRange(fila, 3).setValue(JSON.stringify(list));

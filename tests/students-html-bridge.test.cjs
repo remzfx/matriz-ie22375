@@ -130,7 +130,7 @@ test('all protected student consumers load bridge before students.js, with safe 
   for(const file of ['admin.html','registro.html','primaria.html','secundaria.html','auxiliar.html','photochecks.html','index.html']) {
     const source=read(file);assert.ok(source.indexOf('src="login-bridge.js"')<source.indexOf('src="students.js"'),file);
   }
-  assert.match(read('sw.js'),/'\.\/login-bridge.js'/);assert.match(read('sw.js'),/CACHE_PREFIX \+ 'v8'/);
+  assert.match(read('sw.js'),/'\.\/login-bridge.js'/);assert.match(read('sw.js'),/CACHE_PREFIX \+ 'v10'/);
 });
 test('students loaded in head waits for body before creating the hidden iframe',()=>{
   const f=fixture();let initialize,count=0;
