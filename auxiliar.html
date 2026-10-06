@@ -88,6 +88,8 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
 
 <main id="vistaAsis" class="max-w-lg mx-auto px-4 py-4 space-y-3">
   <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
+  <button id="studentsRetry" class="btn" hidden onclick="ensureBD().catch(function(){})">Reintentar</button>
+  <a id="studentsRelogin" class="btn" href="index.html" hidden>Volver a iniciar sesión</a>
   <div class="card p-3 space-y-3">
     <div id="scanBox" class="space-y-2">
       <div id="reader"></div>
@@ -234,18 +236,18 @@ function loadHorarioLocal() {
   return horarioDefecto();
 }
 let HORARIO_CFG = loadHorarioLocal();
+let horarioVerificado = false;
 async function ensureHorario() {
   try {
-    const r = await fetch('horario_ingreso.json?t=' + Date.now(), { cache: 'no-store' });
-    if (r.ok) {
-      const j = await r.json();
-      if (j && j.defaults) {
-        HORARIO_CFG = Object.assign(horarioDefecto(), j);
-        try { localStorage.setItem(HORARIO_KEY, JSON.stringify(HORARIO_CFG)); } catch (e) {}
-      }
+    const j = await IEStudents.fetchJSON('horario_ingreso.json?t=' + Date.now(), {cache:'no-store'}, 8000);
+    if (j && j.defaults) {
+      HORARIO_CFG = Object.assign(horarioDefecto(), j);
+      horarioVerificado = true;
+      try { localStorage.setItem(HORARIO_KEY, JSON.stringify(HORARIO_CFG)); } catch(e) {}
     }
-  } catch (e) {}
+  } catch(e) {}
 }
+
 function hmAMin(hhmm) {
   const p = String(hhmm || '00:00').split(':');
   return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
@@ -276,7 +278,7 @@ function marcaPorHora(al) {
   return 'T';
 }
 function jornadaCerrada(al) {
-  if (!IEAuxPermissions.permite(al.nivel)) return false;
+  if (!horarioVerificado || !IEAuxPermissions.permite(al.nivel)) return false;
   const vents = ventanasDe(al);
   if (!vents.length) return false;
   const maxHasta = Math.max.apply(null, vents.map(function(v) { return hmAMin(v.hasta); }));
@@ -319,16 +321,52 @@ function fijarNiveles(j) {
   ((j.secundaria && j.secundaria.estudiantes) || []).forEach(a => { a.nivel = 'secundaria'; });
   return j;
 }
+let cargandoEstudiantesAux = false;
+function retirarSesionAuxiliar(token) {
+  const actual = IEStudents.session();
+  if (!actual || actual.token !== token) return false;
+  IEStudents.clear();
+  BD = IEStudents.empty();
+  document.getElementById('lista').innerHTML = '';
+  document.getElementById('selGrado').innerHTML = '<option value="">—</option>';
+  document.getElementById('selSeccion').innerHTML = '';
+  sessionStorage.removeItem('ie22375_session_v1');
+  localStorage.removeItem('ie22375_session_v1');
+  return true;
+}
 async function ensureBD() {
+  if (cargandoEstudiantesAux) return false;
+  cargandoEstudiantesAux = true;
+  const token = IEStudents.validToken();
+  const estado = document.getElementById('studentsStatus');
+  const retry = document.getElementById('studentsRetry');
+  const relogin = document.getElementById('studentsRelogin');
+  estado.textContent = 'Cargando estudiantes…'; retry.hidden = true; relogin.hidden = true;
   try {
     BD = await IEStudents.load();
     IEAuxPermissions.configurar();
-    if (BD.offline) toast('Sin conexión: lista temporal de esta sesión y niveles autorizados.');
+    onNivel();
+    const cantidad = IEAuxPermissions.niveles().reduce((n,nivel) => n + BD[nivel].estudiantes.length,0);
+    estado.textContent = cantidad + ' estudiantes cargados.' + (BD.offline ? ' Lista temporal sin conexión; reintenta para verificar el servidor.' : '');
+    retry.hidden = !BD.offline;
+    return true;
   } catch(e) {
     BD = IEStudents.empty();
-    toast(e.message);
+    if (e.code === 'SESSION' || e.authorizationRejected) {
+      retirarSesionAuxiliar(token || (IEStudents.session() || {}).token);
+      estado.textContent = 'Sesión inválida o revocada. Vuelve a iniciar sesión.';
+      relogin.hidden = false;
+    } else {
+      estado.textContent = (e.message || 'No se pudieron cargar estudiantes.') + ' Puedes reintentar.';
+      retry.hidden = false;
+    }
+    IEAuxPermissions.configurar();
+    document.getElementById('selGrado').innerHTML = '<option value="">—</option>';
+    document.getElementById('selSeccion').innerHTML = '';
+    document.getElementById('lblAula').textContent = estado.textContent;
+    document.getElementById('lista').innerHTML = '';
     throw e;
-  }
+  } finally { cargandoEstudiantesAux = false; }
 }
 
 function alumnosAula() {
@@ -571,12 +609,26 @@ function loadGruposWa() {
   return [];
 }
 async function bajarGruposWa() {
+  const token = tokenSesionAuxiliar();
   try {
-    const r = await fetchLecturaNube(CLOUD_API_URL + '?action=loadwa&t=' + Date.now());
-    const data = JSON.parse(await r.text());
-    if (data && Array.isArray(data.grupos)) localStorage.setItem(WA_KEY, JSON.stringify(data.grupos));
-  } catch (e) {}
+    const data = await IEStudents.fetchJSON(CLOUD_API_URL, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, cache:'no-store',
+      body:JSON.stringify({action:'loadwa',token:token})
+    },8000);
+    if (data && data.ok === false && (data.code === 'SESSION' || /sesión.*(?:inválida|vencida|autorización)/i.test(data.error || ''))) {
+      if (retirarSesionAuxiliar(token)) {
+        BD = IEStudents.empty();
+        IEAuxPermissions.configurar();
+        document.getElementById('studentsStatus').textContent = 'Sesión inválida o revocada. Vuelve a iniciar sesión.';
+        document.getElementById('studentsRetry').hidden = true;
+        document.getElementById('studentsRelogin').hidden = false;
+      }
+      return;
+    }
+    if (data && data.ok && Array.isArray(data.grupos)) localStorage.setItem(WA_KEY, JSON.stringify(data.grupos));
+  } catch(e) {}
 }
+
 function textoListaAula(nivel, grado, seccion, fecha) {
   if (!IEAuxPermissions.permite(nivel)) throw new Error('Nivel no autorizado.');
   const list = (((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion));
@@ -881,10 +933,6 @@ function esEnvioMasivo() {
   return /vista=masivo/.test(location.search) || location.hash === '#grupos';
 }
 IEAuxPermissions.configurar();
-Promise.all([ensureBD(), ensureHorario(), bajarGruposWa()]).then(() => {
-  onNivel();
-  if (esEnvioMasivo()) verMenu('grupos');
-}).catch(function(e) { document.getElementById('lblAula').textContent = e.message; });
 (function pintarYa() {
   BD = fijarNiveles(loadBD()) || { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
   const f = document.getElementById('inpFecha');
@@ -892,6 +940,10 @@ Promise.all([ensureBD(), ensureHorario(), bajarGruposWa()]).then(() => {
   if (esEnvioMasivo()) verMenu('grupos');
   else onNivel();
 })();
+// La lista depende solo de estudiantes; las lecturas secundarias tienen su propio límite.
+ensureBD().catch(function() {});
+ensureHorario().catch(function() {});
+bajarGruposWa().catch(function() {});
 </script>
 </body>
 </html>
