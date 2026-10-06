@@ -52,7 +52,11 @@
     const docs = peek() || [], g = grado(value), sec = seccion(section);
     const found = docs.find(doc => {
       if (doc.nivel !== nivel) return false;
-      if (nivel === 'primaria') return doc.grados.some(v => grado(v) === g);
+      if (nivel === 'primaria') {
+        if (!doc.grados.some(v => grado(v) === g) || sec !== 'UNICA') return false;
+        if (!doc.asignaciones || !Object.keys(doc.asignaciones).length) return area !== 'Educación Física' &&
+          ['Personal Social','Comunicación','Arte y Cultura','Matemática','Ciencia y Tecnología','Educación Religiosa','Competencias Transversales'].includes(area);
+      }
       const aulas = doc.asignaciones != null ? doc.asignaciones[area] :
         ((doc.areas || []).includes(area) ? doc.aulas : []);
       return Array.isArray(aulas) && aulas.some(aula => {

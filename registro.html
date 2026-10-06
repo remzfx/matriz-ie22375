@@ -732,7 +732,7 @@ function areas() {
   let all = Object.keys(estructura());
   const ses = getLoginSession();
 
-  if (ses && ses.role === 'docente' && nivel === 'secundaria') {
+  if (ses && ses.role === 'docente') {
     const gEl = document.getElementById('selGrado');
     const sEl = document.getElementById('selSeccion');
     const grado = gEl ? gEl.value : '';
@@ -749,6 +749,10 @@ function areas() {
         });
       });
       return all;
+    }
+    if (nivel === 'primaria') {
+      return (ses.grados || []).map(Number).includes(Number(grado)) && aulaKey(grado,seccion).endsWith('|ÚNICA')
+        ? all.filter(a => a !== 'Educación Física') : [];
     }
   }
 
@@ -1080,7 +1084,10 @@ function docenteAsignadoAdmin() {
     if (!d || d.nivel !== c.nivel) return;
     let ok = false;
     if (c.nivel === 'primaria') {
-      ok = Array.isArray(d.grados) && d.grados.map(Number).includes(Number(c.grado));
+      const mapa = d.asignaciones && typeof d.asignaciones === 'object' && Object.keys(d.asignaciones).length ? d.asignaciones : null;
+      ok = Array.isArray(d.grados) && d.grados.map(Number).includes(Number(c.grado)) && (mapa
+        ? Array.isArray(mapa[c.area]) && mapa[c.area].some(k=>{const p=String(k).split('|');return aulaKey(p[0],p[1])===aula;})
+        : c.area !== 'Educación Física' && aula.endsWith('|ÚNICA'));
     } else {
       const mapa = d.asignaciones && typeof d.asignaciones === 'object' ? d.asignaciones : null;
       if (mapa && Array.isArray(mapa[c.area])) {
@@ -1149,7 +1156,7 @@ function nivelPermitido() {
 function gradosPermitidos() {
   var s = getLoginSession();
   if (!s || s.role !== 'docente') return null;
-  if (s.nivel === 'primaria' && s.grados && s.grados.length) return s.grados.map(Number);
+  if (s.nivel === 'primaria') return (s.grados || []).map(Number).filter(g=>!s.asignaciones || !Object.keys(s.asignaciones).length || Object.values(s.asignaciones).some(a=>Array.isArray(a)&&a.some(k=>Number(String(k).split('|')[0])===g)));
   return null;
 }
 

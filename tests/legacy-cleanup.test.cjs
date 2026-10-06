@@ -34,7 +34,7 @@ function admin(session, oldFlag = false) {
   const redirects = [], alerts = [], downloads = [], studentWrites = [];
   const document = {
     getElementById: id => elements.get(id) || null,
-    querySelectorAll: selector => selector === '.tab' ? [...elements].filter(([id]) => id.startsWith('tab-')).map(([,el]) => el) : selector === '.doc-grado:checked' ? [{value: '1'}] : [],
+    querySelectorAll: selector => selector === '.tab' ? [...elements].filter(([id]) => id.startsWith('tab-')).map(([,el]) => el) : selector === '.doc-grado:checked' ? [{value: '1'}] : selector === '.doc-area:checked' ? [{value:'Comunicación'}] : selector === '#docAsignacionesBox [data-area-asig]' ? [{getAttribute:()=> 'Comunicación',querySelectorAll:()=>[{value:'1|ÚNICA'}]}] : [],
     createElement: () => ({click() {downloads.push(this);}})
   };
   const context = vm.createContext({

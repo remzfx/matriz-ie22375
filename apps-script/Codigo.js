@@ -286,15 +286,17 @@ function responderLogin_(body) {
     });
     if (docente) {
       const nivel = String(docente.nivel || '').toLowerCase();
+      const primaria = nivel === 'primaria' ? asignacionesPrimaria_(docente) : null;
+      const aulasPrimaria = primaria ? [...new Set(Object.keys(primaria).reduce(function(out, area) { return out.concat(primaria[area]); }, []))] : [];
       perfil = {
         user: docente.user,
         label: docente.nombre || docente.user,
         role: 'docente',
         nivel: nivel,
-        grados: nivel === 'primaria' ? (docente.grados || []) : null,
-        areas: nivel === 'secundaria' ? (docente.areas || []) : null,
-        aulas: nivel === 'secundaria' ? (docente.aulas || []) : null,
-        asignaciones: nivel === 'secundaria' ? (docente.asignaciones || null) : null,
+        grados: nivel === 'primaria' ? [...new Set(aulasPrimaria.map(function(a) { return gradoEscritura_(a.split('|')[0]); }))] : null,
+        areas: nivel === 'primaria' ? Object.keys(primaria) : (docente.areas || []),
+        aulas: nivel === 'primaria' ? aulasPrimaria : (docente.aulas || []),
+        asignaciones: nivel === 'primaria' ? primaria : (docente.asignaciones || null),
         mods: nivel === 'primaria' ? ['registro', 'matriz_pri'] : ['registro', 'matriz_sec']
       };
     }
@@ -417,6 +419,28 @@ function aulaEscritura_(value, ctx) {
     seccionEscritura_(parts[1]) === seccionEscritura_(ctx.seccion);
 }
 
+function asignacionesPrimaria_(docente) {
+  const out = {}, mapa = docente.asignaciones;
+  if (mapa != null && (typeof mapa !== 'object' || Array.isArray(mapa))) return out;
+  const grados = Array.isArray(docente.grados) ? docente.grados.map(gradoEscritura_).filter(function(g) { return g >= 1 && g <= 6; }) : [];
+  if (mapa && Object.keys(mapa).length) {
+    Object.keys(mapa).forEach(function(area) {
+      if (!Array.isArray(mapa[area])) return;
+      const aulas = mapa[area].filter(function(aula) {
+        const parts = String(aula).split('|');
+        return parts.length === 2 && grados.indexOf(gradoEscritura_(parts[0])) >= 0 && seccionEscritura_(parts[1]) === 'ÚNICA';
+      }).map(function(aula) { return gradoEscritura_(String(aula).split('|')[0]) + '|ÚNICA'; });
+      if (aulas.length) out[area] = [...new Set(aulas)];
+    });
+  } else {
+    // Compatibilidad: Admin antiguo guardaba también {}. Nunca concede EF implícita.
+    ['Personal Social','Comunicación','Arte y Cultura','Matemática','Ciencia y Tecnología','Educación Religiosa','Competencias Transversales'].forEach(function(area) {
+      if (grados.length) out[area] = grados.map(function(g) { return g + '|ÚNICA'; });
+    });
+  }
+  return out;
+}
+
 function autorizarEscritura_(body, ctx) {
   const sesion = validarToken_(body.token);
   if (!sesion) return null;
@@ -433,10 +457,8 @@ function autorizarEscritura_(body, ctx) {
   if (!docente || String(docente.nivel || '').toLowerCase() !== ctx.nivel) return null;
   let permitido = false;
   if (ctx.nivel === 'primaria') {
-    // Admin asigna el grado completo: no hay permisos de área/sección en este formato.
-    permitido = Array.isArray(docente.grados) && docente.grados.some(function (grado) {
-      return gradoEscritura_(grado) === ctx.numero;
-    });
+    const aulas = asignacionesPrimaria_(docente)[ctx.area];
+    permitido = Array.isArray(aulas) && aulas.some(function(aula) { return aulaEscritura_(aula, ctx); });
   } else {
     const mapa = docente.asignaciones;
     if (mapa != null && (typeof mapa !== 'object' || Array.isArray(mapa))) return null;
@@ -595,8 +617,7 @@ function sesionLectura_(token, roles) {
   });
   if (!docente) return null;
   const mapa = docente.asignaciones;
-  if (String(docente.nivel || '').toLowerCase() === 'secundaria' &&
-      mapa != null && (typeof mapa !== 'object' || Array.isArray(mapa))) return null;
+  if (mapa != null && (typeof mapa !== 'object' || Array.isArray(mapa))) return null;
   return { sesion: sesion, docente: docente };
 }
 
@@ -606,9 +627,8 @@ function puedeLeerContexto_(acceso, ctx) {
   if (!docente || String(docente.nivel || '').toLowerCase() !== ctx.nivel ||
       !ctx.numero || !seccionEscritura_(ctx.seccion)) return false;
   if (ctx.nivel === 'primaria') {
-    return Array.isArray(docente.grados) && docente.grados.some(function (grado) {
-      return gradoEscritura_(grado) === ctx.numero;
-    });
+    const aulas = asignacionesPrimaria_(docente)[ctx.area];
+    return Array.isArray(aulas) && aulas.some(function(aula) { return aulaEscritura_(aula, ctx); });
   }
   if (ctx.nivel !== 'secundaria' || ctx.numero > 5) return false;
   const mapa = docente.asignaciones;
@@ -628,7 +648,9 @@ function docentesMatrizRuta_(body) {
     // Lista explícita de campos: nunca propagar pass, usuario u otras credenciales.
     const out = {nombre: String(doc.nombre || ''), nivel: String(doc.nivel || '').toLowerCase(),
       grados: Array.isArray(doc.grados) ? doc.grados.map(gradoEscritura_) : []};
-    if (doc.asignaciones != null) {
+    if (out.nivel === 'primaria') {
+      out.asignaciones = asignacionesPrimaria_(doc);
+    } else if (doc.asignaciones != null) {
       out.asignaciones = {};
       if (typeof doc.asignaciones === 'object' && !Array.isArray(doc.asignaciones)) {
         Object.keys(doc.asignaciones).forEach(function(area) {
@@ -661,9 +683,8 @@ function coincideConsultaLectura_(p, ctx) {
 function puedeLeerAula_(acceso, ctx) {
   if (acceso.sesion.role === 'admin') return true;
   const docente = acceso.docente;
-  const mapa = docente.asignaciones;
+  const mapa = ctx.nivel === 'primaria' ? asignacionesPrimaria_(docente) : docente.asignaciones;
   const areas = mapa && Object.keys(mapa).length ? Object.keys(mapa) : (docente.areas || []);
-  if (ctx.nivel === 'primaria') return puedeLeerContexto_(acceso, ctx);
   return Array.isArray(areas) && areas.some(function (area) {
     return puedeLeerContexto_(acceso, Object.assign({}, ctx, { area: area }));
   });
