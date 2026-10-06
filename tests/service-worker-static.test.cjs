@@ -35,7 +35,7 @@ test('SW precaches critical JavaScript and matrix-teachers.js offline returns Ja
 });
 test('SW offline missing or HTML-corrupted JavaScript cache never falls back to index.html',async()=>{
   const s=fixture();await s.dispatch('install');s.offline();
-  const cache=s.cache('matriz-ie22375-v2');
+  const cache=s.cache('matriz-ie22375-v3');
   await cache.put(s.request('matrix-teachers.js'),new Response('<html>wrong cached page</html>',
     {headers:{'Content-Type':'text/html','X-IE-Cached-At':String(s.now())}}));
   for(const file of ['matrix-teachers.js','uncached.js','another.mjs']) {
@@ -58,13 +58,13 @@ test('SW expires static versions after seven days and cleans previous applicatio
   const s=fixture();s.cache('matriz-ie22375-v1');s.cache('unrelated-cache');await s.dispatch('install');await s.dispatch('activate');
   assert.equal(s.stores.has('matriz-ie22375-v1'),false);assert.equal(s.stores.has('unrelated-cache'),true);
   s.advance(8*24*60*60*1000);s.offline();const response=await s.dispatch('fetch',{request:s.request('matrix-teachers.js')});
-  assert.equal(response.type,'error');assert.equal(await s.cache('matriz-ie22375-v2').match(s.request('matrix-teachers.js')),undefined);
+  assert.equal(response.type,'error');assert.equal(await s.cache('matriz-ie22375-v3').match(s.request('matrix-teachers.js')),undefined);
 });
 test('SW neither caches private API responses nor uses HTML fallback for APIs or POST',async()=>{
   const s=fixture();await s.dispatch('install');
   const api=s.request('api?action=loadperiodos');
   s.network(async()=>new Response('{"ok":true}',{headers:{'Content-Type':'application/json'}}));
-  await s.dispatch('fetch',{request:api});assert.equal(await s.cache('matriz-ie22375-v2').match(api),undefined);
+  await s.dispatch('fetch',{request:api});assert.equal(await s.cache('matriz-ie22375-v3').match(api),undefined);
   s.offline();const response=await s.dispatch('fetch',{request:api});assert.equal(response.type,'error');
   assert.equal(await s.dispatch('fetch',{request:new Request(api.url,{method:'POST',body:'synthetic'})}),undefined);
   for(const url of ['https://synthetic-api.example/exec','https://synthetic-cdn.example/library.js']) {
@@ -72,4 +72,49 @@ test('SW neither caches private API responses nor uses HTML fallback for APIs or
     assert.equal(await s.dispatch('fetch',{request:new Request(url)}),undefined);
     assert.equal(s.calls.length,before);
   }
+});
+
+test('SW precaches auxiliar.html and serves its exact static page offline, excluding Admin management',async()=>{
+  const s=fixture(),html=fs.readFileSync(path.join(__dirname,'../auxiliar.html'),'utf8');
+  s.network(async req=>new Response(req.url.endsWith('auxiliar.html')?html:req.url.endsWith('.js')?'/* JS */':'<html>home</html>',
+    {headers:{'Content-Type':req.url.endsWith('.js')?'application/javascript':'text/html'}}));
+  await s.dispatch('install');s.offline();
+  const response=await s.dispatch('fetch',{request:s.request('auxiliar.html')});
+  assert.equal(response.status,200);assert.equal(await response.text(),html);
+  assert.ok(s.calls.some(call=>call.req.url.endsWith('/auxiliar.html')));
+  assert.equal(s.calls.some(call=>call.req.url.endsWith('/auxiliar-admin.js')),false);
+  assert.equal(await s.cache('matriz-ie22375-v3').match(s.request('auxiliar-admin.js')),undefined);
+});
+
+test('SW offline auxiliar-permissions.js returns executable JavaScript, never index.html',async()=>{
+  const s=fixture(),js=fs.readFileSync(path.join(__dirname,'../auxiliar-permissions.js'),'utf8');
+  s.network(async req=>new Response(req.url.endsWith('auxiliar-permissions.js')?js:req.url.endsWith('.js')?'/* JS */':'<html>home</html>',
+    {headers:{'Content-Type':req.url.endsWith('.js')?'application/javascript':'text/html'}}));
+  await s.dispatch('install');s.offline();
+  const response=await s.dispatch('fetch',{request:s.request('auxiliar-permissions.js')}),body=await response.text();
+  assert.equal(response.status,200);assert.match(response.headers.get('Content-Type'),/javascript/);
+  assert.equal(body,js);assert.doesNotMatch(body,/<html|<!doctype/i);
+  const context={window:{}};vm.runInNewContext(body,context);
+  assert.equal(typeof context.window.IEAuxPermissions.configurar,'function');
+});
+
+test('SW missing or HTML-corrupted auxiliar-permissions.js never receives the cached home page',async()=>{
+  const s=fixture();await s.dispatch('install');s.offline();
+  const cache=s.cache('matriz-ie22375-v3'),request=s.request('auxiliar-permissions.js');
+  await cache.put(request,new Response('<html>wrong</html>',{headers:{'Content-Type':'text/html','X-IE-Cached-At':String(s.now())}}));
+  for(let i=0;i<2;i++){
+    const response=await s.dispatch('fetch',{request});
+    assert.equal(response.type,'error');assert.doesNotMatch(await response.text(),/<html|<!doctype/i);
+  }
+  assert.ok(await cache.match(s.request('index.html')));
+  assert.equal(await cache.match(request),undefined);
+});
+
+test('SW activating v3 deletes v2 while preserving the installed cache and unrelated caches',async()=>{
+  const s=fixture();s.cache('matriz-ie22375-v2');s.cache('unrelated-cache');
+  await s.dispatch('install');await s.dispatch('activate');
+  assert.equal(s.stores.has('matriz-ie22375-v2'),false);
+  assert.equal(s.stores.has('matriz-ie22375-v3'),true);
+  assert.equal(s.stores.has('unrelated-cache'),true);
+  assert.ok(await s.cache('matriz-ie22375-v3').match(s.request('auxiliar-permissions.js')));
 });
