@@ -277,6 +277,11 @@ for(const [file,name,helper,role,action] of [
     IEStudents:{fetchJSON:async(url,options)=>(await context.fetch(url,options)).json(),loadRoster:async()=>({primaria:{estudiantes:[]},secundaria:{estudiantes:[]}})},
     XLSX:{read:()=>({SheetNames:[]}),write:()=>new Uint8Array()},fetchRegAula:async()=>[],areasDeNivel:()=>[],estudiantesDe:()=>[]
   });
+  if(file==='auxiliar.html' && name==='bajarGruposWa'){
+    new vm.Script("let waPendiente=null,waToken='',waActualizado=0;function enviarGruposHoy(){}").runInContext(context);
+    context.IEStudents.validToken=()=>token;
+    new vm.Script(clientFunction(file,'cargarGruposWaAuxiliar')).runInContext(context);
+  }
   if(helper)new vm.Script(clientFunction(file,helper)).runInContext(context);
   new vm.Script(clientFunction(file,'fetchLecturaNube')).runInContext(context);
   new vm.Script(clientFunction(file,name)).runInContext(context);

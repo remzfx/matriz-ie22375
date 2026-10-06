@@ -10,8 +10,8 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <title>Auxiliar · Asistencia de ingreso · IE 22375</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#f1f5f9; color:#0f172a; }
     .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); }
@@ -86,10 +86,12 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
   </div>
 </header>
 
-<main id="vistaAsis" class="max-w-lg mx-auto px-4 py-4 space-y-3">
+<div class="max-w-lg mx-auto px-4 pt-4">
   <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
   <button id="studentsRetry" class="btn" hidden onclick="ensureBD().catch(function(){})">Reintentar</button>
   <a id="studentsRelogin" class="btn" href="index.html" hidden>Volver a iniciar sesión</a>
+</div>
+<main id="vistaAsis" class="max-w-lg mx-auto px-4 py-4 space-y-3">
   <div class="card p-3 space-y-3">
     <div id="scanBox" class="space-y-2">
       <div id="reader"></div>
@@ -163,10 +165,13 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     <div>
       <label class="text-[10px] font-bold text-slate-500">Nivel</label>
       <span id="selNivelGruposScope" hidden></span>
-      <select id="selNivelGrupos" onchange="enviarGruposHoy()">
+      <select id="selNivelGrupos" onchange="actualizarGradosGrupos()">
         <option value="primaria">Primaria</option>
         <option value="secundaria">Secundaria</option>
       </select>
+    </div>
+    <div><label class="text-[10px] font-bold text-slate-500">Grado</label>
+      <select id="selGradoGrupos" onchange="enviarGruposHoy()"><option value="">—</option></select>
     </div>
     <div id="waCola" class="space-y-2"></div>
   </div>
@@ -236,8 +241,12 @@ function loadHorarioLocal() {
   return horarioDefecto();
 }
 let HORARIO_CFG = loadHorarioLocal();
-let horarioVerificado = false;
-async function ensureHorario() {
+let horarioVerificado = false,horarioPendiente = null;
+function ensureHorario() {
+  if (!horarioPendiente) horarioPendiente = cargarHorarioAuxiliar().finally(function(){horarioPendiente=null;});
+  return horarioPendiente;
+}
+async function cargarHorarioAuxiliar() {
   try {
     const j = await IEStudents.fetchJSON('horario_ingreso.json?t=' + Date.now(), {cache:'no-store'}, 8000);
     if (j && j.defaults) {
@@ -322,12 +331,32 @@ function fijarNiveles(j) {
   return j;
 }
 let cargandoEstudiantesAux = false;
+const auxiliarInicio = performance.now();
+try {sessionStorage.removeItem('ie22375_aux_timing_v1');}catch(e){}
+function medirAuxiliar(etapa,inicio) {
+  try {
+    const raw = sessionStorage.getItem('ie22375_aux_timing_v1');
+    const datos = raw ? JSON.parse(raw) : {};
+    datos[etapa] = Math.round(performance.now() - inicio);
+    sessionStorage.setItem('ie22375_aux_timing_v1',JSON.stringify(datos));
+  } catch(e) {}
+}
+function pintarBaseAuxiliar(base) {
+  BD = base;
+  IEAuxPermissions.configurar();
+  onNivel();
+  actualizarGradosGrupos();
+  if (!IEAuxPermissions.niveles().some(nivel=>BD[nivel].estudiantes.length)) document.getElementById('lista').innerHTML='';
+}
+
 function retirarSesionAuxiliar(token) {
   const actual = IEStudents.session();
   if (!actual || actual.token !== token) return false;
   IEStudents.clear();
   BD = IEStudents.empty();
   document.getElementById('lista').innerHTML = '';
+  document.getElementById('waCola').innerHTML = '';
+  document.getElementById('selGradoGrupos').innerHTML = '<option value="">—</option>';
   document.getElementById('selGrado').innerHTML = '<option value="">—</option>';
   document.getElementById('selSeccion').innerHTML = '';
   sessionStorage.removeItem('ie22375_session_v1');
@@ -341,25 +370,33 @@ async function ensureBD() {
   const estado = document.getElementById('studentsStatus');
   const retry = document.getElementById('studentsRetry');
   const relogin = document.getElementById('studentsRelogin');
-  estado.textContent = 'Cargando estudiantes…'; retry.hidden = true; relogin.hidden = true;
+  const cache = IEStudents.peek();
+  if (cache) { pintarBaseAuxiliar(cache); medirAuxiliar('cachePaintMs',auxiliarInicio); }
+  else pintarBaseAuxiliar(IEStudents.empty());
+  estado.textContent = cache ? 'Mostrando datos locales · verificando servidor…' : 'Cargando estudiantes…';
+  retry.hidden = true; relogin.hidden = true;
+  const inicioLectura = performance.now();
   try {
-    BD = await IEStudents.load();
-    IEAuxPermissions.configurar();
-    onNivel();
+    const base = await IEStudents.load();
+    medirAuxiliar('studentsResponseMs',inicioLectura);
+    pintarBaseAuxiliar(base);
+    medirAuxiliar('finalPaintMs',auxiliarInicio);
     const cantidad = IEAuxPermissions.niveles().reduce((n,nivel) => n + BD[nivel].estudiantes.length,0);
-    estado.textContent = cantidad + ' estudiantes cargados.' + (BD.offline ? ' Lista temporal sin conexión; reintenta para verificar el servidor.' : '');
+    estado.textContent = 'Datos actualizados · ' + cantidad + ' estudiantes cargados.' + (BD.offline ? ' Lista temporal sin conexión; reintenta para verificar el servidor.' : '');
     retry.hidden = !BD.offline;
     return true;
   } catch(e) {
-    BD = IEStudents.empty();
+    const vigente = e.retryable && IEStudents.validToken() === token && IEStudents.peek();
+    BD = vigente || IEStudents.empty();
     if (e.code === 'SESSION' || e.authorizationRejected) {
       retirarSesionAuxiliar(token || (IEStudents.session() || {}).token);
       estado.textContent = 'Sesión inválida o revocada. Vuelve a iniciar sesión.';
       relogin.hidden = false;
     } else {
-      estado.textContent = (e.message || 'No se pudieron cargar estudiantes.') + ' Puedes reintentar.';
+      estado.textContent = (vigente ? 'Mostrando datos locales. ' : '') + (e.message || 'No se pudieron cargar estudiantes.') + ' Puedes reintentar.';
       retry.hidden = false;
     }
+    if (vigente) { pintarBaseAuxiliar(vigente); throw e; }
     IEAuxPermissions.configurar();
     document.getElementById('selGrado').innerHTML = '<option value="">—</option>';
     document.getElementById('selSeccion').innerHTML = '';
@@ -608,7 +645,17 @@ function loadGruposWa() {
   try { const r = JSON.parse(localStorage.getItem(WA_KEY) || '[]'); if (Array.isArray(r)) return r.filter(g=>g && IEAuxPermissions.permite(g.nivel)); } catch (e) {}
   return [];
 }
-async function bajarGruposWa() {
+let waPendiente = null,waToken = '',waActualizado = 0;
+function bajarGruposWa() {
+  const token=tokenSesionAuxiliar();
+  if (waPendiente && token===waToken) return waPendiente;
+  if (token===waToken && Date.now()-waActualizado<5*60*1000) return Promise.resolve();
+  if(token!==waToken)waActualizado=0;
+  waToken=token;
+  const tarea=cargarGruposWaAuxiliar().finally(function(){if(waPendiente===tarea)waPendiente=null;});
+  waPendiente=tarea;return tarea;
+}
+async function cargarGruposWaAuxiliar() {
   const token = tokenSesionAuxiliar();
   try {
     const data = await IEStudents.fetchJSON(CLOUD_API_URL, {
@@ -625,7 +672,11 @@ async function bajarGruposWa() {
       }
       return;
     }
-    if (data && data.ok && Array.isArray(data.grupos)) localStorage.setItem(WA_KEY, JSON.stringify(data.grupos));
+    if (data && data.ok && Array.isArray(data.grupos) && IEStudents.validToken()===token) {
+      localStorage.setItem(WA_KEY, JSON.stringify(data.grupos));
+      waActualizado=Date.now();
+      enviarGruposHoy();
+    }
   } catch(e) {}
 }
 
@@ -715,38 +766,34 @@ function compartirWhatsApp() {
   const nom = (g && g.nombre) ? g.nombre : ((c.grado + '° ' + c.seccion));
   abrirWhatsApp(pack.txt, g && g.enlace);
 }
-async function enviarGruposHoy() {
-  const fecha = (document.getElementById('inpFechaGrupos') || {}).value || hoyISO();
-  const nivel = (document.getElementById('selNivelGrupos') || {}).value || 'primaria';
-  const box = document.getElementById('waCola');
-  if (!box) return;
-  if (!IEAuxPermissions.permite(nivel)) { toast('Nivel no autorizado.'); return false; }
-  function pintar() {
-    const grupos = loadGruposWa().filter(x => x.nivel === nivel);
-    if (!grupos.length) {
-      box.innerHTML = '<p class="text-sm text-slate-500">No hay grupos. En Admin → WhatsApp pegue el enlace de cada aula.</p>';
-      return;
-    }
-    const pendientes = grupos.filter(g => {
-      const pack = textoListaAula(g.nivel, g.grado, g.seccion, fecha);
-      return pack.list.some(al => { const m = getRec(al).marca; return m==='P'||m==='F'||m==='T'||m==='J'; });
-    });
-    const usar = pendientes.length ? pendientes : grupos;
-    box.innerHTML = usar.map((g, i) => {
-      const nom = g.nombre || (g.grado + '° ' + g.seccion);
-      return '<a class="btn btn-ghost block text-center" data-wa="'+i+'" href="#">Abrir '+nom+'</a>';
-    }).join('');
-    box.onclick = function(ev) {
-      const a = ev.target.closest('a[data-wa]');
-      if (!a) return;
-      ev.preventDefault();
-      const g = usar[Number(a.getAttribute('data-wa'))];
-      const pack = textoListaAula(g.nivel, g.grado, g.seccion, fecha);
-      abrirWhatsApp(pack.txt, g.enlace);
-    };
-  }
-  pintar();
-  bajarGruposWa().then(pintar);
+function actualizarGradosGrupos() {
+  const nivel=document.getElementById('selNivelGrupos').value;
+  const select=document.getElementById('selGradoGrupos'),anterior=select.value;
+  const list=IEAuxPermissions.permite(nivel)&&BD ? (BD[nivel]||{}).estudiantes||[] : [];
+  const grados=[...new Set(list.map(a=>Number(a.grado)))].sort((a,b)=>a-b);
+  select.innerHTML=grados.length ? grados.map(g=>'<option value="'+g+'">'+g+'°</option>').join('') : '<option value="">—</option>';
+  select.value=grados.includes(Number(anterior))?anterior:String(grados[0]||'');
+  enviarGruposHoy();
+}
+function enviarGruposHoy() {
+  const fecha=document.getElementById('inpFechaGrupos').value||hoyISO();
+  const nivel=document.getElementById('selNivelGrupos').value;
+  const grado=document.getElementById('selGradoGrupos').value;
+  const box=document.getElementById('waCola');if(!box)return;
+  if(!IEAuxPermissions.permite(nivel)){box.innerHTML='';return false;}
+  const alumnos=BD ? ((BD[nivel]||{}).estudiantes||[]).filter(a=>String(a.grado)===grado) : [];
+  const secciones=[...new Set(alumnos.map(a=>String(a.seccion)))].sort();
+  const grupos=loadGruposWa();
+  const aulas=secciones.map(seccion=>Object.assign({nivel,grado,seccion},grupos.find(g=>g.nivel===nivel&&String(g.grado)===grado&&String(g.seccion)===seccion)||{}));
+  function escapar(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  box.innerHTML=aulas.length ? aulas.map((g,i)=>'<a class="btn btn-ghost block text-center" data-wa="'+i+'" href="#">'+escapar(g.nombre||g.grado+'° '+g.seccion)+
+    (g.enlace ? '' : ' · Grupo de WhatsApp no configurado.')+'</a>').join('') : '<p class="text-sm text-slate-500">Sin aulas cargadas para este grado.</p>';
+  box.onclick=function(ev){
+    const a=ev.target.closest('a[data-wa]');if(!a)return;ev.preventDefault();
+    const g=aulas[Number(a.getAttribute('data-wa'))];if(!g)return;
+    const pack=textoListaAula(g.nivel,g.grado,g.seccion,fecha);
+    abrirWhatsApp(pack.txt,g.enlace);
+  };
 }
 
 /* ===== QR (iPhone + Android) ===== */
@@ -934,11 +981,12 @@ function esEnvioMasivo() {
 }
 IEAuxPermissions.configurar();
 (function pintarYa() {
-  BD = fijarNiveles(loadBD()) || { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
+  BD = fijarNiveles(IEStudents.peek() || loadBD()) || { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
   const f = document.getElementById('inpFecha');
   if (f) f.value = hoyISO();
   if (esEnvioMasivo()) verMenu('grupos');
   else onNivel();
+  actualizarGradosGrupos();
 })();
 // La lista depende solo de estudiantes; las lecturas secundarias tienen su propio límite.
 ensureBD().catch(function() {});

@@ -18,7 +18,7 @@ function fixture(role='admin'){
   const storage={getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)};
   const calls=[],elements=new Map(),alerts=[];
   function el(id){if(!elements.has(id))elements.set(id,{value:'',style:{},textContent:'',innerHTML:'',classList:{add(){},remove(){}}});return elements.get(id);}
-  const c=vm.createContext({window:{},sessionStorage:storage,localStorage:storage,atob,console,Date,
+  const c=vm.createContext({window:{},sessionStorage:storage,localStorage:storage,atob,console,Date,performance,
     document:{getElementById:el,querySelectorAll:()=>[],querySelector:sel=>sel==='main'?{inert:false,setAttribute(){},querySelectorAll:()=>[]}:null},alert:v=>alerts.push(v),confirm:()=>true,setTimeout:(fn,ms)=>{if(ms<2000)queueMicrotask(fn);return 0;},clearTimeout(){},
     fetch:async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({ok:true,version:'synthetic-current',bimestre:JSON.parse(options.body).bimestre || '',inicializada:true,estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',orden:1,nombre:'Synthetic Primary'},{nivel:'secundaria',grado:1,seccion:'A',orden:1,nombre:'Synthetic Secondary'}]})};}
   });
@@ -47,7 +47,7 @@ for(const file of ['primaria.html','secundaria.html'])test(file+': real matrix l
   else{s.run(extract(file,'normalizarSeccionBD'));s.run(extract(file,'totalEstudiantesDesdeBD'));assert.equal(s.c.totalEstudiantesDesdeBD('1°','A'),1);assert.equal(s.c.totalEstudiantesDesdeBD('2°','B'),0);}
 });
 for(const file of ['auxiliar.html','photochecks.html'])test(file+': real loader uses protected students instead of the old global roster',async()=>{
-  const s=fixture(file==='auxiliar.html'?'auxiliar':'admin');s.run('let BD=null,cargandoEstudiantesAux=false;function toast(){};function onNivel(){}');
+  const s=fixture(file==='auxiliar.html'?'auxiliar':'admin');s.run('let BD=null,cargandoEstudiantesAux=false;const auxiliarInicio=performance.now();function medirAuxiliar(){};function pintarBaseAuxiliar(base){BD=base;}function toast(){};function onNivel(){}');
   s.run(extract(file,'ensureBD'));await s.c.ensureBD();checkRequest(s);
   assert.equal(s.run('BD.primaria.estudiantes[0].nombre'),'Synthetic Primary');
 });

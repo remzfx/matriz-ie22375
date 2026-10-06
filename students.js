@@ -102,6 +102,30 @@
       throw error('NETWORK','No se pudo conectar para obtener una respuesta del servidor.',true);
     } finally { clearTimeout(timer); }
   }
+  function workerMessage(worker,data,timeout) {
+    return new Promise((resolve,reject)=>{
+      const channel=new MessageChannel();
+      const timer=setTimeout(()=>{channel.port1.close();reject(error('TIMEOUT','El servidor tardó demasiado.',true));},timeout);
+      channel.port1.onmessage=event=>{clearTimeout(timer);channel.port1.close();resolve(event.data);};
+      try {worker.postMessage(data,[channel.port2]);}
+      catch(e){clearTimeout(timer);channel.port1.close();reject(error('NETWORK','No se pudo conectar con el servidor.',true));}
+    });
+  }
+  async function preloadAvailable() {
+    const worker=typeof navigator!=='undefined'&&navigator.serviceWorker&&navigator.serviceWorker.controller;
+    if (!worker || typeof MessageChannel==='undefined') return null;
+    try {return (await workerMessage(worker,{type:'IE_STUDENTS_PROBE_V1'},200)).supported ? worker : null;}catch(e){return null;}
+  }
+  async function studentsResponse(data,token) {
+    const worker=session()&&session().role==='auxiliar' ? await preloadAvailable() : null;
+    if (worker) {
+      const result=await workerMessage(worker,{type:'IE_STUDENTS_READ_V1',token,bimestre:data.bimestre||''},13000);
+      if(result.error)throw error(result.error.code,result.error.message,result.error.retryable);
+      return result.response;
+    }
+    return fetchJSON(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(Object.assign({},data,{action:'loadstudents',token})),cache:'no-store'});
+  }
   async function request(action, data) {
     data = data || {};
     const token = validToken(), scope = 'students:' + (data.bimestre || 'actual');
@@ -114,7 +138,7 @@
     for (let attempt = 0; attempt < attempts; attempt++) {
       if (validToken() !== token || epoch !== authorizationEpoch) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
       try {
-        const response = await fetchJSON(API, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        const response = read ? await studentsResponse(data,token) : await fetchJSON(API, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
           body:JSON.stringify(Object.assign({},data,{action:action,token:token})),cache:'no-store'});
         if (validToken() !== token || epoch !== authorizationEpoch) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
         if (!response || typeof response.ok !== 'boolean') throw error('INVALID_RESPONSE','Respuesta del servidor no válida.',true);
@@ -131,6 +155,13 @@
           throw error('INVALID_RESPONSE','El servidor no confirmó el bimestre solicitado.',true);
         // Una respuesta anterior nunca debe borrar datos que una petición más reciente ya confirmó.
         if (requestId !== latestRequest.get(scope)) return peek(scope) || toBase(response);
+        if (session() && session().role==='auxiliar' && response.timing) {
+          try {
+            const datos=JSON.parse(sessionStorage.getItem('ie22375_aux_timing_v1')||'{}');
+            ['authMs','studentsMs','totalMs'].forEach(k=>{const value=Number(response.timing[k]);if(Number.isFinite(value)&&value>=0)datos['backend_'+k]=value;});
+            sessionStorage.setItem('ie22375_aux_timing_v1',JSON.stringify(datos));
+          } catch(e) {}
+        }
         return remember(toBase(response),token,scope);
       } catch(e) {
         last = e;
@@ -160,6 +191,12 @@
     peekRoster: bimestre => ['I','II','III','IV'].includes(bimestre) ? peek('students:' + bimestre) : null,
     clear: clear, session: session, validToken: validToken, fetchJSON: fetchJSON,
     load: () => readOnce(),
+    // Sin coordinador no se precarga: evita una petición abandonada al navegar.
+    preload: async () => {
+      const token=validToken();
+      if (!token || !session() || session().role!=='auxiliar' || !await preloadAvailable() || validToken()!==token) return null;
+      return readOnce();
+    },
     inspect: () => request('loadstudents'),
     loadRoster: bimestre => {
       if (!['I','II','III','IV'].includes(bimestre)) return Promise.reject(new Error('Bimestre inválido.'));

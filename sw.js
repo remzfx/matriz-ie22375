@@ -1,6 +1,6 @@
 /* Service Worker — respaldo estático versionado, siempre network-first. */
 const CACHE_PREFIX = 'matriz-ie22375-';
-const CACHE = CACHE_PREFIX + 'v4';
+const CACHE = CACHE_PREFIX + 'v5';
 const MAX_STATIC_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const PRECACHE = [
   './', './index.html', './primaria.html', './secundaria.html', './auxiliar.html',
@@ -9,6 +9,53 @@ const PRECACHE = [
   './students-migration.js', './aula_innovacion.js'
 ];
 const STATIC_URLS = new Set(PRECACHE.map(path => new URL(path, self.registration.scope).href));
+// Puente de lectura: comparte una petición en curso entre Hub y Auxiliar al navegar.
+// Nunca se escribe información privada en CacheStorage; la petición en curso vive solo en memoria.
+const STUDENTS_API = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
+const studentReads = new Map();
+self.addEventListener('message', event => {
+  const data=event.data||{},port=event.ports&&event.ports[0];
+  if (!port || !event.source || !event.source.url.startsWith(self.registration.scope)) return;
+  if (data.type==='IE_STUDENTS_PROBE_V1') {port.postMessage({supported:true});return;}
+  if (data.type!=='IE_STUDENTS_READ_V1') return;
+  let claims;
+  try {claims=JSON.parse(atob(String(data.token).split('.')[0].replace(/-/g,'+').replace(/_/g,'/')));}catch(e){}
+  if (!claims || claims.role!=='auxiliar' || !(Number(claims.exp)>Date.now()) ||
+      (data.bimestre && !['I','II','III','IV'].includes(data.bimestre))) {
+    port.postMessage({error:{code:'SESSION',message:'Sesión ausente o vencida.',retryable:false}});return;
+  }
+  const key=data.token+'|'+(data.bimestre||'');
+  studentReads.forEach((entry,k)=>{if(entry.until<=Date.now())studentReads.delete(k);});
+  let entry=studentReads.get(key);
+  if (!entry) {
+    entry={until:Math.min(Number(claims.exp),Date.now()+30000)};
+    entry.task=(async()=>{
+      const ctrl=new AbortController();let timer;
+      try {
+        const result=await Promise.race([
+          (async()=>{
+            const r=await fetch(STUDENTS_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},cache:'no-store',signal:ctrl.signal,
+              body:JSON.stringify({action:'loadstudents',token:data.token,...(data.bimestre?{bimestre:data.bimestre}:{})})});
+            if (!r.ok) throw {code:'HTTP',message:'No se pudo conectar con el servidor.',retryable:r.status!==401&&r.status!==403};
+            return await r.json();
+          })(),
+          new Promise((_,reject)=>{timer=setTimeout(()=>{ctrl.abort();reject({code:'TIMEOUT',message:'El servidor tardó demasiado.',retryable:true});},12000);})
+        ]);
+        if (!result || !result.ok) studentReads.delete(key);
+        return {response:result};
+      } catch(e) {studentReads.delete(key);return {error:{code:e.code||'NETWORK',message:e.message||'No se pudo conectar con el servidor.',retryable:e.code?!!e.retryable:true}};}
+      finally {clearTimeout(timer);}
+    })();
+    studentReads.set(key,entry);
+    const cleanup=setTimeout(()=>{if(studentReads.get(key)===entry)studentReads.delete(key);},Math.max(1,entry.until-Date.now()));
+    if (cleanup && typeof cleanup.unref==='function') cleanup.unref();
+  }
+  event.waitUntil(entry.task.then(result=>{
+    port.postMessage(result);
+    // No reutilizar respuestas ya completadas: una verificación nueva consulta servidor.
+    if (studentReads.get(key)===entry) studentReads.delete(key);
+  }));
+});
 function esJavaScript(req) {
   return req.destination === 'script' || /\.m?js$/i.test(new URL(req.url).pathname);
 }
