@@ -23,7 +23,7 @@ function fixture(role='admin'){
     fetch:async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({ok:true,version:'synthetic-current',bimestre:JSON.parse(options.body).bimestre || '',inicializada:true,estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',orden:1,nombre:'Synthetic Primary'},{nivel:'secundaria',grado:1,seccion:'A',orden:1,nombre:'Synthetic Secondary'}]})};}
   });
   c.IEAuxPermissions={configurar(){},niveles(){return ['primaria','secundaria']}};
-  new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;
+  new vm.Script(read('registro-evaluation.js')).runInContext(c);new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;
   const run=code=>new vm.Script(code).runInContext(c);
   return {c,run,calls,memory,storage,session,elements,alerts};
 }

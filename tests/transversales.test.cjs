@@ -15,9 +15,10 @@ function fixture(){
   const route=(action,user,args={})=>s.post({action,token:token(user),...ctx,...args});
   const load=user=>route('loadtransversales',user,{area:user==='communication'?'Comunicación':user==='ef'?'Educación Física':'Matemática'});
   function aporte(user,value,modo=typeof value==='number'?'num':'letra'){
-    const area=user==='communication'?'Comunicación':user==='ef'?'Educación Física':'Matemática',before=load(user);
-    const prev=(before.aportes||[]).find(a=>a.user===user&&a.area===area);
-    return route('savetransversalaporte',user,{area,version:prev?prev.version:0,valores:{[id]:{tic:{modo,valor:value},autonomia:{modo,valor:value}}}});
+    const area=user==='communication'?'Comunicación':user==='ef'?'Educación Física':'Matemática',before=load(user),core=s.c.registroEvaluacion_();
+    const prev=(before.aportes||[]).find(a=>a.user===user&&a.area===area),sessions=['tic','autonomia'].map(comp=>({fecha:'2026-10-14',comp,capacidad:core.CAPS[comp][0]}));
+    const grades=Object.fromEntries(sessions.map(session=>[core.sessionKey(session),{[id]:{modo,valor:value}}]));
+    return route('savetransversalaporte',user,{area,version:prev?prev.version:0,evidencia:{schema:1,sessions,grades}});
   }
   function final(user,value,justificacion='Evidencias colegiadas del bimestre',snapshot=load(user)){
     return route('savetransversalfinal',user,{version:snapshot.version,versionAportes:snapshot.versionAportes,finales:{[id]:{tic:{modo:typeof value==='number'?'num':'letra',valor:value,justificacion},autonomia:{modo:typeof value==='number'?'num':'letra',valor:value,justificacion}}}});
@@ -35,7 +36,7 @@ test('different areas retain independent originals; changing final cannot overwr
   const s=fixture();s.aporte('math',18);s.aporte('communication','A');
   const before=JSON.stringify(s.tables.get('TransversalesAportes').rows);assert.equal(s.final('math',13).ok,true);
   assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),before);assert.equal(s.load('math').aportes.length,2);
-  const records=s.load('math').aportes;assert.equal(records.find(a=>a.area==='Matemática').valores[s.id].tic.nota20,18);assert.equal(records.find(a=>a.area==='Comunicación').valores[s.id].tic.valor,'A');
+  const records=s.load('math').aportes;assert.equal(records.find(a=>a.area==='Matemática').valores[s.id].tic.nota20,18);assert.equal(records.find(a=>a.area==='Comunicación').evidencia.grades[s.c.registroEvaluacion_().sessionKey({fecha:'2026-10-14',comp:'tic',capacidad:s.c.registroEvaluacion_().CAPS.tic[0]})][s.id].valor,'A');
 });
 for(const [n,level] of [[18,'AD'],[14,'A'],[11,'B'],[10,'C'],[0,'C'],[20,'AD']])test('equivalence '+n+' agrees with existing Registro exactly',()=>{
   const s=fixture(),f=client();f.run(extract('registro.html','numToLetter'));f.run(read('transversales-client.js'));const raw={modo:'num',valor:n};
@@ -194,17 +195,20 @@ for(const stage of ['confirmed','confirmed-C','obsolete','pending','pending-canc
 });
 
 function dom(){
- function el(tag){const e={tagName:tag,children:[],value:'',disabled:false,textContent:'',setAttribute(){},appendChild(x){this.children.push(x);return x},replaceChildren(){this.children=[]},querySelectorAll(tag){return this.children.flatMap(c=>[...(c.tagName===tag?[c]:[]),...c.querySelectorAll(tag)])}};return e;}
+ function el(tag){const e={style:{},tagName:tag,children:[],value:'',disabled:false,textContent:'',setAttribute(){},appendChild(x){this.children.push(x);return x},replaceChildren(){this.children=[]},querySelectorAll(tag){return this.children.flatMap(c=>[...(c.tagName===tag?[c]:[]),...c.querySelectorAll(tag)])}};return e;}
  return el;
 }
-test('real contribution editor keeps numeric originals when switching view and edits only its own area/user',async()=>{
+test('real evidence grid retains numeric originals on view switch, rounds edited grade, saves only own area/user',async()=>{
  const server=fixture();server.aporte('math',18);server.aporte('communication',14);
  const f=client('docente'),el=dom();f.session.user='math';f.storage.setItem('ie22375_session_v1',JSON.stringify(f.session));f.c.document.createElement=el;
  f.run(read('transversales-client.js'));const box=el('div'),editor=f.c.window.IETransversales.editor(box,clone(server.load('math')),{...server.ctx,area:'Matemática'},false);
- const selector=box.querySelectorAll('select')[0];assert.equal(box.querySelectorAll('select')[1].value,'AD');selector.value='num';selector.onchange();assert.equal(box.querySelectorAll('input')[0].value,18);assert.equal(editor.dirty(),false);
- box.querySelectorAll('input')[0].value='13.5';box.querySelectorAll('input')[0].onchange();assert.equal(editor.dirty(),true);
+ const mode=box.querySelectorAll('select')[0];assert.equal(box.querySelectorAll('select')[2].value,'AD');mode.value='num';mode.onchange();const grade=box.querySelectorAll('input').find(e=>e.type==='number');assert.equal(grade.value,18);assert.equal(editor.dirty(),false);
+ grade.value='13.5';grade.onchange();assert.equal(editor.dirty(),true);
  let payload;const signed=server.token('math');f.c.window.IEStudents.validToken=()=>signed;f.c.window.IEStudents.fetchJSON=async(url,options)=>{payload=JSON.parse(options.body);const result=server.post(payload);assert.equal(result.ok,true,result.error);return result};
- await box.querySelectorAll('button')[0].onclick();assert.equal(payload.action,'savetransversalaporte');assert.equal(payload.valores[server.id].tic.valor,14);assert.equal(payload.valores[server.id].autonomia.valor,18);assert.equal(editor.dirty(),false);
+ // Recreate with stable token: session switch is deliberately rejected by the original editor.
+ f.c.window.IEStudents.validToken=()=>f.session.token;f.session.token=signed;f.storage.setItem('ie22375_session_v1',JSON.stringify(f.session));
+ const fresh=el('div'),active=f.c.window.IETransversales.editor(fresh,clone(server.load('math')),{...server.ctx,area:'Matemática'},false);fresh.querySelectorAll('select')[0].value='num';fresh.querySelectorAll('select')[0].onchange();const input=fresh.querySelectorAll('input').find(e=>e.type==='number');input.value='13.5';input.onchange();
+ await fresh.querySelectorAll('button').find(b=>b.textContent==='Guardar sesión y evidencias del área').onclick();assert.equal(payload.action,'savetransversalaporte');const core=server.c.registroEvaluacion_(),key=core.sessionKey(payload.evidencia.sessions.find(s=>s.comp==='tic'));assert.equal(payload.evidencia.grades[key][server.id].valor,14);assert.equal(active.dirty(),false);
  assert.equal(server.load('math').aportes.find(a=>a.user==='communication').valores[server.id].tic.valor,14);
 });
 test('real consolidation editor never prefills a suggestion, blocks confirmation with unsaved final and is read-only for closed periods/Admin',async()=>{
@@ -255,4 +259,134 @@ test('bimestre roster version change invalidates confirmed final without rewriti
  const s=confirmed(),before=s.load('pip'),padron=s.post({action:'loadstudents',token:s.admin,bimestre:'I'});
  assert.equal(s.post({action:'syncstudents',token:s.admin,bimestre:'I',version:padron.version,base:{primaria:s.base.primaria,secundaria:{estudiantes:s.roster}}}).ok,true);
  const after=s.load('pip');assert.notEqual(after.versionAportes,before.versionAportes);assert.equal(after.resultados[s.id].tic.listo,false);assert.deepEqual(clone(after.resultados[s.id].tic.final),clone(before.resultados[s.id].tic.final));
+});
+
+function evidencia(s,items){
+ const core=s.c.registroEvaluacion_(),sessions=new Map(),grades={};
+ items.forEach(q=>{const session={fecha:q.fecha||'2026-10-14',comp:q.comp||'tic',capacidad:q.capacidad||core.CAPS[q.comp||'tic'][q.cap||0]},key=core.sessionKey(session);sessions.set(key,session);
+   if(q.valor!==undefined){grades[key]=grades[key]||{};grades[key][q.id||s.id]={modo:typeof q.valor==='number'?'num':'letra',valor:q.valor};}});
+ return {schema:1,sessions:[...sessions.values()],grades};
+}
+function guardarEvidencia(s,user,raw,extra={}){const area=user==='communication'?'Comunicación':user==='ef'?'Educación Física':'Matemática',prev=(s.load(user).aportes||[]).find(a=>a.area===area&&a.user===user);return s.route('savetransversalaporte',user,{area,version:prev?prev.version:0,evidencia:raw,...extra});}
+test('exactly four official TIC capacities and three autonomous-learning capacities are shared with server',()=>{
+ const s=fixture(),f=client();assert.equal(s.c.registroEvaluacion_.toString(),f.c.registroEvaluacion_.toString(),'single grading core must stay identical in the complete Apps Script');
+ const core=s.c.registroEvaluacion_();assert.equal(core.COMP.tic,'Se desenvuelve en los entornos virtuales generados por las TIC');
+ assert.deepEqual(clone(core.CAPS.tic),['Personaliza entornos virtuales','Gestiona información del entorno virtual','Interactúa en entornos virtuales','Crea objetos virtuales en diversos formatos']);
+ assert.deepEqual(clone(core.CAPS.autonomia),['Define metas de aprendizaje','Organiza acciones estratégicas para alcanzar sus metas de aprendizaje','Monitorea y ajusta su desempeño durante el proceso de aprendizaje']);
+ assert.deepEqual(clone(core.CAPS),clone(f.c.window.IERegistroEvaluacion.CAPS));
+});
+for(const count of [1,2,4])test('teacher can select '+count+' TIC capacities without requiring the others',()=>{
+ const s=fixture(),raw=evidencia(s,Array.from({length:count},(_,cap)=>({cap,valor:'A'}))),out=guardarEvidencia(s,'math',raw);assert.equal(out.ok,true);
+ const own=out.aportes[0];assert.equal(own.evidencia.sessions.length,count);assert.equal(own.estadisticas[s.id].tic.evidencias,count);assert.equal(own.estadisticas[s.id].tic.capacidades.length,count);assert.equal(own.valores[s.id].tic.nivel,'A');assert.equal(own.valores[s.id].autonomia,undefined);
+});
+for(const invalid of ['foreign-capacity','invented-capacity','invalid-date','duplicate-session','grade-without-session','foreign-student','direct-result'])test('backend rejects invalid evidence: '+invalid+' atomically',()=>{
+ const s=fixture(),raw=evidencia(s,[{valor:'A'}]);
+ if(invalid==='foreign-capacity')raw.sessions[0].capacidad=s.c.registroEvaluacion_().CAPS.autonomia[0];
+ if(invalid==='invented-capacity')raw.sessions[0].capacidad='Synthetic invented capacity';
+ if(invalid==='invalid-date')raw.sessions[0].fecha='2026-02-30';
+ if(invalid==='duplicate-session')raw.sessions.push({...raw.sessions[0]});
+ if(invalid==='grade-without-session')raw.sessions=[];
+ if(invalid==='foreign-student')raw.grades[Object.keys(raw.grades)[0]]={'id:synthetic-b':{modo:'letra',valor:'A'}};
+ const before=s.state.writes,out=invalid==='direct-result'?s.route('savetransversalaporte','math',{area:'Matemática',version:0,valores:{[s.id]:{tic:{modo:'letra',valor:'A'}}}}):guardarEvidencia(s,'math',raw);
+ assert.equal(out.ok,false);assert.equal(s.state.writes,before);assert.equal(s.tables.has('TransversalesAportes'),false);
+});
+test('dates, capacities, competencies and areas retain independent originals and server-owned context',()=>{
+ const s=fixture(),raw=evidencia(s,[{fecha:'2026-10-14',comp:'autonomia',cap:0,valor:'A'},{fecha:'2026-10-14',comp:'autonomia',cap:2,valor:13.5},{fecha:'2026-10-15',comp:'autonomia',cap:1,valor:'B'}]);
+ raw.sessions.forEach(x=>Object.assign(x,{user:'communication',area:'Comunicación',grado:5,seccion:'B',bimestre:'II',docente:'Forged',ts:1}));raw.finales={[s.id]:{autonomia:{nivel:'AD',valor:20}}};
+ const out=guardarEvidencia(s,'math',raw);assert.equal(out.ok,true);const original=JSON.stringify(s.tables.get('TransversalesAportes').rows[1]);
+ const own=out.aportes[0];assert.equal(own.evidencia.sessions.length,3);own.evidencia.sessions.forEach(x=>{assert.equal(x.user,'math');assert.equal(x.area,'Matemática');assert.equal(x.grado,2);assert.equal(x.seccion,'A');assert.equal(x.bimestre,'I');assert.equal(x.docente,'Synthetic Math');assert.ok(x.ts>1);});
+ const numeric=Object.values(own.evidencia.grades).map(g=>g[s.id]).find(g=>g.modo==='num');assert.equal(numeric.valor,14);assert.equal(numeric.nivel,'A');assert.equal(own.valores[s.id].autonomia.valor,14);assert.equal(own.valores[s.id].tic,undefined);
+ guardarEvidencia(s,'communication',evidencia(s,[{comp:'autonomia',valor:'C'}]));assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows[1]),original);
+ assert.equal(s.load('pip').aportes.find(a=>a.user==='communication').valores[s.id].autonomia.nivel,'C');
+});
+test('evidence result matches real Registro notaDesdeSesiones, letter midpoints and rounded average for each competence',()=>{
+ const s=fixture(),items=[{valor:'AD'},{cap:1,valor:'C'},{fecha:'2026-10-15',valor:13.5},{comp:'autonomia',valor:'B'},{comp:'autonomia',cap:1,valor:8}],out=guardarEvidencia(s,'math',evidencia(s,items)),own=out.aportes[0],f=client();
+ f.run("let store={sessions:[],grades:{}};function ctxBase(){return {nivel:'secundaria',bim:'I',grado:2,seccion:'A',area:'Matemática'}};function identidadAlumno(id){return id};function leerNota(map,k){return map[k]}");
+ for(const name of ['numToLetter','letterToNum','promedioNums','notaDesdeSesiones'])f.run(extract('registro.html',name));
+ f.c.input=clone(own.evidencia);f.c.names=clone(s.c.registroEvaluacion_().COMP);f.run("input.sessions.forEach(s=>{const comp=names[s.comp];store.sessions.push({nivel:'secundaria',bim:'I',grado:2,seccion:'A',area:'Matemática',comp,capacidad:s.capacidad,fecha:s.fecha});Object.entries(input.grades[JSON.stringify([s.fecha,s.comp,s.capacidad])]||{}).forEach(([id,g])=>{store.grades[['secundaria','I',2,'A','Matemática',comp,s.capacidad,s.fecha,id].join('||')]=g;});})");
+ for(const comp of ['tic','autonomia']){const original=f.c.notaDesdeSesiones(f.c.names[comp],s.id);assert.equal(own.valores[s.id][comp].nota20,original.nota);assert.equal(own.valores[s.id][comp].nivel,original.letra);}
+ assert.notEqual(own.valores[s.id].tic.valor,own.valores[s.id].autonomia.valor);
+});
+test('ten Math evidences count as one area vote, equal to a single Communication evidence',()=>{
+ const s=fixture();guardarEvidencia(s,'math',evidencia(s,Array.from({length:10},(_,i)=>({fecha:'2026-10-'+(14+i),valor:'A'}))));guardarEvidencia(s,'communication',evidencia(s,[{valor:'B'}]));
+ const r=s.load('pip').resultados[s.id].tic.resumen;assert.equal(r.recibidos,2);assert.deepEqual(clone(r.conteo),{AD:0,A:1,B:1,C:0});assert.equal(r.sugerencia,null);assert.equal(r.empate,true);
+ assert.equal(s.load('pip').aportes.find(a=>a.user==='math').estadisticas[s.id].tic.evidencias,10);assert.equal(s.load('pip').resultados[s.id].autonomia.resumen.recibidos,0);
+});
+test('selected but ungraded capacities are Sin aporte and leave each competence independently pending',()=>{
+ const s=fixture(),out=guardarEvidencia(s,'math',evidencia(s,[{comp:'tic'},{comp:'autonomia',valor:'A'}]));assert.equal(out.aportes[0].valores[s.id].tic,undefined);assert.equal(out.aportes[0].estadisticas[s.id].tic.evidencias,0);
+ const all=s.load('pip');assert.ok(all.resultados[s.id].tic.resumen.faltan.includes('Matemática'));assert.ok(!all.resultados[s.id].autonomia.resumen.faltan.includes('Matemática'));
+});
+for(const change of ['add-date','change-grade-same-level','change-capacity','remove-evidence'])test('evidence '+change+' invalidates Tutor/AIP even if aggregate stays A; append history survives',()=>{
+ const s=fixture();guardarEvidencia(s,'math',evidencia(s,[{valor:14},{cap:1,valor:15}]));s.final('math','A');s.confirm('math','confirmtransversaltutor');s.confirm('pip','confirmtransversalaip');
+ const before=s.load('pip'),own=s.load('math').aportes.find(a=>a.user==='math'),raw=clone(own.evidencia),original=JSON.stringify(s.tables.get('TransversalesAportes').rows[1]),core=s.c.registroEvaluacion_();
+ if(change==='add-date'){const session={fecha:'2026-10-15',comp:'tic',capacidad:core.CAPS.tic[0]};raw.sessions.push(session);raw.grades[core.sessionKey(session)]={[s.id]:{modo:'letra',valor:'A'}};}
+ if(change==='change-grade-same-level')raw.grades[core.sessionKey(raw.sessions[0])][s.id]={modo:'num',valor:15};
+ if(change==='change-capacity'){const first=raw.sessions[0],grades=raw.grades[core.sessionKey(first)];delete raw.grades[core.sessionKey(first)];first.capacidad=core.CAPS.tic[2];raw.grades[core.sessionKey(first)]=grades;}
+ if(change==='remove-evidence'){const first=raw.sessions.shift();delete raw.grades[core.sessionKey(first)];}
+ assert.equal(guardarEvidencia(s,'math',raw).ok,true);const after=s.load('pip');assert.equal(after.aportes[0].valores[s.id].tic.nivel,'A');assert.notEqual(after.versionAportes,before.versionAportes);assert.equal(after.resultados[s.id].tic.listo,false);assert.match(after.resultados[s.id].tic.estado,/Requiere nueva confirmación/);assert.deepEqual(clone(after.resultados[s.id].tic.final),clone(before.resultados[s.id].tic.final));assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows[1]),original);
+});
+test('Tutor and AIP can read originals but cannot edit another teacher evidence or forge academic scope',()=>{
+ const s=fixture();guardarEvidencia(s,'communication',evidencia(s,[{valor:'B'}]));const original=JSON.stringify(s.tables.get('TransversalesAportes').rows),raw=evidencia(s,[{valor:'A'}]);
+ assert.ok(s.load('pip').aportes[0].evidencia);assert.ok(s.load('math').aportes[0].evidencia);
+ for(const [user,args] of [['pip',{area:'Comunicación'}],['math',{area:'Comunicación'}],['math',{grado:2,seccion:'B'}],['admin',{}],['auxiliar',{}],['test-primary',{}]])assert.equal(guardarEvidencia(s,user,raw,args).ok,false);
+ assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),original);assert.equal(s.load('ef').aportes.length,0);
+});
+for(const state of ['cerrado','bloqueado'])test(state+': existing evidence, deletion, addition and grade changes are read-only',()=>{
+ const s=fixture();guardarEvidencia(s,'math',evidencia(s,[{valor:'A'}]));s.tables.get('ConfigSistema').rows[1][2]=JSON.stringify({bimestres:{I:state}});const original=JSON.stringify(s.tables.get('TransversalesAportes').rows);
+ assert.equal(guardarEvidencia(s,'math',{schema:1,sessions:[],grades:{}}).code,'PERIOD');assert.equal(guardarEvidencia(s,'math',evidencia(s,[{valor:'B'}])).code,'PERIOD');assert.equal(s.load('math').abierto,false);assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),original);
+});
+test('direct legacy contributions are retained as historical without becoming fabricated evidence or votes',()=>{
+ const s=fixture(),raw={[s.id]:{tic:{modo:'letra',valor:'AD',nivel:'AD'}}};s.tables.set('TransversalesAportes',s.sheet('TransversalesAportes',[['clave','bimestre','grado','seccion','areaOrigen','docente','user','ts','json'],['secundaria||I||2||A||Matemática||math','I',2,'A','Matemática','Synthetic Math','math',1001,JSON.stringify(raw)]]));
+ const original=JSON.stringify(s.tables.get('TransversalesAportes').rows),out=s.load('math');assert.deepEqual(clone(out.aportes[0].legacyValores),raw);assert.equal(out.aportes[0].evidencia,null);assert.equal(out.resultados[s.id].tic.resumen.recibidos,0);assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),original);
+});
+
+function evidenciaUI(s,closed=false){
+ const f=client('docente'),el=dom(),signed=s.token('math');f.session.user='math';f.session.token=signed;f.storage.setItem('ie22375_session_v1',JSON.stringify(f.session));f.c.document.createElement=el;
+ const requests=[];f.c.window.IEStudents.fetchJSON=async(url,options)=>{requests.push({url,options});return s.post(JSON.parse(options.body));};f.run(read('transversales-client.js'));
+ const box=el('div'),data=clone(s.load('math'));if(closed)data.abierto=false;const active=f.c.window.IETransversales.editor(box,data,{...s.ctx,area:'Matemática'},false);return {f,box,active,requests};
+}
+test('real Registro transversal UI selects multiple capacities, keeps two dates, saves one block and reopens previous evidence',async()=>{
+ const s=fixture(),ui=evidenciaUI(s),{box,active,requests}=ui;
+ const date=box.querySelectorAll('input').find(e=>e.type==='date');date.value='2026-10-14';date.onchange();
+ const comp=box.querySelectorAll('select')[1];comp.value='autonomia';comp.onchange();assert.equal(box.querySelectorAll('input').filter(e=>e.type==='checkbox').length,3);
+ const checks=box.querySelectorAll('input').filter(e=>e.type==='checkbox');checks[0].checked=checks[2].checked=true;box.querySelectorAll('button').find(b=>b.textContent==='Agregar capacidades a la grilla').onclick();
+ const inputs=box.querySelectorAll('select').slice(2);assert.equal(inputs.length,2);inputs[0].value='A';inputs[0].onchange();inputs[1].value='B';inputs[1].onchange();assert.equal(active.dirty(),true);
+ date.value='2026-10-15';date.onchange();box.querySelectorAll('input').filter(e=>e.type==='checkbox')[1].checked=true;box.querySelectorAll('button').find(b=>b.textContent==='Agregar capacidades a la grilla').onclick();
+ const input=box.querySelectorAll('select')[2];input.value='AD';input.onchange();await box.querySelectorAll('button').find(b=>b.textContent==='Guardar sesión y evidencias del área').onclick();
+ assert.equal(requests.length,1);const payload=JSON.parse(requests[0].options.body);assert.equal(payload.evidencia.sessions.length,3);assert.equal(Object.keys(payload.evidencia.grades).length,3);assert.equal(active.dirty(),false);
+ const own=s.load('math').aportes.find(a=>a.user==='math');assert.equal(own.estadisticas[s.id].autonomia.capacidades.length,3);assert.equal(own.estadisticas[s.id].autonomia.evidencias,3);assert.equal(own.valores[s.id].autonomia.nivel,'A');assert.equal(own.valores[s.id].tic,undefined);
+ box.querySelectorAll('button').find(b=>b.textContent.startsWith('2026-10-14')).onclick();assert.equal(box.querySelectorAll('select').length,4);assert.equal(box.querySelectorAll('select')[2].value,'A');assert.equal(box.querySelectorAll('select')[3].value,'B');assert.equal(requests.length,1);
+ const reopened=evidenciaUI(s);assert.equal(reopened.box.querySelectorAll('select')[2].value,'A');assert.equal(reopened.active.dirty(),false);
+});
+test('real evidence UI single capacity and deleting a session require save; letters/numbers view does not mutate stored notes',async()=>{
+ const s=fixture();guardarEvidencia(s,'math',evidencia(s,[{valor:'A'},{fecha:'2026-10-15',valor:18}]));const original=JSON.stringify(s.tables.get('TransversalesAportes').rows),ui=evidenciaUI(s),{box,active,requests}=ui;
+ const mode=box.querySelectorAll('select')[0];mode.value='num';mode.onchange();assert.equal(box.querySelectorAll('input').find(e=>e.type==='number').value,15);mode.value='letra';mode.onchange();assert.equal(active.dirty(),false);assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),original);
+ box.querySelectorAll('button').find(b=>b.textContent==='Quitar capacidad y sus notas').onclick();assert.equal(active.dirty(),true);assert.equal(requests.length,0);assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),original);
+ await box.querySelectorAll('button').find(b=>b.textContent==='Guardar sesión y evidencias del área').onclick();assert.equal(requests.length,1);assert.equal(s.load('math').aportes[0].evidencia.sessions.length,1);assert.equal(s.load('math').aportes[0].valores[s.id].tic.nivel,'AD');assert.equal(s.tables.get('TransversalesAportes').rows.length,3);
+});
+test('closed evidence grid allows consulting dates/mode but never adding/deleting/grading/saving',async()=>{
+ const s=fixture();guardarEvidencia(s,'math',evidencia(s,[{valor:'A'}]));const {box,active,requests}=evidenciaUI(s,true);
+ const add=box.querySelectorAll('button').find(b=>b.textContent==='Agregar capacidades a la grilla'),del=box.querySelectorAll('button').find(b=>b.textContent==='Quitar capacidad y sus notas'),save=box.querySelectorAll('button').find(b=>b.textContent==='Guardar sesión y evidencias del área');assert.ok(add.disabled&&del.disabled&&save.disabled);
+ assert.equal(box.querySelectorAll('select')[0].disabled,false);assert.equal(box.querySelectorAll('select')[2].disabled,true);
+ add.onclick();del.onclick();await save.onclick();assert.equal(active.dirty(),false);assert.equal(requests.length,0);
+});
+test('Tutor/AIP evidence detail renders original capacity/date grades as readonly while only final decisions are editable',()=>{
+ const s=fixture();guardarEvidencia(s,'math',evidencia(s,[{valor:13.5}]));const f=client('pip'),el=dom();f.c.document.createElement=el;f.run(read('transversales-client.js'));const box=el('div');f.c.window.IETransversales.editor(box,clone(s.load('pip')),s.ctx,true);
+ const detail=box.querySelectorAll('details')[0];assert.match(detail.querySelectorAll('summary')[0].textContent,/Ver evidencias de Matemática/);assert.match(detail.querySelectorAll('p')[0].textContent,/2026-10-14.*Personaliza entornos virtuales.*14 → A/);assert.equal(detail.querySelectorAll('select').length,0);assert.equal(detail.querySelectorAll('input').length,0);assert.equal(detail.querySelectorAll('button').length,0);
+});
+
+test('large bimestral evidence blocks stay below Sheets cell limits and reconstruct without losing originals',()=>{
+ const s=fixture(),students=Array.from({length:30},(_,i)=>({nivel:'secundaria',grado:2,seccion:'A',orden:i+1,nombre:'Synthetic Large Student '+i,idSiagie:'large-'+i})),base=s.post({action:'loadstudents',token:s.admin});
+ assert.equal(s.post({action:'savestudents',token:s.admin,version:base.version,base:{primaria:s.base.primaria,secundaria:{estudiantes:students}}}).ok,true);
+ const items=[];for(let day=1;day<=15;day++)for(let cap=0;cap<4;cap++)for(let i=0;i<30;i++)items.push({fecha:'2026-10-'+String(day).padStart(2,'0'),cap,id:'id:large-'+i,valor:15});
+ const out=guardarEvidencia(s,'math',evidencia(s,items));assert.equal(out.ok,true);const sh=s.tables.get('TransversalesAportes');assert.ok(sh.rows.length>3);sh.rows.slice(1).forEach(row=>assert.ok(String(row[8]).length<50000));
+ const own=s.load('math').aportes[0];assert.equal(own.evidencia.sessions.length,60);assert.equal(Object.values(own.evidencia.grades).reduce((n,g)=>n+Object.keys(g).length,0),1800);assert.equal(own.estadisticas['id:large-0'].tic.evidencias,60);assert.equal(own.valores['id:large-29'].tic.nivel,'A');
+ const snapshot=s.load('pip'),finales={};students.forEach(al=>{finales['id:'+al.idSiagie]={};for(const comp of ['tic','autonomia'])finales['id:'+al.idSiagie][comp]={modo:'letra',valor:'A',justificacion:'Evidencias sintéticas de prueba. '.repeat(45)};});
+ assert.equal(s.route('savetransversalfinal','pip',{version:snapshot.version,versionAportes:snapshot.versionAportes,finales}).ok,true);assert.equal(s.confirm('math','confirmtransversaltutor').ok,true);const confirmed=s.confirm('pip','confirmtransversalaip');assert.equal(confirmed.resultados['id:large-29'].tic.listo,true);
+ const consolidated=s.tables.get('TransversalesConsolidado');assert.ok(consolidated.rows.length>5);consolidated.rows.slice(1).forEach(row=>assert.ok(String(row[6]).length<50000));
+ const before=s.load('pip'),rows=JSON.stringify(sh.rows),append=sh.appendRow;let writes=0;sh.appendRow=function(row){if(++writes===2)throw Error('Synthetic interrupted append');return append.call(sh,row);};
+ const changed=clone(own.evidencia),key=Object.keys(changed.grades)[0];changed.grades[key]['id:large-0']={modo:'num',valor:14};assert.equal(guardarEvidencia(s,'math',changed).ok,false);sh.appendRow=append;
+ const after=s.load('pip');assert.equal(after.versionAportes,before.versionAportes);assert.deepEqual(clone(after.aportes[0].evidencia),clone(before.aportes[0].evidencia));assert.ok(JSON.stringify(sh.rows).startsWith(rows.slice(0,-1)));
+ // Missing part in a committed block must fail closed rather than returning invented/old results.
+ const firstPart=sh.rows.findIndex(row=>String(row[0]).includes('||@parte||'));sh.rows.splice(firstPart,1);assert.equal(s.load('pip').ok,false);assert.match(s.load('pip').error,/incompleto/);
 });

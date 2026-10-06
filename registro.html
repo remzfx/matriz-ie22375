@@ -157,7 +157,7 @@
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
 <script src="student-identity.js"></script>
-<script src="transversales-client.js"></script>
+<script src="registro-evaluation.js"></script><script src="transversales-client.js"></script>
 </head>
 <body class="min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['primaria','secundaria','admin'];</script>
@@ -265,6 +265,7 @@
   </div>
 
   <main class="max-w-3xl mx-auto px-3 py-3 space-y-3" style="padding-bottom:110px">
+    <style>.trans-evidence-grid th,.trans-evidence-grid td{padding:8px;border:1px solid #cbd5e1;vertical-align:middle;text-align:center}.trans-evidence-grid input,.trans-evidence-grid select{min-height:44px;min-width:76px}.trans-evidence-grid small{display:block}</style>
     <section id="registroTransversales" class="card p-3" hidden><h2 class="font-bold">COMPETENCIAS TRANSVERSALES</h2><p class="text-sm">Aporta desde tu área autorizada. La decisión consolidada se revisa por Tutor y AIP.</p><button class="btn" type="button" onclick="abrirTransversalesRegistro()">Evaluar transversales</button><a href="transversales.html" id="registroTutorLink" hidden>Consolidación Tutor/AIP</a><p id="registroTransStatus" role="status"></p><div id="registroTransRows"></div></section>
     <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
 <button type="button" id="retryRoster" class="btn btn-ghost text-sm" hidden onclick="reintentarPadronRegistro()">Reintentar</button>
