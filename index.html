@@ -13,6 +13,7 @@
   <title>IE 22375 · Acceso</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="students.js" defer></script>
+  <script src="login-bridge.js" defer></script>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; min-height: 100vh; margin: 0;
       background: radial-gradient(ellipse at top, #e0f2fe 0%, transparent 55%), radial-gradient(ellipse at bottom right, #d1fae5 0%, transparent 45%), #f1f5f9; }
@@ -160,9 +161,20 @@ async function loginBackendUnaVez(tipo, usuario, password, intento = 1) {
   } finally { clearTimeout(timer); ctrl.abort(); }
 }
 let loginPendiente = null;
+let puenteLogin = null, versionSesionLogin = 0, solicitudLogin = 0;
+function iniciarPuenteLogin() {
+  if (!puenteLogin && typeof IELoginBridge !== 'undefined') {
+    try { puenteLogin = IELoginBridge.create(CLOUD_API_URL); } catch(e) { /* Fetch sigue disponible. */ }
+  }
+}
 async function loginBackend(tipo, usuario, password, onRetry) {
   if (loginPendiente) return loginPendiente;
   loginPendiente = (async () => {
+    if (puenteLogin && puenteLogin.ready()) {
+      detenerPrecalentamientoLogin();
+      // Una solicitud RPC, sin retry ni fallback después de enviar credenciales.
+      return puenteLogin.login(tipo,usuario,password);
+    }
     let ultimoError;
     for (let intento = 1; intento <= 2; intento++) {
       try {
@@ -184,6 +196,7 @@ async function loginBackend(tipo, usuario, password, onRetry) {
 }
 function mensajeErrorLogin(e) {
   const code = e && e.code ? e.code : 'UNKNOWN';
+  if (code.startsWith('BRIDGE_')) return 'No se pudo completar el acceso mediante el puente seguro. Inténtalo nuevamente.';
   if (code === 'TIMEOUT') return 'El servidor está demorando más de lo normal. Se hicieron 2 intentos y no respondió a tiempo.';
   if (code === 'HTTP') return 'El servidor respondió con un error' + (e.status ? ' (HTTP ' + e.status + ')' : '') + '. Inténtalo nuevamente en unos segundos.';
   if (code === 'INVALID_RESPONSE') return 'El servidor respondió de forma inesperada. Inténtalo nuevamente en unos segundos.';
@@ -248,12 +261,14 @@ function getSession() {
   return s;
 }
 function setSession(obj) {
+  versionSesionLogin++;
   const data = JSON.stringify(obj);
   sessionStorage.setItem(SESSION_KEY, data);
   if (obj.recordar) localStorage.setItem(SESSION_KEY, data);
   else localStorage.removeItem(SESSION_KEY);
 }
 function clearSession() {
+  versionSesionLogin++;
   sessionStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(SESSION_KEY);
 }
@@ -285,6 +300,8 @@ async function intentarLogin() {
   }
 
   const btnLogin = document.getElementById('btnLogin');
+  const version = versionSesionLogin, solicitud = ++solicitudLogin;
+  const tokenInicial = (leerSesionCruda() || {}).token;
   if (btnLogin) { btnLogin.disabled = true; btnLogin.textContent = 'Verificando…'; }
 
   err.textContent = 'Verificando credenciales…';
@@ -296,11 +313,13 @@ async function intentarLogin() {
       err.classList.remove('hidden');
     });
   } catch (e) {
+    if (version !== versionSesionLogin || solicitud !== solicitudLogin || (leerSesionCruda() || {}).token !== tokenInicial) return;
     registrarFalloLogin(e);
     err.textContent = mensajeErrorLogin(e);
     if (btnLogin) { btnLogin.disabled = false; btnLogin.textContent = 'Ingresar'; }
     return;
   }
+  if (version !== versionSesionLogin || solicitud !== solicitudLogin || (leerSesionCruda() || {}).token !== tokenInicial) return;
   if (btnLogin) { btnLogin.disabled = false; btnLogin.textContent = 'Ingresar'; }
   if (!perfil || !perfil.ok) {
     err.textContent = (perfil && perfil.error) || 'Usuario o contraseña incorrectos.';
@@ -378,6 +397,7 @@ function cerrarSesion() {
   document.getElementById('viewHub').classList.add('hidden');
   document.getElementById('viewLogin').classList.remove('hidden');
   document.getElementById('inpPass').value = '';
+  iniciarPuenteLogin();
 }
 function modsDe(s) {
   if (s.role === 'admin' || s.user === 'admin') return ['admin_bd','registro','auxiliar','wa_grupos','matriz_pri','matriz_sec','aip'];
@@ -423,6 +443,10 @@ function mostrarHub() {
 }
 onTipoChange();
 if (!restaurarSesionRecordada()) {
+  iniciarPuenteLogin();
+  if (typeof document.addEventListener === 'function') document.addEventListener('DOMContentLoaded',function() {
+    if (!getSession()) iniciarPuenteLogin();
+  },{once:true});
   // Arrancar Apps Script en segundo plano mientras el usuario completa el login.
   precalentarLoginBackend();
 }
