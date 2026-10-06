@@ -61,7 +61,7 @@
           }
           const enabled=data.abierto&&data.puedeFinal&&!busy;
           const input=control(record,mode,raw=>changed(al.id,comp,raw),cell);input.disabled=!enabled;
-          {const just=document.createElement('textarea');just.placeholder='Justificación breve';just.value=record&&record.justificacion||'';just.disabled=!enabled;just.onchange=()=>changed(al.id,comp,{justificacion:just.value});cell.appendChild(just);}
+          [['justificacion','Justificación de la decisión colegiada'],['conclusion','Conclusión descriptiva']].forEach(([key,label])=>{const wrap=text('label',label,cell),field=document.createElement('textarea');field.setAttribute('aria-label',label);field.placeholder=label;field.value=record&&record[key]||'';field.disabled=!enabled;field.onchange=()=>changed(al.id,comp,{[key]:field.value});wrap.appendChild(field);if(key==='conclusion')text('p','Obligatoria cuando la calificación final es C.',cell);});
         });
       });
       modeEl.disabled=busy;buttons.querySelectorAll('button').forEach(b=>{b.disabled=busy||!data.abierto;});

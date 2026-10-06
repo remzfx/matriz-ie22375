@@ -20,8 +20,8 @@ function fixture(){
     const grades=Object.fromEntries(sessions.map(session=>[core.sessionKey(session),{[id]:{modo,valor:value}}]));
     return route('savetransversalaporte',user,{area,version:prev?prev.version:0,evidencia:{schema:1,sessions,grades}});
   }
-  function final(user,value,justificacion='Evidencias colegiadas del bimestre',snapshot=load(user)){
-    return route('savetransversalfinal',user,{version:snapshot.version,versionAportes:snapshot.versionAportes,finales:{[id]:{tic:{modo:typeof value==='number'?'num':'letra',valor:value,justificacion},autonomia:{modo:typeof value==='number'?'num':'letra',valor:value,justificacion}}}});
+  function final(user,value,justificacion='Evidencias colegiadas del bimestre',snapshot=load(user),conclusion=''){
+    return route('savetransversalfinal',user,{version:snapshot.version,versionAportes:snapshot.versionAportes,finales:{[id]:{tic:{modo:typeof value==='number'?'num':'letra',valor:value,justificacion,conclusion},autonomia:{modo:typeof value==='number'?'num':'letra',valor:value,justificacion,conclusion}}}});
   }
   const confirm=(user,action,snapshot=load(user))=>route(action,user,{version:snapshot.version,versionAportes:snapshot.versionAportes});
   return {...s,docs,ctx,id,roster,token,route,load,aporte,final,confirm};
@@ -151,7 +151,7 @@ test('Registro preserves an unsaved transversal draft on context changes or reop
 
 const exportFixture=new Function('require','__dirname',read('tests/registro-roster-identity.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname);
 for(const stage of ['confirmed','confirmed-C','obsolete','pending','pending-cancel','unlinked-accept','unlinked-cancel','empty','ambiguous-name','ambiguous-code','ambiguous-id'])test('real Admin SIAGIE export '+stage+' uses only current confirmed finals and preserves academic export',async()=>{
- const server=fixture();['math','communication','ef'].forEach(u=>server.aporte(u,stage==='confirmed-C'?'C':'A'));server.final('math',stage==='confirmed-C'?'C':13,stage==='confirmed-C'?'':undefined);server.confirm('math','confirmtransversaltutor');
+ const server=fixture();['math','communication','ef'].forEach(u=>server.aporte(u,stage==='confirmed-C'?'C':'A'));server.final('math',stage==='confirmed-C'?'C':13,stage==='confirmed-C'?'Justificación colegiada distinta':undefined,undefined,stage==='confirmed-C'?'Necesita acompañamiento para desarrollar las capacidades evaluadas.':'');server.confirm('math','confirmtransversaltutor');
  if(!stage.startsWith('pending'))server.confirm('pip','confirmtransversalaip');if(stage==='obsolete')server.aporte('ef','B');
  const f=exportFixture(),ctx={nivel:'secundaria',bim:'I',grado:2,seccion:'A'},academic={finales:{'secundaria||I||2||A||Matemática||Resuelve||id:synthetic-a':{nivel:'AD'}}};
  const sheet=()=>({'!ref':'A1:E3',A3:{v:'synthetic-a'},C3:{v:'Synthetic Student A'},D3:{v:'C'},E3:{v:'Legacy conclusion must not survive'}}),mate=sheet(),tic=sheet(),auto=sheet(),wb={SheetNames:['MATE','DESEN TIC','GEST AUTO'],Sheets:{MATE:mate,'DESEN TIC':tic,'GEST AUTO':auto}};
@@ -180,7 +180,7 @@ for(const stage of ['confirmed','confirmed-C','obsolete','pending','pending-canc
  f.c.IETransversales={request:async(action,data)=>{reads++;return server.route(action,'admin',data)}};
  for(const name of ['numToLetterAdm','promedioAdm','letraDesdePayload','concDesdePayload','vaciarSiagieOficial'])f.run(extract('admin.html',name));
  await f.c.vaciarSiagieOficial();assert.equal(exported,stage.endsWith('-cancel')?0:1);assert.equal(downloads,exported);assert.equal(reads,2);assert.equal(mate.D3.v,'AD');
- for(const ws of [tic,auto]){assert.equal(ws.E3,undefined);if(!stage.startsWith('pending')&&stage!=='obsolete')assert.equal(ws.D3.v,stage==='confirmed-C'?'C':'B');else assert.equal(ws.D3,undefined);}
+ for(const ws of [tic,auto]){if(stage==='confirmed-C'){assert.equal(ws.E3.v,'Necesita acompañamiento para desarrollar las capacidades evaluadas.');assert.notEqual(ws.E3.v,'Justificación colegiada distinta');}else assert.equal(ws.E3,undefined);if(!stage.startsWith('pending')&&stage!=='obsolete')assert.equal(ws.D3.v,stage==='confirmed-C'?'C':'B');else assert.equal(ws.D3,undefined);}
  if(unlinked||stage==='empty'){
    for(const ws of [tic,auto]){assert.equal(ws.D4,undefined);assert.equal(ws.E4,undefined);assert.equal(ws.D6,undefined);assert.equal(ws.E6,undefined);}
    assert.equal(mate.D4.v,'C');assert.equal(mate.E4.v,'Unlinked legacy conclusion');
@@ -233,6 +233,34 @@ for(const entrada of [-0.1,20.1,-1,21])test('numeric '+entrada+' is rejected bef
  assert.equal(s.aporte('math',entrada).ok,false);assert.equal(s.final('pip',entrada).ok,false);assert.equal(s.tables.has('TransversalesAportes'),false);assert.equal(s.tables.has('TransversalesConsolidado'),false);
 });
 function confirmed(s=fixture()){['math','communication','ef'].forEach(u=>s.aporte(u,'A'));s.final('math','A');s.confirm('math','confirmtransversaltutor');s.confirm('pip','confirmtransversalaip');return s;}
+for(const justificacion of ['', 'Justificación colegiada sin conclusión'])test('suggested C without descriptive conclusion cannot be confirmed or ready: '+JSON.stringify(justificacion),()=>{
+ const s=fixture();['math','communication','ef'].forEach(u=>s.aporte(u,'C'));
+ const out=s.final('math','C',justificacion,undefined,'   ');assert.equal(out.ok,true);const r=out.resultados[s.id].tic;
+ assert.equal(r.resumen.sugerencia,'C');assert.equal(r.resumen.alerta,false);assert.equal(r.final.conclusion,'');assert.equal(r.listo,false);assert.equal(r.estado,'Conclusión descriptiva obligatoria para nivel C');
+ const writes=s.state.writes;for(const [user,action] of [['math','confirmtransversaltutor'],['pip','confirmtransversalaip']]){const rejected=s.confirm(user,action);assert.equal(rejected.ok,false);assert.equal(rejected.error,'Conclusión descriptiva obligatoria para nivel C');}assert.equal(s.state.writes,writes);
+});
+test('C conclusion and collegiate justification remain separate; conclusion-only change resets both confirmations and preserves history',()=>{
+ const s=fixture();['math','communication','ef'].forEach(u=>s.aporte(u,'C'));const conclusion='Requiere acompañamiento para organizar sus metas.',just='Decisión colegiada fundamentada.';
+ assert.equal(s.final('math','C',just,undefined,conclusion).ok,true);s.confirm('math','confirmtransversaltutor');let out=s.confirm('pip','confirmtransversalaip');assert.equal(out.ok,true);assert.equal(out.resultados[s.id].tic.listo,true);assert.equal(out.resultados[s.id].tic.final.conclusion,conclusion);assert.equal(out.resultados[s.id].tic.final.justificacion,just);
+ const before=JSON.stringify(s.tables.get('TransversalesConsolidado').rows),version=out.version;
+ out=s.final('pip','C',just,undefined,conclusion+' Seguimiento semanal.');const f=out.resultados[s.id].tic.final;assert.ok(out.version>version);assert.equal(f.tutor,null);assert.equal(f.aip,null);assert.equal(out.resultados[s.id].tic.listo,false);assert.equal(f.justificacion,just);assert.ok(JSON.stringify(s.tables.get('TransversalesConsolidado').rows).startsWith(before.slice(0,-1)));
+ s.confirm('math','confirmtransversaltutor');assert.equal(s.confirm('pip','confirmtransversalaip').resultados[s.id].tic.listo,true);
+});
+test('legacy C with Tutor/AIP confirmations and justification but no conclusion fails closed on load and export',()=>{
+ const s=confirmed(),row=s.tables.get('TransversalesConsolidado').rows.at(-1),finales=JSON.parse(row[6]);for(const f of Object.values(finales[s.id])){f.nivel='C';f.valor='C';delete f.conclusion;}row[6]=JSON.stringify(finales);
+ for(const out of [s.load('pip'),s.route('loadtransversalexport','admin')]){assert.equal(out.resultados[s.id].tic.listo,false);assert.equal(out.resultados[s.id].tic.estado,'Conclusión descriptiva obligatoria para nivel C');}
+ assert.equal(s.c.transversalListo_(finales[s.id].tic,row[4]),false);
+});
+for(const level of ['AD','A','B'])test('final '+level+' needs no descriptive conclusion',()=>{
+ const s=fixture();['math','communication','ef'].forEach(u=>s.aporte(u,level));assert.equal(s.final('math',level,'').ok,true);s.confirm('math','confirmtransversaltutor');const out=s.confirm('pip','confirmtransversalaip');assert.equal(out.ok,true);assert.equal(out.resultados[s.id].tic.listo,true);assert.equal(out.resultados[s.id].tic.final.conclusion,'');
+});
+test('Tutor/AIP editor exposes distinct conclusion and justification; closed period keeps both read-only',()=>{
+ const s=fixture();['math','communication','ef'].forEach(u=>s.aporte(u,'C'));s.final('math','C','Justificación independiente',undefined,'Conclusión del estudiante');
+ const f=client(),el=dom();f.c.document.createElement=el;f.run(read('transversales-client.js'));
+ for(const user of ['math','pip']){const data=clone(s.load(user)),box=el('div');f.c.window.IETransversales.editor(box,data,s.ctx,true);const fields=box.querySelectorAll('textarea');assert.equal(fields.length,4);assert.equal(fields[0].placeholder,'Justificación de la decisión colegiada');assert.equal(fields[0].value,'Justificación independiente');assert.equal(fields[1].placeholder,'Conclusión descriptiva');assert.equal(fields[1].value,'Conclusión del estudiante');assert.ok(fields.every(x=>!x.disabled));
+ data.abierto=false;const closed=el('div');f.c.window.IETransversales.editor(closed,data,s.ctx,true);assert.ok(closed.querySelectorAll('textarea').every(x=>x.disabled));}
+ s.tables.get('ConfigSistema').rows[1][2]=JSON.stringify({bimestres:{I:'cerrado'}});assert.equal(s.final('pip','C','Justificación independiente',undefined,'Cambio prohibido').code,'PERIOD');assert.equal(s.load('pip').resultados[s.id].tic.final.conclusion,'Conclusión del estudiante');
+});
 function saveDocs(s){assert.equal(s.post({action:'savedoc',token:s.admin,docentes:s.docs}).ok,true);return s.load('pip');}
 for(const edit of ['primary','password','other-name','other-room','order','own-name','extra-room'])test('class fingerprint ignores unrelated configuration edit: '+edit,()=>{
  const s=fixture();

@@ -1379,7 +1379,7 @@ async function vaciarSiagieOficial(){
         escritos++;
         const need=ctx.nivel==='primaria'?(letra==='B'||letra==='C'):(letra==='C');
         if(need){
-          const txt=transversal?resultTrans.final.justificacion:concDesdePayload(p,ctx,map.area,nombre,permitirNombre);
+          const txt=transversal?resultTrans.final.conclusion:concDesdePayload(p,ctx,map.area,nombre,permitirNombre);
           if(txt) ws[XLSX.utils.encode_cell({r:r,c:4+i*2})]={t:'s',v:txt};
         }
       });

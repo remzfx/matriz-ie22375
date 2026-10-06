@@ -1190,13 +1190,14 @@ function transversalResumen_(datos,id,comp) {
   const empate=max>0 && ganadores.length>1, dispersion=indices.length>1 && Math.max(...indices)-Math.min(...indices)>=2;
   return {aportes,conteo,recibidos:aportes.length,sugerencia,empate,dispersion,faltan,alerta:empate||dispersion||faltan.length>0};
 }
-function transversalListo_(final,version) { return !!(final && final.nivel && final.versionAportes===version && final.tutor && final.aip); }
+function transversalConclusionPendiente_(final) { return !!(final && final.nivel==='C' && !String(final.conclusion||'').trim()); }
+function transversalListo_(final,version) { return !!(final && final.nivel && !transversalConclusionPendiente_(final) && final.versionAportes===version && final.tutor && final.aip); }
 function transversalVista_(datos,acceso,ctx) {
   const coord=['admin','pip'].includes(acceso.sesion.role)||transversalTutor_(acceso,ctx), resultados={};
   if(coord) datos.estudiantes.forEach(al=>{resultados[al.id]={};['tic','autonomia'].forEach(comp=>{
     const final=(datos.consolidado.finales[al.id]||{})[comp]||null, resumen=transversalResumen_(datos,al.id,comp);
     const obsoleto=!!final && final.versionAportes!==datos.versionAportes;
-    resultados[al.id][comp]={resumen,final,listo:transversalListo_(final,datos.versionAportes),estado:obsoleto?'Requiere nueva confirmación':!final||!final.tutor?'Pendiente de confirmación del Tutor':!final.aip?'Pendiente de confirmación del AIP':'✓ Consolidación confirmada · Lista para SIAGIE'};
+    resultados[al.id][comp]={resumen,final,listo:transversalListo_(final,datos.versionAportes),estado:transversalConclusionPendiente_(final)?'Conclusión descriptiva obligatoria para nivel C':obsoleto?'Requiere nueva confirmación':!final||!final.tutor?'Pendiente de confirmación del Tutor':!final.aip?'Pendiente de confirmación del AIP':'✓ Consolidación confirmada · Lista para SIAGIE'};
   });});
   return {ok:true,estudiantes:datos.estudiantes,areas:datos.areas,versionAportes:datos.versionAportes,version:datos.consolidado.version,
     aportes:coord?datos.aportes:datos.aportes.filter(a=>normalizarUsuario_(a.user)===normalizarUsuario_(acceso.sesion.user)&&a.area===ctx.area),resultados,
@@ -1237,18 +1238,20 @@ function transversalesRuta_(body) {
           if(!ids.has(id))throw new Error('Estudiante ajeno al padrón.');finales[id]=finales[id]||{};
           Object.keys(body.finales[id]).forEach(comp=>{
             if(!['tic','autonomia'].includes(comp))throw new Error('Competencia inválida.');
-            const raw=body.finales[id][comp],valor=transversalValor_(raw),resumen=transversalResumen_(datos,id,comp),justificacion=String(raw.justificacion||'').trim();
+            const raw=body.finales[id][comp],valor=transversalValor_(raw),resumen=transversalResumen_(datos,id,comp),justificacion=String(raw.justificacion||'').trim(),conclusion=String(raw.conclusion||'').trim();
             if(!valor)throw new Error('La calificación final es inválida.');
             if((resumen.alerta||!resumen.sugerencia||valor.nivel!==resumen.sugerencia)&&justificacion.length<5)throw new Error('Se requiere una justificación breve para esta decisión.');
             if(justificacion.length>2000)throw new Error('Justificación demasiado extensa.');
-            const previo=finales[id][comp],igual=previo&&previo.modo===valor.modo&&previo.valor===valor.valor&&previo.justificacion===justificacion&&previo.versionAportes===datos.versionAportes;
-            if(!igual)finales[id][comp]=Object.assign({},valor,{justificacion,sugerencia:resumen.sugerencia,conteo:resumen.conteo,alerta:resumen.alerta,versionAportes:datos.versionAportes,user:acceso.sesion.user,role:acceso.sesion.role,ts,tutor:null,aip:null});
+            if(conclusion.length>2000)throw new Error('Conclusión descriptiva demasiado extensa.');
+            const previo=finales[id][comp],igual=previo&&previo.modo===valor.modo&&previo.valor===valor.valor&&previo.justificacion===justificacion&&String(previo.conclusion||'')===conclusion&&previo.versionAportes===datos.versionAportes;
+            if(!igual)finales[id][comp]=Object.assign({},valor,{justificacion,conclusion,sugerencia:resumen.sugerencia,conteo:resumen.conteo,alerta:resumen.alerta,versionAportes:datos.versionAportes,user:acceso.sesion.user,role:acceso.sesion.role,ts,tutor:null,aip:null});
           });
         });
       } else {
         let n=0;Object.keys(finales).forEach(id=>{if(!ids.has(id))return;['tic','autonomia'].forEach(comp=>{
           const f=finales[id][comp];if(!f)return;
           if(f.versionAportes!==datos.versionAportes)throw new Error('Requiere nueva confirmación: revisa y guarda la decisión con los aportes actuales.');
+          if(transversalConclusionPendiente_(f))throw new Error('Conclusión descriptiva obligatoria para nivel C');
           f[action==='confirmtransversaltutor'?'tutor':'aip']={user:acceso.sesion.user,role:acceso.sesion.role,ts};n++;
         });});if(!n)throw new Error('Primero guarda una calificación final.');
       }
