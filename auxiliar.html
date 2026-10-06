@@ -53,6 +53,7 @@
       font-weight:800; font-size:13px; padding:.5rem 1rem; border-radius:999px; z-index:50; }
   </style>
   <script src="students.js"></script>
+  <script src="auxiliar-permissions.js"></script>
 </head>
 <body>
 <script>
@@ -103,6 +104,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     </div>
     <div>
       <label class="text-[10px] font-bold text-slate-500">Nivel</label>
+      <span id="selNivelScope" hidden></span>
       <select id="selNivel" onchange="onNivel()">
         <option value="primaria">Primaria</option>
         <option value="secundaria">Secundaria</option>
@@ -158,6 +160,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     </div>
     <div>
       <label class="text-[10px] font-bold text-slate-500">Nivel</label>
+      <span id="selNivelGruposScope" hidden></span>
       <select id="selNivelGrupos" onchange="enviarGruposHoy()">
         <option value="primaria">Primaria</option>
         <option value="secundaria">Secundaria</option>
@@ -273,6 +276,7 @@ function marcaPorHora(al) {
   return 'T';
 }
 function jornadaCerrada(al) {
+  if (!IEAuxPermissions.permite(al.nivel)) return false;
   const vents = ventanasDe(al);
   if (!vents.length) return false;
   const maxHasta = Math.max.apply(null, vents.map(function(v) { return hmAMin(v.hasta); }));
@@ -296,6 +300,7 @@ function loadAsis() {
 function saveAsis(obj) { localStorage.setItem(ASIS_KEY, JSON.stringify(obj)); }
 
 function ctx() {
+  if (!IEAuxPermissions.permite(document.getElementById('selNivel').value)) throw new Error('Nivel no autorizado.');
   return {
     fecha: document.getElementById('inpFecha').value || hoyISO(),
     nivel: document.getElementById('selNivel').value,
@@ -317,7 +322,8 @@ function fijarNiveles(j) {
 async function ensureBD() {
   try {
     BD = await IEStudents.load();
-    if (BD.offline) toast('Sin conexión: lista temporal de esta sesión (10 minutos máximo).');
+    IEAuxPermissions.configurar();
+    if (BD.offline) toast('Sin conexión: lista temporal de esta sesión y niveles autorizados.');
   } catch(e) {
     BD = IEStudents.empty();
     toast(e.message);
@@ -333,6 +339,7 @@ function alumnosAula() {
 }
 
 function onNivel() {
+  if (!IEAuxPermissions.permite(document.getElementById('selNivel').value)) { document.getElementById('selGrado').innerHTML=''; document.getElementById('selSeccion').innerHTML=''; toast('Nivel no autorizado.'); return false; }
   const nivel = document.getElementById('selNivel').value;
   const list = ((BD[nivel] || {}).estudiantes) || [];
   const grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
@@ -345,6 +352,7 @@ function onNivel() {
   onGrado();
 }
 function onGrado() {
+  if (!IEAuxPermissions.permite(document.getElementById('selNivel').value)) return false;
   const nivel = document.getElementById('selNivel').value;
   const g = parseInt(document.getElementById('selGrado').value, 10);
   const list = ((BD[nivel] || {}).estudiantes) || [];
@@ -366,6 +374,7 @@ function getRec(al) {
   return { marca: rec.marca || '', hora: rec.hora || '', motivo: rec.motivo || '', via: rec.via || '', ts: rec.ts };
 }
 function setRec(al, marca, via, motivo) {
+  if (!IEAuxPermissions.permite(al.nivel)) return false;
   const all = loadAsis();
   const k = asisKey(al);
   const prev = all[k] || {};
@@ -397,6 +406,7 @@ function tokenSesionAuxiliar() {
   } catch (e) { return ''; }
 }
 async function subirUnoNube(al) {
+  if (!IEAuxPermissions.permite(al.nivel)) return false;
   try {
     const k = asisKey(al);
     const rec = loadAsis()[k];
@@ -424,10 +434,11 @@ function completarFaltasAlSubir() {
   return n;
 }
 async function subirTodoNube() {
+  if (!IEAuxPermissions.permite(document.getElementById('selNivel').value)) { toast('Nivel no autorizado.'); return false; }
   const faltas = completarFaltasAlSubir();
   if (faltas) renderLista();
   const all = loadAsis();
-  const items = Object.keys(all).map(k => recToItem(k, all[k])).filter(it => it.marca);
+  const items = Object.keys(all).map(k => recToItem(k, all[k])).filter(it => it.marca && IEAuxPermissions.permite(it.nivel));
   if (!items.length) { toast('No hay marcas para subir'); return; }
   try {
     const res = await fetch(CLOUD_API_URL, {
@@ -442,13 +453,16 @@ async function subirTodoNube() {
   } catch(e) { toast('No se pudo subir. Actualiza el Apps Script.'); }
 }
 async function bajarNube() {
+  const nivel=document.getElementById('selNivel').value;
+  if (!IEAuxPermissions.permite(nivel)) { toast('Nivel no autorizado.'); return false; }
   const fecha = document.getElementById('inpFecha').value || hoyISO();
   try {
-    const res = await fetchLecturaNube(CLOUD_API_URL + '?action=loadasis&fecha=' + encodeURIComponent(fecha));
+    const res = await fetchLecturaNube(CLOUD_API_URL + '?action=loadasis&nivel=' + encodeURIComponent(nivel) + '&fecha=' + encodeURIComponent(fecha));
     const data = JSON.parse(await res.text());
     if (!data.ok) throw new Error(data.error || 'Error');
     const all = loadAsis();
     (data.items || []).forEach(it => {
+      if (!IEAuxPermissions.permite(it.nivel)) return;
       const k = it.clave || [it.fecha, it.nivel, it.grado, it.seccion, it.nombre].join('||');
       const prev = all[k];
       const ts = Number(it.ts) || 0;
@@ -553,7 +567,7 @@ function marcarTodos(marca) {
 
 const WA_KEY = 'ie22375_wa_grupos_v1';
 function loadGruposWa() {
-  try { const r = JSON.parse(localStorage.getItem(WA_KEY) || '[]'); if (Array.isArray(r)) return r; } catch (e) {}
+  try { const r = JSON.parse(localStorage.getItem(WA_KEY) || '[]'); if (Array.isArray(r)) return r.filter(g=>g && IEAuxPermissions.permite(g.nivel)); } catch (e) {}
   return [];
 }
 async function bajarGruposWa() {
@@ -564,6 +578,7 @@ async function bajarGruposWa() {
   } catch (e) {}
 }
 function textoListaAula(nivel, grado, seccion, fecha) {
+  if (!IEAuxPermissions.permite(nivel)) throw new Error('Nivel no autorizado.');
   const list = (((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion));
   let cP=0,cF=0,cT=0,cJ=0;
   const lineas = [], faltas = [];
@@ -653,6 +668,7 @@ async function enviarGruposHoy() {
   const nivel = (document.getElementById('selNivelGrupos') || {}).value || 'primaria';
   const box = document.getElementById('waCola');
   if (!box) return;
+  if (!IEAuxPermissions.permite(nivel)) { toast('Nivel no autorizado.'); return false; }
   function pintar() {
     const grupos = loadGruposWa().filter(x => x.nivel === nivel);
     if (!grupos.length) {
@@ -688,7 +704,7 @@ let lastScanText = '';
 
 function todosAlumnos() {
   const out = [];
-  ['primaria','secundaria'].forEach(n => {
+  IEAuxPermissions.niveles().forEach(n => {
     (((BD[n] || {}).estudiantes) || []).forEach(a => out.push(a));
   });
   return out;
@@ -864,6 +880,7 @@ async function leerFotoQR(input) {
 function esEnvioMasivo() {
   return /vista=masivo/.test(location.search) || location.hash === '#grupos';
 }
+IEAuxPermissions.configurar();
 Promise.all([ensureBD(), ensureHorario(), bajarGruposWa()]).then(() => {
   onNivel();
   if (esEnvioMasivo()) verMenu('grupos');

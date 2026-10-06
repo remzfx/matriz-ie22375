@@ -179,8 +179,70 @@ function validarToken_(token, role, docentesConfig) {
     const config = docentesConfig || obtenerDocentesConfig_();
     if (Number(claims.permisosVersion) !== Number(config.ts)) return null;
   }
+  if (claims.role === 'auxiliar') {
+    const config = obtenerAuxiliaresConfig_();
+    const auxiliar = config.auxiliares.find(function(a) { return a.user === normalizarUsuario_(claims.user); });
+    if (!auxiliar || auxiliar.activo !== true || !nivelesAuxiliar_(auxiliar.niveles).length || Number(claims.permisosVersion) !== config.ts) return null;
+    claims.niveles = nivelesAuxiliar_(auxiliar.niveles);
+  }
   return claims;
 }
+
+function obtenerAuxiliaresConfig_() {
+  const sh = asegurarConfig_(), last = sh.getLastRow();
+  let best = {auxiliares:[], ts:0};
+  if (last < 2) return best;
+  sh.getRange(2,1,last-1,3).getValues().forEach(function(row) {
+    if (String(row[0]) !== 'AUXILIAR_ACCESOS' || Number(row[1]) < best.ts) return;
+    try { const list = JSON.parse(row[2]); if (Array.isArray(list)) best = {auxiliares:list,ts:Number(row[1]) || 0}; } catch(e) {}
+  });
+  return best;
+}
+function nivelesAuxiliar_(niveles) {
+  return ['primaria','secundaria'].filter(function(n) { return Array.isArray(niveles) && niveles.indexOf(n) >= 0; });
+}
+function autorizaNivelAuxiliar_(sesion, nivel) {
+  return ['primaria','secundaria'].indexOf(nivel) >= 0 && !!sesion &&
+    (sesion.role === 'admin' || (sesion.role === 'auxiliar' && nivelesAuxiliar_(sesion.niveles).indexOf(nivel) >= 0));
+}
+function hashAuxiliarPass_(user, pass) {
+  return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(
+    'auxiliar-password:' + normalizarUsuario_(user) + ':' + pass, secretoToken_(), Utilities.Charset.UTF_8)).replace(/=+$/, '');
+}
+function respuestaAuxiliares_(config) {
+  return {ok:true,version:config.ts,auxiliares:config.auxiliares.map(function(a) {
+    return {user:a.user,nombre:a.nombre,niveles:nivelesAuxiliar_(a.niveles),activo:a.activo === true};
+  }),legacyPendiente:config.ts === 0 && !!PropertiesService.getScriptProperties().getProperty(AUXILIAR_PASS_PROPERTY)};
+}
+function guardarAuxiliar_(body) {
+  const lock = LockService.getScriptLock(); lock.waitLock(5000);
+  try {
+    const config = obtenerAuxiliaresConfig_();
+    if (Number(body.version) !== config.ts) return {ok:false,code:'CONFLICT',error:'La configuración cambió. Vuelve a cargar auxiliares.'};
+    const input = body.auxiliar || {}, user = normalizarUsuario_(input.user);
+    if (!/^[a-z0-9._@-]{1,80}$/.test(user) || ['admin','pip'].indexOf(user) >= 0) return {ok:false,error:'Usuario inválido.'};
+    const prev = config.auxiliares.find(function(a) { return a.user === user; });
+    const list = config.auxiliares.filter(function(a) { return a.user !== user; });
+    if (!body.eliminar) {
+      const niveles = nivelesAuxiliar_(input.niveles), nombre = String(input.nombre || '').trim();
+      if (!nombre || nombre.length > 120 || !Array.isArray(input.niveles) || input.niveles.some(function(n) { return ['primaria','secundaria'].indexOf(n) < 0; }) || (input.activo === true && !niveles.length))
+        return {ok:false,error:'Indica nombre y al menos un nivel para un auxiliar activo.'};
+      let passHash = prev && prev.passHash;
+      const pass = String(input.password || '').trim();
+      if (pass) passHash = hashAuxiliarPass_(user,pass);
+      else if (!prev && input.usarClaveAnterior === true && user === 'auxiliar') {
+        const anterior = PropertiesService.getScriptProperties().getProperty(AUXILIAR_PASS_PROPERTY);
+        if (anterior) passHash = hashAuxiliarPass_(user,anterior);
+      }
+      if (!passHash) return {ok:false,error:'Indica una contraseña o autoriza migrar la cuenta auxiliar antigua.'};
+      list.push({user:user,nombre:nombre,niveles:niveles,activo:input.activo === true,passHash:passHash});
+    } else if (!prev) return {ok:false,error:'Auxiliar inexistente.'};
+    const ts = Math.max(Date.now(),config.ts + 1), sh = asegurarConfig_();
+    sh.appendRow(['AUXILIAR_ACCESOS',ts,JSON.stringify(list)]);
+    return respuestaAuxiliares_({ts:ts,auxiliares:list});
+  } finally { lock.releaseLock(); }
+}
+
 
 function responderLogin_(body) {
   const tipo = String(body.tipo || '').toLowerCase();
@@ -190,7 +252,7 @@ function responderLogin_(body) {
     return { ok: false, error: 'Usuario o contraseña incorrectos.' };
   }
 
-  // Admin, Auxiliar y PIP no dependen de DOCENTE_ACCESOS.
+  // Admin y PIP no dependen de configuraciones de cuentas; Auxiliar usa su configuración privada.
   // Evitar Sheets/CacheService en esos logins reduce la latencia del inicio.
   let config = null;
   let perfil = null;
@@ -203,16 +265,18 @@ function responderLogin_(body) {
         mods: ['admin_bd', 'registro', 'auxiliar', 'wa_grupos', 'matriz_pri', 'matriz_sec', 'aip']
       };
     }
-  } else if (tipo === 'auxiliar' || tipo === 'pip') {
-    const propiedad = tipo === 'auxiliar' ? AUXILIAR_PASS_PROPERTY : PIP_PASS_PROPERTY;
-    const password = PropertiesService.getScriptProperties().getProperty(propiedad);
-    if (usuario === tipo && password && compararSeguro_(pass, password)) {
-      perfil = {
-        user: tipo, label: tipo === 'auxiliar' ? 'Auxiliar' : 'Innovación', role: tipo,
-        nivel: 'colegio', grados: null, areas: null, aulas: null, asignaciones: null,
-        mods: tipo === 'auxiliar' ? ['auxiliar', 'wa_grupos'] : ['aip']
-      };
+  } else if (tipo === 'auxiliar') {
+    config = obtenerAuxiliaresConfig_();
+    const auxiliar = config.auxiliares.find(function(a) { return a.user === usuario && a.activo === true; });
+    if (auxiliar && nivelesAuxiliar_(auxiliar.niveles).length && compararSeguro_(hashAuxiliarPass_(usuario,pass),auxiliar.passHash)) {
+      const niveles = nivelesAuxiliar_(auxiliar.niveles);
+      perfil = {user:auxiliar.user,label:auxiliar.nombre,role:'auxiliar',niveles:niveles,
+        nivel:niveles.length === 1 ? niveles[0] : 'multiple',mods:['auxiliar','wa_grupos']};
     }
+  } else if (tipo === 'pip') {
+    const password = PropertiesService.getScriptProperties().getProperty(PIP_PASS_PROPERTY);
+    if (usuario === 'pip' && password && compararSeguro_(pass,password))
+      perfil = {user:'pip',label:'Innovación',role:'pip',nivel:'colegio',grados:null,areas:null,aulas:null,asignaciones:null,mods:['aip']};
   } else {
     // Solo el login docente necesita cargar la configuración de accesos.
     config = obtenerDocentesConfig_();
@@ -243,6 +307,7 @@ function responderLogin_(body) {
     user: perfil.user,
     role: perfil.role,
     nivel: perfil.nivel,
+    niveles: perfil.niveles || null,
     permisosVersion: config ? config.ts : 0,
     iat: now,
     exp: exp
@@ -334,7 +399,7 @@ function sesionRutaEscritura_(token, roles) {
 }
 
 function itemAsistenciaAutorizado_(item) {
-  // Admin/Auxiliar tienen el colegio completo; Docente no usa esta ruta de ingreso.
+  // La estructura se valida aquí; el permiso por nivel se valida antes de escribir el lote.
   const nivel = String(item.nivel || '').trim().toLowerCase();
   const grado = gradoEscritura_(item.grado);
   const seccion = seccionEscritura_(item.seccion);
@@ -725,7 +790,9 @@ function normalizarBaseEstudiantes_(body) {
 function respuestaEstudiantes_(base, acceso, meta) {
   const list = base ? base.estudiantes : [];
   const estudiantes = list.filter(function(al) {
-    if (acceso.sesion.role === 'admin' || acceso.sesion.role === 'auxiliar') return true;
+    if (acceso.nivelFiltro && al.nivel !== acceso.nivelFiltro) return false;
+    if (acceso.sesion.role === 'admin') return true;
+    if (acceso.sesion.role === 'auxiliar') return autorizaNivelAuxiliar_(acceso.sesion,al.nivel);
     return puedeLeerAula_(acceso, {nivel: al.nivel, numero: gradoEscritura_(al.grado), seccion: al.seccion});
   }).map(function(al) {
     const out = {nivel: al.nivel, grado: al.grado, seccion: al.seccion, orden: al.orden, nombre: al.nombre};
@@ -787,6 +854,10 @@ function estudiantesRuta_(body) {
   const acceso = sesionLectura_(body.token, lectura ? ['admin', 'auxiliar', 'docente'] : ['admin']);
   const authMs = Date.now() - inicio;
   if (!acceso) return {ok: false, code: 'SESSION', error: 'Sesión inválida o sin autorización para estudiantes.'};
+  if (lectura && acceso.sesion.role !== 'docente') {
+    if (body.nivel && (['primaria','secundaria'].indexOf(body.nivel) < 0 || !autorizaNivelAuxiliar_(acceso.sesion,body.nivel))) return {ok:false,error:'Nivel no autorizado.'};
+    acceso.nivelFiltro = body.nivel || '';
+  }
   // loadstudents es estrictamente de lectura y no espera el lock global.
   if (lectura) {
     const shLectura = hojaEstudiantes_();
@@ -905,6 +976,8 @@ function doGet(e) {
       return responder_({ ok: true, msg: 'API Matriz IE 22375 — áreas + asistencia + registro + docentes' });
     }
 
+    if ((action === 'loadasis' || action === 'loadwa') && p.nivel && !autorizaNivelAuxiliar_(acceso.sesion,String(p.nivel))) return responder_({ok:false,error:'Nivel no autorizado.'});
+
     if (action === 'loadasis') {
       const fecha = String(p.fecha || '');
       const sh = asegurarAsis_();
@@ -914,6 +987,8 @@ function doGet(e) {
         const data = sh.getRange(2, 1, last, 11).getValues();
         for (let i = 0; i < data.length; i++) {
           if (fecha && String(data[i][1]) !== fecha) continue;
+          const nivelItem = String(data[i][2]).toLowerCase();
+          if (!autorizaNivelAuxiliar_(acceso.sesion,nivelItem) || (p.nivel && p.nivel !== nivelItem)) continue;
           items.push({
             clave: data[i][0],
             fecha: data[i][1],
@@ -1049,7 +1124,7 @@ function doGet(e) {
           best = { ts: ts, grupos: grupos };
         }
       }
-      return responder_({ ok: true, grupos: best ? best.grupos : [], ts: best ? best.ts : 0 });
+      return responder_({ ok: true, grupos: (best && Array.isArray(best.grupos) ? best.grupos : []).filter(function(g) { return acceso.sesion.role === 'admin' && !p.nivel || g && autorizaNivelAuxiliar_(acceso.sesion,g.nivel) && (!p.nivel || g.nivel === p.nivel); }), ts: best ? best.ts : 0 });
     }
 
     if (action === 'loadperiodos') {
@@ -1165,16 +1240,22 @@ function doPost(e) {
       return responder_({ ok: true, docentes: config.docentes, ts: config.ts, total: config.docentes.length });
     }
 
+    if (action === 'loadauxiliares' || action === 'saveauxiliar') {
+      if (!validarToken_(body.token,'admin')) return responder_({ok:false,error:'Sesión administrativa inválida.'});
+      return responder_(action === 'loadauxiliares' ? respuestaAuxiliares_(obtenerAuxiliaresConfig_()) : guardarAuxiliar_(body));
+    }
+
     if (action === 'saveasis') {
-      if (!sesionRutaEscritura_(body.token, ['admin', 'auxiliar'])) {
+      const sesion = sesionRutaEscritura_(body.token, ['admin', 'auxiliar']);
+      if (!sesion) {
         return responder_({ ok: false, error: 'Sesión inválida o sin autorización para asistencia de ingreso.' });
       }
       const originales = Array.isArray(body.items) ? body.items : [body];
       const items = originales.map(function (item) {
         return item && typeof item === 'object' ? itemAsistenciaAutorizado_(item) : null;
       });
-      if (items.some(function (item) { return !item; })) {
-        return responder_({ ok: false, error: 'Contexto de asistencia inválido.' });
+      if ((body.nivel && !autorizaNivelAuxiliar_(sesion,body.nivel)) || items.some(function (item) { return !item || !autorizaNivelAuxiliar_(sesion,item.nivel); })) {
+        return responder_({ ok: false, error: 'Contexto de asistencia inválido o nivel no autorizado; no se guardó ningún item.' });
       }
       const sh = asegurarAsis_();
       const last = sh.getLastRow();

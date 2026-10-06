@@ -92,7 +92,8 @@ Antes de ejecutarlo, comprobar que `apps-script/` contiene:
 Además, en **Configuración del proyecto → Propiedades de la secuencia de comandos**, crear:
 
 - `IE22375_ADMIN_PASS`: contraseña vigente del rol Admin. No escribir su valor en el repositorio.
-- `IE22375_AUXILIAR_PASS` y `IE22375_PIP_PASS`: contraseñas privadas para los roles existentes Auxiliar e Innovación. El login ahora se valida en servidor y emite el mismo token HMAC. Definir contraseñas nuevas; las anteriores estaban publicadas en el cliente. No hay fallback al login local y las sesiones anteriores sin token requieren volver a iniciar sesión.
+- `IE22375_PIP_PASS`: contraseña privada de Innovación, validada en servidor. No hay fallback al login local.
+- Auxiliar: configurar cuentas y niveles en **Admin → Auxiliares**. `IE22375_AUXILIAR_PASS` queda únicamente como origen opcional para la migración explícita de la cuenta anterior; por sí sola ya no permite iniciar sesión. Seguir [la guía de permisos y migración](auxiliares-niveles.md).
 
 El backend crea automáticamente `IE22375_TOKEN_SECRET` la primera vez que emite un token. Si ya existe,
 no debe reemplazarse: cambiarlo invalida inmediatamente todas las sesiones firmadas.
