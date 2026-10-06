@@ -157,7 +157,7 @@
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
 <script src="student-identity.js"></script>
-<script src="registro-evaluation.js"></script><script src="transversales-client.js"></script>
+<script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script>
 </head>
 <body class="min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['primaria','secundaria','admin'];</script>
@@ -265,8 +265,8 @@
   </div>
 
   <main class="max-w-3xl mx-auto px-3 py-3 space-y-3" style="padding-bottom:110px">
-    <style>.trans-evidence-grid th,.trans-evidence-grid td{padding:8px;border:1px solid #cbd5e1;vertical-align:middle;text-align:center}.trans-evidence-grid input,.trans-evidence-grid select{min-height:44px;min-width:76px}.trans-evidence-grid small{display:block}</style>
-    <section id="registroTransversales" class="card p-3" hidden><h2 class="font-bold">COMPETENCIAS TRANSVERSALES</h2><p class="text-sm">Aporta desde tu área autorizada. La decisión consolidada se revisa por Tutor y AIP.</p><button class="btn" type="button" onclick="abrirTransversalesRegistro()">Evaluar transversales</button><a href="transversales.html" id="registroTutorLink" hidden>Consolidación Tutor/AIP</a><p id="registroTransStatus" role="status"></p><div id="registroTransRows"></div></section>
+
+    <div id="registroTransAviso" hidden><p id="registroTransStatus" role="status" class="text-sm"></p><button type="button" class="btn" onclick="IERegistroTransversales.load(true)">Reintentar / revisar aportes transversales</button></div>
     <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
 <button type="button" id="retryRoster" class="btn btn-ghost text-sm" hidden onclick="reintentarPadronRegistro()">Reintentar</button>
     <!-- Área -->
@@ -300,8 +300,8 @@
           <p class="text-[11px] text-slate-500 mt-1">Por alumno: si escribes aquí, esta nota manda. Si no, se usa Calificar.</p>
         </div>
         <div class="flex flex-wrap gap-2 text-[11px] font-bold" id="finResumen"></div>
-        <div id="finLista" class="fin-wrap"></div>
-        <button type="button" class="btn btn-primary w-full text-sm" data-reg-write onclick="guardarFinales(); toast('Promedios guardados')">Guardar promedios</button>
+        <a href="transversales.html" id="registroTutorLink" hidden>Consolidar competencias transversales</a><div id="finLista" class="fin-wrap"></div>
+        <button type="button" class="btn btn-primary w-full text-sm" data-reg-write onclick="guardarRegistroIntegrado(true)">Guardar promedios</button>
       </div>
     </div>
 
@@ -426,7 +426,7 @@
       <div class="grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex">
         <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="subirRegistroNube()">Nube Subir</button>
         <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#0284c7;color:#fff" onclick="bajarRegistroNube()">Nube Bajar</button>
-        <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" data-reg-write onclick="if (guardarTodo() !== false) toast('Guardado local')">Guardar</button>
+        <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" data-reg-write onclick="guardarRegistroIntegrado(false)">Guardar</button>
       </div>
     </div>
   </div>
@@ -657,16 +657,41 @@ function mergeRegistroPayload(p) {
   return n;
 }
 async function subirRegistroNube() {
+  if (subirRegistroNube.pending) return subirRegistroNube.pending;
+  const tarea = (async()=>{
   if (registroNubeNoVerificada()) {
     toast('Sincronización pendiente: pulsa Reintentar y espera la verificación del servidor.');
     return false;
   }
   if (!nivel || !areaActual) { toast('Elija área primero'); return; }
+  const ses = getLoginSession() || {}, integral = nivel==='secundaria' && ses.role==='docente';
+  if (integral && typeof IERegistroTransversales==='undefined') { toast('No se envió el área completa. Las competencias transversales están pendientes. Corrige o reintenta.'); return false; }
+  if (integral) IERegistroTransversales.capture();
+  const invalidas = Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!=='' && (!Number.isFinite(Number(inp.value)) || Number(inp.value)<0 || Number(inp.value)>20));
+  if (invalidas) { toast('Hay notas académicas inválidas. Corrige los valores antes de enviar el área.'); return false; }
   if (guardarTodo() === false) { toast('Espera a que cargue el padrón del bimestre.'); return; }
   toast('Guardado local. Subiendo a la nube…');
   const c = ctxBase();
-  const payload = sliceRegistroArea();
+  let payload = sliceRegistroArea();
   const tokenSubida = (getLoginSession() || {}).token || '';
+  const contextoSubida = JSON.stringify(c);
+  if (integral) {
+    if (!await IERegistroTransversales.syncForUpload()) {
+      toast('No se envió el área completa. Las competencias transversales están pendientes. Corrige o reintenta.');
+      return false;
+    }
+    if (registroNubeNoVerificada() || tokenSubida!==((getLoginSession()||{}).token||'') || contextoSubida!==JSON.stringify(ctxBase())) {
+      toast('Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Reintenta.');
+      return false;
+    }
+    // Recolectar también lo escrito mientras se verificaba el aporte transversal.
+    const invalidasAhora = Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!=='' && (!Number.isFinite(Number(inp.value)) || Number(inp.value)<0 || Number(inp.value)>20));
+    if (invalidasAhora || guardarTodo()===false) {
+      toast('Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Corrige las notas y reintenta.');
+      return false;
+    }
+    payload = sliceRegistroArea();
+  }
   try {
     const res = await fetch(CLOUD_API_URL, {
       method: 'POST',
@@ -687,12 +712,26 @@ async function subirRegistroNube() {
     });
     if (res.status === 401 || res.status === 403) retirarVerificacionNube(tokenSubida, c.bim, {code:'SESSION'});
     const data = JSON.parse(await res.text());
+    if (res.status>=400) data.ok=false;
     if (!data.ok) retirarVerificacionNube(tokenSubida, c.bim, data);
-    toast(data.ok ? 'Notas en la nube (' + c.area + ')' : (data.error || 'Error al subir'));
+    if (data.ok && integral) {
+      IERegistroTransversales.capture();
+      const aporte = IERegistroTransversales.current();
+      if (!aporte || aporte.dirty || tokenSubida!==((getLoginSession()||{}).token||'') || contextoSubida!==JSON.stringify(ctxBase())) {
+        toast('El envío confirmó la versión anterior. Hay cambios posteriores pendientes; vuelve a enviar el área.');
+        return false;
+      }
+    }
+    toast(data.ok ? (integral ? 'Área enviada correctamente · Notas académicas y competencias transversales sincronizadas.' : 'Notas en la nube (' + c.area + ')') : (integral ? 'Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Reintenta.' : (data.error || 'Error al subir')));
+    return !!data.ok;
   } catch (e) {
     retirarVerificacionNube(tokenSubida, c.bim);
-    toast('No se pudo confirmar la subida. Notas conservadas localmente; verifica el servidor antes de volver a subir.');
+    toast(integral ? 'Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Reintenta.' : 'No se pudo confirmar la subida. Notas conservadas localmente; verifica el servidor antes de volver a subir.');
+    return false;
   }
+  })();
+  subirRegistroNube.pending=tarea;
+  try { return await tarea; } finally { subirRegistroNube.pending=null; }
 }
 async function bajarRegistroNube() {
   if (!nivel) { toast('Elija nivel'); return; }
@@ -1416,6 +1455,7 @@ function onContexto(options) {
   else if (asis && asis.classList.contains('on')) renderAsistencia();
   if (!options.localOnly) consultarEstadoSiagie();
   sincronizarEdicionRegistro();
+  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.load();
 }
 
 function guardarMeta() {
@@ -1435,25 +1475,27 @@ function updateHdr() {
   document.getElementById('hdrSub').textContent = 'Bimestre ' + b + (areaActual ? ' · ' + areaActual : '');
   document.getElementById('lblN').textContent = estudiantes().length;
   fixHdrHeight();
-  const trans=document.getElementById('registroTransversales');if(trans){const ses=getLoginSession();trans.hidden=nivel!=='secundaria'||!ses||ses.role!=='docente'||!areaActual||areaActual==='Competencias Transversales';const link=document.getElementById('registroTutorLink');if(link)link.hidden=!(ses&&(ses.tutorAulas||[]).includes(aulaKey(g,s)));}
+  const ses=getLoginSession(),aviso=document.getElementById('registroTransAviso');if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.syncStatus();else if(aviso)aviso.hidden=true;
+  const link=document.getElementById('registroTutorLink');if(link)link.hidden=!(nivel==='secundaria'&&ses&&(ses.tutorAulas||[]).includes(aulaKey(g,s)));
 }
 
-let registroTransSolicitud=0,registroTransEditor=null,registroTransContexto=null;
 function cerrarTransversalesRegistro(){
-  if(registroTransEditor&&registroTransEditor.dirty()&&!confirm('Hay aportes transversales sin guardar. ¿Descartarlos?')){
-    if(registroTransContexto){const c=registroTransContexto;document.getElementById('selBim').value=c.bim;document.getElementById('selGrado').value=c.grado;document.getElementById('selSeccion').value=c.seccion;areaActual=c.area;}
-    return false;
-  }
-  registroTransSolicitud++;registroTransEditor=null;registroTransContexto=null;
-  const box=document.getElementById('registroTransRows');if(box)box.innerHTML='';return true;
+  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.capture();
+  return true; // El borrador de cada contexto permanece separado en memoria.
 }
-async function abrirTransversalesRegistro(){
-  if(!cerrarTransversalesRegistro())return;
-  const c=ctxBase(),seq=++registroTransSolicitud,msg=document.getElementById('registroTransStatus'),box=document.getElementById('registroTransRows');
-  if(c.nivel!=='secundaria'||!areas().includes(c.area))return;
-  box.innerHTML='';msg.textContent='Cargando aportes del área…';
-  try{const ctx={bimestre:c.bim,grado:c.grado,seccion:c.seccion,area:c.area},data=await IETransversales.request('loadtransversales',ctx);if(seq!==registroTransSolicitud)return;registroTransEditor=IETransversales.editor(box,data,ctx,false);registroTransContexto=c;msg.textContent=data.abierto?'Aporte independiente de '+c.area:'Bimestre cerrado/bloqueado · Solo lectura';}
-  catch(e){if(seq===registroTransSolicitud)msg.textContent=e.message;}
+function claveCompetenciaTransversal(comp){
+  if(nivel!=='secundaria'||typeof IERegistroEvaluacion==='undefined')return '';
+  return Object.keys(IERegistroEvaluacion.COMP).find(k=>IERegistroEvaluacion.COMP[k]===comp)||'';
+}
+function esCompetenciaTransversal(comp){return !!claveCompetenciaTransversal(comp);}
+function competenciasParaEvaluar(){
+  return competencias().concat(nivel==='secundaria'&&typeof IERegistroEvaluacion!=='undefined'?Object.values(IERegistroEvaluacion.COMP):[]);
+}
+async function guardarRegistroIntegrado(finales){
+  if(finales){if(guardarFinales()===false)return false;}else if(guardarTodo()===false)return false;
+  const ok=typeof IERegistroTransversales==='undefined'||await IERegistroTransversales.save();
+  if(ok)toast('Guardado local'+(nivel==='secundaria'?' y aportes pendientes sincronizados':''));
+  return ok;
 }
 
 function renderAreas() {
@@ -1479,12 +1521,14 @@ function setArea(a) {
 }
 
 function fillComps() {
-  const comps = competencias();
-  document.getElementById('selComp').innerHTML = comps.map(c => `<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`).join('') || '<option value="">Sin competencias</option>';
+  const option=c=>`<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`;
+  const comps=competenciasParaEvaluar(),academicas=competencias(),trans=comps.filter(esCompetenciaTransversal);
+  document.getElementById('selComp').innerHTML=(trans.length?'<optgroup label="Competencias del área">'+academicas.map(option).join('')+'</optgroup><optgroup label="Competencias transversales">'+trans.map(option).join('')+'</optgroup>':academicas.map(option).join(''))||'<option value="">Sin competencias</option>';
   fillCaps();
 }
 function capsOficiales(comp) {
-  return CAPS_CNEB[comp] || [];
+  const key=claveCompetenciaTransversal(comp);
+  return key?IERegistroEvaluacion.CAPS[key]:CAPS_CNEB[comp] || [];
 }
 function fillCaps() {
   const sel = document.getElementById('selCap');
@@ -1493,7 +1537,7 @@ function fillCaps() {
   const caps = capsOficiales(comp);
   sel.innerHTML = '<option value="">Elige la capacidad…</option>' +
     caps.map(c => '<option value="'+c.replace(/"/g,'&quot;')+'">'+c+'</option>').join('') +
-    '<option value="__otra__">Otra (escribir)</option>';
+    (esCompetenciaTransversal(comp)?'':'<option value="__otra__">Otra (escribir)</option>');
   const hint = document.getElementById('lblNCaps');
   if (hint) hint.textContent = caps.length ? (caps.length + ' capacidades oficiales de esta competencia') : 'Sin listado oficial; use Otra (escribir)';
   const wrap = document.getElementById('wrapCapOtra');
@@ -1560,7 +1604,7 @@ function onSesionChange() {
   (store.sessions||[]).forEach(s => {
     if (s.nivel===c.nivel && s.bim===c.bim && String(s.grado)===String(c.grado) &&
         s.seccion===c.seccion && s.area===c.area && s.fecha===fecha && s.capacidad) {
-      if (!tieneCapSel(s.comp, s.capacidad)) capsElegidas.push({ comp: s.comp, cap: s.capacidad });
+      if (!tieneCapSel(s.comp, s.capacidad)) capsElegidas.push(normCapItem({ comp: s.comp, cap: s.capacidad }));
     }
   });
   saveCapsElegidas();
@@ -1603,7 +1647,8 @@ function activarSesion() {
     renderStudents();
     return;
   }
-  capsElegidas.push({ comp: comp, cap: capacidad });
+  if(esCompetenciaTransversal(comp)&&!IERegistroTransversales.add(comp,capacidad,fecha)){toast('Espera la carga transversal o revisa el estado del bimestre');return;}
+  capsElegidas.push(normCapItem({comp:comp,cap:capacidad}));
   saveCapsElegidas();
   sesionActiva = { fecha, unidad, comp, capacidad };
   upsertSesionCap(comp, capacidad);
@@ -1627,8 +1672,11 @@ function recolectarPantalla() {
     if (n !== '') n = Math.round(n);
     upsertSesionCap(comp, cap);
     const k = capKeyHoy(comp, cap, nombre);
+    const previo = leerNota(store.grades, k);
+    if (n === '' && previo && previo.origen==='letra') return;
+    if (previo && previo.origen!=='letra' && n!=='' && Number(previo.nota20)===n) return;
     if (n === '') store.grades[k] = {borrado:true,ts:Date.now()};
-    else store.grades[k] = { nota20: n, nivel: numToLetter(n), ts: Date.now() };
+    else store.grades[k] = { nota20: n, nivel: numToLetter(n), origen:'numero', ts: Date.now() };
   });
   document.querySelectorAll('#finLista [data-fin][data-comp]').forEach(cell => {
     const inp = cell.querySelector('.fin-nota');
@@ -1637,6 +1685,9 @@ function recolectarPantalla() {
     const cp = decodeURIComponent(cell.dataset.comp);
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(cp, nombre);
+    const previo = leerNota(store.finales, k);
+    if (nraw === '' && previo && previo.origen==='letra') return;
+    if (previo && previo.origen!=='letra' && nraw!=='' && Number(previo.nota20)===Math.round(nraw)) return;
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
     store.finales[k] = { nota20: n, nivel: numToLetter(n), origen: 'numero', ts: Date.now() };
@@ -1659,7 +1710,7 @@ function guardarTodo() {
   if (!padronBimestre || document.getElementById('selBim').value !== padronBimestre) return false;
   try {
     recolectarPantalla();
-    if (sesionActiva) {
+    if (sesionActiva && !(typeof esCompetenciaTransversal==='function'&&esCompetenciaTransversal(sesionActiva.comp))) {
       Object.keys(notas).forEach(nombre => {
         const k = gradeKey(nombre);
         if (k) {
@@ -1682,7 +1733,7 @@ function guardarTodo() {
 
 function renderSesiones() {
   const c = ctxBase();
-  const list = (store.sessions || []).filter(s =>
+  const list = (store.sessions || []).concat(typeof IERegistroTransversales!=='undefined'?IERegistroTransversales.sessions():[]).filter(s =>
     s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
     s.seccion === c.seccion && s.area === c.area
   ).sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'') || (b.ts||0)-(a.ts||0));
@@ -1728,7 +1779,7 @@ function renderSesiones() {
 }
 function abrirSesionFecha(fecha) {
   const c = ctxBase();
-  const delDia = (store.sessions || []).filter(s =>
+  const delDia = (store.sessions || []).concat(typeof IERegistroTransversales!=='undefined'?IERegistroTransversales.sessions():[]).filter(s =>
     s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
     s.seccion === c.seccion && s.area === c.area && s.fecha === fecha
   );
@@ -1742,7 +1793,7 @@ function abrirSesionFecha(fecha) {
   }
   loadCapsElegidas();
   delDia.forEach(s => {
-    if (s.capacidad && !tieneCapSel(s.comp, s.capacidad)) capsElegidas.push({ comp: s.comp, cap: s.capacidad });
+    if (s.capacidad && !tieneCapSel(s.comp, s.capacidad)) capsElegidas.push(normCapItem({ comp: s.comp, cap: s.capacidad }));
   });
   saveCapsElegidas();
   sesionActiva = delDia[0] ? { fecha, unidad: delDia[0].unidad||'', comp: delDia[0].comp, capacidad: delDia[0].capacidad } : { fecha, unidad:'', comp:'', capacidad:'' };
@@ -1756,8 +1807,9 @@ function borrarSesionFecha(fecha) {
   const n = (store.sessions || []).filter(s =>
     s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
     s.seccion === c.seccion && s.area === c.area && s.fecha === fecha
-  ).length;
+  ).length + (typeof IERegistroTransversales!=='undefined' ? IERegistroTransversales.columns(fecha).length : 0);
   if (!confirm('¿Borrar la sesión del ' + fecha + ' y sus notas?\n(' + n + ' capacidad(es))\n\nNo se puede deshacer.')) return;
+  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.removeDate(fecha);
   store.sessions = (store.sessions || []).filter(s =>
     !(s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
       s.seccion === c.seccion && s.area === c.area && s.fecha === fecha)
@@ -1815,8 +1867,8 @@ function keyCapsHoy() {
 }
 function normCapItem(x, fallbackComp) {
   if (!x) return null;
-  if (typeof x === 'string') return { comp: fallbackComp || '', cap: x };
-  if (x.cap) return { comp: x.comp || fallbackComp || '', cap: x.cap };
+  if (typeof x === 'string') return normCapItem({comp:fallbackComp||'',cap:x});
+  if (x.cap){const comp=x.comp||fallbackComp||'';return {comp:comp,cap:x.cap,origen:esCompetenciaTransversal(comp)?'transversal':'academica'};}
   return null;
 }
 function tieneCapSel(comp, cap) {
@@ -1826,11 +1878,12 @@ function loadCapsElegidas() {
   if (!store.capsSel) store.capsSel = {};
   const fb = (document.getElementById('selComp')||{}).value || '';
   capsElegidas = (store.capsSel[keyCapsHoy()] || []).map(x => normCapItem(x, fb)).filter(Boolean);
+  if(typeof IERegistroTransversales!=='undefined')capsElegidas=capsElegidas.concat(IERegistroTransversales.columns((document.getElementById('inpFecha')||{}).value||'').filter(x=>!tieneCapSel(x.comp,x.cap)));
 }
 function saveCapsElegidas() {
   if (registroSoloLectura()) return false;
   if (!store.capsSel) store.capsSel = {};
-  store.capsSel[keyCapsHoy()] = capsElegidas.slice();
+  store.capsSel[keyCapsHoy()] = capsElegidas.filter(x=>x.origen!=='transversal'&&!esCompetenciaTransversal(x.comp));
   saveStore();
 }
 function renderChipsCaps() { /* las columnas de la grilla ya muestran competencia y capacidad */ }
@@ -1845,6 +1898,7 @@ function quitarCapGrilla(i) {
     '\n\nLas demás capacidades del día se mantienen.'
   );
   if (!ok) return;
+  if(col.origen==='transversal'){if(!IERegistroTransversales.remove(col.comp,col.cap,fecha))return false;capsElegidas.splice(i,1);renderStudents();renderSesiones();return;}
   const c = ctxBase();
   store.sessions = (store.sessions || []).filter(s =>
     !(s.nivel===c.nivel && s.bim===c.bim && String(s.grado)===String(c.grado) &&
@@ -1874,6 +1928,7 @@ function capKeyHoy(comp, cap, nombre) {
 }
 function upsertSesionCap(comp, cap) {
   if (registroSoloLectura()) return false;
+  if(esCompetenciaTransversal(comp))return IERegistroTransversales.add(comp,cap,document.getElementById('inpFecha').value||hoyISO());
   const c = ctxBase();
   const fecha = document.getElementById('inpFecha').value || hoyISO();
   const unidad = (document.getElementById('selUnidad')||{}).value || '';
@@ -1919,9 +1974,10 @@ function renderStudents() {
   const rows = list.map((al, i) => {
     let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
     cols.forEach(col => {
+      if(col.origen==='transversal'){tds+=IERegistroTransversales.cell(al,col,fecha);return;}
       const k = capKeyHoy(col.comp, col.cap, studentKey(al));
       const g = leerNota(store.grades, k) || {};
-      let nota = (g.nota20!=='' && g.nota20!=null) ? g.nota20 : '';
+      let nota = (g.origen!=='letra' && g.nota20!=='' && g.nota20!=null) ? g.nota20 : '';
       let letra = g.nivel || (nota!=='' ? numToLetter(nota) : '');
       if (letra==='AD') cAD++; else if (letra==='A') cA++; else if (letra==='B') cB++; else if (letra==='C') cC++;
       const encN = encodeURIComponent(studentKey(al));
@@ -1941,6 +1997,7 @@ function renderStudents() {
   }).join('');
 
   box.innerHTML = '<div class="fin-wrap"><table class="fin-grid"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.bind(box);
   const cc = document.getElementById('cC'), cb = document.getElementById('cB'), ca = document.getElementById('cA'), cad = document.getElementById('cAD');
   if (cc) cc.textContent = cC;
   if (cb) cb.textContent = cB;
@@ -2560,7 +2617,7 @@ function renderFinales() {
 
   res.innerHTML = (bloqueado
     ? '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>'
-    : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">0–20 · columna con evidencias = solo lectura</span>');
+    : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">'+(modoCalif==='letra'?'Letras':'0–20')+' · Promedio directo prevalece sobre evidencias</span>');
 
   let cAD=0,cA=0,cB=0,cC=0,cV=0,cTot=0;
   let head = '<th class="fin-nom">Estudiante</th>';
@@ -2580,7 +2637,8 @@ function renderFinales() {
       const ev = notaDesdeSesiones(cp, studentKey(al));
       const ofi = notaCompAlumno(cp, studentKey(al));
       let nota='', letra='';
-      if (dir.nota !== '' && dir.nota != null) { nota = dir.nota; letra = dir.letra; }
+      const original = leerNota(store.finales, finalKey(cp, studentKey(al))) || {};
+      if (dir.nota !== '' && dir.nota != null) { nota = original.origen==='letra'?'':dir.nota; letra = dir.letra; }
       if (ofi.letra==='AD') cAD++; else if (ofi.letra==='A') cA++; else if (ofi.letra==='B') cB++; else if (ofi.letra==='C') cC++;
       if (ofi.letra) cV++;
       cTot++;
@@ -2656,6 +2714,7 @@ function renderFinales() {
       renderFinales();
     });
   });
+  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);
   sincronizarEdicionRegistro();
 }
 
@@ -2669,9 +2728,12 @@ function guardarFinales() {
     const comp = decodeURIComponent(cell.dataset.comp);
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(comp, nombre);
+    const previo = leerNota(store.finales, k);
+    if (nraw === '' && previo && previo.origen==='letra') return;
+    if (previo && previo.origen!=='letra' && nraw!=='' && Number(previo.nota20)===Math.round(nraw)) return;
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
-    store.finales[k] = { nota20: n, nivel: numToLetter(n), ts: Date.now() };
+    store.finales[k] = { nota20: n, nivel: numToLetter(n), origen:'numero', ts: Date.now() };
   });
   saveStore();
 }
@@ -2912,6 +2974,7 @@ function renderAvance() {
   });
   if (!sess.length && !hayFinales) {
     box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Aún no hay evaluaciones ni promedios en este bimestre/área.</p>';
+    if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
     return;
   }
 
@@ -2947,7 +3010,8 @@ function renderAvance() {
         }
       });
       const ofi = notaCompAlumno(comp, studentKey(al));
-      return { prom: ofi.nota===''?null:Number(ofi.nota), letra: ofi.letra };
+      const original = leerNota(store.finales, finalKey(comp, studentKey(al))) || {};
+      return { prom: ofi.nota===''?null:Number(ofi.nota), letra: ofi.letra, letraOriginal: ofi.src==='P' && original.origen==='letra' };
     });
     aula[comp] = {
       caps: evidencias,
@@ -2975,7 +3039,7 @@ function renderAvance() {
       const r = data[comp][i];
       if (r.prom!=null && r.prom!=='') nums.push(Number(r.prom));
       tds += '<td><div class="fin-cell">' +
-        (modoCalif==='num' && r.prom!=null ? '<div style="font-weight:800;font-size:16px">'+pad2(r.prom)+'</div>' : '') +
+        (modoCalif==='num' && r.prom!=null && !r.letraOriginal ? '<div style="font-weight:800;font-size:16px">'+pad2(r.prom)+'</div>' : '') +
         '<span class="eq-letter '+(r.letra?eqClass(r.letra):'eq-none')+'">'+(r.letra||'—')+'</span></div></td>';
     });
     const pg = promedioNums(nums);
@@ -3007,6 +3071,7 @@ function renderAvance() {
       saveStore();
     });
   });
+  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
   sincronizarEdicionRegistro();
 }
 

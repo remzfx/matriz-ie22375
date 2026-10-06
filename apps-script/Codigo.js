@@ -1105,7 +1105,16 @@ function transversalEvidencia_(raw,ctx,acceso,ids,ts,previo) {
       const old=anteriores&&((anteriores.grades||{})[key]||{})[id];grades[key][id]=Object.assign({},v,{ts:old&&old.modo===v.modo&&old.valor===v.valor?old.ts:ts});
     });
   });
-  const evidencia={schema:1,sessions,grades};evidencia.finales=core.resultados(evidencia,[...ids]).valores;return evidencia;
+  const directos={},input=raw.directos===undefined?(anteriores&&anteriores.directos||{}):raw.directos;
+  if(!obj(input))throw new Error('Valoraciones directas inválidas.');
+  Object.keys(input).forEach(id=>{
+    if(!ids.has(id)||!obj(input[id]))throw new Error('Estudiante o valoración directa no autorizados.');
+    directos[id]={};Object.keys(input[id]).forEach(comp=>{
+      if(!Object.prototype.hasOwnProperty.call(core.COMP,comp))throw new Error('Competencia directa no autorizada.');
+      const v=core.valor(input[id][comp]);if(!v)throw new Error('Valoración directa inválida.');directos[id][comp]=v;
+    });
+  });
+  const evidencia={schema:1,sessions,grades,directos};evidencia.finales=core.resultados(evidencia,[...ids]).valores;return evidencia;
 }
 function transversalIdentidad_(al) {
   return String(al.idSiagie||'').trim() ? 'id:'+encodeURIComponent(String(al.idSiagie).trim()) : String(al.codigoEstudiante||'').trim() ? 'cod:'+encodeURIComponent(String(al.codigoEstudiante).trim()) : 'nom:'+encodeURIComponent(normalizarNombreIdentidad_(String(al.nombre||'').replace(/,/g,' ')));
@@ -1176,14 +1185,21 @@ function transversalDatos_(ctx,config) {
     if(!a.evidencia)return;const grades={};
     Object.keys(a.evidencia.grades||{}).forEach(key=>{grades[key]={};estudiantes.forEach(al=>{const source=a.evidencia.grades[key],id=alias[al.id].find(k=>Object.prototype.hasOwnProperty.call(source,k));if(id)grades[key][al.id]=source[id];});});
     a.evidencia.grades=grades;const result=registroEvaluacion_().resultados(a.evidencia,estudiantes.map(a=>a.id));
-    a.valores=result.valores;a.estadisticas=result.estadisticas;a.evidencia.finales=result.valores;
+    const directos={};estudiantes.forEach(al=>{const source=a.evidencia.directos||{},id=alias[al.id].find(k=>Object.prototype.hasOwnProperty.call(source,k));if(id)directos[al.id]=source[id];});
+    a.evidencia.directos=directos;a.calculados=result.valores;a.origenes={};a.valores=JSON.parse(JSON.stringify(result.valores));
+    estudiantes.forEach(al=>{a.origenes[al.id]={};['tic','autonomia'].forEach(comp=>{
+      const directo=registroEvaluacion_().valor((directos[al.id]||{})[comp]);
+      if(directo)a.valores[al.id][comp]=directo;
+      if(a.valores[al.id][comp])a.origenes[al.id][comp]=directo?'directo':'evidencias';
+    });});
+    a.estadisticas=result.estadisticas;a.evidencia.finales=result.valores;
   });
   let consolidado={version:0,finales:{}};
   transversalFilas_('TransversalesConsolidado').forEach(row=>{if(String(row[0])===clave && Number(row[5])>consolidado.version)consolidado={version:Number(row[5]),finales:JSON.parse(row[6])};});
   return {clave,estudiantes,areas:[...areas].sort(),aportes,consolidado,versionTs:version,versionAportes:'evidencias-v1:'+fingerprint+':'+version+':'+padron.version};
 }
 function transversalResumen_(datos,id,comp) {
-  const porArea={};datos.aportes.forEach(a=>{const v=(a.valores[id]||{})[comp];if(v && (!porArea[a.area]||a.ts>porArea[a.area].ts))porArea[a.area]={area:a.area,docente:a.docente,ts:a.ts,valor:v};});
+  const porArea={};datos.aportes.forEach(a=>{const v=(a.valores[id]||{})[comp];if(v && (!porArea[a.area]||a.ts>porArea[a.area].ts))porArea[a.area]={area:a.area,docente:a.docente,ts:a.ts,valor:v,origen:(a.origenes&&a.origenes[id]||{})[comp]||'evidencias'};});
   const aportes=Object.values(porArea),conteo={AD:0,A:0,B:0,C:0};aportes.forEach(a=>conteo[a.valor.nivel]++);
   const max=Math.max(...Object.values(conteo)), ganadores=Object.keys(conteo).filter(k=>conteo[k]===max), sugerencia=max && ganadores.length===1?ganadores[0]:null;
   const orden=['C','B','A','AD'],indices=aportes.map(a=>orden.indexOf(a.valor.nivel)), faltan=datos.areas.filter(a=>!porArea[a]);
@@ -1199,7 +1215,7 @@ function transversalVista_(datos,acceso,ctx) {
     const obsoleto=!!final && final.versionAportes!==datos.versionAportes;
     resultados[al.id][comp]={resumen,final,listo:transversalListo_(final,datos.versionAportes),estado:transversalConclusionPendiente_(final)?'Conclusión descriptiva obligatoria para nivel C':obsoleto?'Requiere nueva confirmación':!final||!final.tutor?'Pendiente de confirmación del Tutor':!final.aip?'Pendiente de confirmación del AIP':'✓ Consolidación confirmada · Lista para SIAGIE'};
   });});
-  return {ok:true,estudiantes:datos.estudiantes,areas:datos.areas,versionAportes:datos.versionAportes,version:datos.consolidado.version,
+  return {ok:true,soportaDirectos:true,estudiantes:datos.estudiantes,areas:datos.areas,versionAportes:datos.versionAportes,version:datos.consolidado.version,
     aportes:coord?datos.aportes:datos.aportes.filter(a=>normalizarUsuario_(a.user)===normalizarUsuario_(acceso.sesion.user)&&a.area===ctx.area),resultados,
     puedeFinal:acceso.sesion.role==='pip'||transversalTutor_(acceso,ctx),puedeTutor:!!transversalTutor_(acceso,ctx),puedeAip:acceso.sesion.role==='pip',abierto:bimestreAbierto_(ctx.bimestre)};
 }

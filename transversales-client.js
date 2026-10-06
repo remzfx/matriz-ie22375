@@ -50,6 +50,7 @@
               text('p',a.area+': '+a.valor.valor+' → '+a.valor.nivel,cell);
               const detail=text('details','',cell);text('summary','Ver evidencias de '+a.area,detail);
               const aporte=data.aportes.find(x=>x.area===a.area&&x.ts===a.ts),evidencia=aporte&&aporte.evidencia;
+              text('p','Aporte efectivo: '+a.valor.nivel+' · origen: '+(a.origen==='directo'?'nota directa':'evidencias'),detail);
               if(evidencia)(evidencia.sessions||[]).filter(s=>s.comp===comp).forEach(s=>{const g=((evidencia.grades||{})[grading.sessionKey(s)]||{})[al.id];if(g)text('p',s.fecha+' · '+s.capacidad+' · '+g.valor+' → '+g.nivel,detail);});
             });
             text('p','AD: '+result.resumen.conteo.AD+' · A: '+result.resumen.conteo.A+' · B: '+result.resumen.conteo.B+' · C: '+result.resumen.conteo.C,cell);
