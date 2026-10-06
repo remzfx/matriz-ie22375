@@ -35,7 +35,7 @@ function checkRequest(s,bimestre){
   assert.deepEqual(Object.keys(body).sort(),bimestre?['action','bimestre','token']:['action','token']);if(bimestre)assert.equal(body.bimestre,bimestre);
 }
 test('Admin real loader consumes the protected backend response',async()=>{
-  const s=fixture();s.run('let bdGuardando=false,bdPendiente=false,baseCargada=false;let recibido;function estadoBD(){};function aplicarBaseServidor(base){recibido=base;}');
+  const s=fixture();s.run('let bdGuardando=false,bdPendiente=false,baseCargada=false;let recibido;function estadoBD(){};function actualizarResumen(){};function aplicarBaseServidor(base){recibido=base;}');
   s.run(extract('admin.html','cargarEstudiantesAdmin'));await s.c.cargarEstudiantesAdmin();checkRequest(s);
   assert.equal(s.run('recibido.primaria.estudiantes[0].nombre'),'Synthetic Primary');
 });

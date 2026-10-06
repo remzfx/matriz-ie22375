@@ -45,6 +45,7 @@
     .mobile-nav-scroll > button { flex:0 0 auto; }
   }
 </style>
+  <script src="login-bridge.js"></script>
   <script src="students.js"></script>
 <script src="student-identity.js"></script>
 </head>
@@ -113,7 +114,7 @@
           <div class="text-2xl mb-1">👥</div>
           <div class="font-black">Base de estudiantes</div>
           <div class="text-sm text-slate-500">Ver, buscar y editar la lista oficial</div>
-          <div class="mt-2 text-xs font-bold text-sky-700" id="statAlumnos">— alumnos</div>
+          <div class="mt-2 text-xs font-bold text-sky-700" id="statAlumnos">— alumnos · verificando…</div>
         </button>
         <button class="card p-4 text-left hover:ring-2 hover:ring-sky-300" onclick="showTab('import')">
           <div class="text-2xl mb-1">📤</div>
@@ -508,7 +509,7 @@ function aplicarBaseServidor(base) {
   baseCargada = true;
   bdPendiente = false;
   actualizarResumen(); fillFiltros(); renderTabla();
-  estadoBD(base.offline ? 'Sin conexión: lista temporal de esta sesión (máximo 10 minutos).'
+  estadoBD(base.offline ? 'Sin conexión: última lista autorizada de esta sesión.'
     : baseInicializada ? 'Base oficial cargada desde el servidor.' : 'Base privada pendiente de inicialización. Importa la base oficial y confírmala abajo.');
 }
 async function cargarEstudiantesAdmin(options) {
@@ -516,13 +517,15 @@ async function cargarEstudiantesAdmin(options) {
   if (bdGuardando) return;
   if (bdPendiente && !confirm('Hay cambios sin guardar. ¿Descartarlos y recargar la base del servidor?')) return;
 
-  // La caché está ligada al token exacto y vence a los 10 minutos.
+  // La caché está ligada al token exacto y limitada por su expiración.
   // Se usa solo para pintar el panel de inmediato; el servidor sigue siendo autoritativo.
-  const cached = !options.forceNetwork && IEStudents.peek ? IEStudents.peek() : null;
+  const cached = IEStudents.peek ? IEStudents.peek() : null;
   if (cached && cached.inicializada) {
     aplicarBaseServidor(cached);
     estadoBD('Base reciente mostrada al instante. Verificando datos con el servidor…');
   } else {
+    baseCargada = false;
+    actualizarResumen();
     estadoBD('Cargando estudiantes con la sesión Admin…');
   }
 
@@ -530,13 +533,18 @@ async function cargarEstudiantesAdmin(options) {
     const fresca = await IEStudents.load();
     aplicarBaseServidor(fresca);
   } catch(e) {
-    if (cached && cached.inicializada) {
-      baseCargada = true;
+    const vigente = IEStudents.peek ? IEStudents.peek() : null;
+    if (vigente && vigente.inicializada) {
+      aplicarBaseServidor(vigente);
       estadoBD('Mostrando la última base autorizada de esta sesión. No se pudo actualizar ahora.');
       return;
     }
     baseCargada = false;
-    estadoBD(e.message);
+    baseInicializada = false;
+    estado = IEStudents.empty();
+    actualizarResumen(); fillFiltros(); renderTabla();
+    document.getElementById('statAlumnos').textContent = '— alumnos · no disponibles';
+    estadoBD('No se pudo cargar la base. ' + e.message);
   }
 }
 window.addEventListener('beforeunload', function(e) {
@@ -660,6 +668,11 @@ async function guardarBD() {
 
 function actualizarResumen() {
   if (!estado) return;
+  if (!baseCargada || !baseInicializada) {
+    document.getElementById('statAlumnos').textContent = '— alumnos · verificando…';
+    document.getElementById('resumenRapido').innerHTML = '<div><b>Primaria</b> (—)</div><div><b>Secundaria</b> (—)</div>';
+    return;
+  }
   const p = estudiantesDe('primaria').length;
   const s = estudiantesDe('secundaria').length;
   document.getElementById('statAlumnos').textContent = (p+s) + ' alumnos (' + p + ' prim. / ' + s + ' sec.)';
