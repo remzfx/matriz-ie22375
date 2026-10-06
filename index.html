@@ -93,23 +93,6 @@
 <script>
 const SESSION_KEY = 'ie22375_session_v1';
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
-async function fetchConTiempo(url, ms, options) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ms);
-  try {
-    const opts = Object.assign({ cache: 'no-store' }, options || {}, { signal: ctrl.signal });
-    return await fetch(url, opts);
-  } catch (e) {
-    if (e && e.name === 'AbortError') {
-      const err = new Error('El servidor tardó demasiado en responder.');
-      err.code = 'TIMEOUT';
-      throw err;
-    }
-    const err = new Error('No se pudo establecer conexión con el servidor.');
-    err.code = 'NETWORK';
-    throw err;
-  } finally { clearTimeout(t); }
-}
 function normalizarUsuarioDocente(v) {
   return String(v || '').trim().toLowerCase().replace(/^@+/, '');
 }
@@ -122,63 +105,82 @@ function errorLogin(code, message, extra) {
 function esperar(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-async function leerRespuestaLoginConTiempo(response, ms) {
-  let timer;
+function registrarIntentoLogin(info) {
   try {
-    return await Promise.race([response.text(), new Promise((_, reject) => {
-      timer = setTimeout(() => reject(errorLogin('TIMEOUT','El servidor tardó demasiado en responder.')),ms);
-    })]);
-  } finally { clearTimeout(timer); }
+    const key = 'ie22375_login_attempts_v1';
+    const prev = info.intento === 1 ? [] : JSON.parse(sessionStorage.getItem(key) || '[]');
+    sessionStorage.setItem(key, JSON.stringify(prev.concat([info]).slice(-2)));
+  } catch (_) {}
 }
-async function loginBackendUnaVez(tipo, usuario, password) {
-  const t0 = performance.now();
-  const r = await fetchConTiempo(CLOUD_API_URL, 18000, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action:'login', tipo:tipo, usuario:usuario, password:password })
+async function loginBackendUnaVez(tipo, usuario, password, intento = 1) {
+  detenerPrecalentamientoLogin();
+  const ctrl = new AbortController(), t0 = performance.now();
+  let fase = 'fetch', r = null, t1 = t0, vencido = false, timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      vencido = true;
+      ctrl.abort();
+      reject(errorLogin('TIMEOUT', 'El servidor tardó demasiado en responder.'));
+    }, 18000);
   });
-  const t1 = performance.now();
-  if (!r || !r.ok) {
+  function diagnostico(code) {
     let origin = '';
-    try { origin = new URL(r.url).origin; } catch(e) {}
-    throw errorLogin('HTTP', 'El servidor respondió con un error.', {
-      status:r ? r.status : 0, origin:origin,
-      contentType:r && r.headers ? (r.headers.get('Content-Type') || '').split(';')[0] : '',
-      redirected:!!(r && r.redirected)
-    });
+    try { origin = new URL(r.url).origin; } catch (_) {}
+    return {intento:intento, totalMs:Math.round(performance.now()-t0), fase:fase,
+      status:r ? r.status : 0, origin:origin, redirected:!!(r && r.redirected),
+      contentType:r && r.headers ? (r.headers.get('Content-Type') || '').split(';')[0] : '', code:code};
   }
-  const raw = await leerRespuestaLoginConTiempo(r,Math.max(1,18000 - (performance.now() - t0)));
-  const t2 = performance.now();
-  let data;
   try {
-    data = JSON.parse(raw);
+    const data = await Promise.race([deadline, (async () => {
+      r = await fetch(CLOUD_API_URL, {method:'POST', cache:'no-store', signal:ctrl.signal,
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:JSON.stringify({action:'login',tipo:tipo,usuario:usuario,password:password})});
+      t1 = performance.now();
+      fase = 'respuesta';
+      if (!r || !r.ok) throw errorLogin('HTTP', 'El servidor respondió con un error.');
+      fase = 'cuerpo';
+      const raw = await r.text();
+      fase = 'respuesta';
+      let value;
+      try { value = JSON.parse(raw); }
+      catch (_) { throw errorLogin('INVALID_RESPONSE', 'El servidor devolvió una respuesta no válida.'); }
+      if (!value || typeof value !== 'object' || typeof value.ok !== 'boolean')
+        throw errorLogin('INVALID_RESPONSE', 'El servidor devolvió una respuesta no válida.');
+      value.__timing = {totalMs:Math.round(performance.now()-t0), fetchMs:Math.round(t1-t0),
+        parseMs:Math.round(performance.now()-t1)};
+      return value;
+    })()]);
+    registrarIntentoLogin(diagnostico('OK'));
+    return data;
   } catch (e) {
-    throw errorLogin('INVALID_RESPONSE', 'El servidor devolvió una respuesta no válida.');
-  }
-  data = data && typeof data === 'object' ? data : {};
-  data.__timing = {
-    totalMs: Math.round(t2 - t0),
-    fetchMs: Math.round(t1 - t0),
-    parseMs: Math.round(t2 - t1)
-  };
-  return data;
+    const code = vencido ? 'TIMEOUT' : e.code || 'NETWORK';
+    const info = diagnostico(code);
+    registrarIntentoLogin(info);
+    throw errorLogin(code, 'No se pudo completar el acceso.', info);
+  } finally { clearTimeout(timer); ctrl.abort(); }
 }
+let loginPendiente = null;
 async function loginBackend(tipo, usuario, password, onRetry) {
-  let ultimoError = null;
-  for (let intento = 1; intento <= 2; intento++) {
-    try {
-      const data = await loginBackendUnaVez(tipo, usuario, password);
-      data.__retryCount = intento - 1;
-      return data;
-    } catch (e) {
-      ultimoError = e;
-      if (intento === 1) {
-        if (typeof onRetry === 'function') onRetry(e);
-        await esperar(1200);
+  if (loginPendiente) return loginPendiente;
+  loginPendiente = (async () => {
+    let ultimoError;
+    for (let intento = 1; intento <= 2; intento++) {
+      try {
+        const data = await loginBackendUnaVez(tipo, usuario, password, intento);
+        data.__retryCount = intento - 1;
+        return data;
+      } catch (e) {
+        ultimoError = e;
+        if (intento === 1) {
+          if (typeof onRetry === 'function') onRetry(e);
+          await esperar(1200);
+        }
       }
     }
-  }
-  throw ultimoError || errorLogin('UNKNOWN', 'No fue posible completar el acceso.');
+    throw ultimoError;
+  })();
+  try { return await loginPendiente; }
+  finally { loginPendiente = null; }
 }
 function mensajeErrorLogin(e) {
   const code = e && e.code ? e.code : 'UNKNOWN';
@@ -200,15 +202,27 @@ function registrarFalloLogin(e) {
     }));
   } catch (_) {}
 }
-let loginPrecalentado = false;
+let loginPrecalentado = false, loginWarmup = null;
+function detenerPrecalentamientoLogin() {
+  if (loginWarmup) {
+    loginWarmup.ctrl.abort();
+    clearTimeout(loginWarmup.timer);
+    loginWarmup = null;
+  }
+}
 function precalentarLoginBackend() {
-  if (loginPrecalentado || getSession()) return;
+  if (loginPrecalentado || loginPendiente || getSession()) return;
   loginPrecalentado = true;
-  fetchConTiempo(CLOUD_API_URL + '?action=ping&t=' + Date.now(), 4000, {
-    method: 'GET',
-    cache: 'no-store'
-  }).catch(function () {
-    // Es solo una optimización: nunca debe bloquear ni mostrar error al usuario.
+  const warmup = {ctrl:new AbortController()};
+  loginWarmup = warmup;
+  warmup.timer = setTimeout(() => warmup.ctrl.abort(), 4000);
+  warmup.task = fetch(CLOUD_API_URL + '?action=ping&t=' + Date.now(), {
+    method:'GET', cache:'no-store', signal:warmup.ctrl.signal
+  }).then(r => r.text()).catch(function () {
+    // Optimización opcional: nunca bloquea el login ni muestra un error.
+  }).finally(function () {
+    clearTimeout(warmup.timer);
+    if (loginWarmup === warmup) loginWarmup = null;
   });
 }
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -323,14 +337,41 @@ async function intentarLogin() {
   mostrarHub();
   precargarAuxiliar();
 }
-function precargarAuxiliar() {
-  const s=getSession();
-  if (s && s.role==='auxiliar' && typeof IEStudents!=='undefined') IEStudents.preload().catch(function(e){
-    const actual=getSession();
-    if ((e.code==='SESSION'||e.authorizationRejected) && actual && actual.token===s.token) {
-      clearSession();IEStudents.clear();mostrarHub();
-    }
-  });
+let comprobacionAuxiliar = null;
+function precargarAuxiliar(verificar = false) {
+  const s = getSession();
+  if (!s || s.role !== 'auxiliar' || typeof IEStudents === 'undefined') return;
+  if (comprobacionAuxiliar && comprobacionAuxiliar.token === s.token) {
+    comprobacionAuxiliar.verificar = comprobacionAuxiliar.verificar || verificar;
+    return comprobacionAuxiliar.task;
+  }
+  const check = {token:s.token, verificar:verificar};
+  comprobacionAuxiliar = check;
+  check.task = (async function () {
+    try {
+      const base = await IEStudents.preload();
+      // Al restaurar sesión se verifica también si no hay un SW capaz de precargar.
+      if (check.verificar && !base && getSession() && getSession().token === s.token) await IEStudents.load();
+    } catch (e) {
+      const actual = getSession();
+      if ((e.code === 'SESSION' || e.authorizationRejected) && actual && actual.token === s.token) {
+        clearSession(); IEStudents.clear(); mostrarHub();
+        const err = document.getElementById('loginErr');
+        err.textContent = 'La sesión ya no está autorizada. Vuelve a iniciar sesión.';
+        err.classList.remove('hidden');
+      }
+    } finally { if (comprobacionAuxiliar === check) comprobacionAuxiliar = null; }
+  })();
+  return check.task;
+}
+function restaurarSesionRecordada() {
+  if (!getSession()) return false;
+  mostrarHub();
+  // students.js es defer: esperar al DOM permite usarlo sin retrasar el Hub.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { precargarAuxiliar(true); }, {once:true});
+  } else precargarAuxiliar(true);
+  return true;
 }
 function cerrarSesion() {
   clearSession();
@@ -381,15 +422,13 @@ function mostrarHub() {
   }).join('') || '<p class="text-sm text-slate-500">No hay módulos para este usuario.</p>';
 }
 onTipoChange();
-if (getSession()) {
-  mostrarHub();
-} else {
+if (!restaurarSesionRecordada()) {
   // Arrancar Apps Script en segundo plano mientras el usuario completa el login.
   precalentarLoginBackend();
 }
 if (typeof navigator!=='undefined' && navigator.serviceWorker) {
   navigator.serviceWorker.register('./sw.js').catch(function(){});
-  navigator.serviceWorker.addEventListener('controllerchange',precargarAuxiliar);
+  navigator.serviceWorker.addEventListener('controllerchange',function () { precargarAuxiliar(); });
 }
 </script>
 </body>
