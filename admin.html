@@ -1331,12 +1331,12 @@ async function vaciarSiagieOficial(){
   try { padron=await IEStudents.loadRoster(ctx.bim); } catch(e) { alert(e.message); return; }
   if(padron.offline){alert('Exportación SIAGIE requiere el padrón del servidor con conexión.');return;}
   const alumnos=((padron[ctx.nivel]||{}).estudiantes||[]).filter(a=>String(a.grado)===String(ctx.grado)&&String(a.seccion)===String(ctx.seccion));
-  const idxNom={},idxId={},idxCod={};
+  const idxNom={},idxId={},idxCod={},idxIdUnico={},idxCodUnico={};
   alumnos.forEach(al=>{
     const nom=normNomAdm(al.nombre);
     idxNom[nom]=Object.hasOwn(idxNom,nom)?null:al;
-    if(al.idSiagie) idxId[String(al.idSiagie).trim()]=al;
-    if(al.codigoEstudiante) idxCod[String(al.codigoEstudiante).trim()]=al;
+    if(al.idSiagie){const id=String(al.idSiagie).trim();idxId[id]=al;idxIdUnico[id]=Object.hasOwn(idxIdUnico,id)?null:al;}
+    if(al.codigoEstudiante){const cod=String(al.codigoEstudiante).trim();idxCod[cod]=al;idxCodUnico[cod]=Object.hasOwn(idxCodUnico,cod)?null:al;}
   });
   const wb=XLSX.read(buf,{type:'array',cellDates:true});
   let escritos=0;const pendientesTrans=[];
@@ -1357,17 +1357,21 @@ async function vaciarSiagieOficial(){
       const idX=cellId?String(cellId.v||'').trim():'';
       const codX=cellCod?String(cellCod.v||'').trim():'';
       const nomX=cell?cell.v:'';
-      const nombre=(idX&&idxId[idX])||(codX&&idxCod[codX])||idxNom[normNomAdm(nomX)];
-      if(!nombre) continue;
+      if(transversal){
+        // Limpiar incluso filas no vinculadas: ninguna nota anterior puede pasar al archivo nuevo.
+        use.forEach((cp,i)=>{delete ws[XLSX.utils.encode_cell({r:r,c:3+i*2})];delete ws[XLSX.utils.encode_cell({r:r,c:4+i*2})];});
+      }
+      const nombre=(idX&&(transversal?idxIdUnico:idxId)[idX])||(codX&&(transversal?idxCodUnico:idxCod)[codX])||idxNom[normNomAdm(nomX)];
+      if(!nombre){
+        if(transversal&&(idX||codX||String(nomX||'').trim()))pendientesTrans.push('Alumno/fila no vinculada al padrón · '+sn+' · fila '+(r+1));
+        continue;
+      }
       use.forEach((cp,i)=>{
         const permitirNombre=alumnos.filter(a=>normNomAdm(a.nombre)===normNomAdm(nombre.nombre)).length===1;
         const compTrans=map.only===1?'autonomia':map.only===0?'tic':i===0?'tic':'autonomia';
         const resultTrans=transversal?((transversales.resultados[studentKey(nombre)]||{})[compTrans]):null;
         const letra=transversal?(resultTrans&&resultTrans.listo?resultTrans.final.nivel:''):letraDesdePayload(p,ctx,map.area,cp,nombre,permitirNombre);
-        if(transversal) delete ws[XLSX.utils.encode_cell({r:r,c:4+i*2})];
         if(transversal&&!letra){
-          // Una plantilla puede contener una nota antigua: nunca exportarla como consolidado vigente.
-          delete ws[XLSX.utils.encode_cell({r:r,c:3+i*2})];delete ws[XLSX.utils.encode_cell({r:r,c:4+i*2})];
           pendientesTrans.push(nombre.nombre+' · '+cp+' · '+(resultTrans?resultTrans.estado:'Sin calificación final'));
         }
         if(!letra) return;

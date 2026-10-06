@@ -149,28 +149,47 @@ test('Registro preserves an unsaved transversal draft on context changes or reop
 });
 
 const exportFixture=new Function('require','__dirname',read('tests/registro-roster-identity.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname);
-for(const stage of ['confirmed','confirmed-C','obsolete','pending','pending-cancel'])test('real Admin SIAGIE export '+stage+' uses only current confirmed finals and preserves academic export',async()=>{
+for(const stage of ['confirmed','confirmed-C','obsolete','pending','pending-cancel','unlinked-accept','unlinked-cancel','empty','ambiguous-name','ambiguous-code','ambiguous-id'])test('real Admin SIAGIE export '+stage+' uses only current confirmed finals and preserves academic export',async()=>{
  const server=fixture();['math','communication','ef'].forEach(u=>server.aporte(u,stage==='confirmed-C'?'C':'A'));server.final('math',stage==='confirmed-C'?'C':13,stage==='confirmed-C'?'':undefined);server.confirm('math','confirmtransversaltutor');
  if(!stage.startsWith('pending'))server.confirm('pip','confirmtransversalaip');if(stage==='obsolete')server.aporte('ef','B');
  const f=exportFixture(),ctx={nivel:'secundaria',bim:'I',grado:2,seccion:'A'},academic={finales:{'secundaria||I||2||A||Matemática||Resuelve||id:synthetic-a':{nivel:'AD'}}};
  const sheet=()=>({'!ref':'A1:E3',A3:{v:'synthetic-a'},C3:{v:'Synthetic Student A'},D3:{v:'C'},E3:{v:'Legacy conclusion must not survive'}}),mate=sheet(),tic=sheet(),auto=sheet(),wb={SheetNames:['MATE','DESEN TIC','GEST AUTO'],Sheets:{MATE:mate,'DESEN TIC':tic,'GEST AUTO':auto}};
- let exported=0,reads=0;const confirmations=[];
- f.c.XLSX={read:()=>wb,write:()=>{exported++;return new Uint8Array()},utils:{decode_range:()=>({s:{r:0},e:{r:2}}),encode_cell:({r,c})=>String.fromCharCode(65+c)+(r+1)}};
- f.c.Blob=Blob;f.c.atob=atob;f.c.URL={createObjectURL:()=> 'synthetic'};f.c.document.createElement=()=>({click(){}});f.c.confirm=message=>{confirmations.push(message);assert.match(f.el('tplMsg').textContent,/Transversales pendientes:/);assert.equal(exported,0);return stage!=='pending-cancel'};
+ const unlinked=stage.startsWith('unlinked')||stage.startsWith('ambiguous'),partial=unlinked||stage==='obsolete'||stage.startsWith('pending'),students=clone(server.roster);
+ if(unlinked||stage==='empty'){
+   for(const ws of [mate,tic,auto]){ws['!ref']='A1:E6';ws.D4={v:'C'};ws.E4={v:'Unlinked legacy conclusion'};}
+   if(unlinked){
+     for(const ws of [mate,tic,auto]){ws.A4={v:'missing-id'};ws.B4={v:'missing-code'};ws.C4={v:'Synthetic Missing Student'};}
+     if(stage.startsWith('ambiguous')){
+       students.push({grado:2,seccion:'A',nombre:'Synthetic Homonym',idSiagie:'duplicate-id',codigoEstudiante:'duplicate-code'}, {grado:2,seccion:'A',nombre:'Synthetic Homonym',idSiagie:'duplicate-id',codigoEstudiante:'duplicate-code'});
+       for(const ws of [mate,tic,auto]){if(stage==='ambiguous-name')ws.C4.v='Synthetic Homonym';if(stage==='ambiguous-code')ws.B4.v='duplicate-code';if(stage==='ambiguous-id')ws.A4.v='duplicate-id';}
+     }
+   }
+   // Row 5 is entirely empty; row 6 has no identity but stale grade cells. Neither is a student pending.
+   for(const ws of [tic,auto]){ws.D6={v:'C'};ws.E6={v:'Identity-free legacy conclusion'};}
+ }
+ let exported=0,reads=0,downloads=0;const confirmations=[];
+ f.c.XLSX={read:()=>wb,write:()=>{exported++;return new Uint8Array()},utils:{decode_range:()=>({s:{r:0},e:{r:unlinked||stage==='empty'?5:2}}),encode_cell:({r,c})=>String.fromCharCode(65+c)+(r+1)}};
+ f.c.Blob=Blob;f.c.atob=atob;f.c.URL={createObjectURL:()=> 'synthetic'};f.c.document.createElement=()=>({click(){downloads++;}});f.c.confirm=message=>{confirmations.push(message);assert.match(f.el('tplMsg').textContent,/Transversales pendientes:/);assert.equal(exported,0);return !stage.endsWith('-cancel')};
  f.c.ctxTpl=()=>ctx;f.c.areasDeNivel=()=>['Matemática','Competencias Transversales'];f.c.COMPS_SIAGIE={'Matemática':['Resuelve'],'Competencias Transversales':['TIC','Autonomía']};
  f.c.areaDeHojaAdm=name=>name==='MATE'?{area:'Matemática',only:null}:{area:'Competencias Transversales',only:name==='DESEN TIC'?0:1};
  f.c.normNomAdm=f.c.IEStudentIdentity.normalizarNombre;
  f.c.fetchRegAula=async()=>[{area:'Matemática',payload:academic},{area:'Competencias Transversales',payload:{finales:{'secundaria||I||2||A||Competencias Transversales||TIC||id:synthetic-a':{nivel:'AD'}}}}];
- f.c.IEStudents.loadRoster=async()=>({primaria:{estudiantes:[]},secundaria:{estudiantes:server.roster}});
+ f.c.IEStudents.loadRoster=async()=>({primaria:{estudiantes:[]},secundaria:{estudiantes:students}});
  f.c.fetchLecturaNube=async()=>({text:async()=>JSON.stringify({ok:true,b64:Buffer.from('synthetic').toString('base64')})});f.c.CLOUD_API_URL='synthetic';
  f.c.IETransversales={request:async(action,data)=>{reads++;return server.route(action,'admin',data)}};
- for(const name of ['letraDesdePayload','concDesdePayload','vaciarSiagieOficial'])f.run(extract('admin.html',name));
- await f.c.vaciarSiagieOficial();assert.equal(exported,stage==='pending-cancel'?0:1);assert.equal(reads,2);assert.equal(mate.D3.v,'AD');
- for(const ws of [tic,auto]){assert.equal(ws.E3,undefined);if(stage.startsWith('confirmed'))assert.equal(ws.D3.v,stage==='confirmed-C'?'C':'B');else assert.equal(ws.D3,undefined);}
- if(!stage.startsWith('confirmed')){
+ for(const name of ['numToLetterAdm','promedioAdm','letraDesdePayload','concDesdePayload','vaciarSiagieOficial'])f.run(extract('admin.html',name));
+ await f.c.vaciarSiagieOficial();assert.equal(exported,stage.endsWith('-cancel')?0:1);assert.equal(downloads,exported);assert.equal(reads,2);assert.equal(mate.D3.v,'AD');
+ for(const ws of [tic,auto]){assert.equal(ws.E3,undefined);if(!stage.startsWith('pending')&&stage!=='obsolete')assert.equal(ws.D3.v,stage==='confirmed-C'?'C':'B');else assert.equal(ws.D3,undefined);}
+ if(unlinked||stage==='empty'){
+   for(const ws of [tic,auto]){assert.equal(ws.D4,undefined);assert.equal(ws.E4,undefined);assert.equal(ws.D6,undefined);assert.equal(ws.E6,undefined);}
+   assert.equal(mate.D4.v,'C');assert.equal(mate.E4.v,'Unlinked legacy conclusion');
+   assert.doesNotMatch(f.el('tplMsg').textContent,/fila 5|fila 6/);
+   if(unlinked){assert.match(f.el('tplMsg').textContent,/Alumno\/fila no vinculada al padrón · DESEN TIC · fila 4/);assert.match(f.el('tplMsg').textContent,/Alumno\/fila no vinculada al padrón · GEST AUTO · fila 4/);}
+ }
+ if(partial){
    assert.equal(confirmations.length,1);assert.equal(confirmations[0],'Hay competencias transversales pendientes. Este archivo será parcial y todavía no está listo como registro completo para SIAGIE. ¿Generar de todas formas las áreas disponibles?');
-   assert.match(f.el('tplMsg').textContent,/NO listo para envío completo a SIAGIE/);assert.match(f.el('tplMsg').textContent,/Synthetic Student A/);assert.doesNotMatch(f.el('tplMsg').textContent,/Registro oficial listo/);
-   if(stage!=='pending-cancel')assert.match(f.el('tplMsg').textContent,/^Archivo parcial generado/);
+   assert.match(f.el('tplMsg').textContent,/NO listo para envío completo a SIAGIE/);if(!unlinked)assert.match(f.el('tplMsg').textContent,/Synthetic Student A/);assert.doesNotMatch(f.el('tplMsg').textContent,/Registro oficial listo/);
+   if(!stage.endsWith('-cancel'))assert.match(f.el('tplMsg').textContent,/^Archivo parcial generado/);
  }else{assert.equal(confirmations.length,0);assert.match(f.el('tplMsg').textContent,/^Registro oficial listo.*Suba este archivo a SIAGIE/);}
 });
 
