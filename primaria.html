@@ -964,18 +964,27 @@ window.__IE_SES = (function(){
     return r ? JSON.parse(r) : null;
   } catch(e) { return null; }
 })();
-window.__IE_areasOK = function(nombreArea) {
+window.__IE_areasOK = function(nombreArea, gradoVal, seccionVal) {
   var s = window.__IE_SES;
   if (!s || s.role === 'admin' || s.user === 'admin') return true;
   if (s.role !== 'docente') return true;
-  if (!s.areas || !s.areas.length) return true;
-  return s.areas.indexOf(nombreArea) >= 0;
+  gradoVal = gradoVal || estado.grado;
+  seccionVal = seccionVal || estado.seccion || 'UNICA';
+  if (!window.__IE_gradoOK(gradoVal)) return false;
+  var mapa = s.asignaciones;
+  if (mapa && Object.keys(mapa).length) {
+    var numero = ['PRIMERO','SEGUNDO','TERCERO','CUARTO','QUINTO','SEXTO'].indexOf(gradoVal) + 1 || parseInt(gradoVal,10);
+    return Array.isArray(mapa[nombreArea]) && mapa[nombreArea].some(function(aula) {
+      var p=String(aula).split('|');return Number(p[0])===numero && String(p[1]).toUpperCase().replace(/Ú/g,'U')===String(seccionVal).toUpperCase().replace(/Ú/g,'U');
+    });
+  }
+  return String(seccionVal).toUpperCase().replace(/Ú/g,'U') === 'UNICA' && nombreArea !== 'Educación Física';
 };
 window.__IE_gradoOK = function(gradoVal) {
   var s = window.__IE_SES;
   if (!s || s.role === 'admin' || s.user === 'admin') return true;
   if (s.role !== 'docente') return true;
-  if (!s.grados || !s.grados.length) return true;
+  if (!s.grados || !s.grados.length) return false;
   var map = {'PRIMERO':1,'SEGUNDO':2,'TERCERO':3,'CUARTO':4,'QUINTO':5,'SEXTO':6,'1°':1,'2°':2,'3°':3,'4°':4,'5°':5,'6°':6};
   var n = map[String(gradoVal)] || parseInt(String(gradoVal),10);
   return s.grados.map(Number).indexOf(n) >= 0;
@@ -1534,12 +1543,13 @@ window.__IE_gradoOK = function(gradoVal) {
             el.title = 'Calculado desde la base oficial privada';
         }
 
-        function getNombreDocente() {
-            return typeof IEMatrixTeachers === 'undefined' ? '' : IEMatrixTeachers.nombre('primaria', estado.grado);
+        function getNombreDocente(area) {
+            const contexto = area || estado.areaActual || (typeof ESTRUCTURA_AREAS !== 'undefined' ? Object.keys(ESTRUCTURA_AREAS).find(a=>!window.__IE_areasOK || window.__IE_areasOK(a)) : 'Comunicación');
+            return typeof IEMatrixTeachers === 'undefined' ? '' : IEMatrixTeachers.nombre('primaria', estado.grado, estado.seccion || 'UNICA', contexto);
         }
-        function nombreDocenteParaSubir() {
+        function nombreDocenteParaSubir(area) {
             if (typeof IEMatrixTeachers === 'undefined') throw new Error('Espera mientras se verifica el docente responsable');
-            return IEMatrixTeachers.exigirNombre('primaria', estado.grado);
+            return IEMatrixTeachers.exigirNombre('primaria', estado.grado, estado.seccion || 'UNICA', area || estado.areaActual || 'Comunicación');
         }
         function setNombreDocente(nombre, ts) {
             if (!estado.docentesPorAula) estado.docentesPorAula = {};
@@ -2401,7 +2411,9 @@ window.__IE_gradoOK = function(gradoVal) {
         // SELECCIONAR ÁREA
         // ============================================
         function seleccionarArea(nombreArea) {
+            if (window.__IE_areasOK && !window.__IE_areasOK(nombreArea)) return;
             estado.areaActual = nombreArea;
+            syncInputDocente();
             document.getElementById('mensajeInicial').classList.add('hidden');
             document.getElementById('panelCompetencias').classList.remove('hidden');
             document.getElementById('vistaTabla').classList.add('hidden');
@@ -2415,6 +2427,7 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         function renderizarAreaHeader() {
+            syncInputDocente();
             const area = ESTRUCTURA_AREAS[estado.areaActual];
             const header = document.getElementById('areaHeader');
             const resumen = calcularResumenArea(estado.areaActual);
@@ -3264,10 +3277,27 @@ window.__IE_gradoOK = function(gradoVal) {
         // ============================================
         // EXPORT / IMPORT
         // ============================================
+        function estadoParaExportar() {
+            const copia = JSON.parse(JSON.stringify(estado));
+            if (!window.__IE_SES || window.__IE_SES.role !== 'docente') return copia;
+            const datos = {}, permitida = (area, g, s)=>window.__IE_areasOK && window.__IE_areasOK(area,g,s);
+            Object.keys(copia.datos || {}).forEach(key=>{
+                const parts=key.split('|'); if (parts.length !== 3) return;
+                const areas = {};
+                Object.keys(copia.datos[key] || {}).forEach(area=>{if (permitida(area,parts[1],parts[2])) areas[area]=copia.datos[key][area];});
+                if (Object.keys(areas).length) datos[key]=areas;
+            });
+            const porAula = mapa=>Object.fromEntries(Object.entries(mapa || {}).filter(([key])=>{
+                const parts=key.split('|');return parts.length===3 && Object.keys(ESTRUCTURA_AREAS).some(area=>permitida(area,parts[1],parts[2]));
+            }));
+            return {bimestre:copia.bimestre,grado:copia.grado,seccion:copia.seccion,areaActual:permitida(copia.areaActual,copia.grado,copia.seccion)?copia.areaActual:null,
+                totalEstudiantes:getTotalEstudiantes(),totalesPorAula:porAula(copia.totalesPorAula),totalesPorAulaTs:porAula(copia.totalesPorAulaTs),
+                nombreDocente:getNombreDocente(),docentesPorAula:{},docentesPorAulaTs:{},datos,ultimaModificacion:copia.ultimaModificacion};
+        }
         function exportarDatos() {
             try {
                 estado.ultimaModificacion = Date.now();
-                const dataStr = JSON.stringify(estado, null, 2);
+                const dataStr = JSON.stringify(estadoParaExportar(), null, 2);
                 const blob = new Blob([dataStr], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -3514,7 +3544,7 @@ window.__IE_gradoOK = function(gradoVal) {
             const ctxKey = `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
             const bloque = (estado.datos && estado.datos[ctxKey]) ? estado.datos[ctxKey] : {};
             const lista = [];
-            Object.keys(ESTRUCTURA_AREAS).forEach(area => {
+            Object.keys(ESTRUCTURA_AREAS).filter(area=>!window.__IE_areasOK || window.__IE_areasOK(area)).forEach(area => {
                 const comps = bloque[area];
                 if (!comps) return;
                 const tiene = Object.keys(comps).some(c => {
@@ -3528,11 +3558,12 @@ window.__IE_gradoOK = function(gradoVal) {
 
         async function enviarAreaANube(area) {
             if (impedirEdicionPeriodo()) return;
+            if (window.__IE_areasOK && !window.__IE_areasOK(area)) throw new Error('Área no autorizada para esta aula');
             const ctxKey = `${estado.bimestre}|${estado.grado}|${estado.seccion || 'UNICA'}`;
             const areaData = (estado.datos[ctxKey] && estado.datos[ctxKey][area])
                 ? estado.datos[ctxKey][area]
                 : {};
-            const docenteArea = nombreDocenteParaSubir();
+            const docenteArea = nombreDocenteParaSubir(area);
             const payload = {
                 action: 'saveArea',
                 token: (window.__IE_SES || {}).token || '',
@@ -3567,7 +3598,7 @@ window.__IE_gradoOK = function(gradoVal) {
 
         function subirNube() {
             if (impedirEdicionPeriodo()) return;
-            try { nombreDocenteParaSubir(); }
+            try { if (typeof IEMatrixTeachers === 'undefined' || !IEMatrixTeachers.peek()) throw new Error('Espera mientras se verifica el docente responsable'); }
             catch(e) { mostrarToast(e.message, 'error'); return; }
             const areasDatos = areasConDatosDelGrado();
             const areaAct = estado.areaActual;
