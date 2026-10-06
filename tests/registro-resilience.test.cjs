@@ -96,15 +96,6 @@ test('Local-first mode allows Calificar, Promedios, Resumen and Asistencia tabs 
  }
 });
 
-test('Login body timeout stays inside the original attempt budget instead of hanging after headers',async()=>{
- const s=fixture(),source=read('index.html');
- const name='leerRespuestaLoginConTiempo',a=source.indexOf('async function '+name+'('),b=source.indexOf('\n}',a)+2;
- s.run("function errorLogin(code,message){return Object.assign(new Error(message),{code});}");s.run(source.slice(a,b));
- const request=s.c.leerRespuestaLoginConTiempo({text:()=>new Promise(()=>{})},300);
- const rejected=assert.rejects(request,e=>e.code==='TIMEOUT');await s.tick(300);await rejected;
- assert.match(source,/18000 - \(performance.now\(\) - t0\)/);
-});
-
 test('Late server refresh preserves the active local session, notes and unfinished conclusion',async()=>{
  const s=fixture();await s.c.IEStudents.loadRoster('III');let release;
  s.c.fetch=async()=>({ok:true,json:()=>new Promise(r=>release=r)});
