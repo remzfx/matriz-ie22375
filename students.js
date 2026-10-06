@@ -7,6 +7,14 @@
   let memory = null, authorizationEpoch = 0;
   const pending = new Map();
   const latestRequest = new Map();
+  let bridge = null;
+  function startBridge() {
+    if (!document.body && typeof document.addEventListener === 'function') return null;
+    if (!bridge && validToken() && global.IELoginBridge) {
+      try { bridge = global.IELoginBridge.create(API,'students'); } catch(e) {}
+    }
+    return bridge;
+  }
   function status(message) {
     const el = document.getElementById('studentsStatus');
     if (el) el.textContent = message;
@@ -116,7 +124,8 @@
     if (!worker || typeof MessageChannel==='undefined') return null;
     try {return (await workerMessage(worker,{type:'IE_STUDENTS_PROBE_V1'},200)).supported ? worker : null;}catch(e){return null;}
   }
-  async function studentsResponse(data,token) {
+  async function studentsResponse(data,token,transport) {
+    if (transport) return transport.loadStudents({token,bimestre:data.bimestre || ''});
     const worker=session()&&session().role==='auxiliar' ? await preloadAvailable() : null;
     if (worker) {
       const result=await workerMessage(worker,{type:'IE_STUDENTS_READ_V1',token,bimestre:data.bimestre||''},13000);
@@ -133,12 +142,15 @@
     const epoch = authorizationEpoch;
     const requestId = (latestRequest.get(scope) || 0) + 1;
     latestRequest.set(scope, requestId);
-    const read = action === 'loadstudents', attempts = read ? 2 : 1;
+    const read = action === 'loadstudents';
+    const candidate = read ? startBridge() : null;
+    const transport = candidate && (candidate.ready() || await candidate.whenReady()) ? candidate : null;
+    const attempts = read && !transport ? 2 : 1;
     let last;
     for (let attempt = 0; attempt < attempts; attempt++) {
       if (validToken() !== token || epoch !== authorizationEpoch) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
       try {
-        const response = read ? await studentsResponse(data,token) : await fetchJSON(API, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+        const response = read ? await studentsResponse(data,token,transport) : await fetchJSON(API, {method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
           body:JSON.stringify(Object.assign({},data,{action:action,token:token})),cache:'no-store'});
         if (validToken() !== token || epoch !== authorizationEpoch) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
         if (!response || typeof response.ok !== 'boolean') throw error('INVALID_RESPONSE','Respuesta del servidor no válida.',true);
@@ -187,6 +199,8 @@
     if (!base.inicializada) { clear(); throw new Error('Base privada no inicializada. Admin debe completar la inicialización SIAGIE.'); }
     return base;
   }
+  if (!document.body && typeof document.addEventListener === 'function') document.addEventListener('DOMContentLoaded',startBridge,{once:true});
+  else startBridge();
   global.IEStudents = {empty: empty, peek: () => peek('students:actual'),
     peekRoster: bimestre => ['I','II','III','IV'].includes(bimestre) ? peek('students:' + bimestre) : null,
     clear: clear, session: session, validToken: validToken, fetchJSON: fetchJSON,

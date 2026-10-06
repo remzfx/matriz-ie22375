@@ -11,9 +11,9 @@ function backend() {
   s.docentes[0].pass='synthetic-login-value';s.tables.get('DocentesAcceso').rows[1][2]=JSON.stringify(s.docentes);s.cacheEntries.clear();
   return s;
 }
-function bridgeFixture(server=backend()) {
+function bridgeFixture(server=backend(),mode='login') {
   let parentReceive,childReceive,frameError,success,failure,blocked=false;
-  const sent=[],rpc=[],timers=new Map(),parent={},outer={},child={};
+  const sent=[],rpc=[],callbacks=[],timers=new Map(),parent={},outer={},child={};
   parent.parent=parent;outer.parent=parent;child.parent=outer;
   parent.location={origin:ORIGIN};parent.crypto=crypto.webcrypto;
   parent.addEventListener=(type,fn)=>{assert.equal(type,'message');parentReceive=fn};
@@ -24,14 +24,14 @@ function bridgeFixture(server=backend()) {
   const frame={contentWindow:outer,addEventListener:(type,fn)=>{assert.equal(type,'error');frameError=fn}};
   parent.document={createElement:tag=>{assert.equal(tag,'iframe');return frame},body:{appendChild:value=>assert.equal(value,frame)}};
   const c=vm.createContext({window:parent,URL,Uint8Array,setTimeout:(fn,ms)=>{const id=timers.size+1;timers.set(id,{fn,ms});return id},clearTimeout:id=>timers.delete(id)});
-  vm.runInContext(read('login-bridge.js'),c);const api=parent.IELoginBridge.create(API);
-  const config={origin:ORIGIN,nonce:new URL(frame.src).searchParams.get('nonce')};
-  const runner={withSuccessHandler:fn=>{success=fn;return runner},withFailureHandler:fn=>{failure=fn;return runner},loginBridgeAutenticar:body=>{rpc.push(clone(body));if(!blocked)success(server.c.loginBridgeAutenticar(body))}};
+  vm.runInContext(read('login-bridge.js'),c);const api=parent.IELoginBridge.create(API,mode);
+  const config={origin:ORIGIN,nonce:new URL(frame.src).searchParams.get('nonce'),mode};
+  const runner={withSuccessHandler:fn=>{success=fn;return runner},withFailureHandler:fn=>{failure=fn;return runner},loginBridgeAutenticar:body=>{rpc.push(clone(body));callbacks.push(success);if(!blocked)success(server.c.loginBridgeAutenticar(body))},studentsBridgeCargar:body=>{rpc.push(clone(body));callbacks.push(success);if(!blocked)success(server.c.studentsBridgeCargar(body))}};
   const inner=vm.createContext({window:child,google:{script:{run:runner}}});
   const start=()=>vm.runInContext('('+server.c.loginBridgeFrame_.toString()+')('+JSON.stringify(config)+')',inner);
   const msg=(type,extra={})=>({channel:CHANNEL,nonce:config.nonce,type,...extra});
   return {api,frame,config,parent,outer,child,sent,rpc,timers,start,msg,server,
-    receiveParent:event=>parentReceive(event),receiveChild:event=>childReceive(event),unavailable:()=>frameError(),block:()=>{blocked=true},resolve:body=>success(body),fail:()=>failure(new Error('private error must not escape'))};
+    receiveParent:event=>parentReceive(event),receiveChild:event=>childReceive(event),unavailable:()=>frameError(),block:()=>{blocked=true},resolve:body=>success(body),resolveRpc:(index,body)=>callbacks[index](body),fail:()=>failure(new Error('private error must not escape'))};
 }
 test('bridge handshake binds the sandbox descendant, source, origin and random session nonce before login',async()=>{
   const s=bridgeFixture();assert.equal(s.api.ready(),false);assert.match(s.config.nonce,/^[a-f0-9]{32}$/);

@@ -324,10 +324,16 @@ function loginBridgeAutenticar(body) {
   return responderLogin_(body || {});
 }
 
+// RPC de solo lectura; ignora cualquier acción suministrada por el cliente.
+function studentsBridgeCargar(body) {
+  body = body || {};
+  return estudiantesRuta_({action:'loadstudents',token:body.token,bimestre:body.bimestre || ''});
+}
+
 function loginBridgeVista_(p) {
   const origins = ['https://matriz.biblioteca360.com','https://biblioteca360.com','https://www.biblioteca360.com','https://remzfx.github.io'];
   if (origins.indexOf(p.parentOrigin) < 0 || !/^[a-f0-9]{32}$/.test(String(p.nonce || ''))) return responder_({ok:false,error:'Bridge inválido.'});
-  const config = JSON.stringify({origin:p.parentOrigin,nonce:p.nonce});
+  const config = JSON.stringify({origin:p.parentOrigin,nonce:p.nonce,mode:p.bridge === 'students-v1' ? 'students' : 'login'});
   return HtmlService.createHtmlOutput('<!doctype html><html><head><meta charset="utf-8"></head><body><script>(' +
     loginBridgeFrame_.toString() + ')(' + config + ');</script></body></html>')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).setTitle('Acceso IE22375');
@@ -351,15 +357,17 @@ function loginBridgeFrame_(config) {
     if (event.origin !== config.origin || !ancestor(event.source) || !data || data.channel !== channel || data.nonce !== config.nonce) return;
     if (parent && event.source !== parent) return;
     if (data.type === 'init' && !parent) { parent=event.source;reply('ack');return; }
-    if (!parent || data.type !== 'login' || busy || !Number.isSafeInteger(data.id) || data.id <= lastId) return;
+    const students = config.mode === 'students';
+    if (!parent || data.type !== (students ? 'students' : 'login') || (!students && busy) || !Number.isSafeInteger(data.id) || data.id <= lastId) return;
     const body = data.body;
-    if (!body || typeof body.tipo !== 'string' || typeof body.usuario !== 'string' || typeof body.password !== 'string') return;
+    if (!body || (students ? typeof body.token !== 'string' || typeof body.bimestre !== 'string' : typeof body.tipo !== 'string' || typeof body.usuario !== 'string' || typeof body.password !== 'string')) return;
     lastId=data.id;busy=true;
     const id=data.id;
     try {
-      google.script.run.withSuccessHandler(function(result) { busy=false;reply('result',id,result); })
-        .withFailureHandler(function() { busy=false;reply('error',id); })
-        .loginBridgeAutenticar({tipo:body.tipo,usuario:body.usuario,password:body.password});
+      const runner = google.script.run.withSuccessHandler(function(result) { busy=false;reply('result',id,result); })
+        .withFailureHandler(function() { busy=false;reply('error',id); });
+      if (students) runner.studentsBridgeCargar({token:body.token,bimestre:body.bimestre});
+      else runner.loginBridgeAutenticar({tipo:body.tipo,usuario:body.usuario,password:body.password});
     } catch(e) { busy=false;reply('error',id); }
   });
   // HtmlService añade un sandbox interior. Solo el ancestro del origen permitido recibe READY.
@@ -1008,7 +1016,7 @@ function estudiantesRuta_(body) {
 function doGet(e) {
   try {
     const p = (e && e.parameter) || {};
-    if (p.bridge === 'login-v1') return loginBridgeVista_(p);
+    if (p.bridge === 'login-v1' || p.bridge === 'students-v1') return loginBridgeVista_(p);
     const action = String(p.action || '').toLowerCase();
     const nivel = String(p.nivel || '').toLowerCase();
     if (action === 'loadstudents') return responder_({ok:false,code:'METHOD_NOT_ALLOWED',error:'La lectura de estudiantes requiere POST con token en el cuerpo.'});
