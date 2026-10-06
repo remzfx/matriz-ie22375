@@ -1436,7 +1436,7 @@ function updateHdr() {
   document.getElementById('hdrSub').textContent = 'Bimestre ' + b + (areaActual ? ' · ' + areaActual : '');
   document.getElementById('lblN').textContent = estudiantes().length;
   fixHdrHeight();
-  const ses=getLoginSession(),aviso=document.getElementById('registroTransAviso');if(aviso)aviso.hidden=!(nivel==='secundaria'&&ses&&ses.role==='docente');
+  const ses=getLoginSession(),aviso=document.getElementById('registroTransAviso');if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.syncStatus();else if(aviso)aviso.hidden=true;
   const link=document.getElementById('registroTutorLink');if(link)link.hidden=!(nivel==='secundaria'&&ses&&(ses.tutorAulas||[]).includes(aulaKey(g,s)));
 }
 
