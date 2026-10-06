@@ -1058,8 +1058,9 @@ function transversalValor_(raw) {
   if (!raw || !['letra','num'].includes(raw.modo)) return null;
   if (raw.modo==='letra') return ['AD','A','B','C'].includes(raw.valor) ? {modo:'letra',valor:raw.valor,nivel:raw.valor} : null;
   if (raw.valor==='' || raw.valor==null || (typeof raw.valor!=='number' && typeof raw.valor!=='string')) return null;
-  const n=Number(raw.valor);
-  return Number.isFinite(n) && n>=0 && n<=20 ? {modo:'num',valor:n,nota20:n,nivel:n>=18?'AD':n>=14?'A':n>=11?'B':'C'} : null;
+  const entrada=Number(raw.valor);if(!Number.isFinite(entrada)||entrada<0||entrada>20)return null;
+  const n=Math.round(entrada);
+  return {modo:'num',valor:n,nota20:n,nivel:n>=18?'AD':n>=14?'A':n>=11?'B':'C'};
 }
 function transversalIdentidad_(al) {
   return String(al.idSiagie||'').trim() ? 'id:'+encodeURIComponent(String(al.idSiagie).trim()) : String(al.codigoEstudiante||'').trim() ? 'cod:'+encodeURIComponent(String(al.codigoEstudiante).trim()) : 'nom:'+encodeURIComponent(normalizarNombreIdentidad_(String(al.nombre||'').replace(/,/g,' ')));
@@ -1086,14 +1087,19 @@ function transversalDatos_(ctx,config) {
     const out={id:transversalIdentidad_(a),nombre:a.nombre,orden:a.orden};if(a.idSiagie)out.idSiagie=a.idSiagie;if(a.codigoEstudiante)out.codigoEstudiante=a.codigoEstudiante;return out;
   });
   if (new Set(estudiantes.map(a=>a.id)).size!==estudiantes.length) throw new Error('Identidad ambigua: revise el padrón antes de evaluar.');
-  const clave=['secundaria',ctx.bimestre,ctx.numero,ctx.seccion].join('||'), actuales={}, areas=new Set();
+  const clave=['secundaria',ctx.bimestre,ctx.numero,ctx.seccion].join('||'), actuales={}, areas=new Set(),asignaciones=[],tutores=[];
+  const aula=ctx.numero+'|'+ctx.seccion;
   config.docentes.forEach(doc=>{
     if (doc.nivel!=='secundaria') return;
+    if(tutorAulas_(doc).includes(aula))tutores.push(normalizarUsuario_(doc.user));
     const mapa=doc.asignaciones, lista=mapa && Object.keys(mapa).length?Object.keys(mapa):(doc.areas||[]);
     lista.filter(a=>a!=='Competencias Transversales').forEach(area=>{
-      if(puedeLeerContexto_({sesion:{role:'docente'},docente:doc},Object.assign({},ctx,{area})))areas.add(area);
+      if(puedeLeerContexto_({sesion:{role:'docente'},docente:doc},Object.assign({},ctx,{area}))){areas.add(area);asignaciones.push(JSON.stringify([area,normalizarUsuario_(doc.user),aula]));}
     });
   });
+  // Solo relaciones académicas de esta aula: el orden, nombres y contraseñas no son versiones académicas.
+  const configAula=JSON.stringify([clave,[...new Set(asignaciones)].sort(),[...new Set(tutores)].sort()]);
+  const fingerprint=Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,configAula,Utilities.Charset.UTF_8)).replace(/=+$/,'');
   let version=0;
   transversalFilas_('TransversalesAportes').forEach(row=>{
     if (String(row[1])!==ctx.bimestre || gradoEscritura_(row[2])!==ctx.numero || seccionEscritura_(row[3])!==ctx.seccion) return;
@@ -1115,7 +1121,7 @@ function transversalDatos_(ctx,config) {
   });
   let consolidado={version:0,finales:{}};
   transversalFilas_('TransversalesConsolidado').forEach(row=>{if(String(row[0])===clave && Number(row[5])>consolidado.version)consolidado={version:Number(row[5]),finales:JSON.parse(row[6])};});
-  return {clave,estudiantes,areas:[...areas].sort(),aportes,consolidado,versionTs:version,versionAportes:String(config.ts)+':'+version+':'+padron.version};
+  return {clave,estudiantes,areas:[...areas].sort(),aportes,consolidado,versionTs:version,versionAportes:fingerprint+':'+version+':'+padron.version};
 }
 function transversalResumen_(datos,id,comp) {
   const porArea={};datos.aportes.forEach(a=>{const v=(a.valores[id]||{})[comp];if(v && (!porArea[a.area]||a.ts>porArea[a.area].ts))porArea[a.area]={area:a.area,docente:a.docente,ts:a.ts,valor:v};});

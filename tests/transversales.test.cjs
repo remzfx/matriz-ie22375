@@ -149,14 +149,14 @@ test('Registro preserves an unsaved transversal draft on context changes or reop
 });
 
 const exportFixture=new Function('require','__dirname',read('tests/registro-roster-identity.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname);
-for(const stage of ['confirmed','confirmed-C','obsolete','pending'])test('real Admin SIAGIE export '+stage+' uses only current confirmed finals and preserves academic export',async()=>{
+for(const stage of ['confirmed','confirmed-C','obsolete','pending','pending-cancel'])test('real Admin SIAGIE export '+stage+' uses only current confirmed finals and preserves academic export',async()=>{
  const server=fixture();['math','communication','ef'].forEach(u=>server.aporte(u,stage==='confirmed-C'?'C':'A'));server.final('math',stage==='confirmed-C'?'C':13,stage==='confirmed-C'?'':undefined);server.confirm('math','confirmtransversaltutor');
- if(stage!=='pending')server.confirm('pip','confirmtransversalaip');if(stage==='obsolete')server.aporte('ef','B');
+ if(!stage.startsWith('pending'))server.confirm('pip','confirmtransversalaip');if(stage==='obsolete')server.aporte('ef','B');
  const f=exportFixture(),ctx={nivel:'secundaria',bim:'I',grado:2,seccion:'A'},academic={finales:{'secundaria||I||2||A||Matemática||Resuelve||id:synthetic-a':{nivel:'AD'}}};
  const sheet=()=>({'!ref':'A1:E3',A3:{v:'synthetic-a'},C3:{v:'Synthetic Student A'},D3:{v:'C'},E3:{v:'Legacy conclusion must not survive'}}),mate=sheet(),tic=sheet(),auto=sheet(),wb={SheetNames:['MATE','DESEN TIC','GEST AUTO'],Sheets:{MATE:mate,'DESEN TIC':tic,'GEST AUTO':auto}};
- let exported=0,reads=0;
+ let exported=0,reads=0;const confirmations=[];
  f.c.XLSX={read:()=>wb,write:()=>{exported++;return new Uint8Array()},utils:{decode_range:()=>({s:{r:0},e:{r:2}}),encode_cell:({r,c})=>String.fromCharCode(65+c)+(r+1)}};
- f.c.Blob=Blob;f.c.atob=atob;f.c.URL={createObjectURL:()=> 'synthetic'};f.c.document.createElement=()=>({click(){}});f.c.confirm=()=>true;
+ f.c.Blob=Blob;f.c.atob=atob;f.c.URL={createObjectURL:()=> 'synthetic'};f.c.document.createElement=()=>({click(){}});f.c.confirm=message=>{confirmations.push(message);assert.match(f.el('tplMsg').textContent,/Transversales pendientes:/);assert.equal(exported,0);return stage!=='pending-cancel'};
  f.c.ctxTpl=()=>ctx;f.c.areasDeNivel=()=>['Matemática','Competencias Transversales'];f.c.COMPS_SIAGIE={'Matemática':['Resuelve'],'Competencias Transversales':['TIC','Autonomía']};
  f.c.areaDeHojaAdm=name=>name==='MATE'?{area:'Matemática',only:null}:{area:'Competencias Transversales',only:name==='DESEN TIC'?0:1};
  f.c.normNomAdm=f.c.IEStudentIdentity.normalizarNombre;
@@ -165,9 +165,13 @@ for(const stage of ['confirmed','confirmed-C','obsolete','pending'])test('real A
  f.c.fetchLecturaNube=async()=>({text:async()=>JSON.stringify({ok:true,b64:Buffer.from('synthetic').toString('base64')})});f.c.CLOUD_API_URL='synthetic';
  f.c.IETransversales={request:async(action,data)=>{reads++;return server.route(action,'admin',data)}};
  for(const name of ['letraDesdePayload','concDesdePayload','vaciarSiagieOficial'])f.run(extract('admin.html',name));
- await f.c.vaciarSiagieOficial();assert.equal(exported,1);assert.equal(reads,2);assert.equal(mate.D3.v,'AD');
+ await f.c.vaciarSiagieOficial();assert.equal(exported,stage==='pending-cancel'?0:1);assert.equal(reads,2);assert.equal(mate.D3.v,'AD');
  for(const ws of [tic,auto]){assert.equal(ws.E3,undefined);if(stage.startsWith('confirmed'))assert.equal(ws.D3.v,stage==='confirmed-C'?'C':'B');else assert.equal(ws.D3,undefined);}
- if(!stage.startsWith('confirmed'))assert.match(f.el('tplMsg').textContent,/Transversales pendientes:.*Synthetic Student A/);
+ if(!stage.startsWith('confirmed')){
+   assert.equal(confirmations.length,1);assert.equal(confirmations[0],'Hay competencias transversales pendientes. Este archivo será parcial y todavía no está listo como registro completo para SIAGIE. ¿Generar de todas formas las áreas disponibles?');
+   assert.match(f.el('tplMsg').textContent,/NO listo para envío completo a SIAGIE/);assert.match(f.el('tplMsg').textContent,/Synthetic Student A/);assert.doesNotMatch(f.el('tplMsg').textContent,/Registro oficial listo/);
+   if(stage!=='pending-cancel')assert.match(f.el('tplMsg').textContent,/^Archivo parcial generado/);
+ }else{assert.equal(confirmations.length,0);assert.match(f.el('tplMsg').textContent,/^Registro oficial listo.*Suba este archivo a SIAGIE/);}
 });
 
 function dom(){
@@ -179,9 +183,9 @@ test('real contribution editor keeps numeric originals when switching view and e
  const f=client('docente'),el=dom();f.session.user='math';f.storage.setItem('ie22375_session_v1',JSON.stringify(f.session));f.c.document.createElement=el;
  f.run(read('transversales-client.js'));const box=el('div'),editor=f.c.window.IETransversales.editor(box,clone(server.load('math')),{...server.ctx,area:'Matemática'},false);
  const selector=box.querySelectorAll('select')[0];assert.equal(box.querySelectorAll('select')[1].value,'AD');selector.value='num';selector.onchange();assert.equal(box.querySelectorAll('input')[0].value,18);assert.equal(editor.dirty(),false);
- box.querySelectorAll('input')[0].value='13';box.querySelectorAll('input')[0].onchange();assert.equal(editor.dirty(),true);
+ box.querySelectorAll('input')[0].value='13.5';box.querySelectorAll('input')[0].onchange();assert.equal(editor.dirty(),true);
  let payload;const signed=server.token('math');f.c.window.IEStudents.validToken=()=>signed;f.c.window.IEStudents.fetchJSON=async(url,options)=>{payload=JSON.parse(options.body);const result=server.post(payload);assert.equal(result.ok,true,result.error);return result};
- await box.querySelectorAll('button')[0].onclick();assert.equal(payload.action,'savetransversalaporte');assert.equal(payload.valores[server.id].tic.valor,'13');assert.equal(payload.valores[server.id].autonomia.valor,18);assert.equal(editor.dirty(),false);
+ await box.querySelectorAll('button')[0].onclick();assert.equal(payload.action,'savetransversalaporte');assert.equal(payload.valores[server.id].tic.valor,14);assert.equal(payload.valores[server.id].autonomia.valor,18);assert.equal(editor.dirty(),false);
  assert.equal(server.load('math').aportes.find(a=>a.user==='communication').valores[server.id].tic.valor,14);
 });
 test('real consolidation editor never prefills a suggestion, blocks confirmation with unsaved final and is read-only for closed periods/Admin',async()=>{
@@ -191,4 +195,45 @@ test('real consolidation editor never prefills a suggestion, blocks confirmation
  const confirm=box.querySelectorAll('button').find(b=>b.textContent==='Tutor confirma');await confirm.onclick();assert.equal(f.calls.length,0);
  const closed=clone(server.load('pip'));closed.abierto=false;const cbox=el('div');f.c.window.IETransversales.editor(cbox,closed,server.ctx,true);assert.ok(cbox.querySelectorAll('select').slice(1).every(e=>e.disabled));assert.ok(cbox.querySelectorAll('button').every(e=>e.disabled));
  const abox=el('div');f.c.window.IETransversales.editor(abox,clone(server.load('admin')),server.ctx,true);assert.equal(abox.querySelectorAll('button').length,0);assert.ok(abox.querySelectorAll('select').slice(1).every(e=>e.disabled));
+});
+
+for(const [entrada,nivel,normalizado] of [[13.4,'B',13],[13.5,'A',14],[17.5,'AD',18]])test('numeric '+entrada+' rounds exactly as Registro before deriving level in frontend/backend and persisted decisions',()=>{
+ const s=fixture(),f=client();f.run(extract('registro.html','numToLetter'));f.run(extract('registro.html','pad2'));f.run(read('transversales-client.js'));
+ const expected={modo:'num',valor:normalizado,nota20:normalizado,nivel};
+ assert.deepEqual(clone(s.c.transversalValor_({modo:'num',valor:entrada})),expected);assert.deepEqual(clone(f.c.window.IETransversales.valor({modo:'num',valor:entrada})),expected);
+ assert.equal(Number(f.c.pad2(entrada)),normalizado);assert.equal(f.c.numToLetter(Number(f.c.pad2(entrada))),nivel);
+ assert.equal(s.aporte('math',entrada).aportes[0].valores[s.id].tic.valor,normalizado);
+ assert.equal(s.final('pip',entrada).resultados[s.id].tic.final.valor,normalizado);
+});
+for(const entrada of [-0.1,20.1,-1,21])test('numeric '+entrada+' is rejected before rounding in both layers and cannot be stored',()=>{
+ const s=fixture(),f=client();f.run(read('transversales-client.js'));assert.equal(s.c.transversalValor_({modo:'num',valor:entrada}),null);assert.equal(f.c.window.IETransversales.valor({modo:'num',valor:entrada}),null);
+ assert.equal(s.aporte('math',entrada).ok,false);assert.equal(s.final('pip',entrada).ok,false);assert.equal(s.tables.has('TransversalesAportes'),false);assert.equal(s.tables.has('TransversalesConsolidado'),false);
+});
+function confirmed(s=fixture()){['math','communication','ef'].forEach(u=>s.aporte(u,'A'));s.final('math','A');s.confirm('math','confirmtransversaltutor');s.confirm('pip','confirmtransversalaip');return s;}
+function saveDocs(s){assert.equal(s.post({action:'savedoc',token:s.admin,docentes:s.docs}).ok,true);return s.load('pip');}
+for(const edit of ['primary','password','other-name','other-room','order','own-name','extra-room'])test('class fingerprint ignores unrelated configuration edit: '+edit,()=>{
+ const s=fixture();
+ if(edit==='order'){s.docs[1].asignaciones['Matemática'].push('3|B');s.docs[1].asignaciones['Ciencia y Tecnología']=['3|B','2|A'];s.docs[1].tutorAulas.push('3|B');s.tables.get('DocentesAcceso').rows[1][2]=JSON.stringify(s.docs);s.cacheEntries.clear();}
+ confirmed(s);const before=s.load('pip');
+ if(edit==='primary')s.docs[0].grados=[2,5];
+ if(edit==='password')s.docs[1].pass='changed-synthetic-value';
+ if(edit==='other-name')s.docs[4].nombre='Synthetic Renamed Other';
+ if(edit==='other-room')s.docs[4].asignaciones={'Ciencia y Tecnología':['3|B']};
+ if(edit==='order'){s.docs.reverse();s.docs.forEach(d=>{if(d.tutorAulas)d.tutorAulas.reverse();if(d.asignaciones)d.asignaciones=Object.fromEntries(Object.entries(d.asignaciones).reverse().map(([a,rows])=>[a,rows.slice().reverse()]));});}
+ if(edit==='own-name')s.docs[1].nombre='Synthetic Renamed Same Person';
+ if(edit==='extra-room'){s.docs[1].asignaciones['Matemática'].push('3|B');s.docs[1].asignaciones['Ciencia y Tecnología']=['3|B'];}
+ const after=saveDocs(s);assert.equal(after.ok,true);assert.equal(after.versionAportes,before.versionAportes);assert.equal(after.resultados[s.id].tic.listo,true);assert.deepEqual(clone(after.resultados[s.id].tic.final),clone(before.resultados[s.id].tic.final));
+});
+for(const edit of ['math-teacher','remove-area','add-area','tutor'])test('class fingerprint invalidates confirmed final only for relevant edit: '+edit,()=>{
+ const s=confirmed(),before=s.load('pip');
+ if(edit==='math-teacher'){delete s.docs[1].asignaciones['Matemática'];s.docs[1].areas=[];s.docs[1].aulas=[];s.docs[4].asignaciones['Matemática']=['2|A'];}
+ if(edit==='remove-area')s.docs[2].asignaciones={'Comunicación':['2|B']};
+ if(edit==='add-area')s.docs[4].asignaciones['Ciencia y Tecnología']=['2|A'];
+ if(edit==='tutor'){s.docs[1].tutorAulas=[];s.docs[2].tutorAulas=['2|A'];}
+ const after=saveDocs(s);assert.notEqual(after.versionAportes,before.versionAportes);assert.equal(after.resultados[s.id].tic.listo,false);assert.match(after.resultados[s.id].tic.estado,/Requiere nueva confirmación/);assert.deepEqual(clone(after.resultados[s.id].tic.final),clone(before.resultados[s.id].tic.final));
+});
+test('bimestre roster version change invalidates confirmed final without rewriting its trace',()=>{
+ const s=confirmed(),before=s.load('pip'),padron=s.post({action:'loadstudents',token:s.admin,bimestre:'I'});
+ assert.equal(s.post({action:'syncstudents',token:s.admin,bimestre:'I',version:padron.version,base:{primaria:s.base.primaria,secundaria:{estudiantes:s.roster}}}).ok,true);
+ const after=s.load('pip');assert.notEqual(after.versionAportes,before.versionAportes);assert.equal(after.resultados[s.id].tic.listo,false);assert.deepEqual(clone(after.resultados[s.id].tic.final),clone(before.resultados[s.id].tic.final));
 });

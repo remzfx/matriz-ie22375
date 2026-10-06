@@ -9,7 +9,8 @@
     if(!raw||!['letra','num'].includes(raw.modo))return null;
     if(raw.modo==='letra')return ['AD','A','B','C'].includes(raw.valor)?{modo:'letra',valor:raw.valor,nivel:raw.valor}:null;
     if(raw.valor===''||raw.valor==null||(typeof raw.valor!=='number'&&typeof raw.valor!=='string'))return null;
-    const n=Number(raw.valor);return Number.isFinite(n)&&n>=0&&n<=20?{modo:'num',valor:n,nota20:n,nivel:n>=18?'AD':n>=14?'A':n>=11?'B':'C'}:null;
+    const entrada=Number(raw.valor);if(!Number.isFinite(entrada)||entrada<0||entrada>20)return null;
+    const n=Math.round(entrada);return {modo:'num',valor:n,nota20:n,nivel:n>=18?'AD':n>=14?'A':n>=11?'B':'C'};
   }
   function start(){if(!bridge&&global.IELoginBridge&&document.body)try{bridge=global.IELoginBridge.create(API,'transversales');}catch(e){}return bridge;}
   async function operation(action,data){
@@ -33,7 +34,7 @@
     const el=document.createElement(mode==='letra'?'select':'input');
     if(mode==='letra'){['','AD','A','B','C'].forEach(v=>{const opt=document.createElement('option');opt.value=v;opt.textContent=v||'—';el.appendChild(opt);});el.value=record&&record.nivel||'';}
     else{el.type='number';el.min=0;el.max=20;el.step=1;el.value=record&&record.nota20!=null?record.nota20:'';}
-    el.setAttribute('aria-label','Calificación final o aporte');el.onchange=()=>change({modo:mode,valor:el.value});parent.appendChild(el);return el;
+    el.setAttribute('aria-label','Calificación final o aporte');el.onchange=()=>{const raw={modo:mode,valor:el.value};change(valor(raw)||raw);};parent.appendChild(el);return el;
   }
   function editor(container,data,ctx,final){
     let mode='letra',draft={},busy=false;

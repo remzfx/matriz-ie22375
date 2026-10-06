@@ -1385,12 +1385,16 @@ async function vaciarSiagieOficial(){
     try{const vigente=await IETransversales.request('loadtransversalexport',{bimestre:ctx.bim,grado:ctx.grado,seccion:ctx.seccion});if(vigente.version!==transversales.version||vigente.versionAportes!==transversales.versionAportes){alert('La consolidación cambió durante el vaciado. Recargue y exporte nuevamente.');return;}}
     catch(e){alert('No se pudo confirmar la versión transversal para exportar.');return;}
   }
+  if(pendientesTrans.length){
+    msg.textContent='Transversales pendientes: '+pendientesTrans.join(' · ')+'. NO listo para envío completo a SIAGIE.';
+    if(!confirm('Hay competencias transversales pendientes. Este archivo será parcial y todavía no está listo como registro completo para SIAGIE. ¿Generar de todas formas las áreas disponibles?'))return;
+  }
   const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   a.download=filename;
   a.click();
-  msg.textContent='Registro oficial listo · '+escritos+' notas.'+(pendientesTrans.length?' Transversales pendientes: '+pendientesTrans.join(' · '):' Suba este archivo a SIAGIE.');
+  msg.textContent=pendientesTrans.length?'Archivo parcial generado · transversales pendientes · NO listo para envío completo a SIAGIE. Pendientes: '+pendientesTrans.join(' · '):'Registro oficial listo · '+escritos+' notas. Suba este archivo a SIAGIE.';
 }
 
 function loadDocentes() {
