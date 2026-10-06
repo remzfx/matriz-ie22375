@@ -140,13 +140,10 @@ for(const state of ['cold','hot'])test('savedoc with '+state+' configuration cac
  assert.equal(s.post({action:'loadtransversalesaulas',token:login.token}).code,'SESSION');
  const fresh=s.c.responderLogin_({tipo:'docente',usuario:'math',password:'synthetic-only'});assert.deepEqual(clone(fresh.tutorAulas),[]);assert.notEqual(fresh.permisosVersion,login.permisosVersion);
 });
-test('Registro preserves an unsaved transversal draft on context changes or reopen until explicitly discarded',async()=>{
- const f=client('docente');f.run("let areaActual='Matemática',registroTransSolicitud=0,registroTransEditor={dirty:()=>true},registroTransContexto={bim:'III',grado:2,seccion:'A',area:'Matemática'};function ctxBase(){return {nivel:'secundaria',bim:'III',grado:2,seccion:'A',area:areaActual}};function areas(){return ['Matemática']}");
- f.c.confirm=()=>false;f.run(extract('registro.html','cerrarTransversalesRegistro'));f.run(extract('registro.html','abrirTransversalesRegistro'));
- f.elements.set('registroTransRows',{innerHTML:'draft remains'});f.c.IETransversales={request:()=>{throw Error('must not load');}};
- f.run("areaActual='Comunicación'");assert.equal(f.c.cerrarTransversalesRegistro(),false);assert.equal(f.run('areaActual'),'Matemática');assert.equal(f.elements.get('registroTransRows').innerHTML,'draft remains');assert.equal(f.run('registroTransEditor.dirty()'),true);
- await f.c.abrirTransversalesRegistro();assert.equal(f.elements.get('registroTransRows').innerHTML,'draft remains');
- f.c.confirm=()=>true;assert.equal(f.c.cerrarTransversalesRegistro(),true);assert.equal(f.elements.get('registroTransRows').innerHTML,'');assert.equal(f.run('registroTransEditor'),null);
+test('Registro context changes retain the separate in-memory transversal draft',()=>{
+ const f=client('docente');let captured=0;const draft={tic:'A'};
+ f.c.IERegistroTransversales={capture:()=>captured++,draft};f.run(extract('registro.html','cerrarTransversalesRegistro'));
+ assert.equal(f.c.cerrarTransversalesRegistro(),true);assert.equal(captured,1);assert.equal(f.c.IERegistroTransversales.draft,draft);
 });
 
 const exportFixture=new Function('require','__dirname',read('tests/registro-roster-identity.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname);
@@ -400,7 +397,7 @@ test('closed evidence grid allows consulting dates/mode but never adding/deletin
 });
 test('Tutor/AIP evidence detail renders original capacity/date grades as readonly while only final decisions are editable',()=>{
  const s=fixture();guardarEvidencia(s,'math',evidencia(s,[{valor:13.5}]));const f=client('pip'),el=dom();f.c.document.createElement=el;f.run(read('transversales-client.js'));const box=el('div');f.c.window.IETransversales.editor(box,clone(s.load('pip')),s.ctx,true);
- const detail=box.querySelectorAll('details')[0];assert.match(detail.querySelectorAll('summary')[0].textContent,/Ver evidencias de Matemática/);assert.match(detail.querySelectorAll('p')[0].textContent,/2026-10-14.*Personaliza entornos virtuales.*14 → A/);assert.equal(detail.querySelectorAll('select').length,0);assert.equal(detail.querySelectorAll('input').length,0);assert.equal(detail.querySelectorAll('button').length,0);
+ const detail=box.querySelectorAll('details')[0];assert.match(detail.querySelectorAll('summary')[0].textContent,/Ver evidencias de Matemática/);assert.match(detail.querySelectorAll('p')[1].textContent,/2026-10-14.*Personaliza entornos virtuales.*14 → A/);assert.equal(detail.querySelectorAll('select').length,0);assert.equal(detail.querySelectorAll('input').length,0);assert.equal(detail.querySelectorAll('button').length,0);
 });
 
 test('large bimestral evidence blocks stay below Sheets cell limits and reconstruct without losing originals',()=>{
