@@ -319,6 +319,57 @@ function responderLogin_(body) {
   return perfil;
 }
 
+// Única función pública RPC del bridge: conserva íntegra la autenticación existente.
+function loginBridgeAutenticar(body) {
+  return responderLogin_(body || {});
+}
+
+function loginBridgeVista_(p) {
+  const origins = ['https://matriz.biblioteca360.com','https://biblioteca360.com','https://www.biblioteca360.com','https://remzfx.github.io'];
+  if (origins.indexOf(p.parentOrigin) < 0 || !/^[a-f0-9]{32}$/.test(String(p.nonce || ''))) return responder_({ok:false,error:'Bridge inválido.'});
+  const config = JSON.stringify({origin:p.parentOrigin,nonce:p.nonce});
+  return HtmlService.createHtmlOutput('<!doctype html><html><head><meta charset="utf-8"></head><body><script>(' +
+    loginBridgeFrame_.toString() + ')(' + config + ');</script></body></html>')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).setTitle('Acceso IE22375');
+}
+
+function loginBridgeFrame_(config) {
+  const channel = 'IE22375_LOGIN_BRIDGE_V1';
+  let parent = null, lastId = 0, busy = false;
+  function ancestor(source) {
+    try {
+      let node = window;
+      for (let i=0; i<5 && node.parent !== node; i++) { node=node.parent; if (node === source) return true; }
+    } catch(e) {}
+    return false;
+  }
+  function reply(type, id, result) {
+    if (parent) parent.postMessage({channel:channel,type:type,nonce:config.nonce,id:id,result:result},config.origin);
+  }
+  window.addEventListener('message',function(event) {
+    const data = event.data;
+    if (event.origin !== config.origin || !ancestor(event.source) || !data || data.channel !== channel || data.nonce !== config.nonce) return;
+    if (parent && event.source !== parent) return;
+    if (data.type === 'init' && !parent) { parent=event.source;reply('ack');return; }
+    if (!parent || data.type !== 'login' || busy || !Number.isSafeInteger(data.id) || data.id <= lastId) return;
+    const body = data.body;
+    if (!body || typeof body.tipo !== 'string' || typeof body.usuario !== 'string' || typeof body.password !== 'string') return;
+    lastId=data.id;busy=true;
+    const id=data.id;
+    try {
+      google.script.run.withSuccessHandler(function(result) { busy=false;reply('result',id,result); })
+        .withFailureHandler(function() { busy=false;reply('error',id); })
+        .loginBridgeAutenticar({tipo:body.tipo,usuario:body.usuario,password:body.password});
+    } catch(e) { busy=false;reply('error',id); }
+  });
+  // HtmlService añade un sandbox interior. Solo el ancestro del origen permitido recibe READY.
+  let target=window;
+  for (let i=0; i<5 && target.parent !== target; i++) {
+    target=target.parent;
+    target.postMessage({channel:channel,type:'ready',nonce:config.nonce},config.origin);
+  }
+}
+
 function gradoEscritura_(value) {
   const raw = String(value == null ? '' : value).trim().toUpperCase();
   const nombres = ['PRIMERO', 'SEGUNDO', 'TERCERO', 'CUARTO', 'QUINTO', 'SEXTO'];
@@ -957,6 +1008,7 @@ function estudiantesRuta_(body) {
 function doGet(e) {
   try {
     const p = (e && e.parameter) || {};
+    if (p.bridge === 'login-v1') return loginBridgeVista_(p);
     const action = String(p.action || '').toLowerCase();
     const nivel = String(p.nivel || '').toLowerCase();
     if (action === 'loadstudents') return responder_({ok:false,code:'METHOD_NOT_ALLOWED',error:'La lectura de estudiantes requiere POST con token en el cuerpo.'});
