@@ -55,6 +55,7 @@ function setup() {
     ContentService: {MimeType: {JSON: 'json'}, createTextOutput: text => ({setMimeType: () => ({text})})}
   });
   new vm.Script(source).runInContext(c);
+  tables.get('ConfigSistema').rows.push(['AUXILIAR_ACCESOS',1000,JSON.stringify([{user:'auxiliar',nombre:'Synthetic Auxiliary',niveles:['primaria','secundaria'],activo:true,passHash:c.hashAuxiliarPass_('auxiliar','synthetic-aux-password')}])]);
   const post = body => JSON.parse(c.doPost({postData: {contents: JSON.stringify(body)}}).text);
   const token = (user, role = 'docente', extra = {}) => c.firmarToken_({user, role, permisosVersion: 1000, exp: Date.now() + 60000, ...extra});
   const primary = token('test-primary');
@@ -259,6 +260,7 @@ for(const [file,name,helper,role,action] of [
   const level=secondary?'secundaria':'primaria';const requests=[],responses=[];
   const storage={getItem:()=>JSON.stringify({token}),setItem(){}};
   const context=vm.createContext({
+    IEAuxPermissions:{permite:()=>true,niveles:()=>['primaria','secundaria']},
     sessionStorage:storage,localStorage:storage,window:{__IE_SES:{token}},getLoginSession:()=>({token,role}),
     URLSearchParams,Blob,URL:{createObjectURL:()=> 'synthetic-blob'},atob:value=>Buffer.from(value,'base64').toString('binary'),
     CLOUD_API_URL:'synthetic-backend',CLOUD_NIVEL:level,nivel:level,areaActual:'Comunicación',

@@ -98,6 +98,7 @@
       <button class="navbtn chip chip-off" data-tab="import" onclick="showTab('import')">Importar</button>
       <button class="navbtn chip chip-off" data-tab="whatsapp" onclick="showTab('whatsapp')">WhatsApp</button>
       <button class="navbtn chip chip-off" data-tab="docentes" onclick="showTab('docentes')">Docentes</button>
+      <button class="navbtn chip chip-off" data-tab="auxiliares" onclick="showTab('auxiliares')">Auxiliares</button>
       <button class="navbtn chip chip-off" data-tab="config" onclick="showTab('config')">Respaldo</button>
     </nav>
   </header>
@@ -452,6 +453,23 @@
       </div>
     </section>
 
+    <section id="tab-auxiliares" class="tab hidden space-y-3">
+      <h2 class="font-black text-lg">Auxiliares: cuentas y niveles autorizados</h2>
+      <p>Configuración privada en servidor. Cambiar cuentas, niveles o estado revoca las sesiones anteriores de auxiliares.</p>
+      <p id="auxEstado" role="status"></p>
+      <button class="btn" onclick="cargarAuxiliares()">Recargar desde servidor</button>
+      <div class="card p-4 space-y-3">
+        <label>Nombre <input id="auxNombre" autocomplete="off" maxlength="120"></label>
+        <label>Usuario <input id="auxUser" autocomplete="off" maxlength="80"></label>
+        <label>Contraseña nueva <input id="auxPassword" type="password" autocomplete="new-password" placeholder="Vacío conserva la contraseña al editar"></label>
+        <div><label><input id="auxPrimaria" type="checkbox"> Primaria</label> <label><input id="auxSecundaria" type="checkbox"> Secundaria</label></div>
+        <label><input id="auxActivo" type="checkbox" checked> Activo</label>
+        <label id="auxLegacyWrap" hidden><input id="auxLegacy" type="checkbox" onchange="if(this.checked) document.getElementById('auxUser').value='auxiliar'"> Migrar cuenta auxiliar antigua usando su contraseña privada. Selecciona explícitamente los niveles antes de guardar.</label>
+        <div><button id="auxGuardar" class="btn" onclick="guardarAuxiliarAdmin()">Guardar en servidor</button> <button class="btn" onclick="limpiarAuxiliar()">Nuevo / limpiar</button></div>
+      </div>
+      <div id="auxLista" class="space-y-2"></div>
+    </section>
+
     <section id="tab-config" class="tab hidden">
       <div class="card p-4 space-y-3">
         <h2 class="font-black text-lg">Respaldo y exportación</h2>
@@ -547,6 +565,7 @@ function showTab(id) {
     const on = b.getAttribute('data-tab') === id;
     b.className = 'navbtn chip ' + (on ? 'chip-on' : 'chip-off');
   });
+  if (id === 'auxiliares') cargarAuxiliares();
   if (id === 'docentes') { initDocentesUI(); }
   if (id === 'bd') { fillFiltros(); renderTabla(); }
   if (id === 'periodos') { initPeriodosUI(); bajarPeriodosNube().then(function(p){ if(p) initPeriodosUI(); }); }
@@ -1724,5 +1743,6 @@ if (sesionIndexAdmin()) {
   cargarEstudiantesAdmin();
 }
 </script>
+<script src="auxiliar-admin.js"></script>
 </body>
 </html>

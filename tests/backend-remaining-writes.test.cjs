@@ -62,6 +62,7 @@ function setup() {
     ContentService: {MimeType: {JSON: 'json'}, createTextOutput: text => ({setMimeType: () => ({text})})}
   });
   new vm.Script(source).runInContext(c);
+  tables.get('ConfigSistema').rows.push(['AUXILIAR_ACCESOS',1000,JSON.stringify([{user:'auxiliar',nombre:'Synthetic Auxiliary',niveles:['primaria','secundaria'],activo:true,passHash:c.hashAuxiliarPass_('auxiliar','synthetic-aux-password')}])]);
   const post = body => JSON.parse(c.doPost({postData: {contents: JSON.stringify(body)}}).text);
   const token = (user, role = 'docente', extra = {}) => c.firmarToken_({user, role, permisosVersion: 1000, exp: Date.now() + 60000, ...extra});
   const primary = token('test-primary');
@@ -145,7 +146,7 @@ test('admin/auxiliar/pip login fast path does not load DOCENTE_ACCESOS', () => {
     const profile = s.post({action: 'login', tipo: role, usuario: role, password: s.props[property]});
     assert.equal(profile.ok, true);
     assert.equal(profile.role, role);
-    assert.equal(profile.permisosVersion, 0);
+    assert.equal(profile.permisosVersion, role === 'auxiliar' ? 1000 : 0);
     assert.ok(s.c.validarToken_(profile.token, role));
   }
 });
@@ -161,7 +162,7 @@ for (const [role, property] of [['auxiliar', 'IE22375_AUXILIAR_PASS'], ['pip', '
     assert.equal(s.post({...body, usuario: 'admin'}).ok, false);
     assert.equal(s.post({...body, password: 'incorrect'}).ok, false);
     delete s.props[property];
-    assert.equal(s.post(body).ok, false);
+    assert.equal(s.post(body).ok, role === 'auxiliar'); // Scoped hashes no longer depend on the old global password.
   });
 }
 
@@ -193,6 +194,7 @@ for (const [file, name, helper, role, action] of [
     const fileFixture = {name: 'Synthetic.xlsx', arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer};
     const context = vm.createContext({
       sessionStorage: storage, localStorage: storage, window: {}, KEY: 'test', plan: {},
+      IEAuxPermissions:{permite:()=>true,niveles:()=>['primaria','secundaria']},
       CLOUD_API_URL: 'test-url',
       fetch: async (url, options) => {
         const body = JSON.parse(options.body); requests.push(body); const response = s.post(body); responses.push(response);
@@ -229,7 +231,7 @@ for (const [role, property] of [['auxiliar', 'IE22375_AUXILIAR_PASS'], ['pip', '
     const script = [...clientSource('index.html').matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
     new vm.Script(script).runInContext(context);
     context.mostrarHub = () => {};
-    elements.inpDocUser.value = 'admin';
+    elements.inpDocUser.value = role;
     await context.intentarLogin();
     assert.equal(requests.length, 1); assert.equal(requests[0].usuario, role); assert.equal(requests[0].tipo, role);
     const profile = context.getSession();

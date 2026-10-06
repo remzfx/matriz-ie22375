@@ -56,6 +56,7 @@ function setup() {
     ContentService: {MimeType: {JSON: 'json'}, createTextOutput: text => ({setMimeType: () => ({text})})}
   });
   new vm.Script(source).runInContext(c);
+  tables.get('ConfigSistema').rows.push(['AUXILIAR_ACCESOS',1000,JSON.stringify([{user:'auxiliar',nombre:'Synthetic Auxiliary',niveles:['primaria','secundaria'],activo:true,passHash:c.hashAuxiliarPass_('auxiliar','synthetic-aux-password')}])]);
   const post = body => JSON.parse(c.doPost({postData: {contents: JSON.stringify(body)}}).text);
   const token = (user, role = 'docente', extra = {}) => c.firmarToken_({user, role, permisosVersion: 1000, exp: Date.now() + 60000, ...extra});
   const primary = token('test-primary');
@@ -122,7 +123,7 @@ for(const tokenKind of ['primary','secondary'])test(tokenKind+': forged filters,
     assert.deepEqual(s.load(token,filter).estudiantes,normal.estudiantes);
   }
 });
-test('Auxiliar retains the school-wide student scope',()=> {
+test('Auxiliar explicitly assigned both levels retains the school-wide student scope',()=> {
   const s=studentsFixture();assert.equal(s.load(s.token('auxiliar','auxiliar')).estudiantes.length,7);
 });
 for(const kind of ['missing','expired','tampered','revoked','removed','pip','malformed-map'])test('Student read rejects '+kind+' without returning names',()=> {

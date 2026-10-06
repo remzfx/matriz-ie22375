@@ -239,7 +239,7 @@ function onTipoChange() {
   if (!u) return;
   u.readOnly = t === 'admin';
   if (t === 'admin') u.value = 'admin';
-  if (t === 'auxiliar') u.value = 'auxiliar';
+  if (t === 'auxiliar' && (u.value === 'admin' || u.value === 'pip')) u.value = '';
   if (t === 'pip') u.value = 'pip';
   if (t === 'docente' && (u.value === 'admin' || u.value === 'auxiliar' || u.value === 'pip')) u.value = '';
 }
@@ -253,9 +253,9 @@ async function intentarLogin() {
     err.classList.remove('hidden');
     return;
   }
-  const usuario = (tipo === 'auxiliar' || tipo === 'pip') ? tipo : normalizarUsuarioDocente(document.getElementById('inpDocUser').value);
+  const usuario = tipo === 'pip' ? tipo : normalizarUsuarioDocente(document.getElementById('inpDocUser').value);
   if (!usuario) {
-    err.textContent = tipo === 'admin' ? 'Ingrese el usuario administrador.' : 'Ingrese su usuario o DNI de docente.';
+    err.textContent = tipo === 'admin' ? 'Ingrese el usuario administrador.' : tipo === 'auxiliar' ? 'Ingrese su usuario.' : 'Ingrese su usuario o DNI de docente.';
     err.classList.remove('hidden');
     return;
   }
@@ -298,6 +298,7 @@ async function intentarLogin() {
   err.classList.add('hidden');
   setSession({
     user: perfil.user, label: perfil.label || perfil.user, nivel: perfil.nivel, role: perfil.role,
+    niveles: perfil.niveles || null,
     grados: perfil.grados || null,
     areas: perfil.areas || null,
     aulas: perfil.aulas || null,
