@@ -237,6 +237,13 @@ for (const [file, name, action] of [
       LS_PER: 'test-periodos', PERIODOS_CLOUD_KEY: 'test-periodos-cloud',
       document: {getElementById: () => ({value: '2026'}), querySelectorAll: () => []}
     });
+    if(name==='subirRegistroNube'){
+      s.c.Utilities.getUuid=()=> 'synthetic-official';
+      const al={nivel:'primaria',grado:1,seccion:'Única',orden:1,nombre:'Synthetic Student',idSiagie:'synthetic'};
+      s.c.escribirVersionEstudiantes_(s.c.hojaEstudiantes_(),[al],['BASE_ACTUAL']);
+      const finales=Object.fromEntries(s.c.registroAcademico_().catalog.primaria['Comunicación'].map(cp=>['primaria||I||1||Única||Comunicación||'+cp+'||id:synthetic',{nota20:15,nivel:'A',origen:'numero'}]));
+      context.sliceRegistroArea=()=>({meta:{docente:'Forged Name'},finales});
+    }
     if(name==='subirRegistroNube')Object.assign(context,{IERegistroAcademico:{canonical:JSON.stringify},baselineAcademica:()=>({version:0,baseline:'not-synchronized'}),prepararVersionAcademica:async()=>true,informeSiagie:()=>({ok:true}),saveStore:()=>{},dirtyAcademico:()=>{}});
     if (admin) new vm.Script(clientFunction(file, 'tokenSesionAdmin')).runInContext(context);
     new vm.Script(clientFunction(file, name)).runInContext(context);

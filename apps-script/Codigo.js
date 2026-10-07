@@ -1055,6 +1055,56 @@ function validarTutores_(list) {
   }
   return true;
 }
+// Envío oficial integral: el padrón privado, nunca el listado del cliente, decide a quién evaluar.
+function validarRegistroIntegral_(payload, ctx) {
+  const c={nivel:ctx.nivel,bim:ctx.bimestre,grado:ctx.grado,seccion:ctx.seccion,area:ctx.area};
+  const model=registroAcademico_(), comps=(model.catalog[c.nivel]||{})[c.area]||[];
+  if(!comps.length)throw Error('Área académica no reconocida para el envío integral.');
+  const sh=hojaEstudiantes_(),base=leerPadronEstudiantes_(sh,c.bim)||leerBaseEstudiantes_(sh,false);
+  if(!base)throw Error('Padrón privado no inicializado. No se puede verificar el envío integral.');
+  const alumnos=base.estudiantes.filter(a=>a.nivel===c.nivel&&gradoEscritura_(a.grado)===gradoEscritura_(c.grado)&&seccionEscritura_(a.seccion)===seccionEscritura_(c.seccion));
+  if(!alumnos.length)throw Error('El padrón no contiene estudiantes para este contexto.');
+  if(new Set(alumnos.map(transversalIdentidad_)).size!==alumnos.length)throw Error('Identidad ambigua en el padrón.');
+  const aliases=payload.meta&&payload.meta.studentAliases||{},ev=registroEvaluacion_();
+  function leer(map,prefix,al) {
+    const ids=[transversalIdentidad_(al)];
+    if(al.codigoEstudiante)ids.push('cod:'+encodeURIComponent(String(al.codigoEstudiante).trim()));
+    const norm=n=>normalizarNombreIdentidad_(String(n||'').replace(/,/g,' '));
+    ids.push('nom:'+encodeURIComponent(norm(al.nombre)));
+    const nombres=new Set([norm(al.nombre)]);
+    ids.forEach(id=>(Array.isArray(aliases[id])?aliases[id]:[]).forEach(n=>nombres.add(norm(n))));
+    const otroDueno=Object.entries(aliases).some(([id,lista])=>/^(id:|cod:)/.test(id)&&!ids.includes(id)&&Array.isArray(lista)&&lista.some(n=>nombres.has(norm(n))));
+    const nombreSeguro=!otroDueno&&alumnos.filter(a=>nombres.has(norm(a.nombre))).length===1;
+    map=map||{};
+    for(const id of [...new Set(ids)]) {
+      if(!nombreSeguro&&id.startsWith('nom:'))continue;
+      if(Object.prototype.hasOwnProperty.call(map,prefix+id)){const v=map[prefix+id];return v&&!v.borrado?v:null;}
+    }
+    if(!nombreSeguro)return null;
+    const keys=Object.keys(map).filter(k=>k.startsWith(prefix)&&!/^(id:|cod:|nom:)/.test(k.slice(prefix.length))&&nombres.has(norm(k.slice(prefix.length))));
+    const v=keys.length===1?map[keys[0]]:null;return v&&!v.borrado?v:null;
+  }
+  function numero(v) {
+    if(!v)return null;
+    if(v.nota20!==''&&v.nota20!=null){const n=Number(v.nota20);if(!Number.isFinite(n)||n<0||n>20)throw Error('Nota académica inválida.');return n;}
+    const n=ev.letterToNum(v.nivel);if(n==='')throw Error('Resultado académico inválido.');return n;
+  }
+  for(const comp of comps)if(model.worked(payload,c,comp))for(const al of alumnos) {
+    const prefix=model.prefix(c)+comp+'||',directo=leer(payload.finales,prefix,al);
+    let letra='';
+    if(directo&&(directo.nivel||directo.nota20!==''&&directo.nota20!=null)){const n=numero(directo);letra=directo.nivel||ev.numToLetter(n);if(!['AD','A','B','C'].includes(letra))throw Error('Resultado académico inválido.');}
+    else {
+      const nums=[];
+      for(const s of payload.sessions||[])if(s.nivel===c.nivel&&s.bim===c.bim&&String(s.grado)===String(c.grado)&&s.seccion===c.seccion&&s.area===c.area&&s.comp===comp){
+        const v=leer(payload.grades,prefix+s.capacidad+'||'+s.fecha+'||',al);if(v&&(v.nivel||v.nota20!==''&&v.nota20!=null))nums.push(numero(v));
+      }
+      const promedio=ev.promedioNums(nums);if(promedio!==null)letra=ev.numToLetter(promedio);
+    }
+    if(!letra)throw Error('Envío integral incompleto: falta resultado por competencia trabajada.');
+    const conclusion=leer(payload.concComp,prefix,al);
+    if(letra==='C'&&!(conclusion&&typeof conclusion.texto==='string'&&conclusion.texto.trim()))throw Error('Envío integral incompleto: una competencia C requiere su conclusión específica.');
+  }
+}
 function registroEvaluacion_() {
   function numToLetter(n) { n=Number(n);if(isNaN(n)||n<0||n>20)return '';return n>=18?'AD':n>=14?'A':n>=11?'B':'C'; }
   function letterToNum(L) { return ({AD:19,A:15,B:12,C:8})[L] ?? ''; }
@@ -1661,7 +1711,7 @@ function doPost(e) {
         if(nuevo&&(body.modeloAcademico!==1||body.version==null||Number(body.version)!==prevVersion))return responder_({ok:false,code:'CONFLICT',error:'El registro cambió. Baje y revise antes de guardar.',version:prevVersion});
         const payload=Object.assign({},body.payload||{});
         for(const field of ['concComp','competenciasEstado'])if(payload[field]===undefined&&prev[field]!==undefined)payload[field]=prev[field];
-        try{registroAcademico_().validate(payload,{nivel:nivelR,bim:bimestre,grado:grado,seccion:seccion,area:area});}catch(e){return responder_({ok:false,error:e.message});}
+        try{registroAcademico_().validate(payload,{nivel:nivelR,bim:bimestre,grado:grado,seccion:seccion,area:area});if(body.modeloAcademico===1&&body.envioIntegral===true)validarRegistroIntegral_(payload,ctx);}catch(e){return responder_({ok:false,error:e.message});}
         if(permiso.role==='docente'){const meta=payload.meta&&typeof payload.meta==='object'&&!Array.isArray(payload.meta)?payload.meta:{};payload.meta=Object.assign({},meta,{docente:permiso.docente});}
         if(nuevo)payload.modeloAcademico=1;
         if(JSON.stringify(payload).length>49000)return responder_({ok:false,error:'El registro supera el límite seguro de la celda. El borrador se conserva; reduzca el detalle antes de enviar.'});
@@ -1894,22 +1944,7 @@ function listarClassroom_() {
   }
 }
 
-function registroAcademico_(){
- const catalog={"primaria":{"Personal Social":["Construye su Identidad","Convive y participa democráticamente","Construye interpretaciones históricas","Gestiona responsablemente el espacio y el ambiente","Gestiona responsablemente los recursos económicos"],"Educación Física":["Se desenvuelve de manera autónoma a través de su motricidad","Asume una vida saludable","Interactúa a través de sus habilidades sociomotrices"],"Comunicación":["Se comunica oralmente en su lengua materna","Lee diversos tipos de textos escritos en su lengua materna","Escribe diversos tipos de textos en su lengua materna"],"Arte y Cultura":["Aprecia de manera crítica manifestaciones artístico-culturales","Crea proyectos artísticos desde los lenguajes artísticos"],"Matemática":["Resuelve problemas de cantidad","Resuelve problemas de regularidad, equivalencia y cambio","Resuelve problemas de forma, movimiento y localización","Resuelve problemas de gestión de datos e incertidumbre"],"Ciencia y Tecnología":["Indaga mediante métodos científicos para construir sus conocimientos","Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo","Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"],"Educación Religiosa":["Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas","Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"]},"secundaria":{"Desarrollo Personal, Ciudadanía y Cívica":["Construye su identidad","Convive y participa democráticamente en la búsqueda del bien común"],"Ciencias Sociales":["Construye interpretaciones históricas","Gestiona responsablemente el espacio y el ambiente","Gestiona responsablemente los recursos económicos"],"Educación para el Trabajo (EPT)":["Gestiona proyectos de emprendimiento económico o social"],"Educación Física":["Se desenvuelve de manera autónoma a través de su motricidad","Asume una vida saludable","Interactúa a través de sus habilidades sociomotrices"],"Comunicación":["Se comunica oralmente en su lengua materna","Lee diversos tipos de textos escritos en su lengua materna","Escribe diversos tipos de textos en su lengua materna"],"Arte y Cultura":["Aprecia de manera crítica manifestaciones artístico-culturales","Crea proyectos artísticos desde los lenguajes artísticos"],"Inglés":["Se comunica oralmente en inglés como lengua extranjera","Lee diversos tipos de texto en inglés como lengua extranjera","Escribe diversos tipos de textos en inglés como lengua extranjera"],"Matemática":["Resuelve problemas de cantidad","Resuelve problemas de regularidad, equivalencia y cambio","Resuelve problemas de forma, movimiento y localización","Resuelve problemas de gestión de datos e incertidumbre"],"Ciencia y Tecnología":["Indaga mediante métodos científicos para construir sus conocimientos","Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo","Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"],"Educación Religiosa":["Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas","Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"]}};
- const prefix=c=>[c.nivel,c.bim||c.bimestre,c.grado,c.seccion,c.area].join('||')+'||';
- const key=(c,comp,id)=>prefix(c)+comp+(id===undefined?'':'||'+id);
- const worked=(p,c,comp)=>!p.competenciasEstado||!p.competenciasEstado[key(c,comp)]||p.competenciasEstado[key(c,comp)].trabajada!==false;
- const conclusion=(p,c,comp,id)=>{const r=(p.concComp||{})[key(c,comp,id)];return r&&!r.borrado?String(r.texto||'').trim():'';};
- function canonical(p){
-  function clean(x){if(Array.isArray(x))return x.map(clean).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));if(x&&typeof x==='object'){const out={};Object.keys(x).sort().filter(k=>!['ts','_ts','registroVersion','docente'].includes(k)).forEach(k=>out[k]=clean(x[k]));return out;}return x;}
-  const state={};Object.keys(p.competenciasEstado||{}).sort().forEach(k=>{if(p.competenciasEstado[k].trabajada===false)state[k]={trabajada:false};});
-  const notes=map=>Object.fromEntries(Object.entries(map||{}).sort().map(([k,v])=>[k,v.borrado?{borrado:true}:v.origen==='letra'?{origen:'letra',nivel:v.nivel}:clean(v)]));
-  const conc=Object.fromEntries(Object.entries(p.concComp||{}).filter(([,v])=>!v.borrado&&String(v.texto||'').trim()).sort().map(([k,v])=>[k,{texto:String(v.texto).trim()}]));
-  return JSON.stringify(clean({...p,ts:undefined,meta:undefined,competenciasEstado:state,concComp:conc,grades:notes(p.grades),finales:notes(p.finales)}));
- }
- function validate(p,c){const comps=(catalog[c.nivel]||{})[c.area]||[],pref=prefix(c);for(const field of ['competenciasEstado','concComp']){const map=p[field]||{};if(typeof map!=='object'||Array.isArray(map))throw Error('Metadata académica inválida.');for(const [k,v] of Object.entries(map)){const parts=k.slice(pref.length).split('||');if(!k.startsWith(pref)||!comps.includes(parts[0])||parts.length!==(field==='concComp'?2:1)||!v||typeof v!=='object')throw Error('Competencia o contexto académico no autorizado.');if(field==='competenciasEstado'&&typeof v.trabajada!=='boolean')throw Error('Estado de competencia inválido.');if(field==='concComp'&&(typeof v.texto!=='string'||v.texto.length>2000))throw Error('Conclusión académica inválida.');if(field==='concComp')v.texto=v.texto.replace(/\r\n?/g,'\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,'').trim();}}return p;}
- return {catalog,prefix,key,worked,conclusion,canonical,validate};
-}/* Modelo académico compartido. concArea se conserva únicamente como historial. */
+/* Modelo académico compartido. concArea se conserva únicamente como historial. */
 function registroAcademico_() {
   // El catálogo coincide con EST_PRIM/EST_SEC del Registro; no concede permisos.
   const catalog = {
