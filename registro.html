@@ -677,7 +677,7 @@ async function subirRegistroNube() {
   const contextoSubida = JSON.stringify(c);
   if (integral) {
     if (!await IERegistroTransversales.syncForUpload()) {
-      toast('No se envió el área completa. Las competencias transversales están pendientes. Corrige o reintenta.');
+      toast(IERegistroTransversales.missingConclusions() ? 'Falta conclusión descriptiva en competencias transversales con nivel C. Complétala en Resumen antes de enviar el área.' : 'No se envió el área completa. Las competencias transversales están pendientes. Corrige o reintenta.');
       return false;
     }
     if (registroNubeNoVerificada() || tokenSubida!==((getLoginSession()||{}).token||'') || contextoSubida!==JSON.stringify(ctxBase())) {

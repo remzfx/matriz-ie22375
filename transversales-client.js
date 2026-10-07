@@ -48,6 +48,7 @@
             text('strong','Aportes de las áreas',cell);
             result.resumen.aportes.forEach(a=>{
               text('p',a.area+': '+a.valor.valor+' → '+a.valor.nivel,cell);
+              if(a.valor.nivel==='C')text('p','Conclusión del docente: '+(a.conclusion||'Pendiente'),cell);
               const detail=text('details','',cell);text('summary','Ver evidencias de '+a.area,detail);
               const aporte=data.aportes.find(x=>x.area===a.area&&x.ts===a.ts),evidencia=aporte&&aporte.evidencia;
               text('p','Aporte efectivo: '+a.valor.nivel+' · origen: '+(a.origen==='directo'?'nota directa':'evidencias'),detail);
