@@ -19,7 +19,7 @@ function fixture(){
    function ctxBase(){return {nivel,bim:document.getElementById('selBim').value,grado:4,seccion:'B',area:areaActual};}
    function estudiantes(){return bdEstudiantes.secundaria.estudiantes;}
    function cloudClaveReg(){const c=ctxBase();return [c.nivel,c.bim,c.grado,c.seccion,c.area].join('||');}`);
- for(const name of ['alumnoIdentidad','identidadAlumno','aliasesAula','recordarPadron','leerNota','metaRegistro','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','cambiarBimestreRegistro','gradeKey','finalKey','concAreaKey','asisCtxKey','asisGet','mergeFechasAsistencia','sliceRegistroArea','mergeRegistroPayload','bimCerradoDocente'])run(extract('registro.html',name));
+ for(const name of ['competenciaTrabajada','alumnoIdentidad','identidadAlumno','aliasesAula','recordarPadron','leerNota','metaRegistro','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','cambiarBimestreRegistro','gradeKey','finalKey','concAreaKey','asisCtxKey','asisGet','mergeFechasAsistencia','sliceRegistroArea','mergeRegistroPayload','bimCerradoDocente'])run(extract('registro.html',name));
  run("function prefijoReg(){return cloudClaveReg()+'||';}function tsDe(x){return x&&x.ts||0;}let savedBim='';function guardarTodo(){savedBim=ctxBase().bim;}function llenarAulasPadron(){}function onContexto(){}");
  return {c,run,roster,requests,alerts,el,main};
 }
@@ -97,8 +97,8 @@ test('Admin export reads both stable and historical note keys using the same ide
  const s=fixture();for(const name of ['letraDesdePayload','concDesdePayload'])s.run(extract('admin.html',name));
  s.run("function numToLetterAdm(n){return n>=17?'AD':'A'}function promedioAdm(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:null}");
  const ctx={nivel:'secundaria',bim:'III',grado:4,seccion:'B'},al={idSiagie:'42',nombre:'Synthetic Student'};
- const p={finales:{'secundaria||III||4||B||Matemática||Resuelve||id:42':{nivel:'AD'}},concArea:{'secundaria||III||4||B||Matemática||Synthetic Student':{texto:'Synthetic Conclusion'}}};
- assert.equal(s.c.letraDesdePayload(p,ctx,'Matemática','Resuelve',al),'AD');assert.equal(s.c.concDesdePayload(p,ctx,'Matemática',al),'Synthetic Conclusion');
+ const p={finales:{'secundaria||III||4||B||Matemática||Resuelve||id:42':{nivel:'AD'}},concComp:{'secundaria||III||4||B||Matemática||Resuelve||Synthetic Student':{texto:'Synthetic Conclusion'}}};
+ assert.equal(s.c.letraDesdePayload(p,ctx,'Matemática','Resuelve',al),'AD');assert.equal(s.c.concDesdePayload(p,ctx,'Matemática','Resuelve',al),'Synthetic Conclusion');
 });
 
 test('Real grade collection writes a stable key while retaining the historical name key',()=>{
@@ -124,6 +124,7 @@ for(const file of ['admin.html','registro.html'])test(file+': real SIAGIE export
  s.c.fetchLecturaNube=async()=>({text:async()=>JSON.stringify({ok:true,b64:Buffer.from('synthetic').toString('base64')})});
  s.c.CLOUD_API_URL='synthetic';s.c.informeSiagie=()=>({ok:true});s.c.getLoginSession=()=>({role:'admin'});s.c.siagieTplMeta=null;
  s.c.IETransversales={request:async()=>({version:0,versionAportes:'synthetic',resultados:{}})};
+ s.run(extract('registro.html','competenciaTrabajada'));
  const names=file==='admin.html'?['letraDesdePayload','concDesdePayload','vaciarSiagieOficial']:['letraEnArea','concEnArea','rellenarSiagieExcel'];
  for(const name of names)s.run(extract(file,name));
  await s.c[names[2]]();assert.equal(ws.D3.v,'AD','ID must win over another matching code/name');assert.equal(ws.D4.v,'AD');assert.equal(ws.D5.v,'AD');

@@ -164,7 +164,7 @@ test('UI refinements keep Registro Promedios compact and cloud actions explicit'
   assert.doesNotMatch(src, />Nube [↑↓]</);
   assert.match(src, /max-width:104px/);
   assert.match(src, /fin-grid thead th\.av-prom-col/);
-  assert.match(src, /class="av-prom-col">Promedio/);
+  assert.match(src, /Promedio referencial/);
   assert.doesNotMatch(src, /fin-grid tbody td:not\(\.fin-nom\)/);
   assert.match(src, /viewHome[^>]*min-h-screen[^>]*justify-center/);
 });

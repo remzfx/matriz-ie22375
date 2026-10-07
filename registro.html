@@ -157,7 +157,7 @@
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
 <script src="student-identity.js"></script>
-<script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script>
+<script src="registro-academic-model.js" defer></script><script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script>
 </head>
 <body class="min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['primaria','secundaria','admin'];</script>
@@ -598,10 +598,13 @@ function sliceRegistroArea() {
     grades: grades,
     finales: finales,
     concArea: concArea,
+    concComp: Object.fromEntries(Object.entries(store.concComp||{}).filter(([k])=>k.startsWith(pref))),
+    competenciasEstado: Object.fromEntries(Object.entries(store.competenciasEstado||{}).filter(([k])=>k.startsWith(pref))),
+    modeloAcademico: 1,
     asistencia: asistencia,
     asisFechas: asisFechas,
     asisFechasEstado: asisFechasEstado,
-    capsSel: store.capsSel || {},
+    capsSel: Object.fromEntries(Object.entries(store.capsSel||{}).filter(([k])=>k.startsWith(pref))),
     meta: metaRegistro()
   };
 }
@@ -613,6 +616,13 @@ function tsDe(obj) {
 function mergeRegistroPayload(p) {
   if (!p) return 0;
   let n = 0;
+  for(const field of ['concComp','competenciasEstado']){
+    store[field]=store[field]||{};
+    for(const [key,value] of Object.entries(p[field]||{})){
+      const prior=store[field][key];
+      if(!prior||tsDe(value)>tsDe(prior)){store[field][key]=value;n++;}
+    }
+  }
   (p.sessions || []).forEach(s => {
     const id = sessionId(s);
     const idx = (store.sessions || []).findIndex(x => sessionId(x) === id);
@@ -657,6 +667,7 @@ function mergeRegistroPayload(p) {
   return n;
 }
 async function subirRegistroNube() {
+  if(typeof IERegistroAcademico==='undefined'){toast('No se cargó el modelo académico. El borrador local se conserva; reintenta antes de enviar.');return false;}
   if (subirRegistroNube.pending) return subirRegistroNube.pending;
   const tarea = (async()=>{
   if (registroNubeNoVerificada()) {
@@ -670,6 +681,7 @@ async function subirRegistroNube() {
   const invalidas = Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!=='' && (!Number.isFinite(Number(inp.value)) || Number(inp.value)<0 || Number(inp.value)>20));
   if (invalidas) { toast('Hay notas académicas inválidas. Corrige los valores antes de enviar el área.'); return false; }
   if (guardarTodo() === false) { toast('Espera a que cargue el padrón del bimestre.'); return; }
+  if(typeof IERegistroAcademico!=='undefined'){const info=informeSiagie();if(!info.ok){toast('Área pendiente: '+[...info.faltanNota,...info.faltanConc].slice(0,3).join(' · '));return false;}try{if(!await prepararVersionAcademica())return false;}catch(e){toast(e.message);return false;}}
   toast('Guardado local. Subiendo a la nube…');
   const c = ctxBase();
   let payload = sliceRegistroArea();
@@ -692,12 +704,15 @@ async function subirRegistroNube() {
     }
     payload = sliceRegistroArea();
   }
+  const academicBaseline=typeof IERegistroAcademico!=='undefined'?baselineAcademica():null;
+  if(academicBaseline&&academicBaseline.version!==null&&IERegistroAcademico.canonical(payload)===academicBaseline.baseline){toast('Sin cambios académicos pendientes');return true;}
   try {
     const res = await fetch(CLOUD_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         action: 'savereg',
+        ...(academicBaseline?{modeloAcademico:1,version:academicBaseline.version}:{}),
         token: tokenSubida,
         clave: cloudClaveReg(),
         nivel: c.nivel,
@@ -713,7 +728,10 @@ async function subirRegistroNube() {
     if (res.status === 401 || res.status === 403) retirarVerificacionNube(tokenSubida, c.bim, {code:'SESSION'});
     const data = JSON.parse(await res.text());
     if (res.status>=400) data.ok=false;
+    if(data.ok&&academicBaseline){academicBaseline.version=data.version;academicBaseline.baseline=IERegistroAcademico.canonical(payload);saveStore();dirtyAcademico();}
+    if(data.code==='CONFLICT'){toast('CONFLICT: el registro académico cambió en otro dispositivo. Baje y revise; el trabajo local se conserva.');return false;}
     if (!data.ok) retirarVerificacionNube(tokenSubida, c.bim, data);
+    if(data.ok&&academicBaseline&&IERegistroAcademico.canonical(sliceRegistroArea())!==IERegistroAcademico.canonical(payload)){toast('Se guardó la versión enviada. Hay cambios locales posteriores pendientes; vuelve a enviar el área.');return false;}
     if (data.ok && integral) {
       IERegistroTransversales.capture();
       const aporte = IERegistroTransversales.current();
@@ -735,11 +753,13 @@ async function subirRegistroNube() {
 }
 async function bajarRegistroNube() {
   if (!nivel) { toast('Elija nivel'); return; }
+  const contexto=JSON.stringify(ctxBase()),token=(getLoginSession()||{}).token;
   toast('Bajando…');
   try {
     const url = CLOUD_API_URL + '?action=loadreg&nivel=' + encodeURIComponent(nivel);
     const res = await fetchLecturaNube(url);
     const data = JSON.parse(await res.text());
+    if(contexto!==JSON.stringify(ctxBase())||token!==(getLoginSession()||{}).token){toast('El contexto o la sesión cambió. Reintenta en el contexto actual.');return false;}
     if (!data.ok) throw new Error(data.error || 'Error');
     const c = ctxBase();
     const items = (data.items || []).filter(it => {
@@ -750,7 +770,7 @@ async function bajarRegistroNube() {
       return true;
     });
     let n = 0;
-    items.forEach(it => { n += mergeRegistroPayload(it.payload || {}); });
+    items.forEach(it => { n += mergeRegistroPayload(it.payload || {}); if(it.clave===cloudClaveReg()&&typeof IERegistroAcademico!=='undefined'){store.academicSync=store.academicSync||{};store.academicSync[it.clave]={version:Number(it.ts)||0,soportaModeloAcademico:!!data.soportaModeloAcademico,baseline:IERegistroAcademico.canonical(it.payload||{})};} });
     saveStore();
     notas = {};
     if (sesionActiva) {
@@ -761,11 +781,13 @@ async function bajarRegistroNube() {
     }
     try { renderSesiones(); } catch (e) {}
     try { renderStudents(); } catch (e) {}
+    if(document.getElementById('panelFinales')?.classList.contains('on'))renderFinales();
+    if(document.getElementById('panelAvance')?.classList.contains('on'))renderAvance();
     const panelAsis = document.getElementById('panelAsistencia');
     if (panelAsis && panelAsis.classList.contains('on')) renderAsistencia();
     toast(items.length ? ('Nube: ' + items.length + ' bloque(s)') : 'Nube: no hay notas de este aula/área');
   } catch (e) {
-    toast('No se pudo bajar. Actualice el Apps Script.');
+    toast('No se pudo bajar. El trabajo local se conserva; verifica la conexión y reintenta.');
   }
 }
 
@@ -1521,7 +1543,7 @@ function setArea(a) {
 }
 
 function fillComps() {
-  const option=c=>`<option value="${c.replace(/"/g,'&quot;')}">${c}</option>`;
+  const option=c=>`<option value="${c.replace(/"/g,'&quot;')}">${c}${!esCompetenciaTransversal(c)&&!competenciaTrabajada(c)?' · No trabajada este bimestre':''}</option>`;
   const comps=competenciasParaEvaluar(),academicas=competencias(),trans=comps.filter(esCompetenciaTransversal);
   document.getElementById('selComp').innerHTML=(trans.length?'<optgroup label="Competencias del área">'+academicas.map(option).join('')+'</optgroup><optgroup label="Competencias transversales">'+trans.map(option).join('')+'</optgroup>':academicas.map(option).join(''))||'<option value="">Sin competencias</option>';
   fillCaps();
@@ -1648,6 +1670,7 @@ function activarSesion() {
     return;
   }
   if(esCompetenciaTransversal(comp)&&!IERegistroTransversales.add(comp,capacidad,fecha)){toast('Espera la carga transversal o revisa el estado del bimestre');return;}
+  if(!esCompetenciaTransversal(comp)&&!competenciaTrabajada(comp)){toast('Competencia no trabajada: actívala en Promedios');return;}
   capsElegidas.push(normCapItem({comp:comp,cap:capacidad}));
   saveCapsElegidas();
   sesionActiva = { fecha, unidad, comp, capacidad };
@@ -1659,6 +1682,7 @@ function activarSesion() {
 }
 
 function recolectarPantalla() {
+  document.querySelectorAll(".academic-conclusion").forEach(el=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value));
   if (registroSoloLectura()) return false;
   try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
   document.querySelectorAll('.cal-nota').forEach(inp => {
@@ -1666,7 +1690,7 @@ function recolectarPantalla() {
     const nombre = decodeURIComponent(inp.dataset.nom || '');
     const cap = decodeURIComponent(inp.dataset.cap || '');
     const comp = decodeURIComponent(inp.dataset.comp || '') || ((document.getElementById('selComp')||{}).value || '');
-    if (!nombre || !cap || !comp) return;
+    if (!nombre || !cap || !comp || !competenciaTrabajada(comp)) return;
     let n = inp.value === '' ? '' : Number(inp.value);
     if (n !== '' && (isNaN(n) || n < 0 || n > 20)) return;
     if (n !== '') n = Math.round(n);
@@ -1683,6 +1707,7 @@ function recolectarPantalla() {
     if (!inp || inp.readOnly) return;
     const nombre = decodeURIComponent(cell.dataset.fin);
     const cp = decodeURIComponent(cell.dataset.comp);
+    if(!competenciaTrabajada(cp))return;
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(cp, nombre);
     const previo = leerNota(store.finales, k);
@@ -1927,6 +1952,7 @@ function capKeyHoy(comp, cap, nombre) {
   return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, cap, fecha, identidadAlumno(nombre)].join('||');
 }
 function upsertSesionCap(comp, cap) {
+  if(!esCompetenciaTransversal(comp)&&!competenciaTrabajada(comp)){toast("Esta competencia está marcada como no trabajada. Actívala en Promedios para registrar nuevas evidencias.");return false;}
   if (registroSoloLectura()) return false;
   if(esCompetenciaTransversal(comp))return IERegistroTransversales.add(comp,cap,document.getElementById('inpFecha').value||hoyISO());
   const c = ctxBase();
@@ -1939,6 +1965,7 @@ function upsertSesionCap(comp, cap) {
   else store.sessions[idx] = Object.assign({}, store.sessions[idx], s);
 }
 function renderStudents() {
+  if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const list = estudiantes();
   const box = document.getElementById('stuList');
   const fecha = (document.getElementById('inpFecha')||{}).value || '';
@@ -1975,6 +2002,7 @@ function renderStudents() {
     let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
     cols.forEach(col => {
       if(col.origen==='transversal'){tds+=IERegistroTransversales.cell(al,col,fecha);return;}
+      const noTrabajada=!competenciaTrabajada(col.comp);
       const k = capKeyHoy(col.comp, col.cap, studentKey(al));
       const g = leerNota(store.grades, k) || {};
       let nota = (g.origen!=='letra' && g.nota20!=='' && g.nota20!=null) ? g.nota20 : '';
@@ -1985,11 +2013,11 @@ function renderStudents() {
       const encP = encodeURIComponent(col.comp);
       if (modoCalif === 'letra') {
         tds += '<td><div class="fin-cell" data-nom="'+encN+'" data-cap="'+encC+'" data-comp="'+encP+'">' +
-          ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(letra===v?' on':'')+'" data-val="'+v+'" '+(bloqueado?'disabled':'')+'>'+v+'</button>').join('') +
+          ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(letra===v?' on':'')+'" data-val="'+v+'" '+(bloqueado||noTrabajada?'disabled':'')+'>'+v+'</button>').join('') +
           '</div></td>';
       } else {
         tds += '<td><div class="fin-cell">' +
-          '<input type="number" min="0" max="20" step="1" class="cal-nota" '+(bloqueado?'readonly':'')+' data-nom="'+encN+'" data-cap="'+encC+'" data-comp="'+encP+'" value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
+          '<input type="number" min="0" max="20" step="1" class="cal-nota" '+(bloqueado||noTrabajada?'readonly':'')+' data-nom="'+encN+'" data-cap="'+encC+'" data-comp="'+encP+'" value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
           '<span class="eq-letter '+(letra?eqClass(letra):'eq-none')+'">'+(letra||'—')+'</span></div></td>';
       }
     });
@@ -2011,6 +2039,7 @@ function renderStudents() {
       const nombre = decodeURIComponent(inp.dataset.nom);
       const cap = decodeURIComponent(inp.dataset.cap);
       const cp = decodeURIComponent(inp.dataset.comp || '') || ((document.getElementById('selComp')||{}).value || '');
+      if(!competenciaTrabajada(cp))return;
       let n = inp.value === '' ? '' : Number(inp.value);
       if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); inp.value = ''; n = ''; }
       if (n !== '') n = Math.round(n);
@@ -2037,6 +2066,7 @@ function renderStudents() {
       const nombre = decodeURIComponent(cell.dataset.nom);
       const cap = decodeURIComponent(cell.dataset.cap);
       const cp = decodeURIComponent(cell.dataset.comp || '');
+      if(!competenciaTrabajada(cp))return;
       const val = btn.dataset.val;
       const k = capKeyHoy(cp, cap, nombre);
       const previo = leerNota(store.grades, k) || {};
@@ -2073,17 +2103,7 @@ function requiereConclusion(letra) {
   if (nivel === 'primaria') return letra === 'B' || letra === 'C';
   return letra === 'C';
 }
-function validarConclusionesOficial(c, alumnos, sess) {
-  const comps = competencias();
-  const faltan = [];
-  alumnos.forEach(al => {
-    const g = promGeneralAlumno(studentKey(al), comps);
-    if (!requiereConclusion(g.letra)) return;
-    const txt = (leerNota(store.concArea, concAreaKey(studentKey(al)))||{}).texto || '';
-    if (!txt.trim()) faltan.push(al.nombre + ' · Promedio ' + g.prom + ' (' + g.letra + ')');
-  });
-  return faltan;
-}
+function validarConclusionesOficial(c, alumnos, sess) {const faltan=[];alumnos.forEach(al=>competencias().filter(cp=>competenciaTrabajada(cp)).forEach(cp=>{if(notaCompAlumno(cp,studentKey(al)).letra==='C'&&!concCompAlumno(cp,studentKey(al)))faltan.push(al.nombre+' · '+c.area+' · '+cp+' · C · falta conclusión');}));return faltan;}
 
 let siagieHabilitado = false;
 let siagieTplMeta = null;
@@ -2117,32 +2137,7 @@ async function consultarEstadoSiagie() {
     if (lbl) { lbl.textContent = 'Aún no se puede procesar al SIAGIE'; lbl.className = 'text-sm font-black text-amber-700'; }
   }
 }
-function informeSiagie() {
-  guardarTodo();
-  const c = ctxBase();
-  const comps = competencias();
-  const alumnos = estudiantes();
-  const faltanNota = [];
-  const faltanConc = [];
-  const filas = [];
-  alumnos.forEach((al, i) => {
-    const row = { n: i+1, nombre: al.nombre, letras: {}, prom:'', letra:'', conc:'' };
-    comps.forEach(cp => {
-      const d = notaCompAlumno(cp, studentKey(al));
-      row.letras[cp] = d.letra || '';
-      if (!d.letra) faltanNota.push(al.nombre + ' · ' + cp);
-    });
-    const g = promGeneralAlumno(studentKey(al), comps);
-    row.prom = g.prom;
-    row.letra = g.letra;
-    row.conc = (leerNota(store.concArea, concAreaKey(studentKey(al)))||{}).texto || '';
-    if (requiereConclusion(g.letra) && !row.conc.trim()) {
-      faltanConc.push(al.nombre + ' · Prom. ' + (g.prom||'—') + ' (' + g.letra + ')');
-    }
-    filas.push(row);
-  });
-  return { c, comps, alumnos, faltanNota, faltanConc, filas, ok: !faltanNota.length && !faltanConc.length };
-}
+function informeSiagie() {guardarTodo();const c=ctxBase(),comps=competencias(),alumnos=estudiantes(),faltanNota=[],faltanConc=[],noTrabajadas=comps.filter(cp=>!competenciaTrabajada(cp)),filas=[];alumnos.forEach((al,i)=>{const row={n:i+1,nombre:al.nombre,letras:{},conclusiones:{}};comps.forEach(cp=>{if(!competenciaTrabajada(cp)){row.letras[cp]='';return;}const d=notaCompAlumno(cp,studentKey(al));row.letras[cp]=d.letra||'';row.conclusiones[cp]=concCompAlumno(cp,studentKey(al));if(!d.letra)faltanNota.push(al.nombre+' · '+cp);else if(d.letra==='C'&&!row.conclusiones[cp])faltanConc.push(al.nombre+' · '+cp+' · C · falta conclusión');});filas.push(row);});return {c,comps,alumnos,faltanNota,faltanConc,noTrabajadas,filas,ok:!faltanNota.length&&!faltanConc.length};}
 function procesarSiagie() {
   if (!nivel || !areaActual) { toast('Elija área'); return; }
   const inf = informeSiagie();
@@ -2160,7 +2155,7 @@ function procesarSiagie() {
         '</ul></div>';
     }
     if (inf.faltanConc.length) {
-      html += '<div><b>Conclusión descriptiva faltante ('+inf.faltanConc.length+')</b><p class="text-[11px] text-slate-500">'+(nivel==='primaria'?'Primaria: obligatoria si B o C.':'Secundaria: obligatoria solo si C.')+'</p><ul class="text-[12px] mt-1 list-disc pl-4 max-h-40 overflow-auto">' +
+      html += '<div><b>Conclusión descriptiva faltante ('+inf.faltanConc.length+')</b><p class="text-[11px] text-slate-500">'+(nivel==='primaria'?'Primaria: obligatoria por competencia C.':'Secundaria: obligatoria solo si C.')+'</p><ul class="text-[12px] mt-1 list-disc pl-4 max-h-40 overflow-auto">' +
         inf.faltanConc.slice(0,40).map(x=>'<li>'+x+'</li>').join('') +
         (inf.faltanConc.length>40?'<li>… y '+(inf.faltanConc.length-40)+' más</li>':'') +
         '</ul></div>';
@@ -2202,6 +2197,7 @@ function areaDeHojaSiagie(name) {
 }
 function letraEnArea(area, comp, nombre) {
   const c = ctxBase();
+  if(!competenciaTrabajada(comp,{...c,area}))return "";
   const fk = [c.nivel,c.bim,c.grado,c.seccion,area,comp, identidadAlumno(nombre)].join('||');
   const f = leerNota(store.finales, fk);
   if (f) {
@@ -2224,11 +2220,7 @@ function letraEnArea(area, comp, nombre) {
   const prom = promedioNums(nums);
   return prom==null ? '' : numToLetter(prom);
 }
-function concEnArea(area, nombre) {
-  const c = ctxBase();
-  const k = [c.nivel,c.bim,c.grado,c.seccion,area, identidadAlumno(nombre)].join('||');
-  return ((leerNota(store.concArea, k)||{}).texto || '').trim();
-}
+function concEnArea(area, comp, nombre) {const c=ctxBase(),k=[c.nivel,c.bim,c.grado,c.seccion,area,comp,identidadAlumno(nombre)].join('||');return ((leerNota(store.concComp||{},k)||{}).texto||'').trim();}
 function compsDeArea(area) {
   const est = estructura();
   return (est[area] && est[area].competencias) ? est[area].competencias.slice() : [];
@@ -2290,6 +2282,7 @@ async function rellenarSiagieExcel() {
       const idX = String((ws[XLSX.utils.encode_cell({r:r,c:0})] || {}).v || '').trim();
       const codX = String((ws[XLSX.utils.encode_cell({r:r,c:1})] || {}).v || '').trim();
       const nombre = (idX && idxId[idX]) || (codX && idxCod[codX]) || idxNom[key];
+      useComps.forEach((cp,i)=>{delete ws[XLSX.utils.encode_cell({r,c:3+i*2})];delete ws[XLSX.utils.encode_cell({r,c:4+i*2})];});
       if (!nombre) { if (nomX) sinMatch++; continue; }
       useComps.forEach((cp, i) => {
         const letra = letraEnArea(map.area, cp, nombre);
@@ -2299,10 +2292,10 @@ async function rellenarSiagieExcel() {
         const addrNL = XLSX.utils.encode_cell({r:r, c:colNL});
         ws[addrNL] = { t:'s', v: letra };
         escritos++;
-        const need = (nivel==='primaria') ? (letra==='B'||letra==='C') : (letra==='C');
+        const need = letra==='C';
         const addrCD = XLSX.utils.encode_cell({r:r, c:colCD});
         if (need) {
-          const txt = concEnArea(map.area, nombre);
+          const txt = concEnArea(map.area, cp, nombre);
           if (txt) ws[addrCD] = { t:'s', v: txt };
         }
       });
@@ -2331,22 +2324,21 @@ function prepararImpresion() {
     s.seccion === c.seccion && s.area === c.area
   ).sort((a,b) => (a.fecha||'').localeCompare(b.fecha||'') || (a.comp||'').localeCompare(b.comp||''));
 
-  if (!sess.length) {
-    alert('No hay evaluaciones guardadas en este bimestre/área para imprimir.');
+  if (!sess.length && !alumnos.some(al=>competencias().some(cp=>notaCompAlumno(cp,studentKey(al)).letra))) {
+    alert('No hay resultados guardados en este bimestre/área para imprimir.');
     return;
   }
 
-  // Validación registro oficial: conclusión obligatoria si PROMEDIO es C
-  // (en primaria también si el promedio es B). Solo alerta aquí (imprimir / enviar oficial).
+  // Cada resultado C requiere su propia conclusión; el promedio es solo referencial.
   const faltanConc = validarConclusionesOficial(c, alumnos, sess);
   if (faltanConc.length) {
     const lista = faltanConc.slice(0, 12).map(x => '• ' + x).join('\n');
     const extra = faltanConc.length > 12 ? '\n… y ' + (faltanConc.length-12) + ' más' : '';
     const ok = confirm(
       'AVISO — Registro oficial (SIAGIE)\n\n' +
-      'Falta conclusión descriptiva en promedios que la requieren:\n\n' +
+      'Falta conclusión descriptiva en competencias C:\n\n' +
       lista + extra +
-      '\n\nRegla: primaria B o C · secundaria solo C.\n' +
+      '\n\nRegla: cada competencia C en Primaria y Secundaria.\n' +
       'Escríbala en Resumen.\n\n' +
       '¿Desea imprimir de todas formas?'
     );
@@ -2378,38 +2370,10 @@ function prepararImpresion() {
     <td><b>Fecha de impresión:</b> ${new Date().toLocaleDateString('es-PE')}</td>
   </tr></table>`;
 
-  // Resumen de avance
-  html += `<h2 style="font-size:11pt;margin:12px 0 6px">1. Resumen de avance por competencia</h2>
-  <table class="print-tbl"><thead><tr>
-    <th>Competencia</th><th>Evidencias</th><th>Prom. aula</th><th>Letra</th>
-  </tr></thead><tbody>`;
-
-  comps.forEach(comp => {
-    const evidencias = byComp[comp];
-    const nums = [];
-    alumnos.forEach(al => {
-      const ns = [];
-      evidencias.forEach(s => {
-        const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha, studentKey(al)].join('||');
-        const g = leerNota(store.grades, k);
-        if (!g) return;
-        if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) ns.push(Number(g.nota20));
-        else if (g.nivel) { const m = letterToNum(g.nivel); if (m!=='') ns.push(Number(m)); }
-      });
-      const p = promedioNums(ns);
-      if (p != null) nums.push(p);
-    });
-    const prom = promedioNums(nums);
-    const letra = prom != null ? numToLetter(prom) : '—';
-    const evTxt = evidencias.map(e => (e.fecha||'') + ' ' + e.capacidad).join(' · ');
-    html += `<tr>
-      <td style="text-align:left">${comp}</td>
-      <td style="text-align:left;font-size:8pt">${evTxt}</td>
-      <td>${prom != null ? prom : '—'}</td>
-      <td><b>${letra}</b></td>
-    </tr>`;
-  });
-  html += `</tbody></table>`;
+  const escImpresion=v=>String(v||'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
+  html+='<h2>Resultados bimestrales por competencia</h2><table class="print-tbl"><thead><tr><th>Estudiante</th>'+competencias().map(cp=>'<th>'+escImpresion(cp)+'</th>').join('')+'</tr></thead><tbody>';
+  alumnos.forEach(al=>{html+='<tr><td>'+escImpresion(al.nombre)+'</td>'+competencias().map(cp=>{if(!competenciaTrabajada(cp))return '<td>No trabajada este bimestre</td>';const r=notaCompAlumno(cp,studentKey(al));return '<td>'+escImpresion(r.letra||'Pendiente')+(r.letra==='C'?'<p>'+escImpresion(concCompAlumno(cp,studentKey(al)))+'</p>':'')+'</td>';}).join('')+'</tr>';});
+  html+='</tbody></table>';
 
   // Detail per competencia
   comps.forEach((comp, idx) => {
@@ -2429,18 +2393,18 @@ function prepararImpresion() {
     html += `<th>PROM</th><th>NL</th></tr></thead><tbody>`;
 
     alumnos.forEach((al, i) => {
-      const vals = [];
+      const vals = [];let exacto=true;
       let cells = '';
       evidencias.forEach(s => {
         const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha, studentKey(al)].join('||');
         const g = leerNota(store.grades, k);
         let show = '';
         if (g) {
-          if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) {
+          if (g.origen!=='letra' && g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) {
             show = pad2(g.nota20);
             vals.push(Number(g.nota20));
           } else if (g.nivel) {
-            show = g.nivel;
+            show = g.nivel;exacto=false;
             const m = letterToNum(g.nivel);
             if (m !== '') vals.push(Number(m));
           }
@@ -2453,7 +2417,7 @@ function prepararImpresion() {
         <td style="text-align:center">${i+1}</td>
         <td style="text-align:left;font-size:8pt">${al.nombre}</td>
         ${cells}
-        <td style="text-align:center;font-weight:bold">${prom != null ? pad2(prom) : ''}</td>
+        <td style="text-align:center;font-weight:bold">${prom != null && exacto ? pad2(prom) : ''}</td>
         <td style="text-align:center;font-weight:bold">${letra}</td>
       </tr>`;
     });
@@ -2544,16 +2508,53 @@ function notaDirectaAlumno(comp, nombre) {
   const letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
   return { nota, letra };
 }
+function competenciaTrabajada(comp,c=ctxBase()){const k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');return !store.competenciasEstado||!store.competenciasEstado[k]||store.competenciasEstado[k].trabajada!==false;}
+function concCompAlumno(comp,nombre){return ((leerNota(store.concComp||{},finalKey(comp,nombre))||{}).texto||'').trim();}
+function baselineAcademica(){if(typeof IERegistroAcademico==='undefined')return null;store.academicSync=store.academicSync||{};const key=cloudClaveReg();if(!store.academicSync[key])store.academicSync[key]={version:null,baseline:IERegistroAcademico.canonical(sliceRegistroArea())};return store.academicSync[key];}
+function dirtyAcademico(){const b=baselineAcademica();dirty=!b||IERegistroAcademico.canonical(sliceRegistroArea())!==b.baseline;}
+function setConclusionAcademica(comp,id,text){if(registroSoloLectura()||bimCerradoDocente()||!competenciaTrabajada(comp))return false;baselineAcademica();store.concComp=store.concComp||{};const k=finalKey(comp,id),v=String(text).trim();if(v.length>2000){toast('Máximo 2000 caracteres por conclusión');return false;}if(v===concCompAlumno(comp,id))return false;store.concComp[k]={texto:v,ts:Date.now()};saveStore();dirtyAcademico();return true;}
+function setCompetenciaTrabajada(comp,activa){if(registroSoloLectura()||bimCerradoDocente()||!competencias().includes(comp))return false;const c=ctxBase(),k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');if(competenciaTrabajada(comp)===activa)return false;
+ const datos=(store.sessions||[]).some(x=>x.nivel===c.nivel&&x.bim===c.bim&&String(x.grado)===String(c.grado)&&x.seccion===c.seccion&&x.area===c.area&&x.comp===comp)||[store.finales||{},store.concComp||{}].some(map=>Object.keys(map).some(x=>x.startsWith(k+'||')));
+ if(!activa&&datos&&!confirm('Esta competencia ya tiene información registrada. Sus evidencias, notas y conclusiones se conservarán, pero no se utilizarán ni se enviarán al SIAGIE durante este bimestre. ¿Continuar?'))return false;
+ baselineAcademica();store.competenciasEstado=store.competenciasEstado||{};store.competenciasEstado[k]={trabajada:activa,ts:Date.now()};saveStore();dirtyAcademico();fillComps();renderStudents();renderFinales();if(document.getElementById('panelAvance').classList.contains('on'))renderAvance();return true;
+}
+function numeroExactoComp(comp,id){
+  const f=leerNota(store.finales,finalKey(comp,id));
+  const exacto=g=>!g||g.origen!=='letra'&&g.nota20!==''&&g.nota20!=null&&Number.isFinite(Number(g.nota20));
+  if(f)return exacto(f);
+  const c=ctxBase();
+  return (store.sessions||[]).filter(s=>s.comp===comp&&s.nivel===c.nivel&&String(s.grado)===String(c.grado)&&s.seccion===c.seccion&&s.area===c.area&&s.bim===c.bim).every(s=>exacto(leerNota(store.grades,[c.nivel,c.bim,c.grado,c.seccion,c.area,comp,s.capacidad,s.fecha,identidadAlumno(id)].join('||'))));
+}
+function promReferencialAlumno(id){
+  const comps=competencias().filter(cp=>competenciaTrabajada(cp));
+  return {...promGeneralAlumno(id,comps),exacto:comps.every(cp=>numeroExactoComp(cp,id))};
+}
+async function prepararVersionAcademica(){
+  if(typeof IERegistroAcademico==='undefined')return true;
+  const b=baselineAcademica();if(b.version!==null&&b.soportaModeloAcademico)return true;
+  const c=ctxBase(),key=cloudClaveReg(),token=(getLoginSession()||{}).token;
+  const r=await fetchLecturaNube(CLOUD_API_URL+'?action=loadreg&nivel='+encodeURIComponent(c.nivel)),data=JSON.parse(await r.text());
+  if(key!==cloudClaveReg()||token!==(getLoginSession()||{}).token)throw Error('El contexto o la sesión cambió. Reintente en el contexto actual.');
+  if(!data.ok)throw Error(data.error||'No se pudo verificar el registro académico.');
+  if(!data.soportaModeloAcademico)throw Error('El servidor todavía no admite el modelo por competencia. El borrador local se conserva.');
+  b.soportaModeloAcademico=true;
+  const row=(data.items||[]).find(x=>x.clave===key);
+  if(!row){b.version=0;b.baseline=IERegistroAcademico.canonical({});return true;}
+  if(IERegistroAcademico.canonical(row.payload||{})!==IERegistroAcademico.canonical(sliceRegistroArea())){toast('CONFLICT: hay un registro académico en nube. Use Nube Bajar y revise antes de enviar; el trabajo local se conserva.');return false;}
+  b.version=Number(row.ts)||0;b.baseline=IERegistroAcademico.canonical(row.payload||{});return true;
+}
+
 function notaCompAlumno(comp, nombre) {
+  if(typeof competenciaTrabajada==='function'&&!competenciaTrabajada(comp))return {nota:'',letra:'',src:''};
   const dir = notaDirectaAlumno(comp, nombre);
-  if (dir.nota !== '' && dir.nota != null) return { nota: dir.nota, letra: dir.letra, src: 'P' };
+  if (dir.letra) return { nota: dir.nota!==''?dir.nota:letterToNum(dir.letra), letra: dir.letra, src: 'P' };
   const ev = notaDesdeSesiones(comp, nombre);
   if (ev.nota !== '' && ev.nota != null) return { nota: ev.nota, letra: ev.letra, src: 'C' };
   return { nota:'', letra:'', src:'' };
 }
 function promGeneralAlumno(nombre, comps) {
   const nums = [];
-  (comps||competencias()).forEach(cp => {
+  (comps||competencias()).filter(cp=>typeof competenciaTrabajada==='function'?competenciaTrabajada(cp):true).forEach(cp => {
     const d = notaCompAlumno(cp, nombre);
     if (d.nota!=='' && d.nota!=null && !isNaN(Number(d.nota))) nums.push(Number(d.nota));
   });
@@ -2601,6 +2602,7 @@ function notaDesdeSesiones(comp, nombre) {
 }
 function renderFinales() {
   loadStore();
+  if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const c = ctxBase();
   document.getElementById('lblFinCtx').textContent =
     (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + ' · Bim ' + c.bim + ' · ' + (c.area||'');
@@ -2626,13 +2628,13 @@ function renderFinales() {
     const capsTxt = caps.length
       ? caps.map(x => (x.fecha?x.fecha.slice(5)+' · ':'') + x.capacidad).join('<br>')
       : 'Sin capacidades aún';
-    head += '<th>C'+(idx+1)+'<div class="fin-caps">'+cp+'<br>'+capsTxt+'</div></th>';
+    head += '<th><label><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" '+(competenciaTrabajada(cp)?'checked':'')+' '+(bloqueado?'disabled':'')+'>Competencia trabajada</label><div>'+cp+'</div>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
   });
 
   const rows = alumnos.map((al, i) => {
     let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
     comps.forEach(cp => {
-      const lock = bloqueado;
+      const lock = bloqueado||!competenciaTrabajada(cp);
       const dir = notaDirectaAlumno(cp, studentKey(al));
       const ev = notaDesdeSesiones(cp, studentKey(al));
       const ofi = notaCompAlumno(cp, studentKey(al));
@@ -2642,6 +2644,7 @@ function renderFinales() {
       if (ofi.letra==='AD') cAD++; else if (ofi.letra==='A') cA++; else if (ofi.letra==='B') cB++; else if (ofi.letra==='C') cC++;
       if (ofi.letra) cV++;
       cTot++;
+      if(!competenciaTrabajada(cp)){tds+='<td>No trabajada este bimestre</td>';return;}
       const encN = encodeURIComponent(studentKey(al));
       const encC = encodeURIComponent(cp);
       if (modoCalif === 'letra') {
@@ -2649,13 +2652,13 @@ function renderFinales() {
         tds += '<td><div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+ev.letra+'</div>' : '') +
-          '</div></td>';
+          (Object.keys(original).length&&!original.borrado?'<button type="button" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" '+(lock?'disabled':'')+'>Quitar directo</button>':'')+'</div></td>';
       } else {
         tds += '<td><div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
           '<span class="eq-letter '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'">'+(letra||ofi.letra||'—')+'</span>' +
-          (dir.nota==='' && ev.nota!=='' ? '<div class="text-[10px] text-slate-400">Cal '+pad2(ev.nota)+'</div>' : '') +
-          '</div></td>';
+          (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+(numeroExactoComp(cp,studentKey(al))?pad2(ev.nota)+' · ':'')+ev.letra+'</div>' : '') +
+          (Object.keys(original).length&&!original.borrado?'<button type="button" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" '+(lock?'disabled':'')+'>Quitar directo</button>':'')+'</div></td>';
       }
     });
     return '<tr>'+tds+'</tr>';
@@ -2676,6 +2679,7 @@ function renderFinales() {
       if (!cell || inp.readOnly) return;
       const nombre = decodeURIComponent(cell.dataset.fin);
       const comp = decodeURIComponent(cell.dataset.comp);
+      if(!competenciaTrabajada(comp))return;
       let n = inp.value === '' ? '' : Number(inp.value);
       if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); inp.value = ''; n = ''; }
       if (n !== '') n = Math.round(n);
@@ -2700,6 +2704,7 @@ function renderFinales() {
       if (!cell) return;
       const nombre = decodeURIComponent(cell.dataset.fin);
       const comp = decodeURIComponent(cell.dataset.comp);
+      if(!competenciaTrabajada(comp))return;
       const val = btn.dataset.val;
       const k = finalKey(comp, nombre);
       const previo = leerNota(store.finales, k) || {};
@@ -2714,6 +2719,8 @@ function renderFinales() {
       renderFinales();
     });
   });
+  box.querySelectorAll('[data-quitar-directo]').forEach(el=>el.onclick=()=>{const cp=decodeURIComponent(el.dataset.quitarDirecto),id=decodeURIComponent(el.dataset.alumno),k=finalKey(cp,id);if(registroSoloLectura()||bimCerradoDocente()||!competenciaTrabajada(cp)||!leerNota(store.finales,k))return;baselineAcademica();store.finales[k]={borrado:true,ts:Date.now()};saveStore();dirtyAcademico();renderFinales();});
+  box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);
   sincronizarEdicionRegistro();
 }
@@ -2726,6 +2733,7 @@ function guardarFinales() {
     if (!inp || inp.readOnly) return;
     const nombre = decodeURIComponent(cell.dataset.fin);
     const comp = decodeURIComponent(cell.dataset.comp);
+    if(!competenciaTrabajada(comp))return;
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(comp, nombre);
     const previo = leerNota(store.finales, k);
@@ -2954,125 +2962,11 @@ function promedioNums(arr) {
 }
 
 function renderAvance() {
-  const box = document.getElementById('avanceBox');
-  const c = ctxBase();
-  document.getElementById('lblAvanceCtx').textContent =
-    (c.nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + c.grado + '° ' + c.seccion + ' · Bim ' + c.bim + ' · ' + (c.area||'');
-  /* resumen por alumno: Promedios si hay, si no Calificar */
-
-  const comps = competencias();
-  const alumnos = estudiantes();
-  // sessions for this context
-  const sess = (store.sessions || []).filter(s =>
-    s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
-    s.seccion === c.seccion && s.area === c.area
-  );
-
-  const hayFinales = Object.keys(store.finales||{}).some(k => {
-    const parts = k.split('||');
-    return parts[0]===c.nivel && parts[1]===c.bim && String(parts[2])===String(c.grado) && parts[3]===c.seccion && parts[4]===c.area;
-  });
-  if (!sess.length && !hayFinales) {
-    box.innerHTML = '<p class="text-sm text-slate-400 py-6 text-center">Aún no hay evaluaciones ni promedios en este bimestre/área.</p>';
-    if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
-    return;
-  }
-
-  // group sessions by competencia
-  const byComp = {};
-  sess.forEach(s => {
-    if (!byComp[s.comp]) byComp[s.comp] = [];
-    byComp[s.comp].push(s);
-  });
-
-  // also include comps with no data at end
-  comps.forEach(comp => {
-    if (!byComp[comp] && alumnos.some(al => leerNota(store.finales, finalKey(comp, studentKey(al))))) {
-      byComp[comp] = []; // sin evidencias; se usarán finales
-    }
-  });
-  const order = comps.filter(x => byComp[x] !== undefined).concat(Object.keys(byComp).filter(x => !comps.includes(x)));
-
-  const data = {};
-  const aula = {};
-  order.forEach(comp => {
-    const evidencias = (byComp[comp] || []).slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
-    data[comp] = alumnos.map(al => {
-      const nums = [];
-      evidencias.forEach(s => {
-        const k = [c.nivel, c.bim, c.grado, c.seccion, c.area, s.comp, s.capacidad, s.fecha, studentKey(al)].join('||');
-        const g = leerNota(store.grades, k);
-        if (!g) return;
-        if (g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
-        else if (g.nivel) {
-          const mid = letterToNum(g.nivel);
-          if (mid !== '') nums.push(Number(mid));
-        }
-      });
-      const ofi = notaCompAlumno(comp, studentKey(al));
-      const original = leerNota(store.finales, finalKey(comp, studentKey(al))) || {};
-      return { prom: ofi.nota===''?null:Number(ofi.nota), letra: ofi.letra, letraOriginal: ofi.src==='P' && original.origen==='letra' };
-    });
-    aula[comp] = {
-      caps: evidencias,
-      classProm: promedioNums(data[comp].map(r => r.prom).filter(x => x != null))
-    };
-  });
-
-  let head = '<th class="fin-nom">Estudiante</th>';
-  order.forEach((comp, idx) => {
-    const ev = aula[comp].caps;
-    const capsTxt = ev.length
-      ? ev.map(e => (e.fecha?String(e.fecha).slice(5)+' · ':'') + (e.capacidad||'')).join('<br>')
-      : 'Promedio directo';
-    const cp = aula[comp].classProm;
-    const cl = cp!=null ? numToLetter(cp) : '';
-    head += '<th>C'+(idx+1)+(cl?' · '+cl:'')+'<div class="fin-caps">'+comp+'<br>'+capsTxt+'</div></th>';
-  });
-  head += '<th class="av-prom-col">Promedio<div class="fin-caps">Promedio de competencias</div></th>';
-  head += '<th>Conclusión<div class="fin-caps">'+(nivel==='primaria'?'Obligatoria si B o C':'Obligatoria solo si C')+'</div></th>';
-
-  const rows = alumnos.map((al, i) => {
-    let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
-    const nums = [];
-    order.forEach(comp => {
-      const r = data[comp][i];
-      if (r.prom!=null && r.prom!=='') nums.push(Number(r.prom));
-      tds += '<td><div class="fin-cell">' +
-        (modoCalif==='num' && r.prom!=null && !r.letraOriginal ? '<div style="font-weight:800;font-size:16px">'+pad2(r.prom)+'</div>' : '') +
-        '<span class="eq-letter '+(r.letra?eqClass(r.letra):'eq-none')+'">'+(r.letra||'—')+'</span></div></td>';
-    });
-    const pg = promedioNums(nums);
-    const lg = pg==null?'':numToLetter(pg);
-    const ck = concAreaKey(studentKey(al));
-    const txt = (leerNota(store.concArea, ck)||{}).texto || '';
-    const abre = requiereConclusion(lg);
-    tds += '<td class="av-prom-col"><div class="fin-cell">' +
-      (modoCalif==='num' && pg!=null ? '<div style="font-weight:800;font-size:16px">'+pg+'</div>' : '') +
-      '<span class="eq-letter '+(lg?eqClass(lg):'eq-none')+'">'+(lg||'—')+'</span></div></td>';
-    tds += '<td style="min-width:160px">' +
-      (abre
-        ? '<textarea class="av-conc" data-nom="'+encodeURIComponent(studentKey(al))+'" placeholder="Conclusión descriptiva (obligatoria: promedio '+lg+')" style="width:100%;min-height:54px;font-size:11px;border:1.5px solid #f87171;border-radius:8px;padding:6px">'+txt.replace(/</g,'&lt;')+'</textarea>'
-        : '<div class="text-[10px] text-slate-400">'+(txt?txt.slice(0,80):'—')+'</div>') +
-      '</td>';
-    return '<tr>'+tds+'</tr>';
-  }).join('');
-
-  box.innerHTML = '<div class="fin-wrap"><table class="fin-grid"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
-  box.querySelectorAll('.av-conc').forEach(el => {
-    el.addEventListener('change', function() {
-      if (registroSoloLectura()) return;
-      if (!store.concArea) store.concArea = {};
-      const nom = decodeURIComponent(el.dataset.nom);
-      const k = concAreaKey(nom);
-      const t = el.value.trim();
-      if (!t) store.concArea[k] = {borrado: true, ts: Date.now()};
-      else store.concArea[k] = { texto: t, ts: Date.now() };
-      saveStore();
-    });
-  });
-  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
-  sincronizarEdicionRegistro();
+ const box=document.getElementById('avanceBox'),c=ctxBase(),comps=competencias(),lock=bimCerradoDocente();document.getElementById('lblAvanceCtx').textContent=c.area+' · Bim '+c.bim;
+ const esc=x=>String(x||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ let html='<div class="fin-wrap"><table class="fin-grid"><thead><tr><th>Estudiante</th>'+comps.map(cp=>'<th>'+esc(cp)+'</th>').join('')+'<th>Promedio referencial<small>Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
+ estudiantes().forEach(al=>{const id=studentKey(al);html+='<tr><th>'+esc(al.nombre)+'</th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td>No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id),f=leerNota(store.finales,finalKey(cp,id))||{},txt=concCompAlumno(cp,id);html+='<td><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+esc(d.letra||'Pendiente')+'</span><small>'+(d.src==='P'?'Directo':d.src==='C'?'Evidencias':'')+'</small></div>'+(d.letra==='C'?'<label>Conclusión descriptiva · Obligatoria para C<textarea class="academic-conclusion" data-id="'+encodeURIComponent(id)+'" data-comp="'+encodeURIComponent(cp)+'" maxlength="2000" required '+(lock?'readonly':'')+'>'+esc(txt)+'</textarea></label>':txt?'<small>Conclusión conservada como borrador (no vigente)</small>':'')+'</td>';});const r=promReferencialAlumno(id);html+='<td>'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>';
+ box.querySelectorAll('.academic-conclusion').forEach(el=>el.oninput=()=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value));if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);sincronizarEdicionRegistro();
 }
 
 const MOBILE_APP_STORES = {

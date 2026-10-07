@@ -47,6 +47,7 @@
 </style>
   <script src="login-bridge.js"></script>
   <script src="students.js"></script>
+<script src="registro-academic-model.js" defer></script>
 <script src="student-identity.js"></script>
 <script src="registro-evaluation.js"></script><script src="transversales-client.js"></script>
 </head>
@@ -1132,6 +1133,7 @@ function areaDeHojaAdm(name){
 }
 function letraDesdePayload(p, ctx, area, comp, nombre, permitirNombre = true){
   if (!p) return '';
+  const estado=(p.competenciasEstado||{})[[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,comp].join('||')];if(estado&&estado.trabajada===false)return '';
   const fk=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,comp,studentKey(nombre)].join('||');
   const f=IEStudentIdentity.leer(p.finales, fk, nombre, (p.meta||{}).studentAliases, permitirNombre);
   if (f){
@@ -1151,9 +1153,9 @@ function letraDesdePayload(p, ctx, area, comp, nombre, permitirNombre = true){
   const pr=promedioAdm(nums);
   return pr==null?'':numToLetterAdm(pr);
 }
-function concDesdePayload(p, ctx, area, nombre, permitirNombre = true){
-  const k=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,studentKey(nombre)].join('||');
-  return (IEStudentIdentity.leer((p||{}).concArea, k, nombre, ((p||{}).meta||{}).studentAliases, permitirNombre)||{}).texto||'';
+function concDesdePayload(p, ctx, area, comp, nombre, permitirNombre = true){
+  const k=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,area,comp,studentKey(nombre)].join('||');
+  return (IEStudentIdentity.leer((p||{}).concComp, k, nombre, ((p||{}).meta||{}).studentAliases, permitirNombre)||{}).texto||'';
 }
 async function fetchRegAula(ctx){
   const r=await fetchLecturaNube(CLOUD_API_URL+'?action=loadreg&nivel='+encodeURIComponent(ctx.nivel)+'&t='+Date.now());
@@ -1339,17 +1341,17 @@ async function vaciarSiagieOficial(){
     if(al.codigoEstudiante){const cod=String(al.codigoEstudiante).trim();idxCod[cod]=al;idxCodUnico[cod]=Object.hasOwn(idxCodUnico,cod)?null:al;}
   });
   const wb=XLSX.read(buf,{type:'array',cellDates:true});
-  let escritos=0;const pendientesTrans=[];
+  let escritos=0;const pendientesTrans=[],pendientesAcademicos=[];
   wb.SheetNames.forEach(sn=>{
     const map=areaDeHojaAdm(sn);
     const transversal=ctx.nivel==='secundaria'&&map&&map.area==='Competencias Transversales';
-    if(!map||(!transversal&&!by[map.area])) return;
+    if(!map) return;
     const ws=wb.Sheets[sn];
     if(!ws||!ws['!ref']) return;
     const range=XLSX.utils.decode_range(ws['!ref']);
-    const comps=COMPS_SIAGIE[map.area]||[];
+    const comps=(typeof IERegistroAcademico!=='undefined'&&(IERegistroAcademico.catalog[ctx.nivel]||{})[map.area])||COMPS_SIAGIE[map.area]||[];
     const use=map.only==null?comps:[comps[map.only]].filter(Boolean);
-    const p=by[map.area];
+    const p=by[map.area]||{};
     for(let r=range.s.r+2;r<=range.e.r;r++){
       const cellId=ws[XLSX.utils.encode_cell({r:r,c:0})];
       const cellCod=ws[XLSX.utils.encode_cell({r:r,c:1})];
@@ -1357,8 +1359,8 @@ async function vaciarSiagieOficial(){
       const idX=cellId?String(cellId.v||'').trim():'';
       const codX=cellCod?String(cellCod.v||'').trim():'';
       const nomX=cell?cell.v:'';
-      if(transversal){
-        // Limpiar incluso filas no vinculadas: ninguna nota anterior puede pasar al archivo nuevo.
+      {
+        // Cada columna NL/CD se limpia antes de escribir el resultado vigente.
         use.forEach((cp,i)=>{delete ws[XLSX.utils.encode_cell({r:r,c:3+i*2})];delete ws[XLSX.utils.encode_cell({r:r,c:4+i*2})];});
       }
       const nombre=(idX&&(transversal?idxIdUnico:idxId)[idX])||(codX&&(transversal?idxCodUnico:idxCod)[codX])||idxNom[normNomAdm(nomX)];
@@ -1374,17 +1376,21 @@ async function vaciarSiagieOficial(){
         if(transversal&&!letra){
           pendientesTrans.push(nombre.nombre+' · '+cp+' · '+(resultTrans?resultTrans.estado:'Sin calificación final'));
         }
+        const estado=!transversal&&(p.competenciasEstado||{})[[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,map.area,cp].join("||")];
+        if(!transversal&&(!estado||estado.trabajada!==false)&&!letra)pendientesAcademicos.push(nombre.nombre+" · "+cp+" · falta resultado");
         if(!letra) return;
         ws[XLSX.utils.encode_cell({r:r,c:3+i*2})]={t:'s',v:letra};
         escritos++;
-        const need=ctx.nivel==='primaria'?(letra==='B'||letra==='C'):(letra==='C');
+        const need=letra==='C';
         if(need){
-          const txt=transversal?resultTrans.final.conclusion:concDesdePayload(p,ctx,map.area,nombre,permitirNombre);
+          const txt=transversal?resultTrans.final.conclusion:concDesdePayload(p,ctx,map.area,cp,nombre,permitirNombre);
           if(txt) ws[XLSX.utils.encode_cell({r:r,c:4+i*2})]={t:'s',v:txt};
+          else if(!transversal)pendientesAcademicos.push(nombre.nombre+' · '+cp+' · C · falta conclusión');
         }
       });
     }
   });
+  if(pendientesAcademicos.length){msg.textContent='Competencias académicas pendientes: '+pendientesAcademicos.join(' · ');return;}
   if(transversales){
     try{const vigente=await IETransversales.request('loadtransversalexport',{bimestre:ctx.bim,grado:ctx.grado,seccion:ctx.seccion});if(vigente.version!==transversales.version||vigente.versionAportes!==transversales.versionAportes){alert('La consolidación cambió durante el vaciado. Recargue y exporte nuevamente.');return;}}
     catch(e){alert('No se pudo confirmar la versión transversal para exportar.');return;}

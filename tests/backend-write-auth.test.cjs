@@ -237,6 +237,7 @@ for (const [file, name, action] of [
       LS_PER: 'test-periodos', PERIODOS_CLOUD_KEY: 'test-periodos-cloud',
       document: {getElementById: () => ({value: '2026'}), querySelectorAll: () => []}
     });
+    if(name==='subirRegistroNube')Object.assign(context,{IERegistroAcademico:{canonical:JSON.stringify},baselineAcademica:()=>({version:0,baseline:'not-synchronized'}),prepararVersionAcademica:async()=>true,informeSiagie:()=>({ok:true}),saveStore:()=>{},dirtyAcademico:()=>{}});
     if (admin) new vm.Script(clientFunction(file, 'tokenSesionAdmin')).runInContext(context);
     new vm.Script(clientFunction(file, name)).runInContext(context);
     await context[name](secondary ? 'Matemática' : 'Comunicación');

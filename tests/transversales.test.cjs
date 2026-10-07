@@ -171,6 +171,7 @@ for(const stage of ['confirmed','confirmed-C','obsolete','pending','pending-canc
  f.c.ctxTpl=()=>ctx;f.c.areasDeNivel=()=>['Matemática','Competencias Transversales'];f.c.COMPS_SIAGIE={'Matemática':['Resuelve'],'Competencias Transversales':['TIC','Autonomía']};
  f.c.areaDeHojaAdm=name=>name==='MATE'?{area:'Matemática',only:null}:{area:'Competencias Transversales',only:name==='DESEN TIC'?0:1};
  f.c.normNomAdm=f.c.IEStudentIdentity.normalizarNombre;
+ students.filter(al=>al.nombre==='Synthetic Homonym').forEach(al=>academic.finales['secundaria||I||2||A||Matemática||Resuelve||id:duplicate-id']={nivel:'A'});
  f.c.fetchRegAula=async()=>[{area:'Matemática',payload:academic},{area:'Competencias Transversales',payload:{finales:{'secundaria||I||2||A||Competencias Transversales||TIC||id:synthetic-a':{nivel:'AD'}}}}];
  f.c.IEStudents.loadRoster=async()=>({primaria:{estudiantes:[]},secundaria:{estudiantes:students}});
  f.c.fetchLecturaNube=async()=>({text:async()=>JSON.stringify({ok:true,b64:Buffer.from('synthetic').toString('base64')})});f.c.CLOUD_API_URL='synthetic';
@@ -180,7 +181,7 @@ for(const stage of ['confirmed','confirmed-C','obsolete','pending','pending-canc
  for(const ws of [tic,auto]){if(stage==='confirmed-C'){assert.equal(ws.E3.v,'Necesita acompañamiento para desarrollar las capacidades evaluadas.');assert.notEqual(ws.E3.v,'Justificación colegiada distinta');}else assert.equal(ws.E3,undefined);if(!stage.startsWith('pending')&&stage!=='obsolete')assert.equal(ws.D3.v,stage==='confirmed-C'?'C':'B');else assert.equal(ws.D3,undefined);}
  if(unlinked||stage==='empty'){
    for(const ws of [tic,auto]){assert.equal(ws.D4,undefined);assert.equal(ws.E4,undefined);assert.equal(ws.D6,undefined);assert.equal(ws.E6,undefined);}
-   assert.equal(mate.D4.v,'C');assert.equal(mate.E4.v,'Unlinked legacy conclusion');
+   assert.equal(mate.E4,undefined);if(!stage.startsWith('ambiguous'))assert.equal(mate.D4,undefined);
    assert.doesNotMatch(f.el('tplMsg').textContent,/fila 5|fila 6/);
    if(unlinked){assert.match(f.el('tplMsg').textContent,/Alumno\/fila no vinculada al padrón · DESEN TIC · fila 4/);assert.match(f.el('tplMsg').textContent,/Alumno\/fila no vinculada al padrón · GEST AUTO · fila 4/);}
  }
@@ -385,7 +386,7 @@ test('real Registro transversal UI selects multiple capacities, keeps two dates,
 });
 test('real evidence UI single capacity and deleting a session require save; letters/numbers view does not mutate stored notes',async()=>{
  const s=fixture();guardarEvidencia(s,'math',evidencia(s,[{valor:'A'},{fecha:'2026-10-15',valor:18}]));const original=JSON.stringify(s.tables.get('TransversalesAportes').rows),ui=evidenciaUI(s),{box,active,requests}=ui;
- const mode=box.querySelectorAll('select')[0];mode.value='num';mode.onchange();assert.equal(box.querySelectorAll('input').find(e=>e.type==='number').value,15);mode.value='letra';mode.onchange();assert.equal(active.dirty(),false);assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),original);
+ const mode=box.querySelectorAll('select')[0];mode.value='num';mode.onchange();assert.equal(box.querySelectorAll('input').find(e=>e.type==='number').value,'');mode.value='letra';mode.onchange();assert.equal(active.dirty(),false);assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),original);
  box.querySelectorAll('button').find(b=>b.textContent==='Quitar capacidad y sus notas').onclick();assert.equal(active.dirty(),true);assert.equal(requests.length,0);assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),original);
  await box.querySelectorAll('button').find(b=>b.textContent==='Guardar sesión y evidencias del área').onclick();assert.equal(requests.length,1);assert.equal(s.load('math').aportes[0].evidencia.sessions.length,1);assert.equal(s.load('math').aportes[0].valores[s.id].tic.nivel,'AD');assert.equal(s.tables.get('TransversalesAportes').rows.length,3);
 });
@@ -397,7 +398,7 @@ test('closed evidence grid allows consulting dates/mode but never adding/deletin
 });
 test('Tutor/AIP evidence detail renders original capacity/date grades as readonly while only final decisions are editable',()=>{
  const s=fixture();guardarEvidencia(s,'math',evidencia(s,[{valor:13.5}]));const f=client('pip'),el=dom();f.c.document.createElement=el;f.run(read('transversales-client.js'));const box=el('div');f.c.window.IETransversales.editor(box,clone(s.load('pip')),s.ctx,true);
- const detail=box.querySelectorAll('details')[0];assert.match(detail.querySelectorAll('summary')[0].textContent,/Ver evidencias de Matemática/);assert.match(detail.querySelectorAll('p')[1].textContent,/2026-10-14.*Personaliza entornos virtuales.*14 → A/);assert.equal(detail.querySelectorAll('select').length,0);assert.equal(detail.querySelectorAll('input').length,0);assert.equal(detail.querySelectorAll('button').length,0);
+ const detail=box.querySelectorAll('details').find(d=>d.querySelectorAll('summary')[0].textContent==='Ver evidencias de Matemática');assert.match(detail.querySelectorAll('summary')[0].textContent,/Ver evidencias de Matemática/);assert.match(detail.querySelectorAll('p')[1].textContent,/2026-10-14.*Personaliza entornos virtuales.*14 → A/);assert.equal(detail.querySelectorAll('select').length,0);assert.equal(detail.querySelectorAll('input').length,0);assert.equal(detail.querySelectorAll('button').length,0);
 });
 
 test('large bimestral evidence blocks stay below Sheets cell limits and reconstruct without losing originals',()=>{
