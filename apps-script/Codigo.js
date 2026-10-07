@@ -719,6 +719,7 @@ function payloadRegistroLectura_(payload, acceso, ctx) {
       return s && mismoContexto(s.nivel, s.bim, s.grado, s.seccion, s.area);
     }) : [],
     grades: mapaContexto(payload.grades, true), finales: mapaContexto(payload.finales, true),
+    concComp: mapaContexto(payload.concComp, true), competenciasEstado: mapaContexto(payload.competenciasEstado, true), modeloAcademico: payload.modeloAcademico,
     concArea: mapaContexto(payload.concArea, true), asistencia: mapaContexto(payload.asistencia, false),
     asisFechas: mapaContexto(payload.asisFechas, false, true), asisFechasEstado: mapaContexto(payload.asisFechasEstado, false),
     capsSel: mapaContexto(payload.capsSel, true), meta: payload.meta || {}
@@ -1054,6 +1055,56 @@ function validarTutores_(list) {
   }
   return true;
 }
+// Envío oficial integral: el padrón privado, nunca el listado del cliente, decide a quién evaluar.
+function validarRegistroIntegral_(payload, ctx) {
+  const c={nivel:ctx.nivel,bim:ctx.bimestre,grado:ctx.grado,seccion:ctx.seccion,area:ctx.area};
+  const model=registroAcademico_(), comps=(model.catalog[c.nivel]||{})[c.area]||[];
+  if(!comps.length)throw Error('Área académica no reconocida para el envío integral.');
+  const sh=hojaEstudiantes_(),base=leerPadronEstudiantes_(sh,c.bim)||leerBaseEstudiantes_(sh,false);
+  if(!base)throw Error('Padrón privado no inicializado. No se puede verificar el envío integral.');
+  const alumnos=base.estudiantes.filter(a=>a.nivel===c.nivel&&gradoEscritura_(a.grado)===gradoEscritura_(c.grado)&&seccionEscritura_(a.seccion)===seccionEscritura_(c.seccion));
+  if(!alumnos.length)throw Error('El padrón no contiene estudiantes para este contexto.');
+  if(new Set(alumnos.map(transversalIdentidad_)).size!==alumnos.length)throw Error('Identidad ambigua en el padrón.');
+  const aliases=payload.meta&&payload.meta.studentAliases||{},ev=registroEvaluacion_();
+  function leer(map,prefix,al) {
+    const ids=[transversalIdentidad_(al)];
+    if(al.codigoEstudiante)ids.push('cod:'+encodeURIComponent(String(al.codigoEstudiante).trim()));
+    const norm=n=>normalizarNombreIdentidad_(String(n||'').replace(/,/g,' '));
+    ids.push('nom:'+encodeURIComponent(norm(al.nombre)));
+    const nombres=new Set([norm(al.nombre)]);
+    ids.forEach(id=>(Array.isArray(aliases[id])?aliases[id]:[]).forEach(n=>nombres.add(norm(n))));
+    const otroDueno=Object.entries(aliases).some(([id,lista])=>/^(id:|cod:)/.test(id)&&!ids.includes(id)&&Array.isArray(lista)&&lista.some(n=>nombres.has(norm(n))));
+    const nombreSeguro=!otroDueno&&alumnos.filter(a=>nombres.has(norm(a.nombre))).length===1;
+    map=map||{};
+    for(const id of [...new Set(ids)]) {
+      if(!nombreSeguro&&id.startsWith('nom:'))continue;
+      if(Object.prototype.hasOwnProperty.call(map,prefix+id)){const v=map[prefix+id];return v&&!v.borrado?v:null;}
+    }
+    if(!nombreSeguro)return null;
+    const keys=Object.keys(map).filter(k=>k.startsWith(prefix)&&!/^(id:|cod:|nom:)/.test(k.slice(prefix.length))&&nombres.has(norm(k.slice(prefix.length))));
+    const v=keys.length===1?map[keys[0]]:null;return v&&!v.borrado?v:null;
+  }
+  function numero(v) {
+    if(!v)return null;
+    if(v.nota20!==''&&v.nota20!=null){const n=Number(v.nota20);if(!Number.isFinite(n)||n<0||n>20)throw Error('Nota académica inválida.');return n;}
+    const n=ev.letterToNum(v.nivel);if(n==='')throw Error('Resultado académico inválido.');return n;
+  }
+  for(const comp of comps)if(model.worked(payload,c,comp))for(const al of alumnos) {
+    const prefix=model.prefix(c)+comp+'||',directo=leer(payload.finales,prefix,al);
+    let letra='';
+    if(directo&&(directo.nivel||directo.nota20!==''&&directo.nota20!=null)){const n=numero(directo);letra=directo.nivel||ev.numToLetter(n);if(!['AD','A','B','C'].includes(letra))throw Error('Resultado académico inválido.');}
+    else {
+      const nums=[];
+      for(const s of payload.sessions||[])if(s.nivel===c.nivel&&s.bim===c.bim&&String(s.grado)===String(c.grado)&&s.seccion===c.seccion&&s.area===c.area&&s.comp===comp){
+        const v=leer(payload.grades,prefix+s.capacidad+'||'+s.fecha+'||',al);if(v&&(v.nivel||v.nota20!==''&&v.nota20!=null))nums.push(numero(v));
+      }
+      const promedio=ev.promedioNums(nums);if(promedio!==null)letra=ev.numToLetter(promedio);
+    }
+    if(!letra)throw Error('Envío integral incompleto: falta resultado por competencia trabajada.');
+    const conclusion=leer(payload.concComp,prefix,al);
+    if(letra==='C'&&!(conclusion&&typeof conclusion.texto==='string'&&conclusion.texto.trim()))throw Error('Envío integral incompleto: una competencia C requiere su conclusión específica.');
+  }
+}
 function registroEvaluacion_() {
   function numToLetter(n) { n=Number(n);if(isNaN(n)||n<0||n>20)return '';return n>=18?'AD':n>=14?'A':n>=11?'B':'C'; }
   function letterToNum(L) { return ({AD:19,A:15,B:12,C:8})[L] ?? ''; }
@@ -1114,7 +1165,18 @@ function transversalEvidencia_(raw,ctx,acceso,ids,ts,previo) {
       const v=core.valor(input[id][comp]);if(!v)throw new Error('Valoración directa inválida.');directos[id][comp]=v;
     });
   });
-  const evidencia={schema:1,sessions,grades,directos};evidencia.finales=core.resultados(evidencia,[...ids]).valores;return evidencia;
+  const conclusiones={},textos=raw.conclusiones===undefined?(anteriores&&anteriores.conclusiones||{}):raw.conclusiones;
+  if(!obj(textos))throw new Error('Conclusiones descriptivas inválidas.');
+  Object.keys(textos).forEach(id=>{
+    if(!ids.has(id)||!obj(textos[id]))throw new Error('Estudiante o conclusión no autorizados.');
+    Object.keys(textos[id]).forEach(comp=>{
+      if(!Object.prototype.hasOwnProperty.call(core.COMP,comp)||typeof textos[id][comp]!=='string')throw new Error('Competencia o texto de conclusión inválidos.');
+      const texto=textos[id][comp].replace(/\r\n?/g,'\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,'').trim();
+      if(texto.length>2000)throw new Error('Conclusión descriptiva demasiado extensa.');
+      if(texto){conclusiones[id]=conclusiones[id]||{};conclusiones[id][comp]=texto;}
+    });
+  });
+  const evidencia={schema:1,sessions,grades,directos,conclusiones};evidencia.finales=core.resultados(evidencia,[...ids]).valores;return evidencia;
 }
 function transversalIdentidad_(al) {
   return String(al.idSiagie||'').trim() ? 'id:'+encodeURIComponent(String(al.idSiagie).trim()) : String(al.codigoEstudiante||'').trim() ? 'cod:'+encodeURIComponent(String(al.codigoEstudiante).trim()) : 'nom:'+encodeURIComponent(normalizarNombreIdentidad_(String(al.nombre||'').replace(/,/g,' ')));
@@ -1186,7 +1248,8 @@ function transversalDatos_(ctx,config) {
     Object.keys(a.evidencia.grades||{}).forEach(key=>{grades[key]={};estudiantes.forEach(al=>{const source=a.evidencia.grades[key],id=alias[al.id].find(k=>Object.prototype.hasOwnProperty.call(source,k));if(id)grades[key][al.id]=source[id];});});
     a.evidencia.grades=grades;const result=registroEvaluacion_().resultados(a.evidencia,estudiantes.map(a=>a.id));
     const directos={};estudiantes.forEach(al=>{const source=a.evidencia.directos||{},id=alias[al.id].find(k=>Object.prototype.hasOwnProperty.call(source,k));if(id)directos[al.id]=source[id];});
-    a.evidencia.directos=directos;a.calculados=result.valores;a.origenes={};a.valores=JSON.parse(JSON.stringify(result.valores));
+    const conclusiones={};estudiantes.forEach(al=>{const source=a.evidencia.conclusiones||{},id=alias[al.id].find(k=>Object.prototype.hasOwnProperty.call(source,k));if(id)conclusiones[al.id]=source[id];});
+    a.evidencia.conclusiones=conclusiones;a.evidencia.directos=directos;a.calculados=result.valores;a.origenes={};a.valores=JSON.parse(JSON.stringify(result.valores));
     estudiantes.forEach(al=>{a.origenes[al.id]={};['tic','autonomia'].forEach(comp=>{
       const directo=registroEvaluacion_().valor((directos[al.id]||{})[comp]);
       if(directo)a.valores[al.id][comp]=directo;
@@ -1199,7 +1262,7 @@ function transversalDatos_(ctx,config) {
   return {clave,estudiantes,areas:[...areas].sort(),aportes,consolidado,versionTs:version,versionAportes:'evidencias-v1:'+fingerprint+':'+version+':'+padron.version};
 }
 function transversalResumen_(datos,id,comp) {
-  const porArea={};datos.aportes.forEach(a=>{const v=(a.valores[id]||{})[comp];if(v && (!porArea[a.area]||a.ts>porArea[a.area].ts))porArea[a.area]={area:a.area,docente:a.docente,ts:a.ts,valor:v,origen:(a.origenes&&a.origenes[id]||{})[comp]||'evidencias'};});
+  const porArea={};datos.aportes.forEach(a=>{const v=(a.valores[id]||{})[comp];if(v && (!porArea[a.area]||a.ts>porArea[a.area].ts))porArea[a.area]={area:a.area,docente:a.docente,ts:a.ts,valor:v,origen:(a.origenes&&a.origenes[id]||{})[comp]||'evidencias',conclusion:v.nivel==='C'?((a.evidencia&&a.evidencia.conclusiones||{})[id]||{})[comp]||'':''};});
   const aportes=Object.values(porArea),conteo={AD:0,A:0,B:0,C:0};aportes.forEach(a=>conteo[a.valor.nivel]++);
   const max=Math.max(...Object.values(conteo)), ganadores=Object.keys(conteo).filter(k=>conteo[k]===max), sugerencia=max && ganadores.length===1?ganadores[0]:null;
   const orden=['C','B','A','AD'],indices=aportes.map(a=>orden.indexOf(a.valor.nivel)), faltan=datos.areas.filter(a=>!porArea[a]);
@@ -1215,7 +1278,7 @@ function transversalVista_(datos,acceso,ctx) {
     const obsoleto=!!final && final.versionAportes!==datos.versionAportes;
     resultados[al.id][comp]={resumen,final,listo:transversalListo_(final,datos.versionAportes),estado:transversalConclusionPendiente_(final)?'Conclusión descriptiva obligatoria para nivel C':obsoleto?'Requiere nueva confirmación':!final||!final.tutor?'Pendiente de confirmación del Tutor':!final.aip?'Pendiente de confirmación del AIP':'✓ Consolidación confirmada · Lista para SIAGIE'};
   });});
-  return {ok:true,soportaDirectos:true,estudiantes:datos.estudiantes,areas:datos.areas,versionAportes:datos.versionAportes,version:datos.consolidado.version,
+  return {ok:true,soportaDirectos:true,soportaConclusiones:true,estudiantes:datos.estudiantes,areas:datos.areas,versionAportes:datos.versionAportes,version:datos.consolidado.version,
     aportes:coord?datos.aportes:datos.aportes.filter(a=>normalizarUsuario_(a.user)===normalizarUsuario_(acceso.sesion.user)&&a.area===ctx.area),resultados,
     puedeFinal:acceso.sesion.role==='pip'||transversalTutor_(acceso,ctx),puedeTutor:!!transversalTutor_(acceso,ctx),puedeAip:acceso.sesion.role==='pip',abierto:bimestreAbierto_(ctx.bimestre)};
 }
@@ -1244,6 +1307,10 @@ function transversalesRuta_(body) {
       const key=datos.clave+'||'+ctx.area+'||'+normalizarUsuario_(acceso.sesion.user), previo=datos.aportes.find(a=>a.area===ctx.area&&normalizarUsuario_(a.user)===normalizarUsuario_(acceso.sesion.user));
       if(Number(body.version)!==Number(previo?previo.version:0))return {ok:false,code:'CONFLICT',error:'El aporte cambió en otro dispositivo. Recarga.'};
       const ts=Math.max(Date.now(),datos.versionTs+1),evidencia=transversalEvidencia_(body.evidencia,ctx,acceso,ids,ts,previo);
+      if(body.envioIntegral===true)ids.forEach(id=>Object.keys(registroEvaluacion_().COMP).forEach(comp=>{
+        const efectivo=(evidencia.directos[id]||{})[comp]||(evidencia.finales[id]||{})[comp];
+        if(efectivo&&efectivo.nivel==='C'&&!((evidencia.conclusiones[id]||{})[comp]||'').trim())throw new Error('Falta conclusión descriptiva en competencias transversales con nivel C. Complétala en Resumen antes de enviar el área.');
+      }));
       transversalAppend_('TransversalesAportes',[key,ctx.bimestre,ctx.numero,ctx.seccion,ctx.area,acceso.docente.nombre||acceso.sesion.user,normalizarUsuario_(acceso.sesion.user),ts,JSON.stringify(evidencia)]);
     } else if(escritura) {
       if(Number(body.version)!==datos.consolidado.version || body.versionAportes!==datos.versionAportes)return {ok:false,code:'CONFLICT',error:'La decisión o los aportes cambiaron. Recarga antes de guardar o confirmar.'};
@@ -1362,7 +1429,7 @@ function doGet(e) {
           });
         }
       }
-      return responder_({ ok: true, nivel: nivel, items: items, total: items.length });
+      return responder_({ ok: true, soportaModeloAcademico:true, nivel: nivel, items: items, total: items.length });
     }
 
     if (action === 'loadaip') {
@@ -1632,33 +1699,28 @@ function doPost(e) {
           error: 'Bimestre ' + bimestre + ' cerrado o bloqueado por Administración. Solo lectura.'
         });
       }
-      const clave = [nivelR, bimestre, grado, seccion, area].join('||');
-      const sh = asegurarReg_();
-      const last = sh.getLastRow();
-      let fila = -1;
-      if (last >= 2) {
-        const claves = sh.getRange(2, 1, last, 1).getValues();
-        for (let i = 0; i < claves.length; i++) {
-          if (String(claves[i][0]) === clave) { fila = i + 2; break; }
-        }
-      }
-      if (fila < 0) fila = sh.getLastRow() + 1;
-      sh.getRange(fila, 1).setValue(clave);
-      sh.getRange(fila, 2).setValue(nivelR);
-      sh.getRange(fila, 3).setValue(bimestre);
-      sh.getRange(fila, 4).setValue(grado);
-      sh.getRange(fila, 5).setValue(seccion);
-      sh.getRange(fila, 6).setValue(area);
-      sh.getRange(fila, 7).setValue(permiso.docente);
-      sh.getRange(fila, 8).setValue(body.ts || Date.now());
-      const payload = Object.assign({}, body.payload || {});
-      if (permiso.role === 'docente') {
-        const meta = payload.meta && typeof payload.meta === 'object' && !Array.isArray(payload.meta)
-          ? payload.meta : {};
-        payload.meta = Object.assign({}, meta, { docente: permiso.docente });
-      }
-      sh.getRange(fila, 9).setValue(JSON.stringify(payload));
-      return responder_({ ok: true, clave: clave, fila: fila, msg: 'Registro guardado' });
+      const lock=LockService.getScriptLock();lock.waitLock(30000);
+      try {
+        const clave=[nivelR,bimestre,grado,seccion,area].join('||'),sh=asegurarReg_();
+        let fila=-1;const last=sh.getLastRow();
+        if(last>=2){const claves=sh.getRange(2,1,last-1,1).getValues();for(let i=0;i<claves.length;i++)if(String(claves[i][0])===clave){fila=i+2;break;}}
+        const previous=fila<0?[0,'{}']:sh.getRange(fila,8,1,2).getValues()[0];
+        const prevVersion=Number(previous[0])||0;
+        let prev={};if(fila>=0){try{prev=JSON.parse(String(previous[1]||'{}'));}catch(e){return responder_({ok:false,code:'CONFLICT',error:'Registro previo ilegible. Revise antes de guardar.'});}}
+        const nuevo=body.modeloAcademico===1||prev.modeloAcademico===1||['concComp','competenciasEstado'].some(field=>Object.keys((body.payload||{})[field]||{}).length>0);
+        if(nuevo&&(body.modeloAcademico!==1||body.version==null||Number(body.version)!==prevVersion))return responder_({ok:false,code:'CONFLICT',error:'El registro cambió. Baje y revise antes de guardar.',version:prevVersion});
+        const payload=Object.assign({},body.payload||{});
+        for(const field of ['concComp','competenciasEstado'])if(payload[field]===undefined&&prev[field]!==undefined)payload[field]=prev[field];
+        try{registroAcademico_().validate(payload,{nivel:nivelR,bim:bimestre,grado:grado,seccion:seccion,area:area});if(body.modeloAcademico===1&&body.envioIntegral===true)validarRegistroIntegral_(payload,ctx);}catch(e){return responder_({ok:false,error:e.message});}
+        if(permiso.role==='docente'){const meta=payload.meta&&typeof payload.meta==='object'&&!Array.isArray(payload.meta)?payload.meta:{};payload.meta=Object.assign({},meta,{docente:permiso.docente});}
+        if(nuevo)payload.modeloAcademico=1;
+        if(JSON.stringify(payload).length>49000)return responder_({ok:false,error:'El registro supera el límite seguro de la celda. El borrador se conserva; reduzca el detalle antes de enviar.'});
+        if(nuevo&&fila>=0&&registroAcademico_().canonical(payload)===registroAcademico_().canonical(prev))return responder_({ok:true,clave:clave,fila:fila,version:prevVersion,unchanged:true});
+        if(fila<0)fila=last+1;
+        const version=nuevo?Math.max(Date.now(),prevVersion+1):(body.ts||Date.now());
+        [clave,nivelR,bimestre,grado,seccion,area,permiso.docente,version,JSON.stringify(payload)].forEach((v,i)=>sh.getRange(fila,i+1).setValue(v));
+        return responder_({ok:true,clave:clave,fila:fila,version:version,msg:'Registro guardado'});
+      }finally{lock.releaseLock();}
     }
 
     if (action === 'saveaip') {
@@ -1880,4 +1942,142 @@ function listarClassroom_() {
   } catch (err) {
     return { ok: false, error: 'Classroom no está habilitado o esta cuenta no es docente. ' + err };
   }
+}
+
+/* Modelo académico compartido. concArea se conserva únicamente como historial. */
+function registroAcademico_() {
+  // El catálogo coincide con EST_PRIM/EST_SEC del Registro; no concede permisos.
+  const catalog = {
+    "primaria": {
+      "Personal Social": [
+        "Construye su Identidad",
+        "Convive y participa democráticamente",
+        "Construye interpretaciones históricas",
+        "Gestiona responsablemente el espacio y el ambiente",
+        "Gestiona responsablemente los recursos económicos"
+      ],
+      "Educación Física": [
+        "Se desenvuelve de manera autónoma a través de su motricidad",
+        "Asume una vida saludable",
+        "Interactúa a través de sus habilidades sociomotrices"
+      ],
+      "Comunicación": [
+        "Se comunica oralmente en su lengua materna",
+        "Lee diversos tipos de textos escritos en su lengua materna",
+        "Escribe diversos tipos de textos en su lengua materna"
+      ],
+      "Arte y Cultura": [
+        "Aprecia de manera crítica manifestaciones artístico-culturales",
+        "Crea proyectos artísticos desde los lenguajes artísticos"
+      ],
+      "Matemática": [
+        "Resuelve problemas de cantidad",
+        "Resuelve problemas de regularidad, equivalencia y cambio",
+        "Resuelve problemas de forma, movimiento y localización",
+        "Resuelve problemas de gestión de datos e incertidumbre"
+      ],
+      "Ciencia y Tecnología": [
+        "Indaga mediante métodos científicos para construir sus conocimientos",
+        "Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo",
+        "Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"
+      ],
+      "Educación Religiosa": [
+        "Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas",
+        "Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"
+      ]
+    },
+    "secundaria": {
+      "Desarrollo Personal, Ciudadanía y Cívica": [
+        "Construye su identidad",
+        "Convive y participa democráticamente en la búsqueda del bien común"
+      ],
+      "Ciencias Sociales": [
+        "Construye interpretaciones históricas",
+        "Gestiona responsablemente el espacio y el ambiente",
+        "Gestiona responsablemente los recursos económicos"
+      ],
+      "Educación para el Trabajo (EPT)": [
+        "Gestiona proyectos de emprendimiento económico o social"
+      ],
+      "Educación Física": [
+        "Se desenvuelve de manera autónoma a través de su motricidad",
+        "Asume una vida saludable",
+        "Interactúa a través de sus habilidades sociomotrices"
+      ],
+      "Comunicación": [
+        "Se comunica oralmente en su lengua materna",
+        "Lee diversos tipos de textos escritos en su lengua materna",
+        "Escribe diversos tipos de textos en su lengua materna"
+      ],
+      "Arte y Cultura": [
+        "Aprecia de manera crítica manifestaciones artístico-culturales",
+        "Crea proyectos artísticos desde los lenguajes artísticos"
+      ],
+      "Inglés": [
+        "Se comunica oralmente en inglés como lengua extranjera",
+        "Lee diversos tipos de texto en inglés como lengua extranjera",
+        "Escribe diversos tipos de textos en inglés como lengua extranjera"
+      ],
+      "Matemática": [
+        "Resuelve problemas de cantidad",
+        "Resuelve problemas de regularidad, equivalencia y cambio",
+        "Resuelve problemas de forma, movimiento y localización",
+        "Resuelve problemas de gestión de datos e incertidumbre"
+      ],
+      "Ciencia y Tecnología": [
+        "Indaga mediante métodos científicos para construir sus conocimientos",
+        "Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo",
+        "Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"
+      ],
+      "Educación Religiosa": [
+        "Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas",
+        "Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"
+      ]
+    }
+  };
+  const prefix = c => [c.nivel,c.bim||c.bimestre,c.grado,c.seccion,c.area].join('||')+'||';
+  const key = (c,comp,id) => prefix(c)+comp+(id===undefined?'':'||'+id);
+  const worked = (p,c,comp) => !p.competenciasEstado || !p.competenciasEstado[key(c,comp)] || p.competenciasEstado[key(c,comp)].trabajada!==false;
+  const conclusion = (p,c,comp,id) => {
+    const r=(p.concComp||{})[key(c,comp,id)];
+    return r&&!r.borrado?String(r.texto||'').trim():'';
+  };
+  function canonical(p) {
+    function clean(x) {
+      if(Array.isArray(x))return x.map(clean).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+      if(x&&typeof x==='object') {
+        const out={};
+        Object.keys(x).sort().filter(k=>!['ts','_ts','registroVersion','docente'].includes(k)).forEach(k=>out[k]=clean(x[k]));
+        return out;
+      }
+      return x;
+    }
+    // Activada es el valor histórico implícito. Las marcas de tiempo no son contenido editable.
+    const state={};
+    Object.keys(p.competenciasEstado||{}).sort().forEach(k=>{
+      if(p.competenciasEstado[k].trabajada===false)state[k]={trabajada:false};
+    });
+    const notes=map=>Object.fromEntries(Object.entries(map||{}).filter(([,v])=>!v.borrado).sort().map(([k,v])=>
+      [k,v.origen==='letra'?{origen:'letra',nivel:v.nivel}:clean(v)]));
+    const conc=Object.fromEntries(Object.entries(p.concComp||{}).filter(([,v])=>!v.borrado&&String(v.texto||'').trim()).sort().map(([k,v])=>[k,{texto:String(v.texto).trim()}]));
+    return JSON.stringify(clean({sessions:[],concArea:{},asistencia:{},asisFechas:{},asisFechasEstado:{},capsSel:{},...p,
+      modeloAcademico:undefined,ts:undefined,meta:{studentAliases:p.meta&&p.meta.studentAliases||{}},competenciasEstado:state,concComp:conc,grades:notes(p.grades),finales:notes(p.finales)}));
+  }
+  function validate(p,c) {
+    const comps=(catalog[c.nivel]||{})[c.area]||[],pref=prefix(c);
+    for(const field of ['competenciasEstado','concComp']) {
+      const map=p[field]||{};
+      if(typeof map!=='object'||Array.isArray(map))throw Error('Metadata académica inválida.');
+      for(const [k,v] of Object.entries(map)) {
+        const parts=k.slice(pref.length).split('||');
+        if(!k.startsWith(pref)||!comps.includes(parts[0])||parts.length!==(field==='concComp'?2:1)||!v||typeof v!=='object'||Array.isArray(v)||parts.some(x=>!x))
+          throw Error('Competencia o contexto académico no autorizado.');
+        if(field==='competenciasEstado'&&typeof v.trabajada!=='boolean')throw Error('Estado de competencia inválido.');
+        if(field==='concComp'&&(typeof v.texto!=='string'||v.texto.length>2000))throw Error('Conclusión académica inválida.');
+        if(field==='concComp')v.texto=v.texto.replace(/\r\n?/g,'\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,'').trim();
+      }
+    }
+    return p;
+  }
+  return {catalog,prefix,key,worked,conclusion,canonical,validate};
 }

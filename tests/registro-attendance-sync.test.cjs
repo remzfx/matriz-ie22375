@@ -17,6 +17,7 @@ function device(){
    registroSoloLectura:()=>false,registroNubeNoVerificada:()=>false,getLoginSession:()=>({token:'synthetic-token'}),guardarTodo(){},saveStore(){},renderSesiones(){},renderStudents(){},estudiantes:()=>[],
    CLOUD_API_URL:'synthetic',fetch:async(url,options)=>{requests.push(JSON.parse(options.body));return {text:async()=>JSON.stringify({ok:true})}}
  });
+ const baseline={version:0,baseline:'not-synchronized'};Object.assign(c,{IERegistroAcademico:{canonical:JSON.stringify},baselineAcademica:()=>baseline,prepararVersionAcademica:async()=>true,informeSiagie:()=>({ok:true}),dirtyAcademico:()=>{}});
  const run=s=>new vm.Script(s).runInContext(c);
  run("let nivel='secundaria',areaActual='Matemática',padronBimestre='III',asisFechaActiva='2026-10-05',sesionActiva=null,notas={},renderedDates=[];function renderAsistencia(){renderedDates=getAsisFechas().slice()}");
  for(const n of ['tsDe','sliceRegistroArea','mergeRegistroPayload','asisCtxKey','asisMarkKey','asisGet','asisSet','mergeFechasAsistencia','getAsisFechas','agregarFechaAsis','borrarFechaAsis','subirRegistroNube','bajarRegistroNube'])run(extract(n));

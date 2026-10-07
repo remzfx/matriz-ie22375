@@ -27,7 +27,7 @@
   function control(record,mode,change,parent){
     const el=document.createElement(mode==='letra'?'select':'input');
     if(mode==='letra'){['','AD','A','B','C'].forEach(v=>{const opt=document.createElement('option');opt.value=v;opt.textContent=v||'—';el.appendChild(opt);});el.value=record&&record.nivel||'';}
-    else{el.type='number';el.min=0;el.max=20;el.step=1;el.value=record?(record.nota20!=null?record.nota20:grading.letterToNum(record.nivel)):'';}
+    else{el.type='number';el.min=0;el.max=20;el.step=1;el.value=record&&record.modo==='num'?(record.nota20!=null?record.nota20:record.valor):'';}
     el.setAttribute('aria-label','Calificación final o aporte');el.onchange=()=>{const raw={modo:mode,valor:el.value};change(valor(raw)||raw);};parent.appendChild(el);return el;
   }
   function editor(container,data,ctx,final){
@@ -39,17 +39,24 @@
     const message=text('p','',container),rows=text('div','',container),buttons=text('div','',container);
     function changed(id,comp,raw){draft[id]=draft[id]||{};draft[id][comp]=Object.assign({},draft[id][comp]||data.resultados[id][comp].final||{},raw);}
     function draw(){
-      rows.replaceChildren();data.estudiantes.forEach(al=>{
-        const card=text('article','',rows);text('h3',al.nombre,card);
+      rows.replaceChildren();rows.className='trans-grid-wrap';
+      const table=text('table','',rows);table.className='trans-grid';const head=text('thead','',table),hr=text('tr','',head);['N°','Estudiante','TIC','Gestiona su aprendizaje','Estado'].forEach(label=>text('th',label,hr));const tbody=text('tbody','',table);
+      data.estudiantes.forEach((al,index)=>{
+        const card=text('tr','',tbody);text('td',String(index+1),card);const student=text('th',al.nombre,card);student.className='trans-student';student.scope='row';
         Object.entries(COMP).forEach(([comp,label])=>{
-          const cell=text('div','',card);text('h4',label,cell);
           const result=data.resultados[al.id][comp],record=(draft[al.id]||{})[comp]||result.final;
+          const td=text('td','',card),cell=text('details','',td);cell.className='trans-detail';
+          const received=result.resumen.recibidos,expected=received+result.resumen.faltan.length;
+          const summary=text('summary',(record&&record.nivel||result.resumen.sugerencia||'—')+' · '+received+'/'+expected+' aportes'+(result.resumen.alerta?' · ⚠':'')+' · '+result.estado,cell);summary.setAttribute('aria-label',al.nombre+' · '+label+' · ver detalle');
+          text('h4',al.nombre+' · '+label,cell);
           {
             text('strong','Aportes de las áreas',cell);
             result.resumen.aportes.forEach(a=>{
-              text('p',a.area+': '+a.valor.valor+' → '+a.valor.nivel,cell);
+              const aporte=data.aportes.find(x=>x.area===a.area&&x.ts===a.ts);
+              text('p',a.area+' · '+(aporte&&aporte.docente||aporte&&aporte.user||'')+': '+(a.valor.modo==='num'?a.valor.valor+' → ':'')+a.valor.nivel+' · '+(a.origen==='directo'?'directo':'evidencias'),cell);
+              if(a.valor.nivel==='C')text('p','Conclusión del docente: '+(a.conclusion||'Pendiente'),cell);
               const detail=text('details','',cell);text('summary','Ver evidencias de '+a.area,detail);
-              const aporte=data.aportes.find(x=>x.area===a.area&&x.ts===a.ts),evidencia=aporte&&aporte.evidencia;
+              const evidencia=aporte&&aporte.evidencia;
               text('p','Aporte efectivo: '+a.valor.nivel+' · origen: '+(a.origen==='directo'?'nota directa':'evidencias'),detail);
               if(evidencia)(evidencia.sessions||[]).filter(s=>s.comp===comp).forEach(s=>{const g=((evidencia.grades||{})[grading.sessionKey(s)]||{})[al.id];if(g)text('p',s.fecha+' · '+s.capacidad+' · '+g.valor+' → '+g.nivel,detail);});
             });
@@ -58,12 +65,13 @@
             text('strong','Sugerencia del sistema: '+(result.resumen.sugerencia||'Sin sugerencia automática'),cell);
             if(result.resumen.alerta)text('p','⚠ Requiere revisión colegiada',cell);
             text('p','Calificación final consolidada',cell);text('p',result.estado,cell);
-            if(result.final)text('p','Decisión guardada: '+result.final.valor+' → '+result.final.nivel+' · '+result.final.justificacion,cell);
+            if(result.final)text('p','Decisión guardada: '+(result.final.modo==='num'?result.final.valor+' → ':'')+result.final.nivel+' · '+result.final.justificacion,cell);
           }
           const enabled=data.abierto&&data.puedeFinal&&!busy;
           const input=control(record,mode,raw=>changed(al.id,comp,raw),cell);input.disabled=!enabled;
           [['justificacion','Justificación de la decisión colegiada'],['conclusion','Conclusión descriptiva']].forEach(([key,label])=>{const wrap=text('label',label,cell),field=document.createElement('textarea');field.setAttribute('aria-label',label);field.placeholder=label;field.value=record&&record[key]||'';field.disabled=!enabled;field.onchange=()=>changed(al.id,comp,{[key]:field.value});wrap.appendChild(field);if(key==='conclusion')text('p','Obligatoria cuando la calificación final es C.',cell);});
         });
+        text('td',Object.keys(COMP).map(cp=>data.resultados[al.id][cp].estado).join(' · '),card);
       });
       modeEl.disabled=busy;buttons.querySelectorAll('button').forEach(b=>{b.disabled=busy||!data.abierto;});
     }
