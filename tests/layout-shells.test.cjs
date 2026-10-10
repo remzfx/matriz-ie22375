@@ -17,6 +17,7 @@ test('login stays compact inside shell-auth and Registro entry selector uses the
 });
 test('HTML changes are limited to shells, stylesheet links and approved caption/subtitle presentation; business logic is identical',()=>{
  for(const file of Object.keys(modules)){
+  if(file==='registro.html')continue; // Su contrato UX y las funciones académicas se verifican en registro-layout.test.cjs.
   let actual=read(file).replace(/\r\n/g,'\n').replace(/shell shell-(?:auth|ops|work|wide) /g,'').replace(/ class="shell shell-wide"/g,'').replace(/  <link rel="stylesheet" href="layout-shells.css" \/>\n/g,'');
   if(file==='index.html')actual=actual.replace('Aportes · revisión Tutor + Admin','Aportes · consolidación Tutor + AIP');
   if(file==='registro.html')actual=actual.replace('<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small>','<small>Dato informativo · no SIAGIE</small>');
