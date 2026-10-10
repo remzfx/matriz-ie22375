@@ -1,10 +1,10 @@
 /* Service Worker — respaldo estático versionado, siempre network-first. */
 const CACHE_PREFIX = 'matriz-ie22375-';
-const CACHE = CACHE_PREFIX + 'v13';
+const CACHE = CACHE_PREFIX + 'v14';
 const MAX_STATIC_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const PRECACHE = [
   './', './index.html', './admin.html', './primaria.html', './secundaria.html', './auxiliar.html',
-  './manifest.json', './icon-192.png', './icon-512.png',
+  './layout-shells.css', './manifest.json', './icon-192.png', './icon-512.png',
   './students.js', './matrix-teachers.js', './student-identity.js', './auxiliar-permissions.js', './login-bridge.js',
   './registro.html', './registro-academic-model.js','./conclusion-suggestions.js', './transversales.html', './transversales-client.js', './registro-evaluation.js', './registro-transversales.js', './students-migration.js', './aula_innovacion.js'
 ];

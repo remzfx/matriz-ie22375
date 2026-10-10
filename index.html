@@ -36,9 +36,10 @@
     .hub-header { padding-top: calc(12px + env(safe-area-inset-top, 28px)); }
     .hub-header .btn { width: auto; min-height: 44px; min-width: 72px; touch-action: manipulation; }
   </style>
+  <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body class="text-slate-800">
-  <div id="viewLogin" class="min-h-screen flex flex-col items-center justify-center px-4 py-10">
+  <div id="viewLogin" class="shell shell-auth min-h-screen flex flex-col items-center justify-center px-4 py-10">
     <div class="w-full max-w-sm">
       <div class="text-center mb-6">
         <img src="icon-192.png" alt="Insignia IE 22375" class="w-28 h-28 mx-auto object-contain drop-shadow-sm" onerror="this.onerror=null;this.src='apple-touch-icon.png'" />
@@ -77,7 +78,7 @@
   </div>
   <div id="viewHub" class="hidden min-h-screen">
     <header class="hub-header bg-gradient-to-r from-slate-900 to-sky-900 text-white">
-      <div class="max-w-lg mx-auto px-4 pb-4 flex items-center justify-between gap-3">
+      <div class="shell shell-ops max-w-lg mx-auto px-4 pb-4 flex items-center justify-between gap-3">
         <div class="min-w-0">
           <div class="text-[10px] font-bold tracking-widest text-sky-200">IE 22375</div>
           <div class="font-black truncate" id="hubTitulo">Panel</div>
@@ -86,7 +87,7 @@
         <button type="button" class="btn btn-ghost text-xs" style="width:auto;padding:0.5rem 0.75rem" onclick="cerrarSesion()">Salir</button>
       </div>
     </header>
-    <main class="max-w-lg mx-auto px-4 py-5 space-y-3">
+    <main class="shell shell-ops max-w-lg mx-auto px-4 py-5 space-y-3">
       <p class="text-sm text-slate-500">Seleccione el módulo:</p>
       <div id="modulos" class="grid gap-3"></div>
     </main>
@@ -431,7 +432,7 @@ function mostrarHub() {
     auxiliar: { href:'auxiliar.html', title:'Asistencia de ingreso', desc:'Puerta · QR · lista del aula', badge:'AUXILIAR' },
     wa_grupos: { href:'auxiliar.html?vista=masivo', title:'Envío masivo', desc:'Listas de asistencia a los grupos de WhatsApp', badge:'WHATSAPP' },
     aip: { href:'aula_innovacion.html', title:'Aula de innovación (AIP)', desc:'Horario mensual · competencia 28', badge:'Innovación' }
-    ,transversales: {href:'transversales.html',title:'Competencias transversales',desc:'Aportes · consolidación Tutor + AIP',badge:'SECUNDARIA'}
+    ,transversales: {href:'transversales.html',title:'Competencias transversales',desc:'Aportes · revisión Tutor + Admin',badge:'SECUNDARIA'}
   };
   const keys = modsDe(s).filter(m => catalog[m]);
   document.getElementById('modulos').innerHTML = keys.map(key => {

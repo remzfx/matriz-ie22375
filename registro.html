@@ -92,6 +92,30 @@
   .panel-fin { display:none; }
   .panel-fin.on { display:block; }
   .fin-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  @media screen {
+    .fin-panel-card { padding:10px 12px; }
+    .fin-header { margin-bottom:4px; }
+    .fin-header-main { display:flex; align-items:center; gap:6px 10px; }
+    .fin-header-context { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+    .fin-mode-info { flex:0 1 auto; min-width:0; max-width:100%; }
+    .fin-mode-info > span { display:block; padding:4px 8px; font-size:11px; line-height:1.2; border-radius:8px; overflow-wrap:anywhere; }
+    .fin-header-main .mode-toggle { flex:0 0 180px; max-width:100%; }
+    .fin-header-aux { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:3px; font-size:10px; font-weight:700; color:#64748b; }
+    @media (max-width:1023px) { .fin-header-main { flex-wrap:wrap; } }
+    @media (max-width:640px) { .fin-header-context { flex-basis:100%; } }
+    .fin-panel-card > button { margin-top:8px; }
+    .registro-datos-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .registro-datos-grid > div { min-width:0; }
+    .registro-datos-meta { display:flex; flex-wrap:wrap; gap:4px 20px; margin-top:8px; font-size:12px; overflow-wrap:anywhere; }
+    #registroDatosPanel[hidden] { display:none; }
+    #btnRegistroDatos[aria-expanded="true"] { box-shadow:inset 0 0 0 2px #0284c7; }
+    .fin-scroll-body { max-height:60vh; max-height:60dvh; overflow-x:auto; overflow-y:auto; max-width:100%; }
+    .fin-scroll-body .fin-grid thead { position:sticky; top:0; z-index:4; background:#0f172a; }
+    .fin-scroll-body .fin-grid thead th { position:static; }
+    .fin-scroll-body .fin-grid thead th.fin-nom { position:sticky; top:auto; left:0; z-index:5; }
+    @media (max-width:600px) { .registro-datos-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width:360px) { .registro-datos-grid { grid-template-columns:minmax(0,1fr); } }
+  }
   .fin-grid { width:100%; border-collapse:separate; border-spacing:0; min-width:640px; }
   .fin-grid th, .fin-grid td { border-bottom:1px solid #e2e8f0; padding:8px 6px; vertical-align:top; }
   .fin-grid thead th { background:#0f172a; color:#fff; font-size:11px; font-weight:800; position:sticky; top:0; z-index:2; }
@@ -160,6 +184,7 @@
 <script src="students.js"></script>
 <script src="student-identity.js"></script>
 <script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script><script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script>
+  <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body class="min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['primaria','secundaria','admin'];</script>
@@ -188,7 +213,7 @@
 </script>
 
 
-<div id="viewHome" class="hidden max-w-lg mx-auto p-4 min-h-screen flex flex-col justify-center">
+<div id="viewHome" class="hidden shell shell-auth max-w-lg mx-auto p-4 min-h-screen flex flex-col justify-center">
   <div class="text-center mb-6">
     <div class="text-xs font-bold tracking-widest text-sky-600">IE 22375 SANTA ROSA DE LOS MOLINOS</div>
     <h1 class="text-2xl font-black mt-1">Registro auxiliar</h1>
@@ -216,7 +241,7 @@
 
 <div id="viewApp" class="hidden">
   <header class="sticky-top mobile-safe-header bg-gradient-to-r from-slate-900 to-sky-900 text-white" id="appHdr">
-    <div class="max-w-3xl mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
+    <div class="shell shell-work max-w-3xl mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
       <div class="min-w-0">
         <div class="text-[10px] font-bold tracking-widest text-sky-200">REGISTRO AUXILIAR</div>
         <div class="font-black leading-tight truncate" id="hdrTitulo">—</div>
@@ -238,9 +263,10 @@
   </header>
 
   <div class="ctx-bar">
-    <div class="max-w-3xl mx-auto px-3">
-      <div class="card p-3">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+    <div class="shell shell-work max-w-3xl mx-auto px-3">
+      <button type="button" id="btnRegistroDatos" class="btn btn-ghost text-xs my-2" aria-controls="registroDatosPanel" aria-expanded="true" onclick="alternarDatosRegistro()">DATOS ▾</button>
+      <div id="registroDatosPanel" class="card p-3">
+        <div class="registro-datos-grid">
           <div>
             <label class="text-[10px] font-bold text-slate-500">Bimestre</label>
             <select id="selBim" onchange="cambiarBimestreRegistro()"></select>
@@ -253,20 +279,17 @@
             <label class="text-[10px] font-bold text-slate-500">Sección</label>
             <select id="selSeccion" onchange="onContexto()"></select>
           </div>
-          <div>
-            <label class="text-[10px] font-bold text-slate-500">Estudiantes</label>
-            <div class="font-black text-xl px-1 pt-1" id="lblN">0</div>
-          </div>
         </div>
-        <div class="mt-2">
-          <label class="text-[10px] font-bold text-slate-500">Docente responsable</label>
-          <input id="inpDocente" placeholder="Apellidos y nombres del docente" onchange="guardarMeta()">
+        <div class="registro-datos-meta">
+          <span>Docente responsable: <strong id="lblDocenteResponsable">—</strong></span>
+          <span>Estudiantes: <strong id="lblN">0</strong></span>
+          <input type="hidden" id="inpDocente">
         </div>
       </div>
     </div>
   </div>
 
-  <main class="max-w-3xl mx-auto px-3 py-3 space-y-3" style="padding-bottom:110px">
+  <main class="shell shell-work max-w-3xl mx-auto px-3 py-3 space-y-3" style="padding-bottom:110px">
 
     <div id="registroTransAviso" hidden><p id="registroTransStatus" role="status" class="text-sm"></p><button type="button" class="btn" onclick="IERegistroTransversales.load(true)">Reintentar / revisar aportes transversales</button></div>
     <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
@@ -287,22 +310,25 @@
 
     <!-- PANEL PROMEDIOS DIRECTOS -->
     <div class="panel-fin" id="panelFinales">
-      <div class="card p-3 space-y-3">
-        <div>
-          <div class="flex items-start justify-between gap-2">
-            <div>
+      <div class="card fin-panel-card">
+        <header class="fin-header">
+          <div class="fin-header-main">
+            <div class="fin-header-context">
               <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
             </div>
-            <div class="mode-toggle" style="min-width:180px">
+            <div class="fin-mode-info" id="finModeInfo"></div>
+            <div class="mode-toggle">
               <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
               <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
             </div>
           </div>
-          <p class="text-[11px] text-slate-500 mt-1">Por alumno: si escribes aquí, esta nota manda. Si no, se usa Calificar.</p>
-        </div>
-        <div class="flex flex-wrap gap-2 text-[11px] font-bold" id="finResumen"></div>
-        <a href="transversales.html" id="registroTutorLink" hidden>Consolidar competencias transversales</a><div id="finLista" class="fin-wrap"></div>
+          <div class="fin-header-aux">
+            <div id="finResumen"></div>
+            <a href="transversales.html" id="registroTutorLink" hidden>Consolidar competencias transversales</a>
+          </div>
+        </header>
+        <div id="finLista" class="fin-wrap fin-scroll-body"></div>
         <button type="button" class="btn btn-primary w-full text-sm" data-reg-write onclick="guardarRegistroIntegrado(true)">Guardar promedios</button>
       </div>
     </div>
@@ -418,7 +444,7 @@
   </main>
 
   <div class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
-    <div class="max-w-3xl mx-auto px-3 py-2 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between text-xs font-bold">
+    <div class="shell shell-work max-w-3xl mx-auto px-3 py-2 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between text-xs font-bold">
       <div class="flex gap-1.5 flex-wrap">
         <span class="px-2 py-1 rounded-lg bg-red-50 text-red-700">C <span id="cC">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-700">B <span id="cB">0</span></span>
@@ -879,6 +905,7 @@ function retirarVerificacionNube(token, bimestre, respuesta) {
   estadoPadron(rechazo ? 'El servidor rechazó la autorización. Vuelve a iniciar sesión; tus notas locales se conservan.' : 'Nube pendiente. Verifica el servidor con Reintentar antes de volver a subir.',true);
 }
 function sincronizarEdicionRegistro() {
+  if (typeof sincronizarDatosRegistro === 'function') sincronizarDatosRegistro();
   const main = document.querySelector('main');
   if (!main) return;
   main.inert = false;
@@ -1146,6 +1173,24 @@ function docenteAsignadoAdmin() {
   return nombres.join(' / ');
 }
 
+let datosRegistroEleccion = null;
+function pintarEstadoDatosRegistro(abierto) {
+  const panel=document.getElementById('registroDatosPanel'),boton=document.getElementById('btnRegistroDatos');
+  if (!panel || !boton) return;
+  panel.hidden=!abierto;boton.setAttribute('aria-expanded',String(abierto));boton.textContent='DATOS '+(abierto?'▾':'▸');
+}
+function alternarDatosRegistro() {
+  const panel=document.getElementById('registroDatosPanel');if(!panel)return;
+  datosRegistroEleccion=panel.hidden;pintarEstadoDatosRegistro(datosRegistroEleccion);
+}
+function sincronizarDatosRegistro() {
+  const completo=nivel&&areaActual&&['selBim','selGrado','selSeccion'].every(id=>{const el=document.getElementById(id);return el&&el.value;})&&!registroSoloLectura()&&estudiantes().length>0;
+  pintarEstadoDatosRegistro(!completo||datosRegistroEleccion===true);
+}
+function pintarDocenteResponsable() {
+  const inp=document.getElementById('inpDocente'),label=document.getElementById('lblDocenteResponsable');
+  if(label)label.textContent=inp&&inp.value||'—';
+}
 function actualizarDocenteResponsable() {
   const inp = document.getElementById('inpDocente');
   if (!inp || !nivel || !areaActual) return;
@@ -1158,6 +1203,7 @@ function actualizarDocenteResponsable() {
     inp.readOnly = true;
     inp.style.background = '#f1f5f9';
     inp.title = 'Definido por administración';
+    pintarDocenteResponsable();
     return;
   }
 
@@ -1169,14 +1215,16 @@ function actualizarDocenteResponsable() {
     inp.readOnly = true;
     inp.style.background = '#f1f5f9';
     inp.title = 'Definido en Admin · Docentes y accesos';
+    pintarDocenteResponsable();
     return;
   }
 
   const meta = store.meta && store.meta[mk];
   const previo = (meta && typeof meta === 'object') ? meta.docente : meta;
   inp.value = nombreDocenteTexto(previo);
-  inp.readOnly = false;
+  inp.readOnly = true;
   inp.style.background = '#fff';
+  pintarDocenteResponsable();
 }
 
 /** Nivel permitido: primaria | secundaria | admin | null */
@@ -1467,6 +1515,7 @@ function updateHdr() {
   document.getElementById('hdrTitulo').textContent = (nivel==='primaria'?'Primaria':'Secundaria') + ' · ' + g + '° ' + s;
   document.getElementById('hdrSub').textContent = 'Bimestre ' + b + (areaActual ? ' · ' + areaActual : '');
   document.getElementById('lblN').textContent = estudiantes().length;
+  if (typeof sincronizarDatosRegistro === 'function') sincronizarDatosRegistro();
   fixHdrHeight();
   const ses=getLoginSession(),aviso=document.getElementById('registroTransAviso');if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.syncStatus();else if(aviso)aviso.hidden=true;
   const link=document.getElementById('registroTutorLink');if(link)link.hidden=!(nivel==='secundaria'&&ses&&(ses.tutorAulas||[]).includes(aulaKey(g,s)));
@@ -2550,14 +2599,15 @@ function renderFinales() {
   const comps = competencias();
   const box = document.getElementById('finLista');
   const res = document.getElementById('finResumen');
+  const modeInfo = document.getElementById('finModeInfo');
   const bloqueado = bimCerradoDocente();
   const alumnos = estudiantes();
-  if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; return; }
+  if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; modeInfo.innerHTML=''; return; }
 
   const capsPor = {};
   comps.forEach(cp => { capsPor[cp] = capsDeComp(cp); });
 
-  res.innerHTML = (bloqueado
+  modeInfo.innerHTML = (bloqueado
     ? '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>'
     : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">'+(modoCalif==='letra'?'Letras':'0–20')+' · Promedio directo prevalece sobre evidencias</span>');
 
@@ -2605,12 +2655,7 @@ function renderFinales() {
   }).join('');
 
   box.innerHTML = '<table class="fin-grid"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table>';
-  res.innerHTML += '<div class="w-full flex flex-wrap gap-2 mt-1">' +
-    '<span class="px-2 py-1 rounded-lg bg-slate-50">Celdas '+cV+'/'+cTot+'</span>' +
-    '<span class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800">AD '+cAD+'</span>' +
-    '<span class="px-2 py-1 rounded-lg bg-green-50 text-green-800">A '+cA+'</span>' +
-    '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">B '+cB+'</span>' +
-    '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">C '+cC+'</span></div>';
+  res.innerHTML = '<span>Celdas '+cV+'/'+cTot+'</span>';
 
   box.querySelectorAll('.fin-nota').forEach(inp => {
     inp.addEventListener('change', function() {
@@ -2904,8 +2949,8 @@ function promedioNums(arr) {
 function renderAvance() {
  const box=document.getElementById('avanceBox'),c=ctxBase(),comps=competencias(),lock=bimCerradoDocente();document.getElementById('lblAvanceCtx').textContent=c.area+' · Bim '+c.bim;
  const esc=x=>String(x||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- let html='<div class="fin-wrap"><table class="fin-grid"><thead><tr><th>Estudiante</th>'+comps.map(cp=>'<th>'+esc(cp)+'</th>').join('')+'<th>Promedio referencial<small>Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
- estudiantes().forEach(al=>{const id=studentKey(al);html+='<tr><th>'+esc(al.nombre)+'</th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td>No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id),f=leerNota(store.finales,finalKey(cp,id))||{},txt=concCompAlumno(cp,id);html+='<td><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+esc(d.letra||'Pendiente')+'</span><small>'+(d.src==='P'?'Directo':d.src==='C'?'Evidencias':'')+'</small></div>'+(d.letra==='C'?'<label>Conclusión descriptiva · Obligatoria para C'+(typeof IEConclusionSuggestions!=='undefined'?IEConclusionSuggestions.html(cp):'')+'<textarea class="academic-conclusion" data-id="'+encodeURIComponent(id)+'" data-comp="'+encodeURIComponent(cp)+'" maxlength="2000" required '+(lock?'readonly':'')+'>'+esc(txt)+'</textarea></label>':txt?'<small>Conclusión conservada como borrador (no vigente)</small>':'')+'</td>';});const r=promReferencialAlumno(id);html+='<td>'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>';
+ let html='<div class="fin-wrap fin-scroll-body"><table class="fin-grid"><thead><tr><th class="fin-nom">Estudiante</th>'+comps.map(cp=>'<th>'+esc(cp)+'</th>').join('')+'<th>Promedio referencial<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
+ estudiantes().forEach(al=>{const id=studentKey(al);html+='<tr><th class="fin-nom">'+esc(al.nombre)+'</th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td>No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id),f=leerNota(store.finales,finalKey(cp,id))||{},txt=concCompAlumno(cp,id);html+='<td><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+esc(d.letra||'Pendiente')+'</span><small>'+(d.src==='P'?'Directo':d.src==='C'?'Evidencias':'')+'</small></div>'+(d.letra==='C'?'<label>Conclusión descriptiva · Obligatoria para C'+(typeof IEConclusionSuggestions!=='undefined'?IEConclusionSuggestions.html(cp):'')+'<textarea class="academic-conclusion" data-id="'+encodeURIComponent(id)+'" data-comp="'+encodeURIComponent(cp)+'" maxlength="2000" required '+(lock?'readonly':'')+'>'+esc(txt)+'</textarea></label>':txt?'<small>Conclusión conservada como borrador (no vigente)</small>':'')+'</td>';});const r=promReferencialAlumno(id);html+='<td>'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>';
  box.querySelectorAll('.academic-conclusion').forEach(el=>el.oninput=()=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value));if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);if(typeof IEConclusionSuggestions!=='undefined')IEConclusionSuggestions.bind(box);sincronizarEdicionRegistro();
 }
 

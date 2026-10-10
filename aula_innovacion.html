@@ -49,10 +49,11 @@
     @page { size: landscape; margin: 8mm; }
   }
 </style>
+  <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body>
 <header class="sticky-top mobile-safe-header bg-gradient-to-r from-slate-900 to-emerald-900 text-white no-print">
-  <div class="mobile-aip-row max-w-6xl mx-auto px-3 py-3 flex items-center justify-between gap-2">
+  <div class="mobile-aip-row shell shell-wide max-w-6xl mx-auto px-3 py-3 flex items-center justify-between gap-2">
     <div>
       <div class="text-[10px] font-bold tracking-widest text-emerald-200">IE 22375 · PIP</div>
       <div class="font-black">Aula de Innovación · Competencia 28</div>
@@ -70,7 +71,7 @@
   <div id="printMesTit" style="font-size:12px;margin-top:2px"></div>
   <div style="font-size:10px">PIP · Horario de ingreso al aula de innovación</div>
 </div>
-<main class="max-w-6xl mx-auto px-3 py-4 space-y-3">
+<main class="shell shell-wide max-w-6xl mx-auto px-3 py-4 space-y-3">
   <div class="no-print flex flex-wrap gap-2">
     <button type="button" class="aip-tab on" id="tabBtnMes" onclick="showAipTab('mes')">Plan del mes</button>
     <button type="button" class="aip-tab" id="tabBtnHs" onclick="showAipTab('hs')">Horario de docentes</button>
