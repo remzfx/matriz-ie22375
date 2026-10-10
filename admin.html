@@ -50,6 +50,7 @@
 <script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script>
 <script src="student-identity.js"></script>
 <script src="registro-evaluation.js"></script><script src="transversales-client.js"></script>
+  <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['admin'];</script>
@@ -81,7 +82,7 @@
 <!-- APP -->
 <div id="screenApp" class="screen">
   <header class="mobile-safe-header bg-gradient-to-r from-slate-900 to-sky-900 text-white sticky top-0 z-20">
-    <div class="mobile-top-row max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+    <div class="mobile-top-row shell shell-wide max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
       <div>
         <div class="text-[10px] font-bold tracking-widest text-sky-200">ADMIN · IE 22375</div>
         <div class="font-black text-lg leading-tight">Registro auxiliar</div>
@@ -92,7 +93,7 @@
         <button class="btn btn-ghost text-xs !py-1.5 !px-3" onclick="logout()">Salir</button>
       </div>
     </div>
-    <nav class="mobile-nav-scroll max-w-5xl mx-auto px-4 pb-3 flex flex-wrap gap-2">
+    <nav class="mobile-nav-scroll shell shell-wide max-w-5xl mx-auto px-4 pb-3 flex flex-wrap gap-2">
       <button class="navbtn chip chip-on" data-tab="menu" onclick="showTab('menu')">Menú</button>
       <button class="navbtn chip chip-off" data-tab="bd" onclick="showTab('bd')">Estudiantes</button>
       <button class="navbtn chip chip-off" data-tab="periodos" onclick="showTab('periodos')">Bimestres</button>
@@ -108,7 +109,7 @@
     </nav>
   </header>
 
-  <main class="max-w-5xl mx-auto px-4 py-4 space-y-4">
+  <main class="shell shell-wide max-w-5xl mx-auto px-4 py-4 space-y-4">
     <p id="bdEstado" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
 
     <!-- MENU -->

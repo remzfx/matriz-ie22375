@@ -55,6 +55,7 @@
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
   <script src="auxiliar-permissions.js"></script>
+  <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body>
 <script>
@@ -77,7 +78,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
 </script>
 
 <header class="app-header bg-gradient-to-r from-slate-900 to-teal-800 text-white sticky top-0 z-30">
-  <div class="max-w-lg mx-auto px-4 pb-3 flex items-start justify-between gap-3">
+  <div class="shell shell-ops max-w-lg mx-auto px-4 pb-3 flex items-start justify-between gap-3">
     <div class="min-w-0 flex-1 pr-2">
       <div class="text-[10px] font-bold tracking-widest text-teal-200">IE 22375 · AUXILIAR</div>
       <div class="font-black leading-tight" id="tituloModulo">Asistencia de ingreso</div>
@@ -87,12 +88,12 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
   </div>
 </header>
 
-<div class="max-w-lg mx-auto px-4 pt-4">
+<div class="shell shell-ops max-w-lg mx-auto px-4 pt-4">
   <p id="studentsStatus" role="status" class="text-sm text-sky-800">Cargando estudiantes…</p>
   <button id="studentsRetry" class="btn" hidden onclick="ensureBD().catch(function(){})">Reintentar</button>
   <a id="studentsRelogin" class="btn" href="index.html" hidden>Volver a iniciar sesión</a>
 </div>
-<main id="vistaAsis" class="max-w-lg mx-auto px-4 py-4 space-y-3">
+<main id="vistaAsis" class="shell shell-ops max-w-lg mx-auto px-4 py-4 space-y-3">
   <div class="card p-3 space-y-3">
     <div id="scanBox" class="space-y-2">
       <div id="reader"></div>
@@ -155,7 +156,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
   </p>
 </main>
 
-<main id="vistaGrupos" class="hidden max-w-lg mx-auto px-4 py-4 space-y-3">
+<main id="vistaGrupos" class="hidden shell shell-ops max-w-lg mx-auto px-4 py-4 space-y-3">
   <div class="card p-3 space-y-3">
     <h2 class="font-black">Envío masivo</h2>
     <p class="text-xs text-slate-500">Aulas con asistencia marcada. Al tocar un salón se copia la lista y se abre su grupo.</p>
