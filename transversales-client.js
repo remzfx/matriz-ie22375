@@ -73,11 +73,12 @@
         });
         text('td',result.resumen.sugerencia||'Sin sugerencia',card);
         const finalCell=text('td','',card),conclusionCell=text('td','',card);
-        if(!data.puedeFinal){text('p',record?record.nivel:'Pendiente',finalCell);if(record&&record.conclusion)text('p','Conclusión del Tutor: '+record.conclusion,conclusionCell);return;}
+        if(!data.puedeFinal){text('p',record?record.nivel:'Pendiente',finalCell);if(record&&record.nivel==='C'&&record.conclusion)text('p','Conclusión del Tutor: '+record.conclusion,conclusionCell);return;}
         const enabled=data.abierto&&!busy&&token===global.IEStudents.validToken();
         const input=control(record,mode,raw=>changed(al.id,comp,raw),finalCell);input.disabled=!enabled;
         const reason=text('details','',finalCell);text('summary','Justificación'+(result.resumen.empate||result.resumen.dispersion||!result.resumen.sugerencia||record&&record.nivel!==result.resumen.sugerencia?' · Obligatoria':''),reason);const reasonField=text('textarea','',reason);reasonField.placeholder='Justificación de la decisión del Tutor';reasonField.setAttribute('aria-label','Justificación de la decisión del Tutor');reasonField.value=record&&record.justificacion||'';reasonField.disabled=!enabled;reasonField.oninput=()=>changed(al.id,comp,{justificacion:reasonField.value});
-        const wrap=text('label','Conclusión descriptiva'+(record&&record.nivel==='C'?' · Obligatoria para C':''),conclusionCell),field=text('textarea','',wrap);field.setAttribute('aria-label','Conclusión descriptiva');field.placeholder='Conclusión descriptiva';field.maxLength=2000;field.value=record&&record.conclusion||'';field.disabled=!enabled;field.oninput=()=>changed(al.id,comp,{conclusion:field.value});
+        if(!record||record.nivel!=='C'){text('p','No requerida',conclusionCell);return;}
+        const wrap=text('label','Conclusión descriptiva · Obligatoria',conclusionCell),field=text('textarea','',wrap);field.setAttribute('aria-label','Conclusión descriptiva');field.placeholder='Conclusión descriptiva';field.maxLength=2000;field.value=record&&record.conclusion||'';field.disabled=!enabled;field.oninput=()=>changed(al.id,comp,{conclusion:field.value});
         if(global.IEConclusionSuggestions)global.IEConclusionSuggestions.mount(field,COMP[comp]);
       });
       modeEl.disabled=busy;buttons.querySelectorAll('button').forEach(b=>{b.disabled=busy||!data.abierto||(b.dataset.process&&!procesable());});
