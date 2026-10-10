@@ -25,3 +25,38 @@ function adminLoadFixture(){
 test('Diagnostic confirms forceNetwork is ignored and late server response can replace edits made during cache-first load',async()=>{const f=adminLoadFixture(),task=f.c.cargarEstudiantesAdmin({forceNetwork:true});assert.deepEqual(f.args(),[]);f.c.estado.primaria.estudiantes[0].nombre='Synthetic pending edit';f.c.bdPendiente=true;f.resolve(base());await task;assert.equal(f.c.bdPendiente,false);assert.equal(f.c.estado.primaria.estudiantes[0].nombre,'Synthetic p');});
 
 test('Verification preserves a selected CSV independently of the other level',async()=>{const f=fixture();await f.api.importar(file,'primaria');f.c.IEStudents.inspect=async()=>base();await f.api.verificar();assert.match(f.el('migracionPreview-primaria').textContent,/Synthetic SIAGIE/);assert.match(f.el('migracionPreview-secundaria').textContent,/Synthetic s/);assert.equal(f.calls.length,0);});
+
+test('Management includes every institutional icon as a decorative uniform inline SVG',()=>{
+ const html=read('admin.html'),panel=html.slice(html.indexOf('<!-- IMPORT -->'),html.indexOf('<!-- PERIODOS -->'));
+ for(const name of ['users-round','database','school','graduation-cap','server','refresh-cw','file-up','file-spreadsheet','list-checks','shield-check','calendar-days','settings','alert-triangle']){
+  const svg=panel.match(new RegExp('<svg[^>]*data-students-icon="'+name+'"[^>]*>'));
+  assert.ok(svg,name);
+  for(const attribute of ['viewBox="0 0 24 24"','fill="none"','stroke="currentColor"','stroke-width="2"','aria-hidden="true"','focusable="false"'])assert.ok(svg[0].includes(attribute),name+' '+attribute);
+ }
+ assert.doesNotMatch(panel,/<(?:img|script)\b|<use\b/i);
+});
+test('Indicator icons sit outside replaceable values and refresh button retains accessible text and handler',()=>{
+ const html=read('admin.html');
+ for(const [id,name,label] of [['gestionPrimaria','school','Primaria'],['gestionSecundaria','graduation-cap','Secundaria'],['gestionServidor','server','Servidor']]){
+  assert.match(html,new RegExp('<span class="students-indicator-label"><svg[^>]*data-students-icon="'+name+'"[^>]*>[\\s\\S]*?</svg>'+label+'</span><strong id="'+id+'"[^>]*>No verificado</strong>'));
+  const f=fixture();f.api.mostrarBase(base(),true);assert.match(f.el(id).textContent,id==='gestionServidor'?/Verificado/:/1 estudiantes/);
+ }
+ const button=html.match(/<button[^>]*onclick="cargarEstudiantesAdmin\(\{forceNetwork:true\}\)"[^>]*>([\s\S]*?)<\/button>/);
+ assert.ok(button);assert.match(button[1],/data-students-icon="refresh-cw"/);assert.match(button[1],/<span>Actualizar consulta<\/span>/);
+});
+test('Icon layout remains scoped, fixed size and flexible for mobile without external dependencies',()=>{
+ const html=read('admin.html');
+ assert.match(html,/\.students-management \.students-icon\{width:20px;height:20px;flex:0 0 20px;color:#0284c7/);
+ assert.match(html,/\.students-management \.students-icon-heading\{width:22px;height:22px/);
+ assert.match(html,/\.students-management \.students-icon-title\{width:24px;height:24px/);
+ assert.match(html,/\.students-management \.students-icon-secondary\{color:#64748b/);
+ assert.match(html,/\.students-management \.students-with-icon\{display:flex;align-items:center;gap:8px;min-width:0/);
+ assert.match(html,/\.students-management \.students-icon-button\{[^}]*max-width:100%;white-space:normal/);
+ assert.match(html,/summary>\.students-with-icon\{display:inline-flex;max-width:calc\(100% - 24px\)/);
+ assert.match(html,/@media\(max-width:640px\)\{\.students-indicators,\.students-file-grid\{grid-template-columns:minmax\(0,1fr\)/);
+});
+test('Warning icons accompany existing warning text without turning it into an editable control',()=>{
+ const html=read('admin.html'),warnings=[...html.matchAll(/<p class="students-help students-warning">([\s\S]*?)<\/p>/g)];
+ assert.equal(warnings.length,2);
+ for(const [,body] of warnings){assert.match(body,/data-students-icon="alert-triangle"/);assert.match(body,/<span>/);assert.doesNotMatch(body,/<(?:input|button|select)\b/);}
+});
