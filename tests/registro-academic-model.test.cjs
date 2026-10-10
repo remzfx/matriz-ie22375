@@ -96,7 +96,7 @@ test('Compact cross CSS isolates desktop/mobile sizes and retains fixed grade/co
 
 test('Dark compact square changes CSS only; removal markup, inline behavior and layout stay identical',()=>{
  const html=read('registro.html'),old=require('node:child_process').execFileSync('git',['show','48f909b5e962d7cc4e5d268fb93a1f13fef0b17d:registro.html'],{encoding:'utf8',maxBuffer:4*1024*1024});
- const withoutCrossStyles=x=>x.replace(/\.final-grade \.fin-clear-direct[^{}]*\{[^}]*\}/g,'').replace(/\r\n/g,'\n');assert.equal(withoutCrossStyles(html),withoutCrossStyles(old));
+ const withoutCrossStyles=x=>x.replace(/\.final-grade \.fin-clear-direct[^{}]*\{[^}]*\}/g,'').replace(/  \.fin-grid td\.summary-competence\{[^}]*\}\r?\n/g,'').replaceAll('<td class="summary-competence">','<td>').replace(/\r\n/g,'\n');assert.equal(withoutCrossStyles(html),withoutCrossStyles(old));
  const css=html.match(/\.final-grade \.fin-clear-direct\{[^}]*\}/)[0];assert.match(css,/align-items:center;justify-content:center;align-self:center/);assert.match(css,/margin:2px 0 0;padding:0/);assert.doesNotMatch(css,/#fff1f2|#be123c|50%/);
  assert.match(html,/fin-clear-direct:hover\{background:#334155;border-color:#334155/);assert.match(html,/fin-clear-direct:focus-visible\{outline:2px solid #334155;outline-offset:2px/);
 });

@@ -39,3 +39,13 @@ test('Printed summary retains student/reference classes and border even without 
 test('Order fallback stays readable without mutating the protected roster',()=>{
  const f=ui(),student={idSiagie:'orderless',nombre:'Synthetic orderless name'},before=JSON.stringify(student);f.c.estudiantes=()=>[student];f.c.renderAvance();assert.match(f.el('avanceBox').innerHTML,/summary-student-order">1<\/span>/);assert.equal(JSON.stringify(student),before);
 });
+
+for(const mode of ['letra','num'])for(const [note,level] of [[18,'AD'],[15,'A'],[12,'B'],[8,'C'],[null,'Pendiente']])test('Summary '+mode+' '+level+' uses centered competence cell without changing result',()=>{
+ const f=ui();f.c.modoCalif=mode;if(note!==null)f.grade(f.comps[0],note);const before=JSON.stringify(f.c.store);f.c.renderAvance();const cell=f.el('avanceBox').innerHTML.match(/<td class="summary-competence">([\s\S]*?)<\/td>/);assert.ok(cell);assert.ok(cell[1].includes('<span>'+level+'</span>'));if(mode==='num'&&note!==null)assert.ok(cell[1].includes('<strong>'+note+' → </strong>'));assert.equal((f.el('avanceBox').innerHTML.match(/<td class="summary-competence">/g)||[]).length,f.comps.length);assert.equal(JSON.stringify(f.c.store),before);assert.equal(f.calls.length,0);
+});
+test('Not-worked and pending results share middle/center alignment with reference, without widening rows',()=>{const f=ui();f.c.setCompetenciaTrabajada(f.comps[0],false);const before=JSON.stringify(f.c.store);f.c.renderAvance();assert.match(f.el('avanceBox').innerHTML,/<td class="summary-competence">No trabajada este bimestre<\/td>/);assert.match(css('.fin-grid td.summary-competence'),/vertical-align:middle;text-align:center/);assert.doesNotMatch(css('.fin-grid td.summary-competence'),/width|height|padding|font-size|overflow/);assert.equal(JSON.stringify(f.c.store),before);});
+test('Print copies centered competence classes, preserving A4 print function and all other presentation',()=>{
+ const f=ui();f.grade(f.comps[0],15);f.c.print=()=>{};const start=html.indexOf('function imprimirResumen()');vm.runInContext(html.slice(start,html.indexOf('\n}',start)+2),f.c);f.c.imprimirResumen();assert.match(f.el('printArea').innerHTML,/<td class="summary-competence">/);
+ const old=require('node:child_process').execFileSync('git',['show','8726757011c8c259667741791b60644b20247053:registro.html'],{encoding:'utf8',maxBuffer:4*1024*1024});
+ const normalized=x=>x.replace(/\r\n/g,'\n');const restored=normalized(html).replace('  .fin-grid td.summary-competence{vertical-align:middle;text-align:center;}\n','').replaceAll('<td class="summary-competence">','<td>');assert.equal(restored,normalized(old));
+});

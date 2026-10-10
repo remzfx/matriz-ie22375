@@ -160,6 +160,7 @@
   .fin-grid th.summary-student,.fin-grid th.summary-student-header{text-align:left;padding-left:12px;padding-right:12px;width:200px;min-width:180px;max-width:240px;white-space:normal;overflow-wrap:anywhere;}
   .summary-student-order,.summary-student-name{display:block;text-align:left;white-space:normal;}
   .summary-student-order{font-size:10px;font-weight:400;color:#64748b;}
+  .fin-grid td.summary-competence{vertical-align:middle;text-align:center;}
   .fin-grid .summary-reference{text-align:center;vertical-align:middle;width:160px;min-width:150px;max-width:180px;background:#f0f7ff;color:#334155;border-left:2px solid #cbd5e1;overflow-wrap:anywhere;}
   .asis-chip {
     display:inline-flex; align-items:center; justify-content:center;
@@ -3024,7 +3025,7 @@ function estadisticaResumenHTML(){const s=IERegistroAcademico.statistics(estudia
 function renderAvance() {
  const box=document.getElementById('avanceBox'),c=ctxBase(),comps=competencias();document.getElementById('lblAvanceCtx').textContent=c.area+' · Bim '+c.bim;
  let html='<div class="fin-wrap fin-scroll-body"><table class="fin-grid"><thead><tr><th class="fin-nom summary-student-header">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'<th class="summary-reference">Promedio referencial<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
- estudiantes().forEach((al,i)=>{const id=studentKey(al);html+='<tr><th class="fin-nom summary-student"><span class="summary-student-order">'+escapeRegistro(al.orden??i+1)+'</span><span class="summary-student-name">'+escapeRegistro(al.nombre)+'</span></th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td>No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id);html+='<td><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+escapeRegistro(d.letra||'Pendiente')+'</span></div></td>';});const r=promReferencialAlumno(id);html+='<td class="summary-reference">'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>'+estadisticaResumenHTML();
+ estudiantes().forEach((al,i)=>{const id=studentKey(al);html+='<tr><th class="fin-nom summary-student"><span class="summary-student-order">'+escapeRegistro(al.orden??i+1)+'</span><span class="summary-student-name">'+escapeRegistro(al.nombre)+'</span></th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td class="summary-competence">No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id);html+='<td class="summary-competence"><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+escapeRegistro(d.letra||'Pendiente')+'</span></div></td>';});const r=promReferencialAlumno(id);html+='<td class="summary-reference">'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>'+estadisticaResumenHTML();
  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
 }
 function imprimirResumen(){
