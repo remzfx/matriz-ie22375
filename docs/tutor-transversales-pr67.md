@@ -18,7 +18,7 @@ El Tutor abre **COMPETENCIAS TRANSVERSALES** junto a las áreas de Registro. Es 
 
 El Tutor ve todos los docentes/áreas habilitados, incluyendo su propio aporte solo si está asignado. Se conserva `transversalResumen_`: un voto completo efectivo por área (el más reciente), mayoría AD/A/B/C y empate sin sugerencia. La sugerencia no es oficial. Una C docente sin conclusión se muestra pendiente y no cuenta como voto completo; las conclusiones textuales nunca se promedian.
 
-El Tutor guarda decisiones finales independientes y pulsa **ENVIAR AL REGISTRO OFICIAL**. Las dos decisiones de cada estudiante deben existir y utilizar la versión vigente de aportes; toda C final necesita una conclusión específica editable, sugerida o personalizada. AD/A/B no la requieren. El Tutor puede decidir con aportes faltantes mediante la justificación existente: la obligación de aportar se exige al docente habilitado al enviar su área, no se transforma en una prohibición de decisión del Tutor.
+El Tutor guarda decisiones finales independientes y pulsa **ENVIAR AL REGISTRO OFICIAL**. Las dos decisiones de cada estudiante deben existir y utilizar la versión vigente de aportes; toda C final necesita una conclusión específica editable, sugerida o personalizada. AD/A/B no la requieren. El Tutor puede guardar borradores con aportes faltantes mediante la justificación existente. El envío oficial exige, para cada estudiante del padrón privado y ambas competencias, un aporte completo de cada docente/área/aula habilitado por Admin; una C docente necesita su propia conclusión. Los docentes no habilitados no bloquean. El backend verifica esta condición antes de emitir el snapshot y comunica los pendientes para deshabilitar el envío en la interfaz.
 
 ## Almacenamiento y compatibilidad
 

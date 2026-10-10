@@ -3,7 +3,7 @@ const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8'),clone=x=>JSON.
 const {fixture,client}=new Function('require','__dirname',source.split('\ntest(')[0]+'\nreturn {fixture,client};')(require,__dirname);
 const ui=new Function('require','__dirname',read('tests/registro-transversales-integracion.test.cjs').split('\ntest(')[0]+'\nreturn ui;')(require,__dirname);
 function config(s){s.tables.get('DocentesAcceso').rows[1][2]=JSON.stringify(s.docs);s.cacheEntries.clear();}
-function official(s=fixture()){s.final('math','A');assert.equal(s.confirm('math','procesartransversales').ok,true);return s;}
+function official(s=fixture()){s.complete();s.final('math','A');assert.equal(s.confirm('math','procesartransversales').ok,true);return s;}
 function extract(file,name){const src=read(file),i=src.indexOf('function '+name+'(');return src.slice(i,src.indexOf('\n}',i)+2);}
 
 test('A teacher may tutor multiple classrooms without teaching academic areas in all of them',()=>{
@@ -39,13 +39,13 @@ test('Assigned Tutor own area and every other assigned teacher remain visible; s
  const s=fixture();s.docs.push({user:'math2',nombre:'Synthetic Math 2',nivel:'secundaria',asignaciones:{'Matemática':['2|A']},aportesTransversales:{'Matemática':['2|A']}});config(s);s.aporte('math','A');s.aporte('communication','B');s.aporte('math2','AD');const out=s.load('math');assert.equal(out.aportes.length,3);assert.equal(out.resultados[s.id].tic.resumen.recibidos,2);assert.equal(out.resultados[s.id].tic.resumen.conteo.AD,1);
 });
 test('Removing assignment excludes old contribution without deleting history and invalidates snapshot',()=>{
- const s=fixture();s.aporte('communication','B');official(s);const rows=JSON.stringify(s.tables.get('TransversalesAportes').rows);delete s.docs[2].aportesTransversales;config(s);const out=s.load('math');assert.equal(out.exportable,false);assert.equal(out.aportes.length,0);assert.ok(!out.resultados[s.id].tic.resumen.sinAporte.includes('Comunicación'));assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),rows);
+ const s=fixture();s.aporte('communication','B');official(s);const rows=JSON.stringify(s.tables.get('TransversalesAportes').rows);delete s.docs[2].aportesTransversales;config(s);const out=s.load('math');assert.equal(out.exportable,false);assert.ok(!out.aportes.some(a=>a.area==='Comunicación'));assert.ok(!out.resultados[s.id].tic.resumen.sinAporte.includes('Comunicación'));assert.equal(JSON.stringify(s.tables.get('TransversalesAportes').rows),rows);
 });
 test('Server rejects contribution assignment outside actual academic area/class',()=>{
  for(const map of [{'Matemática':['2|B']},{'Comunicación':['2|A']},{'Competencias Transversales':['2|A']}]){const s=fixture();s.docs[1].aportesTransversales=map;assert.equal(s.post({action:'savedoc',token:s.admin,docentes:s.docs}).ok,false);}
 });
 for(const level of ['AD','A','B','C'])test('Tutor official '+level+' has conclusion requirement only for C',()=>{
- const s=fixture();s.final('math',level);const out=s.confirm('math','procesartransversales');assert.equal(out.ok,level!=='C');if(level==='C'){s.final('math','C',undefined,undefined,'Synthetic personalized conclusion');assert.equal(s.confirm('math','procesartransversales').ok,true);}
+ const s=fixture();s.complete();s.final('math',level);const out=s.confirm('math','procesartransversales');assert.equal(out.ok,level!=='C');if(level==='C'){s.final('math','C',undefined,undefined,'Synthetic personalized conclusion');assert.equal(s.confirm('math','procesartransversales').ok,true);}
 });
 for(const action of ['savetransversalfinal','revisartransversal','procesartransversales'])test('Admin cannot '+action+' even with forged Tutor identity/configuration',()=>{
  const s=fixture(),data=s.load('admin'),writes=s.state.writes;const out=s.route(action,'admin',{user:'math',role:'docente',tutorAulas:['2|A'],version:data.version,versionAportes:data.versionAportes,finales:{[s.id]:{tic:{modo:'letra',valor:'A'}}}});assert.equal(out.code,'DENIED');assert.equal(s.state.writes,writes);
@@ -89,3 +89,26 @@ test('Admin consultation contains final text but no decision input or descriptiv
 
 test('Malformed existing co-tutor configuration cannot authorize an official write',()=>{const s=fixture();s.docs[2].tutorAulas=['2|A'];config(s);assert.equal(s.load('math').puedeFinal,false);assert.equal(s.final('math','A').code,'DENIED');assert.equal(s.confirm('math','procesartransversales').code,'DENIED');});
 test('Disposed controller metadata failure cannot rebind the next view retry button',async()=>{let reject;const m=mounted(()=>new Promise((r,j)=>reject=j));m.controller.clear();const next=()=>{};m.el('transReload').onclick=next;reject(Error('Synthetic metadata failure'));await m.controller.ready;assert.equal(m.el('transReload').onclick,next);assert.equal(m.el('transRows').children.length,0);});
+
+test('Official send rejects a missing enabled area without appending snapshots or losing Tutor draft',()=>{
+ const s=fixture();s.aporte('math','A');s.aporte('ef','A');assert.equal(s.final('math','A').ok,true);const writes=s.state.writes,out=s.confirm('math','procesartransversales');assert.equal(out.code,'VALIDATION');assert.match(out.error,/faltan aportes transversales obligatorios.*Comunicación/);assert.equal(s.state.writes,writes);assert.equal(s.load('math').resultados[s.id].tic.final.nivel,'A');assert.equal(s.tables.has('TransversalesProcesado'),false);
+});
+for(const comp of ['tic','autonomia'])test('Official send rejects missing '+comp+' even when another teacher of the same area contributed',()=>{
+ const s=fixture();s.complete();s.docs.push({user:'math2',nombre:'Synthetic Math 2',nivel:'secundaria',asignaciones:{'Matemática':['2|A']},aportesTransversales:{'Matemática':['2|A']}});config(s);s.aporte('math2','A');const own=s.load('math').aportes.find(a=>a.user==='math2'),e=clone(own.evidencia);e.sessions=e.sessions.filter(x=>x.comp!==comp);for(const k of Object.keys(e.grades))if(k.includes(comp))delete e.grades[k];assert.equal(s.route('savetransversalaporte','math2',{area:'Matemática',version:own.version,evidencia:e}).ok,true);s.final('math','A');const data=s.load('math');assert.equal(data.resultados[s.id][comp].resumen.sinAporte.length,0);assert.ok(data.aportesPendientes.some(p=>p.user==='math2'&&p.comp===comp));assert.equal(s.confirm('math','procesartransversales').ok,false);
+});
+test('Teacher C without its conclusion blocks official send despite complete Tutor finals',()=>{
+ const s=fixture();s.complete();s.aporte('communication','C');const own=s.load('math').aportes.find(a=>a.user==='communication'),e=clone(own.evidencia);e.conclusiones={};s.route('savetransversalaporte','communication',{area:'Comunicación',version:own.version,evidencia:e});s.final('math','A');const out=s.confirm('math','procesartransversales');assert.equal(out.ok,false);assert.match(out.error,/Aporte C pendiente de conclusión/);assert.equal(s.tables.has('TransversalesProcesado'),false);
+});
+test('An unassigned teacher does not block official send',()=>{const s=fixture();delete s.docs[2].aportesTransversales;config(s);s.aporte('math','A');s.aporte('ef','A');s.final('math','A');assert.deepEqual(clone(s.load('math').aportesPendientes),[]);assert.equal(s.confirm('math','procesartransversales').ok,true);});
+test('Complete assigned contributions permit current Tutor snapshot and only that snapshot reaches SIAGIE',()=>{const s=official();const exportData=s.route('loadtransversalexport','admin');assert.equal(exportData.exportable,true);assert.equal(exportData.procesado.flujo,'tutor');s.aporte('ef','B');assert.equal(s.route('loadtransversalexport','admin').exportable,false);});
+test('Missing contributions still allow saving a Tutor final draft',()=>{const s=fixture();assert.equal(s.final('math','A').ok,true);assert.ok(s.load('math').aportesPendientes.length);assert.equal(s.confirm('math','procesartransversales').ok,false);});
+test('Admin remains unable to emit a snapshot even with every contribution complete',()=>{const s=fixture();s.complete();s.final('math','A');assert.equal(s.confirm('admin','procesartransversales').code,'DENIED');});
+for(const complete of [false,true])test('Frontend official button '+(complete?'enables complete contributions':'blocks missing contributions with saved finals'),()=>{
+ const m=mounted(),s=m.server;if(complete)s.complete();s.final('math','A');const box=m.el('completeness');m.f.c.window.IETransversales.editor(box,clone(s.load('math')),s.ctx,true);const process=box.querySelectorAll('button').find(b=>b.dataset.process);assert.equal(Boolean(process.disabled),!complete);if(!complete)assert.match(box.querySelectorAll('p').map(x=>x.textContent).join(' '),/Envío oficial bloqueado.*borrador/);m.controller.clear();
+});
+test('Frontend permits explicit draft save while required contributions are missing',async()=>{
+ const m=mounted();await m.controller.ready;const select=m.el('transRows').querySelectorAll('select')[1];select.value='A';select.onchange();const fields=m.el('transRows').querySelectorAll('textarea');fields[0].value='Synthetic justified draft';fields[0].oninput();const save=m.el('transRows').querySelectorAll('button').find(b=>b.textContent==='Guardar decisión del Tutor');assert.equal(Boolean(save.disabled),false);await save.onclick();assert.equal(m.server.load('math').resultados[m.server.id].tic.final.nivel,'A');assert.equal(m.server.tables.has('TransversalesProcesado'),false);m.controller.clear();
+});
+test('Frontend fails closed for official send when backend lacks completeness contract',()=>{
+ const m=mounted(),s=m.server;s.complete();s.final('math','A');const data=clone(s.load('math'));delete data.aportesPendientes;const box=m.el('oldCompleteness');m.f.c.window.IETransversales.editor(box,data,s.ctx,true);assert.equal(Boolean(box.querySelectorAll('button').find(b=>b.dataset.process).disabled),true);assert.match(box.querySelectorAll('p').map(x=>x.textContent).join(' '),/verificar la integridad/);m.controller.clear();
+});

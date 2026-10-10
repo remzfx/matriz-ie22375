@@ -1297,6 +1297,23 @@ function transversalResumen_(datos,id,comp) {
   return {aportes,pendientes,conteo,recibidos:aportes.length,sugerencia,empate,dispersion,faltan,sinDocente,sinAporte,alerta:empate||dispersion||sinDocente.length>0||(datos.politica.aportesObligatorios&&(sinAporte.length>0||pendientes.length>0))};
 }
 function transversalConclusionPendiente_(final) { return !!(final && final.nivel==='C' && !String(final.conclusion||'').trim()); }
+function transversalAportesPendientes_(datos) {
+  const pendientes=[];
+  datos.estudiantes.forEach(al=>['tic','autonomia'].forEach(comp=>{
+    const resumen=transversalResumen_(datos,al.id,comp);
+    datos.areas.forEach(area=>{
+      const responsables=datos.responsables[area]||[];
+      if(!responsables.length&&resumen.sinDocente.includes(area))pendientes.push({id:al.id,nombre:al.nombre,comp,area,motivo:'Sin docente responsable'});
+      responsables.forEach(doc=>{
+        const aporte=datos.aportes.find(a=>a.area===area&&normalizarUsuario_(a.user)===normalizarUsuario_(doc.user));
+        const valor=aporte&&((aporte.valores[al.id]||{})[comp]);
+        const conclusion=aporte&&(((aporte.evidencia||{}).conclusiones||{})[al.id]||{})[comp];
+        if(!valor||valor.nivel==='C'&&!String(conclusion||'').trim())pendientes.push({id:al.id,nombre:al.nombre,comp,area,user:doc.user,docente:doc.nombre,motivo:valor?'Aporte C pendiente de conclusión':'Sin aporte'});
+      });
+    });
+  }));
+  return pendientes;
+}
 // Política institucional: ConfigSistema/PERIODOS.anio, nunca la fecha del navegador.
 function politicaTransversal_() {
   const per=obtenerPeriodosConfig_()||{},anio=per.anio==null?2026:Number(per.anio);
@@ -1324,6 +1341,7 @@ function transversalVista_(datos,acceso,ctx,exportacion=false) {
   });});
   return {ok:true,soportaDirectos:true,soportaConclusiones:true,flujoTutor:true,politica:datos.politica,estudiantes:datos.estudiantes,areas:datos.areas,responsables:coord&&!exportacion?datos.responsables:undefined,tutores:coord?datos.tutores:undefined,revisado:coord?datos.consolidado.revisado:undefined,procesado:coord?datos.procesado:undefined,historico:coord&&!exportacion?datos.consolidado.historico:undefined,exportable:vigente,versionProcesado:datos.procesado?datos.procesado.version:0,versionAportes:datos.versionAportes,version:datos.consolidado.version,
     aportes:exportacion?[]:coord?datos.aportes:datos.aportes.filter(a=>normalizarUsuario_(a.user)===normalizarUsuario_(acceso.sesion.user)&&a.area===ctx.area),resultados,
+    aportesPendientes:coord&&!exportacion?transversalAportesPendientes_(datos):undefined,
     puedeFinal:!admin&&transversalTutor_(acceso,ctx)&&datos.tutores.length===1,puedeProcesar:!admin&&transversalTutor_(acceso,ctx)&&datos.tutores.length===1,puedeRevisar:false,puedeTutor:!admin&&transversalTutor_(acceso,ctx),puedeAip:false,abierto:bimestreAbierto_(ctx.bimestre)};
 }
 function transversalesRuta_(body) {
@@ -1380,6 +1398,8 @@ function transversalesRuta_(body) {
         if(datos.tutores.length!==1)throw Error('Sin Tutor asignado o configuración de tutoría inconsistente.');
         if(action==='procesartransversales'){
           if(!ids.size)throw Error('El padrón del aula está vacío.');
+          const pendientes=transversalAportesPendientes_(datos);
+          if(pendientes.length){const p=pendientes[0];throw Error('No se puede enviar al registro oficial: faltan aportes transversales obligatorios ('+pendientes.length+'). '+p.nombre+' · '+p.comp+' · '+p.area+(p.docente?' · '+p.docente:'')+' · '+p.motivo+'.');}
           ids.forEach(id=>['tic','autonomia'].forEach(comp=>{const f=(finales[id]||{})[comp];if(!f||!transversalValor_(f))throw Error('Todos los estudiantes requieren finales TIC y Gestiona.');if(f.versionAportes!==datos.versionAportes||f.tutorUser!==normalizarUsuario_(acceso.sesion.user))throw Error('Decisión obsoleta: revise con los aportes actuales y el Tutor vigente.');if(transversalConclusionPendiente_(f))throw Error('Conclusión descriptiva final obligatoria para nivel C.');}));
           const aprobados=Object.fromEntries([...ids].map(id=>[id,finales[id]]));
           const snapshot={schema:3,flujo:'tutor',aula:{nivel:'secundaria',grado:ctx.numero,seccion:ctx.seccion},bimestre:ctx.bimestre,anio:datos.politica.anio,finales:aprobados,versionAportes:datos.versionAportes,tutorUser:normalizarUsuario_(acceso.sesion.user),ts,version:ts};

@@ -38,10 +38,12 @@
     [['letra','Letras'],['num','0–20']].forEach(([v,label])=>{const opt=document.createElement('option');opt.value=v;opt.textContent=label;modeEl.appendChild(opt);});toolbar.appendChild(modeEl);
     text('p','18–20 → AD · 14–17 → A · 11–13 → B · 0–10 → C. Cambiar el modo no modifica valoraciones guardadas.',container);
     if(data.politica)text('p','Año lectivo '+data.politica.anio+' · Solo aportes habilitados por Admin. Sugerencia: mayoría de áreas, un voto efectivo (el más reciente) por área; empate sin sugerencia. La decisión oficial pertenece al Tutor.',container);
-    const message=text('p','',container),rows=text('div','',container),buttons=text('div','',container);
-    function procesable(){return token===global.IEStudents.validToken()&&data.flujoTutor&&data.abierto&&data.puedeProcesar&&(data.tutores||[]).length===1&&!Object.keys(draft).length&&data.estudiantes.length&&data.estudiantes.every(al=>Object.keys(COMP).every(cp=>{const f=data.resultados[al.id][cp].final;return f&&f.versionAportes===data.versionAportes&&(f.nivel!=='C'||String(f.conclusion||'').trim());}));}
+    const message=text('p','',container),aportesStatus=text('p','',container),rows=text('div','',container),buttons=text('div','',container);
+    function procesable(){return token===global.IEStudents.validToken()&&data.flujoTutor&&Array.isArray(data.aportesPendientes)&&data.aportesPendientes.length===0&&data.abierto&&data.puedeProcesar&&(data.tutores||[]).length===1&&!Object.keys(draft).length&&data.estudiantes.length&&data.estudiantes.every(al=>Object.keys(COMP).every(cp=>{const f=data.resultados[al.id][cp].final;return f&&f.versionAportes===data.versionAportes&&(f.nivel!=='C'||String(f.conclusion||'').trim());}));}
     function changed(id,comp,raw){if(token!==global.IEStudents.validToken()||!data.puedeFinal||!data.abierto||busy)return;draft[id]=draft[id]||{};draft[id][comp]=Object.assign({},draft[id][comp]||data.resultados[id][comp].final||{},raw);buttons.querySelectorAll('button').forEach(b=>{if(b.dataset.process)b.disabled=true;});if(raw.modo)draw();}
     function draw(){
+      const pendientes=data.aportesPendientes;
+      aportesStatus.textContent=!data.puedeFinal?'':!Array.isArray(pendientes)?'No se pudo verificar la integridad de los aportes. Actualiza el backend antes de enviar.':pendientes.length?'Envío oficial bloqueado: '+pendientes.length+' aportes incompletos. '+pendientes[0].nombre+' · '+COMP[pendientes[0].comp]+' · '+pendientes[0].area+(pendientes[0].docente?' · '+pendientes[0].docente:'')+' · '+pendientes[0].motivo+'. Puedes guardar la decisión del Tutor como borrador.':'';
       if(token!==global.IEStudents.validToken()){data.estudiantes=[];draft={};message.textContent='La sesión cambió. Ingresa nuevamente.';}
       rows.replaceChildren();rows.className='trans-grid-wrap';
       const table=text('table','',rows);table.className='trans-grid';const head=text('thead','',table),hr=text('tr','',head);['N°','Estudiante','TIC','Gestiona su aprendizaje','Estado'].forEach(label=>text('th',label,hr));const tbody=text('tbody','',table);
@@ -88,6 +90,7 @@
     }
     async function act(action){
       if(busy||token!==global.IEStudents.validToken())return;
+      if(action==='procesartransversales'&&!procesable()){message.textContent='Completa los aportes obligatorios y guarda las decisiones vigentes antes del envío oficial.';return;}
       if(action!=='savetransversalfinal'&&Object.keys(draft).length){message.textContent='Guarda la decisión final antes de confirmar.';return;}
       const payload=Object.assign({},ctx,{version:data.version,versionAportes:data.versionAportes});
       if(action==='savetransversalfinal'){if(!Object.keys(draft).length){message.textContent='Sin decisiones nuevas para guardar.';return;}payload.finales=draft;}
