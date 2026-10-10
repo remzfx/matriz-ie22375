@@ -3,6 +3,55 @@
   'use strict';
   const listas = {primaria: null, secundaria: null};
   let ocupada = false;
+
+  // Read-only presentation state. Never used to authorize a write or change its payload.
+  let baseComparacion = null;
+  function texto(id, value) { const el=document.getElementById(id);if(el)el.textContent=value; }
+  function compararMatricula(actual, nuevas) {
+    const result={continuan:0,nuevos:0,trasladados:nuevas.filter(a=>String(a.estadoMatricula||'').toUpperCase()==='TRASLADADO').length,ausentes:0,inconsistentes:0,noVerificados:0};
+    const ids=a=>[a.idSiagie?'id:'+String(a.idSiagie).trim():null,a.codigoEstudiante?'cod:'+String(a.codigoEstudiante).trim():null].filter(Boolean);
+    const index=new Map();actual.forEach((a,i)=>ids(a).forEach(k=>{const set=index.get(k)||new Set();set.add(i);index.set(k,set);}));
+    const incoming=new Map();nuevas.forEach((a,i)=>ids(a).forEach(k=>{const set=incoming.get(k)||new Set();set.add(i);incoming.set(k,set);}));
+    const seen=new Set(),unknownBase=actual.some(a=>!ids(a).length);
+    nuevas.forEach(a=>{
+      const keys=ids(a),matches=new Set();keys.forEach(k=>(index.get(k)||[]).forEach(i=>matches.add(i)));
+      if(keys.some(k=>incoming.get(k).size>1)||matches.size>1||!a.nombre||!a.grado||!a.seccion){result.inconsistentes++;return;}
+      if(!keys.length){result.noVerificados++;return;}
+      if(matches.size===1){const i=[...matches][0],old=actual[i];if(a.idSiagie&&old.idSiagie&&String(a.idSiagie).trim()!==String(old.idSiagie).trim()){result.inconsistentes++;return;}seen.add(i);result.continuan++;}
+      else if(unknownBase)result.noVerificados++;else result.nuevos++;
+    });
+    result.ausentes=result.noVerificados||result.inconsistentes||unknownBase?null:actual.length-seen.size;
+    return result;
+  }
+  function pintarComparacion() {
+    if(!listas.primaria||!listas.secundaria){texto('gestionComparacion','Selecciona y revisa ambos CSV. Comparación: No verificado.');return;}
+    if(!baseComparacion){texto('gestionComparacion','CSV listos: Primaria '+listas.primaria.length+' · Secundaria '+listas.secundaria.length+'. Continúan, nuevos y ausentes: No verificado. Consulta la base en el servidor.');return;}
+    const out=['primaria','secundaria'].map(n=>{const r=compararMatricula(baseComparacion[n].estudiantes,listas[n]);return (n==='primaria'?'Primaria':'Secundaria')+': Continúan '+r.continuan+' · Nuevos '+(r.noVerificados?'No verificado':r.nuevos)+' · Trasladados en CSV '+r.trasladados+' · Ya no aparecen '+(r.ausentes===null?'No verificado':r.ausentes)+' · Duplicados/inconsistentes '+r.inconsistentes+' · Identidades por revisar '+r.noVerificados;});
+    texto('gestionComparacion',out.join('\n')+'\nComparación informativa por ID/código; no asocia nombres parecidos ni actualiza datos.');
+  }
+  function mostrarBase(base, verificada, fallo) {
+    const valid=!!(base&&base.inicializada&&base.primaria&&base.secundaria);
+    baseComparacion=valid&&verificada&&!base.offline?JSON.parse(JSON.stringify(base)):null;
+    ['primaria','secundaria'].forEach(n=>texto(n==='primaria'?'gestionPrimaria':'gestionSecundaria',valid?base[n].estudiantes.length+' estudiantes'+(baseComparacion?' · servidor':' · caché, no verificado'):'No verificado'));
+    texto('gestionServidor',fallo?'Error · '+fallo:baseComparacion?'Verificado en esta consulta':base&&base.inicializada===false?'Disponible · base pendiente de inicialización':valid?'Caché · servidor no verificado':'No verificado');
+    pintarComparacion();
+  }
+  function bimestreVista(value) {
+    ['migracionBimestre','gestionBimestre'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=value;});
+    texto('gestionPadronEstado','Bimestre '+value+' · Estado y cantidad: No verificado. Consulta el padrón.');
+    const button=document.getElementById('gestionCrearPadron');if(button)button.hidden=true;
+  }
+  async function mostrarPadron(base,bim) {
+    const button=document.getElementById('gestionCrearPadron');if(button)button.hidden=true;
+    let estado='No verificado';
+    const api=typeof CLOUD_API_URL!=='undefined'?CLOUD_API_URL:global.CLOUD_API_URL;
+    if(api&&IEStudents.fetchJSON)try{const response=await IEStudents.fetchJSON(api+'?action=loadperiodos',{cache:'no-store'});if(response.ok&&response.periodos&&response.periodos.bimestres)estado=response.periodos.bimestres[bim]||'No verificado';}catch(e){}
+    if(bimestreSeleccionado()!==bim)return;
+    const total=base.primaria.estudiantes.length+base.secundaria.estudiantes.length;
+    texto('gestionPadronEstado','Bimestre '+bim+' · '+estado+' · '+(base.padronInicializado?'Padrón verificado: '+total+' estudiantes':'Sin padrón propio; base vigente: '+total+' estudiantes')+'.');
+    if(button)button.hidden=!(estado==='abierto'&&base.inicializada&&!base.padronInicializado);
+  }
+
   function mensaje(text) { document.getElementById('migracionEstado').textContent = text; }
   async function importar(input, nivel) {
     if (ocupada) return;
@@ -29,7 +78,7 @@
     } catch(e) {
       document.getElementById('migracionPreview-' + nivel).textContent = '';
       mensaje(e.message);
-    } finally { ocupada = false; }
+    } finally { ocupada = false; pintarComparacion(); }
   }
   async function verificar() {
     if (ocupada) return;
@@ -38,13 +87,16 @@
     try {
       const base = await (IEStudents.inspect || IEStudents.load)();
       if (base.offline) throw new Error('La verificación requiere conexión; una caché no confirma producción.');
+      mostrarBase(base, true);
       if (base.inicializada) {
         ['primaria', 'secundaria'].forEach(nivel => {
+          // A server check must not replace the selected CSV draft preview.
+          if (listas[nivel]) return;
           document.getElementById('migracionPreview-' + nivel).textContent = base[nivel].estudiantes.map(a => a.grado + '° ' + a.seccion + ' · ' + a.orden + ' · ' + a.nombre).join('\n');
         });
       }
       mensaje(base.inicializada ? 'Base privada inicializada: Primaria ' + base.primaria.estudiantes.length + ' · Secundaria ' + base.secundaria.estudiantes.length + '. Confirma estos datos antes de autorizar la etapa B.' : 'Backend disponible. Hoja privada pendiente de la importación SIAGIE revisada.');
-    } catch(e) { mensaje(e.message); }
+    } catch(e) { mostrarBase(null, false, e.message); mensaje(e.message); }
     finally { ocupada = false; }
   }
   function bimestreSeleccionado() {
@@ -59,13 +111,16 @@
     try {
       const bim = bimestreSeleccionado();
       mensaje('Verificando padrón del bimestre ' + bim + '…');
+      texto('gestionPadronEstado','Consultando padrón '+bim+' · No verificado…');
+      const button=document.getElementById('gestionCrearPadron');if(button)button.hidden=true;
       const base = await IEStudents.loadRoster(bim);
       if (base.offline) throw new Error('La verificación del padrón requiere conexión.');
       if (!base.inicializada) throw new Error('La base privada todavía no está inicializada.');
+      await mostrarPadron(base,bim);
       mensaje(base.padronInicializado
         ? 'Padrón ' + bim + ' guardado en servidor: Primaria ' + base.primaria.estudiantes.length + ' · Secundaria ' + base.secundaria.estudiantes.length + '.'
         : 'El bimestre ' + bim + ' todavía no tiene padrón propio. La base vigente tiene Primaria ' + base.primaria.estudiantes.length + ' · Secundaria ' + base.secundaria.estudiantes.length + '.');
-    } catch(e) { mensaje(e.message); }
+    } catch(e) { texto('gestionPadronEstado','No verificado · '+e.message);mensaje(e.message); }
     finally { ocupada = false; }
   }
   async function crearPadron() {
@@ -121,5 +176,5 @@
     } catch(e) { mensaje(e.message); }
     finally { ocupada = false; }
   }
-  global.IEMigrateStudents = {importar: importar, verificar: verificar, verificarPadron: verificarPadron, crearPadron: crearPadron, sincronizarPadron: sincronizarPadron, inicializar: inicializar};
+  global.IEMigrateStudents = {compararMatricula: compararMatricula, mostrarBase: mostrarBase, bimestreVista: bimestreVista, importar: importar, verificar: verificar, verificarPadron: verificarPadron, crearPadron: crearPadron, sincronizarPadron: sincronizarPadron, inicializar: inicializar};
 })(window);
