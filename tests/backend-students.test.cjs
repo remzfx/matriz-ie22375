@@ -77,13 +77,20 @@ function studentsFixture() {
   const rows = [
     ['primaria',1,'Única'], ['primaria',2,'Única'], ['primaria',3,'Única'],
     ['secundaria',1,'A'], ['secundaria',1,'B'], ['secundaria',5,'Única'], ['secundaria',2,'B']
-  ].map((a,i) => ({nivel:a[0],grado:a[1],seccion:a[2],orden:1,nombre:'Synthetic Student '+i,unused:'private-extra'}));
+  ].map((a,i) => ({nivel:a[0],grado:a[1],seccion:a[2],orden:1,nombre:'Synthetic Student '+i,estadoMatricula:'DEFINITIVA',unused:'private-extra'}));
   const base = {primaria:{estudiantes:rows.filter(a=>a.nivel==='primaria')},secundaria:{estudiantes:rows.filter(a=>a.nivel==='secundaria')}};
   const init = s.post({action:'initstudents',token:s.admin,version:'',base});
   assert.equal(init.ok,true);
   const get = params => JSON.parse(s.c.doGet({parameter:params}).text);
   const load = (token, extra={}) => s.post({action:'loadstudents',token,...extra});
   return {...s,rows,base,init,load,get};
+}
+
+// Legacy frozen roster fixture: production updates must not recreate closed periods.
+function frozenRosterFixture(s,bim) {
+ const sh=s.tables.get('EstudiantesBase'),actual=s.c.leerBaseEstudiantes_(sh,false);
+ sh.appendRow(['PADRON_'+bim,actual.version,JSON.stringify({partes:actual.partes})]);
+ return s.load(s.admin,{bimestre:bim});
 }
 
 test('loadstudents uses canonical protected POST; accidental GET reports method mismatch without leaking students',()=>{
@@ -97,7 +104,7 @@ test('loadstudents uses canonical protected POST; accidental GET reports method 
 test('Admin reads the complete private base and optional SIAGIE identifiers without leaking unrelated fields',()=> {
   const s=studentsFixture(),res=s.load(s.admin);
   assert.equal(res.ok,true);assert.equal(res.estudiantes.length,7);
-  for(const a of res.estudiantes)assert.deepEqual(Object.keys(a).sort(),['grado','nivel','nombre','orden','seccion']);
+  for(const a of res.estudiantes)assert.deepEqual(Object.keys(a).sort(),['estadoMatricula','grado','nivel','nombre','orden','seccion']);
   assert.equal(res.inicializada,true);
 });
 test('Primary teacher reads only server-assigned grades',()=> {
@@ -162,7 +169,7 @@ test('loadstudents reuses cached DocentesAcceso without lock',()=> {
 test('student reconstruction cache is version-bound and a changed roster pointer cannot reuse old data',()=> {
   const s=studentsFixture();
   s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'I'});
-  const first=s.load(s.admin,{bimestre:'I'});assert.equal(first.version,s.init.version);
+  const first=s.load(s.admin,{bimestre:'I'});assert.notEqual(first.version,s.init.version);
   const sh=s.tables.get('EstudiantesBase'), next='external-version';
   const changed=s.rows.concat({nivel:'primaria',grado:1,seccion:'Única',orden:99,nombre:'Synthetic Added'});
   sh.rows.push(['DATOS_'+next+'_0',next,JSON.stringify(changed)]);
@@ -240,7 +247,7 @@ test('Bimonthly roster sync changes only the open roster and never touches exist
 
   const nueva=JSON.parse(JSON.stringify(s.base));
   nueva.primaria.estudiantes=nueva.primaria.estudiantes.filter(a=>a.nombre!=='Synthetic Student 0');
-  nueva.primaria.estudiantes.push({nivel:'primaria',grado:1,seccion:'Única',orden:99,nombre:'Synthetic New Student'});
+  nueva.primaria.estudiantes.push({nivel:'primaria',grado:1,seccion:'Única',orden:99,nombre:'Synthetic New Student',estadoMatricula:'DEFINITIVA'});
   const synced=s.post({action:'syncstudents',token:s.admin,version:s.init.version,bimestre:'I',base:nueva});
   assert.equal(synced.ok,true);
   assert.equal(JSON.stringify(reg.rows),registroAntes,'student roster updates must not rewrite RegistroNotas');
@@ -258,11 +265,11 @@ test('Bimonthly roster sync changes only the open roster and never touches exist
 
 test('Closed bimesters cannot be resynchronized and their roster remains frozen',()=> {
   const s=studentsFixture();
-  const seeded=s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'II'});
+  const seeded=frozenRosterFixture(s,'II');
   assert.equal(seeded.ok,true);
   const before=s.load(s.admin,{bimestre:'II'}).estudiantes.map(a=>a.nombre);
   const nueva=JSON.parse(JSON.stringify(s.base));
-  nueva.primaria.estudiantes.push({nivel:'primaria',grado:1,seccion:'Única',orden:99,nombre:'Should Not Enter Closed Roster'});
+  nueva.primaria.estudiantes.push({nivel:'primaria',grado:1,seccion:'Única',orden:99,nombre:'Should Not Enter Closed Roster',estadoMatricula:'DEFINITIVA'});
   const res=s.post({action:'syncstudents',token:s.admin,version:s.init.version,bimestre:'II',base:nueva});
   assert.equal(res.ok,false);assert.equal(res.code,'PERIOD_CLOSED');
   assert.deepEqual(s.load(s.admin,{bimestre:'II'}).estudiantes.map(a=>a.nombre),before);
@@ -314,7 +321,7 @@ test('Student save/load preserves SIAGIE ID, student code and enrollment status 
 
 test('student cache hit performs no EstudiantesBase getRange, including a frozen roster',()=> {
   const s=studentsFixture();
-  assert.equal(s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'III'}).ok,true);
+  assert.equal(frozenRosterFixture(s,'III').ok,true);
   s.load(s.primary,{bimestre:'III'});s.state.reads=[];
   assert.equal(s.load(s.primary,{bimestre:'III'}).version,s.init.version);
   assert.equal(s.state.reads.filter(r=>r.name==='EstudiantesBase').length,0);
@@ -322,7 +329,7 @@ test('student cache hit performs no EstudiantesBase getRange, including a frozen
 
 test('Admin version change publishes new pointer and frozen periods retain their version',()=> {
   const s=studentsFixture();
-  s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'III'});
+  frozenRosterFixture(s,'III');
   s.load(s.admin,{bimestre:'III'});s.load(s.admin);
   const next=s.post({action:'savestudents',token:s.admin,version:s.init.version,base:s.base});
   assert.equal(next.ok,true);assert.notEqual(next.version,s.init.version);
@@ -360,6 +367,6 @@ test('cached absent roster avoids full reads and seeding invalidates its absence
   assert.equal(first.padronInicializado,false);s.state.reads=[];
   assert.equal(s.load(s.admin,{bimestre:'III'}).version,s.init.version);
   assert.equal(s.state.reads.filter(r=>r.name==='EstudiantesBase').length,0);
-  assert.equal(s.post({action:'seedstudentsroster',token:s.admin,version:s.init.version,bimestre:'III'}).ok,true);
+  assert.equal(frozenRosterFixture(s,'III').ok,true);
   assert.equal(s.load(s.admin,{bimestre:'III'}).padronInicializado,true);
 });

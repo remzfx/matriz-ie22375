@@ -10,7 +10,7 @@ function fixture(){
     {user:'other',nombre:'Synthetic Other',pass:'synthetic-only',nivel:'secundaria',asignaciones:{'Matemática':['2|B']},tutorAulas:[]}];
   docs.filter(d=>d.nivel==='secundaria').forEach(d=>d.aportesTransversales=clone(d.asignaciones||{}));
   s.tables.get('DocentesAcceso').rows[1][2]=JSON.stringify(docs);s.cacheEntries.clear();
-  const roster=[{nivel:'secundaria',grado:2,seccion:'A',orden:1,nombre:'Synthetic Student A',idSiagie:'synthetic-a',codigoEstudiante:'code-a'},{nivel:'secundaria',grado:2,seccion:'B',orden:1,nombre:'Synthetic Student B',idSiagie:'synthetic-b'}];
+  const roster=[{nivel:'secundaria',grado:2,seccion:'A',orden:1,nombre:'Synthetic Student A',estadoMatricula:'DEFINITIVA',idSiagie:'synthetic-a',codigoEstudiante:'code-a'},{nivel:'secundaria',grado:2,seccion:'B',orden:1,nombre:'Synthetic Student B',estadoMatricula:'DEFINITIVA',idSiagie:'synthetic-b'}];
   assert.equal(s.post({action:'savestudents',token:s.admin,version:s.load(s.admin).version,base:{primaria:s.base.primaria,secundaria:{estudiantes:roster}}}).ok,true);
   const id='id:synthetic-a',ctx={grado:2,seccion:'A',bimestre:'I'},token=user=>s.token(user,user==='admin'?'admin':user==='pip'?'pip':user==='auxiliar'?'auxiliar':'docente');
   const route=(action,user,args={})=>s.post({action,token:token(user),...ctx,...args});

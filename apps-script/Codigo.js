@@ -758,7 +758,19 @@ function leerVersionEstudiantes_(sh, clave, filas) {
   if (!Array.isArray(pointer)) pointer = null;
   if (!pointer) {
     rows = rows || leerFilasEstudiantes_(sh);
-    rows.forEach(function(row) { if (String(row[0]) === String(clave)) pointer = row; });
+    rows.forEach(function(row) {
+      if (String(row[0]) === String(clave)) pointer = row; // Legacy pointers remain readable.
+      if (row[0] === 'ESTUDIANTES_COMMIT') {
+        try {
+          const m = JSON.parse(row[2]);
+          if (!row[1] || m.schema !== 1 || !/^PADRON_(I|II|III|IV)$/.test(m.padron.clave) ||
+              !m.base.version || !m.padron.version || m.base.version === m.padron.version ||
+              !Number.isInteger(m.base.partes) || m.base.partes < 1 || !Number.isInteger(m.padron.partes) || m.padron.partes < 1) return;
+          const chosen = clave === 'BASE_ACTUAL' ? m.base : clave === m.padron.clave ? m.padron : null;
+          if (chosen) pointer = [clave, chosen.version, JSON.stringify({partes: chosen.partes, operacionConfirmada:String(row[1])})];
+        } catch(err) { /* An incomplete/malformed commit is not confirmation. */ }
+      }
+    });
     if (pointer) cachePunteroEstudiantes_(sh, pointer, last);
     else {
       // Ausencia cacheada solo para esta instantánea; seed/import cambia last.
@@ -767,6 +779,7 @@ function leerVersionEstudiantes_(sh, clave, filas) {
   }
   if (!pointer || !pointer.length) return null;
   const version = String(pointer[1]);
+  const operacionConfirmada = JSON.parse(pointer[2]).operacionConfirmada || '';
   // La versión forma parte de la clave: un puntero nuevo jamás puede resolver
   // a los datos reconstruidos de una versión anterior.
   const cacheKey = ESTUDIANTES_CACHE_PREFIX + 'CHUNKS_' + version;
@@ -781,7 +794,7 @@ function leerVersionEstudiantes_(sh, clave, filas) {
         rawCache += part;
       }
       const estudiantes = JSON.parse(rawCache);
-      if (Array.isArray(estudiantes)) return {version: version, partes: meta.partes, estudiantes: estudiantes};
+      if (Array.isArray(estudiantes)) return {version: version, partes: meta.partes, estudiantes: estudiantes, operacionConfirmada:operacionConfirmada};
     }
   } catch (err) { /* Reconstruir desde Sheets si la caché no está disponible. */ }
   rows = rows || leerFilasEstudiantes_(sh);
@@ -797,7 +810,7 @@ function leerVersionEstudiantes_(sh, clave, filas) {
   }
   const estudiantes = JSON.parse(raw);
   if (!Array.isArray(estudiantes)) throw new Error('Base privada inválida.');
-  const result = {version: version, partes: manifest.partes, estudiantes: estudiantes};
+  const result = {version: version, partes: manifest.partes, estudiantes: estudiantes, operacionConfirmada:operacionConfirmada};
   try {
     const cache = CacheService.getScriptCache();
     // 20 000 unidades UTF-16 ocupan como máximo 80 KB UTF-8 (<100 KB/entrada).
@@ -835,13 +848,38 @@ function escribirVersionEstudiantes_(sh, estudiantes, claves) {
   for (let i = 0; i < raw.length; i += 30000) {
     sh.appendRow(['DATOS_' + version + '_' + partes++, version, raw.slice(i, i + 30000)]);
   }
-  const manifest = JSON.stringify({partes: partes});
+  publicarVersionEstudiantes_(sh, {version: version, partes: partes}, claves);
+  return {version: version, partes: partes, estudiantes: estudiantes};
+}
+
+function publicarVersionEstudiantes_(sh, base, claves) {
+  const version = base.version, manifest = JSON.stringify({partes: base.partes});
   (claves || []).forEach(function(clave) {
     sh.appendRow([clave, version, manifest]);
   });
   SpreadsheetApp.flush();
   (claves || []).forEach(function(clave) { cachePunteroEstudiantes_(sh, [clave, version, manifest]); });
-  return {version: version, partes: partes, estudiantes: estudiantes};
+}
+
+// Only the selected open academic roster is filtered; the private base remains complete.
+function padronMatriculaVigente_(estudiantes) {
+  const otros = Object.create(null);
+  estudiantes.forEach(function(al) {
+    const estado = String(al.estadoMatricula || '').trim().toUpperCase();
+    if (estado !== 'DEFINITIVA' && estado !== 'TRASLADADO') otros[estado || 'SIN ESTADO'] = (otros[estado || 'SIN ESTADO'] || 0) + 1;
+  });
+  if (Object.keys(otros).length) throw new Error('Revisa los estados de matrícula antes de actualizar el padrón: ' + Object.keys(otros).map(function(k) { return k + ': ' + otros[k]; }).join(' · ') + '. No se realizó la actualización.');
+  return estudiantes.filter(function(al) { return String(al.estadoMatricula).trim().toUpperCase() === 'DEFINITIVA'; });
+}
+
+// The single complete marker is the publication point; no individual pair pointer is written.
+function confirmarParejaEstudiantes_(sh, base, padron, bim) {
+  const operacion = Utilities.getUuid();
+  const manifest = {schema:1,base:{version:base.version,partes:base.partes},padron:{clave:'PADRON_'+bim,version:padron.version,partes:padron.partes}};
+  sh.appendRow(['ESTUDIANTES_COMMIT', operacion, JSON.stringify(manifest)]);
+  SpreadsheetApp.flush();
+  base.operacionConfirmada=operacion;padron.operacionConfirmada=operacion;
+  return operacion;
 }
 
 function normalizarBaseEstudiantes_(body) {
@@ -891,6 +929,7 @@ function respuestaEstudiantes_(base, acceso, meta) {
   meta = meta || {};
   return {
     ok: true, estudiantes: estudiantes, version: base ? base.version : '', inicializada: !!base,
+    operacionConfirmada: base ? base.operacionConfirmada || '' : '',
     bimestre: meta.bimestre || '',
     padronInicializado: Object.prototype.hasOwnProperty.call(meta, 'padronInicializado') ? !!meta.padronInicializado : !!base,
     fuentePadron: meta.fuentePadron || ''
@@ -909,26 +948,35 @@ function enriquecerListaIdentidades_(estudiantes, body) {
   if ((nivel !== 'primaria' && nivel !== 'secundaria') || !grado || !seccion || !identidades.length || identidades.length > 100) {
     throw new Error('Identidades SIAGIE inválidas.');
   }
-  const porNombre = {};
-  identidades.forEach(function(it) {
-    const nombre = normalizarNombreIdentidad_(it && it.nombre);
-    if (!nombre) return;
-    const idSiagie = String(it.idSiagie == null ? '' : it.idSiagie).trim();
-    const codigoEstudiante = String(it.codigoEstudiante == null ? '' : it.codigoEstudiante).trim();
-    if (!idSiagie && !codigoEstudiante) return;
-    if (!porNombre[nombre]) porNombre[nombre] = [];
-    porNombre[nombre].push({idSiagie: idSiagie, codigoEstudiante: codigoEstudiante});
+  const contexto = al => al.nivel === nivel && gradoEscritura_(al.grado) === grado && seccionEscritura_(al.seccion) === seccion;
+  const inputs = identidades.map(function(it) {
+    const hit = {nombre:normalizarNombreIdentidad_(it && it.nombre),idSiagie:String(it && it.idSiagie || '').trim(),codigoEstudiante:String(it && it.codigoEstudiante || '').trim()};
+    if ((!hit.idSiagie && !hit.codigoEstudiante) || hit.idSiagie.length>60 || hit.codigoEstudiante.length>60) throw new Error('Identidades SIAGIE inválidas.');
+    return hit;
+  });
+  const ids = new Set(), codes = new Set(), names = new Set();
+  inputs.forEach(function(it) {
+    if ((it.idSiagie && ids.has(it.idSiagie)) || (it.codigoEstudiante && codes.has(it.codigoEstudiante)) || (it.nombre && names.has(it.nombre))) throw new Error('Identidades duplicadas o ambiguas. Revisa la matriz SIAGIE.');
+    if(it.idSiagie) ids.add(it.idSiagie); if(it.codigoEstudiante) codes.add(it.codigoEstudiante); if(it.nombre) names.add(it.nombre);
+  });
+  const cambios = new Map();
+  inputs.forEach(function(hit) {
+    let candidatos = estudiantes.filter(al => contexto(al) && ((hit.idSiagie && al.idSiagie === hit.idSiagie) || (hit.codigoEstudiante && al.codigoEstudiante === hit.codigoEstudiante)));
+    if(!candidatos.length && hit.nombre) candidatos = estudiantes.filter(al => contexto(al) && normalizarNombreIdentidad_(al.nombre) === hit.nombre);
+    if(candidatos.length>1) throw new Error('Homónimos o identidades ambiguas. Revisa la matriz SIAGIE.');
+    if(!candidatos.length) return;
+    const al=candidatos[0];
+    if(cambios.has(al) || (al.idSiagie && hit.idSiagie && al.idSiagie!==hit.idSiagie) || (al.codigoEstudiante && hit.codigoEstudiante && al.codigoEstudiante!==hit.codigoEstudiante) ||
+       estudiantes.some(other => other!==al && ((hit.idSiagie && other.idSiagie===hit.idSiagie) || (hit.codigoEstudiante && other.codigoEstudiante===hit.codigoEstudiante)))) throw new Error('Identidad en conflicto o duplicada. Revisa la matriz SIAGIE.');
+    cambios.set(al,hit);
   });
   let enriquecidos = 0;
   const out = estudiantes.map(function(al) {
-    if (al.nivel !== nivel || gradoEscritura_(al.grado) !== grado || seccionEscritura_(al.seccion) !== seccion) return al;
-    const hits = porNombre[normalizarNombreIdentidad_(al.nombre)] || [];
-    if (hits.length !== 1) return al;
-    const hit = hits[0], nuevo = Object.assign({}, al);
-    let cambio = false;
-    if (hit.idSiagie && String(nuevo.idSiagie || '') !== hit.idSiagie) { nuevo.idSiagie = hit.idSiagie; cambio = true; }
-    if (hit.codigoEstudiante && String(nuevo.codigoEstudiante || '') !== hit.codigoEstudiante) { nuevo.codigoEstudiante = hit.codigoEstudiante; cambio = true; }
-    if (cambio) enriquecidos++;
+    const hit=cambios.get(al);if(!hit)return al;
+    const nuevo=Object.assign({},al);
+    if(hit.idSiagie)nuevo.idSiagie=hit.idSiagie;
+    if(hit.codigoEstudiante)nuevo.codigoEstudiante=hit.codigoEstudiante;
+    if(nuevo.idSiagie!==al.idSiagie || nuevo.codigoEstudiante!==al.codigoEstudiante)enriquecidos++;
     return nuevo;
   });
   return {estudiantes: out, enriquecidos: enriquecidos};
@@ -974,16 +1022,22 @@ function estudiantesRuta_(body) {
       if (!actual) throw new Error('Primero importa e inicializa la base oficial privada.');
       const bim = normalizarBimestrePadron_(body.bimestre);
       if (!bim) throw new Error('Selecciona un bimestre válido.');
-      const cur = enriquecerListaIdentidades_(actual.estudiantes, body);
-      const nuevaActual = cur.enriquecidos ? escribirVersionEstudiantes_(sh, cur.estudiantes, ['BASE_ACTUAL']) : actual;
       const padron = leerPadronEstudiantes_(sh, bim);
-      let padronCount = 0;
-      if (padron) {
-        const enrPadron = enriquecerListaIdentidades_(padron.estudiantes, body);
-        padronCount = enrPadron.enriquecidos;
-        if (padronCount) escribirVersionEstudiantes_(sh, enrPadron.estudiantes, ['PADRON_' + bim]);
-      }
-      const resp = respuestaEstudiantes_(nuevaActual, acceso, {bimestre: bim, padronInicializado: !!padron, fuentePadron: 'actual'});
+      if (padron && !bimestreAbierto_(bim)) return {ok:false,code:'PERIOD_CLOSED',error:'El padrón del bimestre '+bim+' está cerrado/bloqueado. No se asociaron identidades en base ni padrón.'};
+      // Validate both lists before any write, including ambiguous names and ID conflicts.
+      const cur = enriquecerListaIdentidades_(actual.estudiantes, body);
+      const enrPadron = padron ? enriquecerListaIdentidades_(padron.estudiantes, body) : null;
+      const padronCount = enrPadron ? enrPadron.enriquecidos : 0;
+      let nuevaActual=actual,nuevoPadron=padron;
+      try {
+        if(padron && (cur.enriquecidos || padronCount)) {
+          nuevaActual=escribirVersionEstudiantes_(sh,cur.estudiantes,[]);
+          nuevoPadron=escribirVersionEstudiantes_(sh,enrPadron.estudiantes,[]);
+          confirmarParejaEstudiantes_(sh,nuevaActual,nuevoPadron,bim);
+        } else if(cur.enriquecidos) nuevaActual=escribirVersionEstudiantes_(sh,cur.estudiantes,['BASE_ACTUAL']);
+      } catch(err) { return {ok:false,code:'SYNC_UNCONFIRMED',error:'Asociación no confirmada. Consulta base y padrón en servidor antes de volver a operar.'}; }
+      const resp = respuestaEstudiantes_(nuevaActual, acceso, {fuentePadron:'actual'});
+      if(nuevoPadron)resp.padron=respuestaEstudiantes_(nuevoPadron,acceso,{bimestre:bim,padronInicializado:true,fuentePadron:'bimestre'});
       resp.enriquecidosBase = cur.enriquecidos;
       resp.enriquecidosPadron = padronCount;
       return resp;
@@ -997,10 +1051,9 @@ function estudiantesRuta_(body) {
       if (existente) return respuestaEstudiantes_(existente, acceso, {
         bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'
       });
-      sh.appendRow(['PADRON_' + bim, actual.version, JSON.stringify({partes: actual.partes})]);
-      SpreadsheetApp.flush();
-      cachePunteroEstudiantes_(sh, ['PADRON_' + bim, actual.version, JSON.stringify({partes: actual.partes})]);
-      return respuestaEstudiantes_(actual, acceso, {
+      if (!bimestreAbierto_(bim)) return {ok: false, code: 'PERIOD_CLOSED', error: 'El bimestre ' + bim + ' no está abierto. Su padrón no se modificará.'};
+      const nuevoPadron = escribirVersionEstudiantes_(sh, padronMatriculaVigente_(actual.estudiantes), ['PADRON_' + bim]);
+      return respuestaEstudiantes_(nuevoPadron, acceso, {
         bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'
       });
     }
@@ -1014,10 +1067,16 @@ function estudiantesRuta_(body) {
       }
       const estudiantes = normalizarBaseEstudiantes_(body);
       if (!estudiantes.length) throw new Error('La actualización SIAGIE no puede dejar la base vacía.');
-      const nueva = escribirVersionEstudiantes_(sh, estudiantes, ['BASE_ACTUAL', 'PADRON_' + bim]);
-      return respuestaEstudiantes_(nueva, acceso, {
-        bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'
-      });
+      const vigentes = padronMatriculaVigente_(estudiantes);
+      // Prepare both immutable data versions before publishing either pointer.
+      try {
+        const nueva = escribirVersionEstudiantes_(sh, estudiantes, []);
+        const padron = escribirVersionEstudiantes_(sh, vigentes, []);
+        confirmarParejaEstudiantes_(sh, nueva, padron, bim);
+        const respuesta = respuestaEstudiantes_(nueva, acceso, {fuentePadron: 'actual'});
+        respuesta.padron = respuestaEstudiantes_(padron, acceso, {bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'});
+        return respuesta;
+      } catch(err) { return {ok:false, code:'SYNC_UNCONFIRMED', error:'No se confirmó la actualización SIAGIE. Consulta la base y el padrón en servidor antes de volver a operar; la confirmación pudo persistir aunque se interrumpiera la respuesta.'}; }
     }
 
     if (action === 'restorestudents') {
