@@ -5,7 +5,7 @@ const modules={'index.html':'ops','registro.html':'work','admin.html':'wide','au
 
 test('screen-only shells have functional width limits, fluid gutters and precedence over Tailwind utilities',()=>{
  const css=read('layout-shells.css');assert.match(css,/@media screen\s*\{/);assert.doesNotMatch(css,/@media print|!important|overflow:\s*hidden|zoom:|transform:|font|color:/);
- for(const [kind,width] of Object.entries({auth:560,ops:820,work:1280,wide:1400}))assert.match(css,new RegExp('\\.shell\\.shell-'+kind+'\\s*\\{\\s*max-width:\\s*'+width+'px;'));
+ for(const [kind,width] of Object.entries({auth:560,ops:820,work:1400,wide:1400}))assert.match(css,new RegExp('\\.shell\\.shell-'+kind+'\\s*\\{\\s*max-width:\\s*'+width+'px;'));
  assert.match(css,/width: 100%/);assert.match(css,/min-width: 0/);assert.match(css,/box-sizing: border-box/);assert.match(css,/padding-inline: clamp\(12px, 2vw, 24px\)/);
 });
 for(const [file,shell] of Object.entries(modules))test(file+' uses its functional main shell and a single shared stylesheet',()=>{
@@ -15,11 +15,23 @@ for(const [file,shell] of Object.entries(modules))test(file+' uses its functiona
 test('login stays compact inside shell-auth and Registro entry selector uses the simple form shell',()=>{
  assert.match(read('index.html'),/id="viewLogin" class="shell shell-auth /);assert.match(read('index.html'),/<div class="w-full max-w-sm">/);assert.match(read('registro.html'),/id="viewHome" class="hidden shell shell-auth /);
 });
-test('all HTML changes are limited to principal shell classes and stylesheet links; scripts, IDs, events and internal components are identical',()=>{
+test('HTML changes are limited to shells, stylesheet links and approved caption/subtitle presentation; business logic is identical',()=>{
  for(const file of Object.keys(modules)){
   let actual=read(file).replace(/\r\n/g,'\n').replace(/shell shell-(?:auth|ops|work|wide) /g,'').replace(/ class="shell shell-wide"/g,'').replace(/  <link rel="stylesheet" href="layout-shells.css" \/>\n/g,'');
+  if(file==='index.html')actual=actual.replace('Aportes · revisión Tutor + Admin','Aportes · consolidación Tutor + AIP');
+  if(file==='registro.html')actual=actual.replace('<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small>','<small>Dato informativo · no SIAGIE</small>');
   assert.equal(actual,original(file),file);
  }
+});
+test('Registro shares shell-work across header, context, all panels main and lower bar without per-tab widths',()=>{
+ const html=read('registro.html'),wrappers=html.match(/<(?:div|main)\b[^>]*class="[^"\n]*max-w-3xl[^"\n]*"[^>]*>/g);assert.equal(wrappers.length,4);wrappers.forEach(tag=>assert.match(tag,/shell shell-work/));
+ const start=html.indexOf('<main class="shell shell-work'),main=html.slice(html.indexOf('>',start)+1,html.indexOf('</main>',start));assert.doesNotMatch(main,/max-w-3xl|shell shell-(?:wide|ops|auth)/g);for(const panel of ['panelCalificar','panelFinales','panelAvance','panelAsistencia'])assert.match(main,new RegExp('id="'+panel+'"'));
+});
+test('Hub transversal caption reflects Tutor and Admin review without obsolete AIP attribution',()=>{
+ const module=read('index.html').match(/transversales:\s*\{[^}]+\}/)[0];assert.match(module,/desc:'Aportes · revisión Tutor \+ Admin'/);assert.doesNotMatch(module,/AIP|Tutor \+ AIP/);
+});
+test('Resumen keeps one referential average column and renders its informational subtitle on a smaller separate line',()=>{
+ const html=read('registro.html'),headers=[...html.matchAll(/<th>Promedio referencial([\s\S]*?)<\/th>/g)];assert.equal(headers.length,1);assert.match(headers[0][1],/^<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE<\/small>$/);assert.doesNotMatch(headers[0][1],/<th|<td/);
 });
 test('Apps Script tree is unchanged from the verified main base',()=>{
  const files=execFileSync('git',['ls-tree','-r','--name-only',base,'apps-script/'],{cwd:root,encoding:'utf8'}).trim().split(/\r?\n/);
