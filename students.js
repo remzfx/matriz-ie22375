@@ -138,7 +138,7 @@
   }
   async function request(action, data) {
     data = data || {};
-    const token = validToken(), scope = 'students:' + (data.bimestre || 'actual');
+    const token = validToken(), scope = 'students:' + (action === 'syncstudents' ? 'actual' : (data.bimestre || 'actual'));
     if (!token) { clear(); throw error('SESSION','Sesión ausente o vencida. Vuelve a iniciar sesión.'); }
     const epoch = authorizationEpoch;
     const requestId = (latestRequest.get(scope) || 0) + 1;
@@ -174,6 +174,11 @@
             ['authMs','studentsMs','totalMs'].forEach(k=>{const value=Number(response.timing[k]);if(Number.isFinite(value)&&value>=0)datos['backend_'+k]=value;});
             sessionStorage.setItem('ie22375_aux_timing_v1',JSON.stringify(datos));
           } catch(e) {}
+        }
+        if (action === 'syncstudents' && response.padron && response.padron.ok && response.padron.bimestre === data.bimestre && Array.isArray(response.padron.estudiantes)) {
+          const rosterScope = 'students:' + data.bimestre;
+          latestRequest.set(rosterScope, (latestRequest.get(rosterScope) || 0) + 1);
+          remember(toBase(response.padron),token,rosterScope);
         }
         return remember(toBase(response),token,scope);
       } catch(e) {

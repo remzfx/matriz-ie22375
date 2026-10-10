@@ -835,13 +835,28 @@ function escribirVersionEstudiantes_(sh, estudiantes, claves) {
   for (let i = 0; i < raw.length; i += 30000) {
     sh.appendRow(['DATOS_' + version + '_' + partes++, version, raw.slice(i, i + 30000)]);
   }
-  const manifest = JSON.stringify({partes: partes});
+  publicarVersionEstudiantes_(sh, {version: version, partes: partes}, claves);
+  return {version: version, partes: partes, estudiantes: estudiantes};
+}
+
+function publicarVersionEstudiantes_(sh, base, claves) {
+  const version = base.version, manifest = JSON.stringify({partes: base.partes});
   (claves || []).forEach(function(clave) {
     sh.appendRow([clave, version, manifest]);
   });
   SpreadsheetApp.flush();
   (claves || []).forEach(function(clave) { cachePunteroEstudiantes_(sh, [clave, version, manifest]); });
-  return {version: version, partes: partes, estudiantes: estudiantes};
+}
+
+// Only the selected open academic roster is filtered; the private base remains complete.
+function padronMatriculaVigente_(estudiantes) {
+  const otros = Object.create(null);
+  estudiantes.forEach(function(al) {
+    const estado = String(al.estadoMatricula || '').trim().toUpperCase();
+    if (estado !== 'DEFINITIVA' && estado !== 'TRASLADADO') otros[estado || 'SIN ESTADO'] = (otros[estado || 'SIN ESTADO'] || 0) + 1;
+  });
+  if (Object.keys(otros).length) throw new Error('Revisa los estados de matrícula antes de actualizar el padrón: ' + Object.keys(otros).map(function(k) { return k + ': ' + otros[k]; }).join(' · ') + '. No se realizó la actualización.');
+  return estudiantes.filter(function(al) { return String(al.estadoMatricula).trim().toUpperCase() === 'DEFINITIVA'; });
 }
 
 function normalizarBaseEstudiantes_(body) {
@@ -997,10 +1012,9 @@ function estudiantesRuta_(body) {
       if (existente) return respuestaEstudiantes_(existente, acceso, {
         bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'
       });
-      sh.appendRow(['PADRON_' + bim, actual.version, JSON.stringify({partes: actual.partes})]);
-      SpreadsheetApp.flush();
-      cachePunteroEstudiantes_(sh, ['PADRON_' + bim, actual.version, JSON.stringify({partes: actual.partes})]);
-      return respuestaEstudiantes_(actual, acceso, {
+      if (!bimestreAbierto_(bim)) return {ok: false, code: 'PERIOD_CLOSED', error: 'El bimestre ' + bim + ' no está abierto. Su padrón no se modificará.'};
+      const nuevoPadron = escribirVersionEstudiantes_(sh, padronMatriculaVigente_(actual.estudiantes), ['PADRON_' + bim]);
+      return respuestaEstudiantes_(nuevoPadron, acceso, {
         bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'
       });
     }
@@ -1014,10 +1028,15 @@ function estudiantesRuta_(body) {
       }
       const estudiantes = normalizarBaseEstudiantes_(body);
       if (!estudiantes.length) throw new Error('La actualización SIAGIE no puede dejar la base vacía.');
-      const nueva = escribirVersionEstudiantes_(sh, estudiantes, ['BASE_ACTUAL', 'PADRON_' + bim]);
-      return respuestaEstudiantes_(nueva, acceso, {
-        bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'
-      });
+      const vigentes = padronMatriculaVigente_(estudiantes);
+      // Prepare both immutable data versions before publishing either pointer.
+      const nueva = escribirVersionEstudiantes_(sh, estudiantes, []);
+      const padron = escribirVersionEstudiantes_(sh, vigentes, []);
+      publicarVersionEstudiantes_(sh, nueva, ['BASE_ACTUAL']);
+      publicarVersionEstudiantes_(sh, padron, ['PADRON_' + bim]);
+      const respuesta = respuestaEstudiantes_(nueva, acceso, {fuentePadron: 'actual'});
+      respuesta.padron = respuestaEstudiantes_(padron, acceso, {bimestre: bim, padronInicializado: true, fuentePadron: 'bimestre'});
+      return respuesta;
     }
 
     if (action === 'restorestudents') {

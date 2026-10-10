@@ -1,7 +1,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 function fixture(){
  const els=new Map();function el(id){if(!els.has(id))els.set(id,{value:'primaria',checked:false,textContent:''});return els.get(id);}
- const calls=[],parseOptions=[],window={parseCSV:(text,options)=>{parseOptions.push(options);return [{nivel:el('importNivel').value,grado:1,seccion:'Única',orden:1,nombre:'Synthetic SIAGIE'}];}};
+ const calls=[],parseOptions=[],window={parseCSV:(text,options)=>{parseOptions.push(options);return [{nivel:el('importNivel').value,grado:1,seccion:'Única',orden:1,nombre:'Synthetic SIAGIE',estadoMatricula:'DEFINITIVA'}];}};
  const c=vm.createContext({window,document:{getElementById:el},IEStudents:{load:async()=>{calls.push('load');return {inicializada:false,version:''};},initialize:async(base,version)=>{calls.push({base,version});}},confirm:()=>true});
  new vm.Script(read('students-migration.js')).runInContext(c);return {c,window,calls,parseOptions,el,api:window.IEMigrateStudents};
 }

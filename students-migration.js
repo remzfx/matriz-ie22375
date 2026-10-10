@@ -23,7 +23,21 @@
     result.ausentes=result.noVerificados||result.inconsistentes||unknownBase?null:actual.length-seen.size;
     return result;
   }
+  function resumenMatricula(estudiantes) {
+    const r={total:estudiantes.length,vigentes:0,trasladados:0,otros:0};
+    estudiantes.forEach(a=>{const estado=String(a.estadoMatricula||'').trim().toUpperCase();if(estado==='DEFINITIVA')r.vigentes++;else if(estado==='TRASLADADO')r.trasladados++;else r.otros++;});
+    return r;
+  }
+  function detalleMatricula(estudiantes) {
+    const r=resumenMatricula(estudiantes);
+    return r.total+' importados · '+r.vigentes+' vigentes · '+r.trasladados+' trasladados'+(r.otros?' · '+r.otros+' otros/sin estado: revisar':'');
+  }
+  function revisarEstados(estudiantes) {
+    if(resumenMatricula(estudiantes).otros)throw new Error('Revisa los estados de matrícula: solo DEFINITIVA entra al padrón y TRASLADADO se conserva en la base. Hay otros estados o estados ausentes; no se actualizará el padrón.');
+  }
   function pintarComparacion() {
+    texto('gestionMatricula',['primaria','secundaria'].map(n=>(n==='primaria'?'Primaria':'Secundaria')+': '+(listas[n]?detalleMatricula(listas[n]):'CSV pendiente')).join('\n'));
+
     if(!listas.primaria||!listas.secundaria){texto('gestionComparacion','Selecciona y revisa ambos CSV. Comparación: No verificado.');return;}
     if(!baseComparacion){texto('gestionComparacion','CSV listos: Primaria '+listas.primaria.length+' · Secundaria '+listas.secundaria.length+'. Continúan, nuevos y ausentes: No verificado. Consulta la base en el servidor.');return;}
     const out=['primaria','secundaria'].map(n=>{const r=compararMatricula(baseComparacion[n].estudiantes,listas[n]);return (n==='primaria'?'Primaria':'Secundaria')+': Continúan '+r.continuan+' · Nuevos '+(r.noVerificados?'No verificado':r.nuevos)+' · Trasladados en CSV '+r.trasladados+' · Ya no aparecen '+(r.ausentes===null?'No verificado':r.ausentes)+' · Duplicados/inconsistentes '+r.inconsistentes+' · Identidades por revisar '+r.noVerificados;});
@@ -32,7 +46,7 @@
   function mostrarBase(base, verificada, fallo) {
     const valid=!!(base&&base.inicializada&&base.primaria&&base.secundaria);
     baseComparacion=valid&&verificada&&!base.offline?JSON.parse(JSON.stringify(base)):null;
-    ['primaria','secundaria'].forEach(n=>texto(n==='primaria'?'gestionPrimaria':'gestionSecundaria',valid?base[n].estudiantes.length+' estudiantes'+(baseComparacion?' · servidor':' · caché, no verificado'):'No verificado'));
+    ['primaria','secundaria'].forEach(n=>texto(n==='primaria'?'gestionPrimaria':'gestionSecundaria',valid?base[n].estudiantes.length+' estudiantes'+(baseComparacion?' · servidor':' · caché, no verificado')+' · '+detalleMatricula(base[n].estudiantes):'No verificado'));
     texto('gestionServidor',fallo?'Error · '+fallo:baseComparacion?'Verificado en esta consulta':base&&base.inicializada===false?'Disponible · base pendiente de inicialización':valid?'Caché · servidor no verificado':'No verificado');
     pintarComparacion();
   }
@@ -131,7 +145,8 @@
       const actual = await (IEStudents.inspect || IEStudents.load)();
       if (actual.offline) throw new Error('La creación del padrón requiere conexión.');
       if (!actual.inicializada) throw new Error('Primero inicializa la base privada.');
-      if (!confirm('¿Crear el padrón del bimestre ' + bim + ' desde la base SIAGIE vigente? Si ya existe, no se reemplazará.')) return;
+      revisarEstados(actual.primaria.estudiantes.concat(actual.secundaria.estudiantes));
+      if (!confirm('¿Crear el padrón del bimestre ' + bim + ' desde la matrícula DEFINITIVA de la base SIAGIE? Los trasladados permanecen en la base. Si ya existe, no se reemplazará.')) return;
       const padron = await IEStudents.seedRoster(actual.version, bim);
       mensaje('Padrón ' + bim + ' listo: Primaria ' + padron.primaria.estudiantes.length + ' · Secundaria ' + padron.secundaria.estudiantes.length + '.');
     } catch(e) { mensaje(e.message); }
@@ -149,13 +164,16 @@
       if (actual.offline) throw new Error('La actualización requiere conexión al backend.');
       if (!actual.inicializada) throw new Error('Primero inicializa la base privada.');
       const totalAntes = actual.primaria.estudiantes.length + actual.secundaria.estudiantes.length;
-      const totalNuevo = listas.primaria.length + listas.secundaria.length;
-      if (!confirm('¿Actualizar la base SIAGIE vigente y el padrón del bimestre ' + bim + '?\n\nActual: ' + totalAntes + ' estudiantes · Nueva lista: ' + totalNuevo + '.\n\nLas notas ya guardadas no se modifican; los alumnos que ya no estén en esta lista dejarán de aparecer en el padrón activo del bimestre.')) return;
+      const csv = listas.primaria.concat(listas.secundaria);
+      revisarEstados(csv);
+      const totalNuevo = csv.length, matricula = resumenMatricula(csv);
+      if (!confirm('¿Actualizar la base SIAGIE vigente y el padrón del bimestre ' + bim + '?\n\nActual: ' + totalAntes + ' estudiantes · Nueva base: ' + totalNuevo + '. Padrón: ' + matricula.vigentes + ' vigentes; ' + matricula.trasladados + ' trasladados se conservan solo en la base.\n\nLas notas ya guardadas no se modifican; los alumnos que ya no estén en esta lista dejarán de aparecer en el padrón activo del bimestre.')) return;
       const base = await IEStudents.sync(
         {primaria: {estudiantes: listas.primaria}, secundaria: {estudiantes: listas.secundaria}},
         actual.version, bim
       );
-      mensaje('Actualización SIAGIE aplicada al bimestre ' + bim + ': Primaria ' + base.primaria.estudiantes.length + ' · Secundaria ' + base.secundaria.estudiantes.length + '. Las notas existentes permanecen intactas.');
+      mostrarBase(base, true);
+      mensaje('Actualización SIAGIE aplicada al bimestre ' + bim + ': Base Primaria ' + detalleMatricula(base.primaria.estudiantes) + ' · Base Secundaria ' + detalleMatricula(base.secundaria.estudiantes) + '. Padrón académico: solo matrícula DEFINITIVA. Las notas existentes permanecen intactas.');
     } catch(e) { mensaje(e.message); }
     finally { ocupada = false; }
   }
@@ -176,5 +194,5 @@
     } catch(e) { mensaje(e.message); }
     finally { ocupada = false; }
   }
-  global.IEMigrateStudents = {compararMatricula: compararMatricula, mostrarBase: mostrarBase, bimestreVista: bimestreVista, importar: importar, verificar: verificar, verificarPadron: verificarPadron, crearPadron: crearPadron, sincronizarPadron: sincronizarPadron, inicializar: inicializar};
+  global.IEMigrateStudents = {resumenMatricula: resumenMatricula, compararMatricula: compararMatricula, mostrarBase: mostrarBase, bimestreVista: bimestreVista, importar: importar, verificar: verificar, verificarPadron: verificarPadron, crearPadron: crearPadron, sincronizarPadron: sincronizarPadron, inicializar: inicializar};
 })(window);
