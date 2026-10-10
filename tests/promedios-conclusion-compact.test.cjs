@@ -77,7 +77,7 @@ test('Conclusion removal leaves identical grade controls and no conditional cent
  f.grade(f.cp,15);const after=f.html();assert.match(after,/<div class="final-cell-layout"><div class="final-grade">/);assert.doesNotMatch(after,/final-conclusion/);
  f.grade(f.cp,8);assert.equal(f.html().match(/<div class="final-grade">([\s\S]*?)<\/div><div class="final-conclusion"/)[1],before);
  const css=read('registro.html').slice(read('registro.html').indexOf('.final-cell-layout'),read('registro.html').indexOf('.summary-stats'));
- assert.doesNotMatch(css,/justify-content:space-between|justify-content:center|grid-template-columns:auto/);
+ assert.doesNotMatch(css.replace(/\.final-grade \.fin-clear-direct[^{}]*\{[^}]*\}/g,''),/justify-content:space-between|justify-content:center|grid-template-columns:auto/);
 });
 test('Flexible conclusion cannot impose its long text intrinsic width on the grade column',()=>{
  const f=view('secundaria','C','Synthetic text '.repeat(100));assert.match(f.html(),/final-conclusion/);

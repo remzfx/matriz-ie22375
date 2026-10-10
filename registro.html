@@ -16,6 +16,10 @@
   .final-grade{grid-column:1;width:100px;min-width:100px;display:flex;flex-direction:column;align-items:center;}
   .final-grade > .fin-cell{width:100%;min-width:0;}
   .final-grade button{max-width:100%;overflow-wrap:anywhere;}
+  .final-grade .fin-clear-direct{box-sizing:border-box;display:flex;align-items:center;justify-content:center;align-self:center;flex:0 0 auto;width:26px;height:26px;min-width:26px;min-height:26px;margin:2px 0 0;padding:0;border:1px solid #fecdd3;border-radius:50%;background:#fff1f2;color:#be123c;font-size:17px;font-weight:600;line-height:1;cursor:pointer;box-shadow:none;}
+  .final-grade .fin-clear-direct:hover{background:#ffe4e6;border-color:#fda4af;}
+  .final-grade .fin-clear-direct:focus-visible{outline:2px solid #be123c;outline-offset:2px;}
+  @media(max-width:640px){.final-grade .fin-clear-direct{width:32px;height:32px;min-width:32px;min-height:32px;}}
   .final-conclusion{text-align:left;min-width:0;width:100%;max-width:180px;font-size:11px;}
   .final-conclusion label{display:block;font-size:10px;font-weight:600;}
   .final-conclusion select,.final-conclusion textarea{width:100%;min-width:0;box-sizing:border-box;font-size:11px;line-height:1.25;padding:4px;}
@@ -2701,13 +2705,13 @@ function renderFinales() {
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+ev.letra+'</div>' : '') +
-          (Object.keys(original).length&&!original.borrado?'<button type="button" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" '+(lock?'disabled':'')+'>Quitar directo</button>':'')+'</div>';
+          (Object.keys(original).length&&!original.borrado&&!lock&&!registroSoloLectura()?'<button type="button" class="fin-clear-direct" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" title="Quitar directo" aria-label="Quitar directo">×</button>':'')+'</div>';
       } else {
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
           '<span class="eq-letter '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'">'+(letra||ofi.letra||'—')+'</span>' +
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+(numeroExactoComp(cp,studentKey(al))?pad2(ev.nota)+' · ':'')+ev.letra+'</div>' : '') +
-          (Object.keys(original).length&&!original.borrado?'<button type="button" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" '+(lock?'disabled':'')+'>Quitar directo</button>':'')+'</div>';
+          (Object.keys(original).length&&!original.borrado&&!lock&&!registroSoloLectura()?'<button type="button" class="fin-clear-direct" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" title="Quitar directo" aria-label="Quitar directo">×</button>':'')+'</div>';
       }
       const required=IERegistroAcademico.requiresConclusion(c.nivel,ofi.letra);
       const conclusion=required?IEConclusionSuggestions.compactHtml(cp,concCompAlumno(cp,studentKey(al)),'data-id="'+encN+'" data-comp="'+encC+'"',lock):'';

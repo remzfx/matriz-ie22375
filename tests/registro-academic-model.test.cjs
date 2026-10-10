@@ -69,3 +69,27 @@ test('academic download from another context/token is discarded and cannot repla
 test('missing academic dependency never falls back to an unversioned official upload',async()=>{const f=uploadFixture();f.c.IERegistroAcademico=undefined;assert.equal(await f.c.subirRegistroNube(),false);assert.equal(f.calls.length,0);assert.match(f.el('toast').textContent,/No se cargó el modelo académico/);});
 
 for(const level of ['primaria','secundaria'])test(level+': official print summary includes own C conclusion and inactive label, never historical area conclusion',()=>{const f=ui(level);f.c.setTimeout=()=>0;f.el('inpDocente').value='Synthetic Teacher';f.grade(f.comps[0],8);f.conclusion(f.comps[0],'Own printed competence conclusion');f.c.store.concArea.old={texto:'Forbidden general area conclusion'};f.c.setCompetenciaTrabajada(f.comps[1],false);vm.runInContext(extract('prepararImpresion'),f.c);f.c.prepararImpresion();const html=f.el('printArea').innerHTML;assert.match(html,/Resultados bimestrales por competencia/);assert.match(html,/Own printed competence conclusion/);assert.match(html,/No trabajada este bimestre/);assert.doesNotMatch(html,/Forbidden general area conclusion/);});
+
+for(const mode of ['letra','num'])test('Promedios '+mode+' uses accessible compact cross below grade, never conclusion',()=>{
+ const f=ui();f.c.modoCalif=mode;f.grade(f.comps[0],8);f.conclusion(f.comps[0],'Preserved conclusion');f.c.renderFinales();const html=f.el('finLista').innerHTML;
+ const match=html.match(/<div class="final-grade">([\s\S]*?)<\/button><\/div><\/div>/);assert.ok(match);
+ assert.match(match[1],/class="fin-clear-direct"[^>]*data-quitar-directo="[^" ]+"[^>]*data-alumno="[^" ]+"[^>]*title="Quitar directo" aria-label="Quitar directo">×$/);
+ assert.doesNotMatch(html,/>Quitar directo<|disabled[^>]*>×/);assert.match(html,/final-conclusion/);
+ if(mode==='num')assert.ok(match[1].indexOf('fin-nota')<match[1].indexOf('eq-letter')&&match[1].indexOf('eq-letter')<match[1].indexOf('fin-clear-direct'));
+ else assert.ok(match[1].indexOf('data-val="AD"')<match[1].indexOf('fin-clear-direct'));
+});
+for(const mode of ['letra','num'])test('Promedios '+mode+' cross is absent for evidence-only, tombstones and readonly contexts',()=>{
+ const f=ui(),cp=f.comps[0];f.c.modoCalif=mode;f.c.notaDesdeSesiones=()=>({nota:8,letra:'C'});f.c.renderFinales();assert.doesNotMatch(f.el('finLista').innerHTML,/fin-clear-direct/);
+ f.grade(cp,8);f.c.renderFinales();assert.match(f.el('finLista').innerHTML,/fin-clear-direct/);
+ f.c.registroSoloLectura=()=>true;f.c.renderFinales();assert.doesNotMatch(f.el('finLista').innerHTML,/fin-clear-direct/);
+ f.c.registroSoloLectura=()=>false;f.c.bimCerradoDocente=()=>true;f.c.renderFinales();assert.doesNotMatch(f.el('finLista').innerHTML,/fin-clear-direct/);
+ f.c.bimCerradoDocente=()=>false;f.c.store.finales[f.c.finalKey(cp,f.id)]={borrado:true,ts:Date.now()};f.c.renderFinales();assert.doesNotMatch(f.el('finLista').innerHTML,/fin-clear-direct/);
+});
+test('Compact cross CSS isolates desktop/mobile sizes and retains fixed grade/conclusion grid',()=>{
+ const html=read('registro.html');assert.match(html,/\.final-grade \.fin-clear-direct\{[^}]*width:26px;height:26px;min-width:26px;min-height:26px/);assert.match(html,/margin:2px 0 0;padding:0/);assert.match(html,/background:#fff1f2;color:#be123c;font-size:17px;font-weight:600/);assert.match(html,/fin-clear-direct:focus-visible/);assert.match(html,/fin-clear-direct:hover/);assert.match(html,/\.fin-clear-direct\{width:32px;height:32px;min-width:32px;min-height:32px/);
+ const old=require('node:child_process').execFileSync('git',['show','cb233470f17b7c0bf977805a7ac42371b4d41357:registro.html'],{encoding:'utf8'});
+ for(const selector of ['final-cell-layout','final-grade','final-conclusion']){const re=new RegExp('\\.'+selector+'\\{[^}]+\\}');assert.equal(html.match(re)[0],old.match(re)[0]);}
+ const source=extract('renderFinales');assert.ok(source.includes('Object.keys(original).length&&!original.borrado&&!lock&&!registroSoloLectura()'));
+ const handler=x=>x.slice(x.indexOf("box.querySelectorAll('[data-quitar-directo]')"),x.indexOf("box.querySelectorAll('[data-quitar-directo]')")+x.slice(x.indexOf("box.querySelectorAll('[data-quitar-directo]')")).indexOf('\n'));
+ assert.equal(handler(html),handler(old));
+});
