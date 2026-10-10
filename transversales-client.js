@@ -4,7 +4,7 @@
   const API='https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
   const grading=global.IERegistroEvaluacion,COMP=grading.COMP,CAPS=grading.CAPS;
   const ACTIONS=['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','procesartransversales','loadtransversalexport'];
-  const AREA_LABELS={'Arte y Cultura':'ART','Ciencia y Tecnología':'CYT','Ciencias Sociales':'CCSS','Comunicación':'COM','Desarrollo Personal, Ciudadanía y Cívica':'DPCC','Educación Física':'EFIS','Educación Religiosa':'REL','Educación para el Trabajo':'EPT','Inglés':'ING','Matemática':'MAT'};
+  const AREA_LABELS={'Arte y Cultura':'ART','Ciencia y Tecnología':'CYT','Ciencias Sociales':'CCSS','Comunicación':'COM','Desarrollo Personal, Ciudadanía y Cívica':'DPCC','Educación Física':'EFIS','Educación Religiosa':'REL','Educación para el Trabajo (EPT)':'EPT','Educación para el Trabajo':'EPT','Inglés':'ING','Matemática':'MAT'};
   let bridge=null;const pending=new Map();
   function valor(raw){return grading.valor(raw);}
   function start(){if(!bridge&&global.IELoginBridge&&document.body)try{bridge=global.IELoginBridge.create(API,'transversales');}catch(e){}return bridge;}
@@ -39,13 +39,30 @@
     [['letra','Letras'],['num','0–20']].forEach(([v,label])=>{const opt=document.createElement('option');opt.value=v;opt.textContent=label;modeEl.appendChild(opt);});toolbar.appendChild(modeEl);
     const tabs=text('div','',toolbar);tabs.setAttribute('role','tablist');
     Object.entries(COMP).forEach(([cp,label])=>{const tab=text('button',cp==='tic'?'TIC':'GESTIONA SU APRENDIZAJE',tabs);tab.dataset.competence=cp;tab.setAttribute('role','tab');tab.onclick=()=>{competence=cp;draw();};});
+    const apply=data.puedeFinal?text('button','Aplicar sugeridos a Final',toolbar):null;
     const competenceTitle=text('h3','',container),completeness=text('p','',container);
     text('p','18–20 → AD · 14–17 → A · 11–13 → B · 0–10 → C. Cambiar el modo no modifica valoraciones guardadas.',container);
     if(data.politica)text('p','Año lectivo '+data.politica.anio+' · Solo aportes habilitados por Admin. Sugerencia: mayoría de áreas, un voto efectivo (el más reciente) por área; empate sin sugerencia. La decisión oficial pertenece al Tutor.',container);
     const message=text('p','',container),aportesStatus=text('p','',container),rows=text('div','',container),buttons=text('div','',container);
     function procesable(){return token===global.IEStudents.validToken()&&data.flujoTutor&&Array.isArray(data.aportesPendientes)&&data.aportesPendientes.length===0&&data.abierto&&data.puedeProcesar&&(data.tutores||[]).length===1&&!Object.keys(draft).length&&data.estudiantes.length&&data.estudiantes.every(al=>Object.keys(COMP).every(cp=>{const f=data.resultados[al.id][cp].final;return f&&f.versionAportes===data.versionAportes&&(f.nivel!=='C'||String(f.conclusion||'').trim());}));}
     function changed(id,comp,raw){if(token!==global.IEStudents.validToken()||!data.puedeFinal||!data.abierto||busy)return;draft[id]=draft[id]||{};draft[id][comp]=Object.assign({},draft[id][comp]||data.resultados[id][comp].final||{},raw);buttons.querySelectorAll('button').forEach(b=>{if(b.dataset.process)b.disabled=true;});if(raw.modo)draw();}
+    if(apply)apply.onclick=()=>{
+      if(busy||!data.abierto||!data.puedeFinal||token!==global.IEStudents.validToken())return;
+      let applied=0;
+      data.estudiantes.forEach(al=>{
+        const result=data.resultados[al.id][competence],record=(draft[al.id]||{})[competence]||result.final;
+        if(record&&['AD','A','B','C'].includes(record.nivel))return;
+        const suggested=result.resumen.sugerencia;
+        if(!['AD','A','B','C'].includes(suggested))return;
+        draft[al.id]=draft[al.id]||{};
+        draft[al.id][competence]=Object.assign({},record||{},valor({modo:'letra',valor:suggested}));
+        applied++;
+      });
+      message.textContent=applied+' sugeridos aplicados como borrador. Revisa antes de guardar y enviar.';
+      draw();
+    };
     function draw(){
+      if(apply)apply.disabled=busy||!data.abierto||token!==global.IEStudents.validToken();
       if(token!==global.IEStudents.validToken()){data.estudiantes=[];data.aportesPendientes=[];draft={};message.textContent='La sesión cambió. Ingresa nuevamente.';}
       const pendientes=data.aportesPendientes;
       aportesStatus.textContent=!data.puedeFinal?'':!Array.isArray(pendientes)?'No se pudo verificar la integridad de los aportes. Actualiza el backend antes de enviar.':pendientes.length?'Envío oficial bloqueado: '+pendientes.length+' aportes incompletos. '+pendientes[0].nombre+' · '+COMP[pendientes[0].comp]+' · '+pendientes[0].area+(pendientes[0].docente?' · '+pendientes[0].docente:'')+' · '+pendientes[0].motivo+'. Puedes guardar la decisión del Tutor como borrador.':'';
@@ -177,6 +194,7 @@
       if(!data.aulas.length){msg.textContent='No tiene aulas de tutoría autorizadas.';return;}
       data.aulas.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v.replace('|','° ');aula.appendChild(o);});
       ['I','II','III','IV'].forEach(v=>{const o=document.createElement('option');o.value=v;const state=(data.periodos&&data.periodos.bimestres||{})[v]||'bloqueado';o.textContent=v+' · '+state+(state==='abierto'?'':' 🔒');bim.appendChild(o);});
+      bim.value=['I','II','III','IV'].find(v=>(data.periodos&&data.periodos.bimestres||{})[v]==='abierto')||'I';
       aula.onchange=load;bim.onchange=load;document.getElementById('transReload').onclick=load;await load();
     }catch(e){if(disposed)return;msg.textContent=e.message;document.getElementById('transReload').onclick=initialize;}}
     controller.ready=initialize();return controller;
