@@ -38,12 +38,12 @@ test('Photochecks keeps exact print rules, QR dimensions and legacy print wrappe
  const old=original('photochecks.html'),now=read('photochecks.html').replace(/\r\n/g,'\n');assert.equal(now.match(/<style>([\s\S]*?)<\/style>/)[1],old.match(/<style>([\s\S]*?)<\/style>/)[1]);assert.match(now,/<main class="shell shell-wide max-w-4xl mx-auto px-4 py-4">/);
 });
 test('SW changes only static version and shared stylesheet entry, preserving API transport and cache policy',()=>{
- const sw=read('sw.js').replace(/\r\n/g,'\n');assert.match(sw,/CACHE_PREFIX \+ 'v17'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace("CACHE_PREFIX + 'v17'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
+ const sw=read('sw.js').replace(/\r\n/g,'\n');assert.match(sw,/CACHE_PREFIX \+ 'v18'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace("CACHE_PREFIX + 'v18'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
 });
-test('v17 installs actual shared CSS and serves it offline without caching external Apps Script POST',async()=>{
+test('v18 installs actual shared CSS and serves it offline without caching external Apps Script POST',async()=>{
  const setup=new Function('require','__dirname',read('tests/service-worker-static.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname),s=setup(),css=read('layout-shells.css');
  s.network(async req=>new Response(req.url.endsWith('.css')?css:req.url.endsWith('.js')?'/* JS */':'<html>static</html>',{headers:{'Content-Type':req.url.endsWith('.css')?'text/css':req.url.endsWith('.js')?'application/javascript':'text/html'}}));
- s.cache('matriz-ie22375-v13');await s.dispatch('install');await s.dispatch('activate');assert.equal(s.stores.has('matriz-ie22375-v13'),false);assert.equal(s.stores.has('matriz-ie22375-v17'),true);
+ s.cache('matriz-ie22375-v13');await s.dispatch('install');await s.dispatch('activate');assert.equal(s.stores.has('matriz-ie22375-v13'),false);assert.equal(s.stores.has('matriz-ie22375-v18'),true);
  s.offline();const response=await s.dispatch('fetch',{request:s.request('layout-shells.css')});assert.equal(await response.text(),css);assert.equal(response.headers.get('Content-Type'),'text/css');
- const req=new Request('https://script.google.com/macros/s/synthetic/exec',{method:'POST',body:'synthetic'});assert.equal(await s.dispatch('fetch',{request:req}),undefined);assert.equal(await s.cache('matriz-ie22375-v17').match(req),undefined);
+ const req=new Request('https://script.google.com/macros/s/synthetic/exec',{method:'POST',body:'synthetic'});assert.equal(await s.dispatch('fetch',{request:req}),undefined);assert.equal(await s.cache('matriz-ie22375-v18').match(req),undefined);
 });

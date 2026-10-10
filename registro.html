@@ -12,9 +12,14 @@
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
   .worked-label{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;}
-  .conclusion-compact{max-width:190px;margin:6px auto;text-align:left;white-space:normal;}
-  .conclusion-compact summary{cursor:pointer;min-height:44px;display:flex;align-items:center;}
-  .conclusion-compact textarea,.conclusion-compact select{width:100%;min-width:0;}
+  .final-cell-layout{display:block;}
+  .final-cell-layout.has-conclusion{display:grid;grid-template-columns:auto minmax(130px,180px);gap:8px;align-items:start;}
+  .final-conclusion{text-align:left;min-width:0;font-size:11px;}
+  .final-conclusion label{display:block;font-size:10px;font-weight:600;}
+  .final-conclusion select,.final-conclusion textarea{width:100%;min-width:0;box-sizing:border-box;font-size:11px;line-height:1.25;padding:4px;}
+  .final-conclusion select{min-height:44px;}
+  .final-conclusion textarea{min-height:54px;resize:vertical;margin-top:4px;}
+  @media(max-width:640px){.final-cell-layout.has-conclusion{grid-template-columns:1fr;}.final-conclusion{max-width:180px;}}
   .summary-stats{margin:14px 0;padding:12px;border:1px solid #cbd5e1;border-radius:12px;}
   .summary-counts{display:flex;flex-wrap:wrap;gap:12px;}
   .worked-label input[type=checkbox]{width:17px;height:17px;min-height:17px;padding:0;flex:0 0 17px;}
@@ -2681,22 +2686,23 @@ function renderFinales() {
       if(!competenciaTrabajada(cp)){tds+='<td>No trabajada este bimestre</td>';return;}
       const encN = encodeURIComponent(studentKey(al));
       const encC = encodeURIComponent(cp);
+      let grade='';
       if (modoCalif === 'letra') {
         const L = letra || ofi.letra || '';
-        tds += '<td><div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
+        grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+ev.letra+'</div>' : '') +
-          (Object.keys(original).length&&!original.borrado?'<button type="button" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" '+(lock?'disabled':'')+'>Quitar directo</button>':'')+'</div></td>';
+          (Object.keys(original).length&&!original.borrado?'<button type="button" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" '+(lock?'disabled':'')+'>Quitar directo</button>':'')+'</div>';
       } else {
-        tds += '<td><div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
+        grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
           '<span class="eq-letter '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'">'+(letra||ofi.letra||'—')+'</span>' +
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+(numeroExactoComp(cp,studentKey(al))?pad2(ev.nota)+' · ':'')+ev.letra+'</div>' : '') +
-          (Object.keys(original).length&&!original.borrado?'<button type="button" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" '+(lock?'disabled':'')+'>Quitar directo</button>':'')+'</div></td>';
+          (Object.keys(original).length&&!original.borrado?'<button type="button" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" '+(lock?'disabled':'')+'>Quitar directo</button>':'')+'</div>';
       }
-      const text=concCompAlumno(cp,studentKey(al)),required=IERegistroAcademico.requiresConclusion(c.nivel,ofi.letra);
-      const conclusion='<details class="conclusion-compact"><summary>Conclusión'+(required?' · Obligatoria':'')+'</summary><label>Conclusión descriptiva'+(typeof IEConclusionSuggestions!=='undefined'?IEConclusionSuggestions.html(cp):'')+'<textarea class="academic-conclusion" data-id="'+encN+'" data-comp="'+encC+'" maxlength="2000" '+(required?'required ':'')+(lock?'readonly':'')+'>'+escapeRegistro(text)+'</textarea></label></details>';
-      tds=tds.slice(0,-5)+conclusion+'</td>';
+      const required=IERegistroAcademico.requiresConclusion(c.nivel,ofi.letra);
+      const conclusion=required?IEConclusionSuggestions.compactHtml(cp,concCompAlumno(cp,studentKey(al)),'data-id="'+encN+'" data-comp="'+encC+'"',lock):'';
+      tds+='<td><div class="final-cell-layout'+(required?' has-conclusion':'')+'"><div class="final-grade">'+grade+'</div>'+conclusion+'</div></td>';
     });
     return '<tr>'+tds+'</tr>';
   }).join('');
@@ -2754,8 +2760,7 @@ function renderFinales() {
   });
   box.querySelectorAll('[data-quitar-directo]').forEach(el=>el.onclick=()=>{const cp=decodeURIComponent(el.dataset.quitarDirecto),id=decodeURIComponent(el.dataset.alumno),k=finalKey(cp,id);if(registroSoloLectura()||bimCerradoDocente()||!competenciaTrabajada(cp)||!leerNota(store.finales,k))return;baselineAcademica();store.finales[k]={borrado:true,ts:Date.now()};saveStore();dirtyAcademico();renderFinales();});
   box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
-  box.querySelectorAll('.academic-conclusion').forEach(el=>el.oninput=()=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value));
-  if(typeof IEConclusionSuggestions!=='undefined')IEConclusionSuggestions.bind(box);
+  IEConclusionSuggestions.bindCompact(box,(el,text)=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),text));
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);
   sincronizarEdicionRegistro();
 }
