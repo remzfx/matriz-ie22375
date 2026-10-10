@@ -19,7 +19,7 @@
   function reconcile(e){const invalid=Object.keys(e.invalid).length>0;e.dirty=invalid||canonical(e.evidence)!==e.baseline;if(!invalid&&e.notice&&e.notice.kind==='invalid'){e.notice={message:e.dirty?'Competencias transversales con cambios sin guardar.':'Aportes transversales sin cambios pendientes.',attention:false};if(current()===e)syncStatus();}}
   function context(){const c=ctxBase();return {bimestre:c.bim,grado:c.grado,seccion:c.seccion,area:c.area};}
   function key(){return JSON.stringify([IEStudents.validToken(),context()]);}
-  function eligible(){const s=getLoginSession();return nivel==='secundaria'&&s&&s.role==='docente'&&areaActual&&areaActual!=='Competencias Transversales';}
+  function eligible(){const s=getLoginSession();return nivel==='secundaria'&&s&&s.role==='docente'&&areaActual&&(s.aportesTransversales&&s.aportesTransversales[areaActual]||[]).includes(String(ctxBase().grado)+'|'+String(ctxBase().seccion));}
   function current(){return eligible()?drafts.get(key()):null;}
   function editable(e=current()){return !!(e&&e.loaded&&!e.denied&&e.data.abierto&&e.data.soportaDirectos===true&&e.token===IEStudents.validToken()&&!registroSoloLectura()&&!bimCerradoDocente());}
   function syncStatus(){const e=current(),notice=e&&e.notice,el=document.getElementById('registroTransStatus'),box=document.getElementById('registroTransAviso');if(el)el.textContent=notice?notice.message:'';if(box)box.hidden=!(notice&&notice.attention);}
@@ -151,15 +151,15 @@
     }catch(err){if(err.code==='CONFLICT')e.conflict=true;if(err.code==='SESSION')e.denied=true;if(current()===e)status(err.code==='CONFLICT'?'CONFLICT: el aporte cambió en otro dispositivo. Recarga y revisa; tu borrador sigue en esta pestaña.':'Las notas del área se guardaron localmente, pero las competencias transversales aún no se pudieron guardar. Reintenta.',true);return false;}finally{e.saving=null;}})();return e.saving;
   }
   async function syncForUpload(){
-    if(!eligible())return false;
-    const k=key();capture();const e=current();if(!e)return true;const hasEvidence=(e.evidence.sessions||[]).length||Object.keys(e.evidence.directos||{}).length||Object.keys(e.evidence.grades||{}).length;if(!hasEvidence&&!e.dirty)return true;if(e.saving)await e.saving;
+    if(!eligible())return true;
+    const k=key();capture();const e=current();if(e&&e.saving)await e.saving;
     if(key()!==k)return false;
     if(current())current().loadFailed=false;
     await load(false,true);
     const live=current();if(key()!==k||!editable(live)||live.loadFailed||live.conflict||!live.data.soportaConclusiones)return false;
-    if(missingConclusions(live)){status('Falta conclusión descriptiva en competencias transversales con nivel C. El aporte queda pendiente; las notas académicas siguen disponibles.',true);refreshSummary();return false;}
+    if(live.data.estudiantes.some(a=>Object.keys(core.COMP).some(comp=>!(result(live).valores[a.id]||{})[comp]))||missingConclusions(live)){status('Faltan resultados transversales o conclusión descriptiva para C. El aporte queda pendiente; las notas académicas siguen disponibles.',true);refreshSummary();return false;}
     const ok=await save(true);return ok&&key()===k&&!live.dirty&&!live.conflict&&!live.denied&&!missingConclusions(live);
   }
   if(global.addEventListener)global.addEventListener('beforeunload',event=>{if([...drafts.values()].some(e=>e.dirty)){event.preventDefault();event.returnValue='';}});
-  global.IERegistroTransversales={load,current,editable,columns,sessions,add,remove,removeDate,cell,bind,finals,summary,save,capture,result,setDirect,setConclusion,missingConclusions,identity,syncStatus,syncForUpload};
+  global.IERegistroTransversales={eligible,load,current,editable,columns,sessions,add,remove,removeDate,cell,bind,finals,summary,save,capture,result,setDirect,setConclusion,missingConclusions,identity,syncStatus,syncForUpload};
 })(window);

@@ -179,6 +179,8 @@
     .print-sign { display: flex; justify-content: space-between; margin-top: 28px; }
     .print-sign div { width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 4px; }
   }
+.trans-grid-wrap{overflow-x:auto;max-width:100%;margin:1rem 0}.trans-grid{border-collapse:collapse;min-width:900px;width:100%}.trans-grid th,.trans-grid td{padding:.65rem;border:1px solid #cbd5e1;vertical-align:top}.trans-grid .trans-student{position:sticky;left:0;background:#fff;min-width:220px;max-width:260px;z-index:1;text-align:left}.trans-detail>summary{min-height:44px;cursor:pointer;padding:.3rem;max-width:280px}.trans-detail[open]{min-width:290px;max-width:390px}.trans-detail textarea{display:block;width:100%;min-height:88px}.trans-detail input,.trans-detail select{min-height:44px}@media(max-width:640px){.trans-grid .trans-student{min-width:170px;max-width:180px}.trans-detail>summary{min-width:170px}}
+
 </style>
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
@@ -300,6 +302,15 @@
       <div id="areaBtns" class="flex flex-wrap gap-1.5"></div>
     </div>
 
+    <section id="registroTutorPanel" hidden class="card p-3">
+      <h2>COMPETENCIAS TRANSVERSALES · Tutor</h2>
+      <p>Aportes habilitados → decisión del Tutor → registro oficial.</p>
+      <label>Aula tutorada <select id="transAula"></select></label>
+      <label>Bimestre <select id="transBim"></select></label>
+      <button type="button" class="btn btn-ghost" id="transReload">Reintentar / actualizar</button>
+      <p id="transStatus" role="status">Verificando tutorías…</p><div id="transRows"></div>
+    </section>
+    <div id="registroAcademicoPanel">
     <div id="registroAccionesAcademicas" class="flex gap-2 flex-wrap">
       <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
       <button type="button" id="tabFin" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('fin')">Promedios</button>
@@ -325,7 +336,7 @@
           </div>
           <div class="fin-header-aux">
             <div id="finResumen"></div>
-            <a href="transversales.html" id="registroTutorLink" hidden>Consolidar competencias transversales</a>
+
           </div>
         </header>
         <div id="finLista" class="fin-wrap fin-scroll-body"></div>
@@ -441,9 +452,10 @@
       <div id="stuList" class="mt-2"></div>
     </div>
     </div><!-- /panelCalificar -->
-  </main>
+  </div><!-- /registroAcademicoPanel -->
+</main>
 
-  <div class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
+  <div id="registroAcademicFooter" class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
     <div class="shell shell-work max-w-3xl mx-auto px-3 py-2 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between text-xs font-bold">
       <div class="flex gap-1.5 flex-wrap">
         <span class="px-2 py-1 rounded-lg bg-red-50 text-red-700">C <span id="cC">0</span></span>
@@ -681,6 +693,7 @@ function mergeRegistroPayload(p) {
   return n;
 }
 async function subirRegistroNube() {
+  if(document.getElementById('registroTutorPanel')?.hidden===false){toast('Envía las decisiones desde el módulo del Tutor.');return false;}
   if(typeof IERegistroAcademico==='undefined'){toast('No se cargó el modelo académico. El borrador local se conserva; reintenta antes de enviar.');return false;}
   if (subirRegistroNube.pending) return subirRegistroNube.pending;
   const tarea = (async()=>{
@@ -703,7 +716,7 @@ async function subirRegistroNube() {
   const tokenSubida = (getLoginSession() || {}).token || '';
   const contextoSubida = JSON.stringify(c);
   let aporteSincronizado=true;
-  if(adapter){try{aporteSincronizado=await adapter.syncForUpload();}catch(e){aporteSincronizado=false;}}
+  if(adapter){try{aporteSincronizado=await adapter.syncForUpload();}catch(e){aporteSincronizado=false;}if(!aporteSincronizado){toast('Aporte transversal asignado pendiente. Completa TIC/Gestiona y sus conclusiones C antes de subir el área.');return false;}}
   if(adapter&&(tokenTransSubida!==IEStudents.validToken()||(adapter.current()||{}).denied)){toast('La sesión transversal cambió o fue rechazada. Vuelva a iniciar sesión.');return false;}
   if(registroNubeNoVerificada()||tokenSubida!==((getLoginSession()||{}).token||'')||contextoSubida!==JSON.stringify(ctxBase())){toast('El contexto o la sesión cambió. Trabajo local conservado.');return false;}
   if(adapter){const invalidasAhora=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!==''&&(!Number.isFinite(Number(inp.value))||Number(inp.value)<0||Number(inp.value)>20));if(invalidasAhora||guardarTodo()===false){toast('Hay cambios académicos inválidos o sin guardar. Corrige y reintenta.');return false;}const info=informeSiagie();if(!info.ok){toast('Área académica pendiente: '+[...info.faltanNota,...info.faltanConc].slice(0,3).join(' · '));return false;}}
@@ -1518,7 +1531,7 @@ function updateHdr() {
   if (typeof sincronizarDatosRegistro === 'function') sincronizarDatosRegistro();
   fixHdrHeight();
   const ses=getLoginSession(),aviso=document.getElementById('registroTransAviso');if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.syncStatus();else if(aviso)aviso.hidden=true;
-  const link=document.getElementById('registroTutorLink');if(link)link.hidden=!(nivel==='secundaria'&&ses&&(ses.tutorAulas||[]).includes(aulaKey(g,s)));
+
 }
 
 function cerrarTransversalesRegistro(){
@@ -1531,9 +1544,10 @@ function claveCompetenciaTransversal(comp){
 }
 function esCompetenciaTransversal(comp){return !!claveCompetenciaTransversal(comp);}
 function competenciasParaEvaluar(){
-  return competencias().concat(nivel==='secundaria'&&typeof IERegistroEvaluacion!=='undefined'?Object.values(IERegistroEvaluacion.COMP):[]);
+  return competencias().concat(typeof IERegistroTransversales!=='undefined'&&IERegistroTransversales.eligible()?Object.values(IERegistroEvaluacion.COMP):[]);
 }
 async function guardarRegistroIntegrado(finales){
+  if(document.getElementById('registroTutorPanel')?.hidden===false){toast('Guarda la decisión desde el módulo del Tutor.');return false;}
   if(finales){if(guardarFinales()===false)return false;}else if(guardarTodo()===false)return false;
   const ok=typeof IERegistroTransversales==='undefined'||await IERegistroTransversales.save();
   if(ok)toast('Guardado local'+(nivel==='secundaria'?' y aportes pendientes sincronizados':''));
@@ -1543,18 +1557,28 @@ async function guardarRegistroIntegrado(finales){
 function renderAreas() {
   const lista = areas();
   document.getElementById('areaBtns').innerHTML = lista.length ? lista.map(a => {
-    const on = a === areaActual ? 'on' : '';
+    const on = a === areaActual && document.getElementById('registroTutorPanel').hidden ? 'on' : '';
     const short = a.length > 24 ? a.slice(0,22)+'…' : a;
     return `<button type="button" class="area-btn ${on}" data-a="${encodeURIComponent(a)}" onclick="setArea(decodeURIComponent(this.dataset.a))">${short}</button>`;
   }).join('') : '<span class="text-xs text-slate-400">Sin áreas asignadas para esta aula.</span>';
+  const ses=getLoginSession();if(nivel==='secundaria'&&ses&&ses.role==='docente'&&(ses.tutorAulas||[]).length)document.getElementById('areaBtns').insertAdjacentHTML('beforeend','<button type="button" class="area-btn" onclick="abrirTutorRegistro()">COMPETENCIAS TRANSVERSALES</button>');
 }
 
+let tutorRegistroController=null;
+async function abrirTutorRegistro(){
+  const ses=getLoginSession();if(nivel!=='secundaria'||!ses||ses.role!=='docente'||!(ses.tutorAulas||[]).length)return;
+  if(!cerrarTransversalesRegistro())return;
+  document.getElementById('registroTutorPanel').hidden=false;document.getElementById('registroAcademicoPanel').hidden=true;document.getElementById('registroAcademicFooter').hidden=true;renderAreas();
+  if(!tutorRegistroController)tutorRegistroController=IETransversales.init();
+}
 function setArea(a) {
   if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   if (!areas().includes(a)) {
     toast('Esta área no está asignada al docente en el aula seleccionada');
     return;
   }
+  if(tutorRegistroController){if(!tutorRegistroController.canLeave())return;tutorRegistroController.clear();tutorRegistroController=null;}
+  document.getElementById('registroTutorPanel').hidden=true;document.getElementById('registroAcademicoPanel').hidden=false;document.getElementById('registroAcademicFooter').hidden=false;
   areaActual = a;
   renderAreas();
   fillComps();

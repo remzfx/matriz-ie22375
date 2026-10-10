@@ -281,7 +281,7 @@
     <!-- PERIODOS -->
     <section id="tab-registroGeneral" class="tab hidden">
       <h2 class="font-black text-lg">Registro General · Secundaria</h2>
-      <p class="text-sm">Áreas académicas recibidas y resultados transversales procesados por Admin.</p>
+      <p class="text-sm">Áreas académicas recibidas y resultados transversales enviados por Tutor.</p>
       <label>Aula<select id="generalAula" onchange="renderRegistroGeneral()"></select></label>
       <label>Bimestre<select id="generalBim" onchange="renderRegistroGeneral()"><option>I</option><option>II</option><option>III</option><option>IV</option></select></label>
       <button class="btn" onclick="renderRegistroGeneral()">Actualizar Registro General</button>
@@ -439,7 +439,7 @@
             </p>
             <div id="docAsignacionesBox" class="space-y-3"></div>
           </div>
-          <div id="docTutorWrap" class="mt-4 hidden"><label class="font-bold text-sm">Tutor de aula</label><p class="text-xs text-slate-500">Máximo un tutor activo por aula de Secundaria.</p><div id="docTutorBox" class="flex flex-wrap gap-2 mt-2"></div></div>
+          <div id="docTutorWrap" class="mt-4 hidden"><label class="font-bold text-sm"><input id="docEsTutor" type="checkbox" onchange="document.getElementById('docTutorBox').classList.toggle('hidden',!this.checked)"> Es tutor</label><p class="text-xs text-slate-500">Máximo un tutor activo por aula de Secundaria.</p><div id="docTutorBox" class="hidden flex flex-wrap gap-2 mt-2"></div></div>
         </div>
 
         <input type="hidden" id="docEditId" value="">
@@ -599,9 +599,9 @@ async function renderRegistroGeneral() {
         alumnos.forEach(al=>{const L=letraDesdePayload(p,ctx,area,comp,al),text=document.createElement('p');text.textContent=al.nombre+' · '+(L||'Pendiente')+(L==='C'?' · '+(concDesdePayload(p,ctx,area,comp,al)||'Conclusión pendiente'):'');row.appendChild(text);if(!L||L==='C'&&!concDesdePayload(p,ctx,area,comp,al))ok=false;});
       });title.textContent+=' · '+(ok?'Completa':'Pendiente');if(ok)completas++;box.appendChild(row);
     });
-    const table=document.createElement('table'),head=document.createElement('tr');['Estudiante','TIC procesado','Gestiona procesado'].forEach(t=>{const th=document.createElement('th');th.textContent=t;head.appendChild(th);});table.appendChild(head);
-    alumnos.forEach(al=>{const row=document.createElement('tr'),name=document.createElement('th');name.textContent=al.nombre;row.appendChild(name);['tic','autonomia'].forEach(cp=>{const td=document.createElement('td'),r=(trans.resultados[studentKey(al)]||{})[cp],f=r&&r.listo&&r.final;td.textContent=f?f.nivel+(f.nivel==='C'?' · '+f.conclusion:''):'Pendiente de procesamiento';row.appendChild(td);});table.appendChild(row);});box.appendChild(table);
-    const estadoTrans=trans.exportable?'Procesadas':trans.procesado?'Obsoletas · requiere reprocesar':'Pendientes';status.textContent='Áreas académicas: '+completas+'/'+Object.keys(areas).length+' completas · Transversales: '+estadoTrans+' · Registro general: '+(completas===Object.keys(areas).length&&trans.exportable?'Completo':'Incompleto');
+    const table=document.createElement('table'),head=document.createElement('tr');['Estudiante','TIC oficial Tutor','Gestiona oficial Tutor'].forEach(t=>{const th=document.createElement('th');th.textContent=t;head.appendChild(th);});table.appendChild(head);
+    alumnos.forEach(al=>{const row=document.createElement('tr'),name=document.createElement('th');name.textContent=al.nombre;row.appendChild(name);['tic','autonomia'].forEach(cp=>{const td=document.createElement('td'),r=(trans.resultados[studentKey(al)]||{})[cp],f=r&&r.listo&&r.final;td.textContent=f?f.nivel+(f.nivel==='C'?' · '+f.conclusion:''):'Pendiente de envío por Tutor';row.appendChild(td);});table.appendChild(row);});box.appendChild(table);
+    const estadoTrans=trans.exportable?'Enviadas por Tutor':trans.procesado?'Desactualizadas · requiere reenvío del Tutor':'Pendientes';status.textContent='Áreas académicas: '+completas+'/'+Object.keys(areas).length+' completas · Transversales: '+estadoTrans+' · Registro general: '+(completas===Object.keys(areas).length&&trans.exportable?'Completo':'Incompleto');
   }catch(e){if(serial===renderRegistroGeneral.serial)status.textContent=e.message+' · Reintente Actualizar Registro General.';}
 }
 function showTab(id) {
@@ -1363,7 +1363,7 @@ async function vaciarSiagieOficial(){
   items.forEach(it=>{ by[it.area]=it.payload||{}; });
   let transversales=null;
   if(ctx.nivel==='secundaria'){
-    try{transversales=await IETransversales.request('loadtransversalexport',{bimestre:ctx.bim,grado:ctx.grado,seccion:ctx.seccion});if(!transversales.flujoAdmin)throw Error('El backend debe actualizarse al flujo de procesamiento Admin.');}
+    try{transversales=await IETransversales.request('loadtransversalexport',{bimestre:ctx.bim,grado:ctx.grado,seccion:ctx.seccion});if(!transversales.flujoTutor)throw Error('El backend debe actualizarse al flujo de snapshot oficial Tutor.');}
     catch(e){alert('No se pudo verificar la consolidación transversal: '+e.message);return;}
   }
   let padron;
@@ -1534,16 +1534,23 @@ function leerAsignacionesFormulario() {
   return out;
 }
 
-function renderAsignacionesDocente(mapaInicial) {
+function leerAportesFormulario() {
+  const out={};document.querySelectorAll('#docAsignacionesBox [data-area-asig]').forEach(card=>{
+    const aulas=[...card.querySelectorAll('.doc-aporte-aula:checked')].map(c=>c.value);
+    if(aulas.length)out[card.getAttribute('data-area-asig')]=aulas;
+  });return out;
+}
+function renderAsignacionesDocente(mapaInicial, aportesIniciales) {
   const box = document.getElementById('docAsignacionesBox');
   if (!box) return;
   const seleccionadas = [...document.querySelectorAll('.doc-area:checked')].map(c => c.value);
   const actual = mapaInicial || leerAsignacionesFormulario();
+  const aportes=aportesIniciales||leerAportesFormulario(),secundaria=document.getElementById('docNivel').value==='secundaria';
   const aulas = document.getElementById('docNivel').value === 'primaria'
     ? [...document.querySelectorAll('.doc-grado:checked')].map(c=>c.value + '|ÚNICA') : aulasSecundariaDisponibles();
 
   if (!seleccionadas.length) {
-    box.innerHTML = '<div class="text-xs text-slate-400 p-3 rounded-xl bg-slate-50">Marca al menos un área para asignar sus aulas.</div>';
+    box.innerHTML = '<div class="text-xs text-slate-400 p-3 rounded-xl bg-slate-50">Marca al menos un área para asignar sus aulas. El aporte TIC/Gestiona se habilita por separado para cada aula.</div>';
     return;
   }
 
@@ -1558,10 +1565,11 @@ function renderAsignacionesDocente(mapaInicial) {
         const checked = asignadas.includes(v) ? ' checked' : '';
         return '<label class="text-xs bg-white border border-slate-200 rounded-lg px-3 py-3 inline-flex items-center gap-2">' +
           '<input type="checkbox" class="doc-asig-aula" value="' + v + '"' + checked + '> ' + label +
-          '</label>';
+          '</label>'+(secundaria?'<label class="text-xs border rounded-lg p-2"><input type="checkbox" class="doc-aporte-aula" value="'+v+'"'+(checked&&((aportes[area]||[]).includes(v))?' checked':'')+(checked?'':' disabled')+'> Aporte TIC/Gestiona · '+label+'</label>':'');
       }).join(' ') +
       '</div></div>';
   }).join('');
+  box.querySelectorAll('.doc-asig-aula').forEach(c=>c.onchange=()=>{const card=c.closest('[data-area-asig]'),aporte=[...card.querySelectorAll('.doc-aporte-aula')].find(x=>x.value===c.value);if(aporte){aporte.disabled=!c.checked;if(!c.checked)aporte.checked=false;}});
 }
 
 function initDocentesUI() {
@@ -1586,6 +1594,7 @@ function limpiarFormDocente() {
   document.querySelectorAll('.doc-grado').forEach(c => c.checked = false);
   document.querySelectorAll('.doc-area').forEach(c => c.checked = false);
   document.querySelectorAll('.doc-tutor').forEach(c => c.checked = false);
+  document.getElementById('docEsTutor').checked=false;document.getElementById('docTutorBox').classList.add('hidden');
   const asigBox = document.getElementById('docAsignacionesBox');
   if (asigBox) asigBox.innerHTML = '';
   toggleDocFiltros();
@@ -1607,7 +1616,8 @@ function guardarDocente() {
   const grados = [...document.querySelectorAll('.doc-grado:checked')].map(c => parseInt(c.value,10));
   const areas = [...document.querySelectorAll('.doc-area:checked')].map(c => c.value);
   const asignaciones = leerAsignacionesFormulario();
-  const tutorAulas=nivel==='secundaria'?[...document.querySelectorAll('.doc-tutor:checked')].map(c=>c.value):[];
+  const aportesTransversales=nivel==='secundaria'?leerAportesFormulario():{};
+  const tutorAulas=nivel==='secundaria'&&document.getElementById('docEsTutor').checked?[...document.querySelectorAll('.doc-tutor:checked')].map(c=>c.value):[];
 
   if (nivel === 'primaria' && !grados.length) { alert('Marca al menos un grado'); return; }
   if (!areas.length) { alert('Marca al menos un área'); return; }
@@ -1636,12 +1646,12 @@ function guardarDocente() {
   }
   if (id) {
     const i = list.findIndex(d => d.id === id);
-    if (i >= 0) list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas, aulas, asignaciones, tutorAulas, ts:Date.now() };
+    if (i >= 0) list[i] = { ...list[i], user, pass, nombre, nivel, grados, areas, aulas, asignaciones, tutorAulas, aportesTransversales, ts:Date.now() };
   } else {
     if (list.some(d => d.user === user)) { alert('Ese usuario ya existe'); return; }
     list.push({
       id: 'd' + Date.now(),
-      user, pass, nombre, nivel, grados, areas, aulas, asignaciones, tutorAulas,
+      user, pass, nombre, nivel, grados, areas, aulas, asignaciones, tutorAulas, aportesTransversales,
       ts: Date.now()
     });
   }
@@ -1667,6 +1677,7 @@ function editarDocente(id) {
     c.checked = (d.grados || []).includes(parseInt(c.value,10));
   });
   document.querySelectorAll('.doc-tutor').forEach(c=>{c.checked=(d.tutorAulas||[]).includes(c.value);});
+  document.getElementById('docEsTutor').checked=!!(d.tutorAulas||[]).length;document.getElementById('docTutorBox').classList.toggle('hidden',!(d.tutorAulas||[]).length);
   document.querySelectorAll('.doc-area').forEach(c => {
     c.checked = d.nivel === 'primaria' && (!d.asignaciones || !Object.keys(d.asignaciones).length)
       ? c.value !== 'Educación Física' : (d.asignaciones ? Object.keys(d.asignaciones) : d.areas || []).includes(c.value);
@@ -1681,7 +1692,7 @@ function editarDocente(id) {
       mapa = {};
       (d.areas || []).forEach(area => { mapa[area] = (d.aulas || []).slice(); });
     }
-    renderAsignacionesDocente(mapa);
+    renderAsignacionesDocente(mapa,d.aportesTransversales||{});
   }
 
   showTab('docentes');
@@ -1712,7 +1723,7 @@ function renderDocentes() {
              ((d.aulas&&d.aulas.length) ? (' · Aulas: ' + d.aulas.map(a=>a.replace('|','° ')).join(', ')) : '')));
     return '<div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2" data-doc-id="'+d.id+'">' +
       '<div><div class="font-bold">' + (d.nombre||d.user) + ' <span class="text-slate-400 font-normal">(@'+d.user+')</span></div>' +
-      '<div class="text-xs text-slate-500">' + d.nivel + ' · ' + filtro + ((d.tutorAulas||[]).length?' · Tutor: '+d.tutorAulas.join(', '):'') + '</div>' +
+      '<div class="text-xs text-slate-500">' + d.nivel + ' · ' + filtro + ((d.tutorAulas||[]).length?' · Tutor: '+d.tutorAulas.join(', '):'')+' · Aportes TIC/Gestiona: '+(Object.entries(d.aportesTransversales||{}).map(([area,aulas])=>area+' → '+aulas.join(', ')).join(' · ')||'Sin asignación') + '</div>' +
       '<div class="text-xs text-slate-400">Clave: ' + d.pass + '</div></div>' +
       '<div class="flex gap-1">' +
       '<button type="button" class="btn btn-ghost text-xs !py-1 btn-doc-edit">Editar</button>' +
