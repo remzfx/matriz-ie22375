@@ -11,7 +11,12 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
-  .worked-label{display:flex;align-items:center;gap:6px;font-size:11px;}
+  .worked-label{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;}
+  .conclusion-compact{max-width:190px;margin:6px auto;text-align:left;white-space:normal;}
+  .conclusion-compact summary{cursor:pointer;min-height:44px;display:flex;align-items:center;}
+  .conclusion-compact textarea,.conclusion-compact select{width:100%;min-width:0;}
+  .summary-stats{margin:14px 0;padding:12px;border:1px solid #cbd5e1;border-radius:12px;}
+  .summary-counts{display:flex;flex-wrap:wrap;gap:12px;}
   .worked-label input[type=checkbox]{width:17px;height:17px;min-height:17px;padding:0;flex:0 0 17px;}
   .card { background:#fff; border-radius:16px; box-shadow:0 6px 24px rgba(15,23,42,.08); }
   .btn { border-radius:12px; font-weight:700; padding:.55rem 1rem; transition:.15s; border:0; cursor:pointer; }
@@ -164,6 +169,13 @@
       font-size: 10pt; font-family: Arial, Helvetica, sans-serif;
     }
     .no-print { display: none !important; }
+    #printArea button,#printArea input,#printArea select,#printArea textarea{display:none!important;}
+    #printArea .fin-scroll-body{max-height:none!important;overflow:visible!important;}
+    #printArea .fin-grid{min-width:0!important;width:100%;font-size:8pt;}
+    #printArea .fin-grid thead,#printArea .fin-grid th{position:static!important;background:white!important;color:black!important;}
+    #printArea .fin-grid th,#printArea .fin-grid td{padding:3px;border:1px solid #777;overflow-wrap:anywhere;}
+    #printArea tr{break-inside:avoid;}
+    #printArea .summary-stats{break-inside:avoid;}
     .print-break { page-break-before: always; }
     table.print-tbl { width: 100%; border-collapse: collapse; margin-top: 8px; }
     table.print-tbl th, table.print-tbl td {
@@ -179,7 +191,7 @@
     .print-sign { display: flex; justify-content: space-between; margin-top: 28px; }
     .print-sign div { width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 4px; }
   }
-.trans-grid-wrap{overflow-x:auto;max-width:100%;margin:1rem 0}.trans-grid{border-collapse:collapse;min-width:900px;width:100%}.trans-grid th,.trans-grid td{padding:.65rem;border:1px solid #cbd5e1;vertical-align:top}.trans-grid .trans-student{position:sticky;left:0;background:#fff;min-width:220px;max-width:260px;z-index:1;text-align:left}.trans-detail>summary{min-height:44px;cursor:pointer;padding:.3rem;max-width:280px}.trans-detail[open]{min-width:290px;max-width:390px}.trans-detail textarea{display:block;width:100%;min-height:88px}.trans-detail input,.trans-detail select{min-height:44px}@media(max-width:640px){.trans-grid .trans-student{min-width:170px;max-width:180px}.trans-detail>summary{min-width:170px}}
+.trans-grid-wrap{overflow-x:auto;max-width:100%;margin:1rem 0}.trans-grid{border-collapse:collapse;min-width:900px;width:100%}.trans-grid th,.trans-grid td{padding:.65rem;border:1px solid #cbd5e1;vertical-align:top}.trans-grid td textarea{width:180px;max-width:100%;min-height:80px;box-sizing:border-box;}.trans-grid td select,.trans-grid td input{max-width:180px;min-height:44px;}.trans-grid td{min-width:80px;}.trans-grid .trans-student{position:sticky;left:0;background:#fff;min-width:220px;max-width:260px;z-index:1;text-align:left}.trans-detail>summary{min-height:44px;cursor:pointer;padding:.3rem;max-width:280px}.trans-detail[open]{min-width:290px;max-width:390px}.trans-detail textarea{display:block;width:100%;min-height:88px}.trans-detail input,.trans-detail select{min-height:44px}@media(max-width:640px){.trans-grid .trans-student{min-width:170px;max-width:180px}.trans-detail>summary{min-width:170px}}
 
 </style>
   <script src="login-bridge.js"></script>
@@ -382,8 +394,8 @@
           <div class="text-[10px] font-bold text-slate-500">RESUMEN DEL BIMESTRE</div>
           <div class="text-sm font-bold" id="lblAvanceCtx">—</div>
         </div>
-        <p class="text-[11px] text-slate-500 mb-2" id="lblReglaConc">Resultados por competencia. La conclusión descriptiva es obligatoria únicamente cuando una competencia tiene nivel C. El promedio referencial es solo informativo y no se envía al SIAGIE.</p>
-        <div id="avanceBox"></div>
+        <p class="text-[11px] text-slate-500 mb-2" id="lblReglaConc">Resultados por competencia. La conclusión descriptiva se registra en Promedios: Primaria B/C; Secundaria C, por competencia. El promedio referencial es solo informativo y no se envía al SIAGIE.</p>
+        <button type="button" class="btn btn-ghost no-print" onclick="imprimirResumen()">Imprimir Resumen / PDF</button><div id="avanceBox"></div>
         <div class="mt-3 space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
           <div class="text-sm font-black text-slate-700">Cierre de área</div>
           <p class="text-[11px] text-slate-500">Usted solo <b>Guarda</b> y usa <b>Nube Subir</b>. El director vacía al SIAGIE desde Admin cuando el aula esté completa.</p>
@@ -404,13 +416,7 @@
         </div>
         <div>
           <label class="text-[10px] font-bold text-slate-500">Unidad (opc.)</label>
-          <select id="selUnidad" onchange="onSesionChange()">
-            <option value="">—</option>
-            <option value="1">1ª unidad</option>
-            <option value="2">2ª unidad</option>
-            <option value="3">3ª unidad</option>
-            <option value="4">4ª unidad</option>
-          </select>
+          <select id="selUnidad" onchange="cambiarUnidadSesion()"><option value="">Sin unidad</option></select>
         </div>
       </div>
       <div>
@@ -1469,7 +1475,13 @@ function onGrado(options) {
   if (!options || !options.sinContexto) onContexto();
 }
 
+function actualizarUnidades() {
+ const sel=document.getElementById("selUnidad"),bim=document.getElementById("selBim").value,prev=sel.value;
+ sel.innerHTML='<option value="">Sin unidad</option>'+IERegistroAcademico.unitsForBim(bim).map(n=>'<option value="'+n+'">Unidad '+n+'</option>').join('');
+ sel.value=IERegistroAcademico.unitsForBim(bim).includes(Number(prev))&&prev!==''?prev:'';
+}
 function onContexto(options) {
+  actualizarUnidades();
   if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   options = options || {};
 
@@ -1663,6 +1675,14 @@ function pad2(n) {
   return String(x).padStart(2, '0');
 }
 
+function cambiarUnidadSesion(){
+ if(registroSoloLectura()||bimCerradoDocente())return false;
+ const c=ctxBase(),unidad=IERegistroAcademico.unit(document.getElementById('selUnidad').value,c.bim),fecha=document.getElementById('inpFecha').value;
+ (store.sessions||[]).forEach(s=>{if(s.nivel===c.nivel&&s.bim===c.bim&&String(s.grado)===String(c.grado)&&s.seccion===c.seccion&&s.area===c.area&&s.fecha===fecha)s.unidad=unidad;});
+ if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.sessions().filter(s=>s.fecha===fecha).forEach(s=>IERegistroTransversales.add(s.comp,s.capacidad,fecha,unidad));
+ if(sesionActiva&&sesionActiva.fecha===fecha)sesionActiva.unidad=unidad;
+ saveStore();renderSesiones();return true;
+}
 function onSesionChange() {
   loadCapsElegidas();
   const c = ctxBase();
@@ -1688,7 +1708,7 @@ function activarSesion() {
     return;
   }
   const fecha = document.getElementById('inpFecha').value;
-  const unidad = document.getElementById('selUnidad').value;
+  const unidad = IERegistroAcademico.unit(document.getElementById('selUnidad').value,bim);
   const comp = document.getElementById('selComp').value;
   const capacidad = capacidadElegida();
   if (!fecha) { alert('Indica la fecha de la sesión'); return; }
@@ -1713,7 +1733,7 @@ function activarSesion() {
     renderStudents();
     return;
   }
-  if(esCompetenciaTransversal(comp)&&!IERegistroTransversales.add(comp,capacidad,fecha)){toast('Espera la carga transversal o revisa el estado del bimestre');return;}
+  if(esCompetenciaTransversal(comp)&&!IERegistroTransversales.add(comp,capacidad,fecha,unidad)){toast('Espera la carga transversal o revisa el estado del bimestre');return;}
   if(!esCompetenciaTransversal(comp)&&!competenciaTrabajada(comp)){toast('Competencia no trabajada: actívala en Promedios');return;}
   capsElegidas.push(normCapItem({comp:comp,cap:capacidad}));
   saveCapsElegidas();
@@ -1845,7 +1865,7 @@ function abrirSesionFecha(fecha) {
   );
   document.getElementById('inpFecha').value = fecha;
   if (delDia[0]) {
-    document.getElementById('selUnidad').value = delDia[0].unidad || '';
+    document.getElementById('selUnidad').value = delDia[0].unidad ?? '';
     if (delDia[0].comp) {
       document.getElementById('selComp').value = delDia[0].comp;
       fillCaps();
@@ -1856,7 +1876,7 @@ function abrirSesionFecha(fecha) {
     if (s.capacidad && !tieneCapSel(s.comp, s.capacidad)) capsElegidas.push(normCapItem({ comp: s.comp, cap: s.capacidad }));
   });
   saveCapsElegidas();
-  sesionActiva = delDia[0] ? { fecha, unidad: delDia[0].unidad||'', comp: delDia[0].comp, capacidad: delDia[0].capacidad } : { fecha, unidad:'', comp:'', capacidad:'' };
+  sesionActiva = delDia[0] ? { fecha, unidad: delDia[0].unidad??'', comp: delDia[0].comp, capacidad: delDia[0].capacidad } : { fecha, unidad:'', comp:'', capacidad:'' };
   renderChipsCaps();
   renderSesiones();
   renderStudents();
@@ -1976,10 +1996,10 @@ function capKeyHoy(comp, cap, nombre) {
 function upsertSesionCap(comp, cap) {
   if(!esCompetenciaTransversal(comp)&&!competenciaTrabajada(comp)){toast("Esta competencia está marcada como no trabajada. Actívala en Promedios para registrar nuevas evidencias.");return false;}
   if (registroSoloLectura()) return false;
-  if(esCompetenciaTransversal(comp))return IERegistroTransversales.add(comp,cap,document.getElementById('inpFecha').value||hoyISO());
+  if(esCompetenciaTransversal(comp))return IERegistroTransversales.add(comp,cap,document.getElementById('inpFecha').value||hoyISO(),IERegistroAcademico.unit((document.getElementById('selUnidad')||{}).value,ctxBase().bim));
   const c = ctxBase();
   const fecha = document.getElementById('inpFecha').value || hoyISO();
-  const unidad = (document.getElementById('selUnidad')||{}).value || '';
+  const unidad = IERegistroAcademico.unit((document.getElementById('selUnidad')||{}).value,c.bim);
   const s = { nivel:c.nivel, bim:c.bim, grado:c.grado, seccion:c.seccion, area:c.area, comp, capacidad:cap, fecha, unidad, ts:Date.now() };
   const id = [c.nivel,c.bim,c.grado,c.seccion,c.area,comp,cap,fecha].join('||');
   const idx = (store.sessions||[]).findIndex(x => sessionId(x) === id);
@@ -2120,7 +2140,7 @@ function actualizarContadores() {
   document.getElementById('cAD').textContent = ad;
 }
 
-function validarConclusionesOficial(c, alumnos, sess) {const faltan=[];alumnos.forEach(al=>competencias().filter(cp=>competenciaTrabajada(cp)).forEach(cp=>{if(notaCompAlumno(cp,studentKey(al)).letra==='C'&&!concCompAlumno(cp,studentKey(al)))faltan.push(al.nombre+' · '+c.area+' · '+cp+' · C · falta conclusión');}));return faltan;}
+function validarConclusionesOficial(c, alumnos, sess) {const faltan=[];alumnos.forEach(al=>competencias().filter(cp=>competenciaTrabajada(cp)).forEach(cp=>{if(IERegistroAcademico.requiresConclusion(c.nivel,notaCompAlumno(cp,studentKey(al)).letra)&&!concCompAlumno(cp,studentKey(al)))faltan.push(al.nombre+' · '+c.area+' · '+cp+' · falta conclusión');}));return faltan;}
 
 let siagieHabilitado = false;
 let siagieTplMeta = null;
@@ -2154,7 +2174,7 @@ async function consultarEstadoSiagie() {
     if (lbl) { lbl.textContent = 'Aún no se puede procesar al SIAGIE'; lbl.className = 'text-sm font-black text-amber-700'; }
   }
 }
-function informeSiagie() {guardarTodo();const c=ctxBase(),comps=competencias(),alumnos=estudiantes(),faltanNota=[],faltanConc=[],noTrabajadas=comps.filter(cp=>!competenciaTrabajada(cp)),filas=[];alumnos.forEach((al,i)=>{const row={n:i+1,nombre:al.nombre,letras:{},conclusiones:{}};comps.forEach(cp=>{if(!competenciaTrabajada(cp)){row.letras[cp]='';return;}const d=notaCompAlumno(cp,studentKey(al));row.letras[cp]=d.letra||'';row.conclusiones[cp]=concCompAlumno(cp,studentKey(al));if(!d.letra)faltanNota.push(al.nombre+' · '+cp);else if(d.letra==='C'&&!row.conclusiones[cp])faltanConc.push(al.nombre+' · '+cp+' · C · falta conclusión');});filas.push(row);});return {c,comps,alumnos,faltanNota,faltanConc,noTrabajadas,filas,ok:!faltanNota.length&&!faltanConc.length};}
+function informeSiagie() {guardarTodo();const c=ctxBase(),comps=competencias(),alumnos=estudiantes(),faltanNota=[],faltanConc=[],noTrabajadas=comps.filter(cp=>!competenciaTrabajada(cp)),filas=[];alumnos.forEach((al,i)=>{const row={n:i+1,nombre:al.nombre,letras:{},conclusiones:{}};comps.forEach(cp=>{if(!competenciaTrabajada(cp)){row.letras[cp]='';return;}const d=notaCompAlumno(cp,studentKey(al));row.letras[cp]=d.letra||'';row.conclusiones[cp]=concCompAlumno(cp,studentKey(al));if(!d.letra)faltanNota.push(al.nombre+' · '+cp);else if(IERegistroAcademico.requiresConclusion(c.nivel,d.letra)&&!row.conclusiones[cp])faltanConc.push(al.nombre+' · '+cp+' · falta conclusión');});filas.push(row);});return {c,comps,alumnos,faltanNota,faltanConc,noTrabajadas,filas,ok:!faltanNota.length&&!faltanConc.length};}
 function procesarSiagie() {
   if (!nivel || !areaActual) { toast('Elija área'); return; }
   const inf = informeSiagie();
@@ -2172,7 +2192,7 @@ function procesarSiagie() {
         '</ul></div>';
     }
     if (inf.faltanConc.length) {
-      html += '<div><b>Conclusión descriptiva faltante ('+inf.faltanConc.length+')</b><p class="text-[11px] text-slate-500">'+(nivel==='primaria'?'Primaria: obligatoria por competencia C.':'Secundaria: obligatoria solo si C.')+'</p><ul class="text-[12px] mt-1 list-disc pl-4 max-h-40 overflow-auto">' +
+      html += '<div><b>Conclusión descriptiva faltante ('+inf.faltanConc.length+')</b><p class="text-[11px] text-slate-500">'+(nivel==='primaria'?'Primaria: obligatoria por competencia B o C.':'Secundaria: obligatoria solo si C.')+'</p><ul class="text-[12px] mt-1 list-disc pl-4 max-h-40 overflow-auto">' +
         inf.faltanConc.slice(0,40).map(x=>'<li>'+x+'</li>').join('') +
         (inf.faltanConc.length>40?'<li>… y '+(inf.faltanConc.length-40)+' más</li>':'') +
         '</ul></div>';
@@ -2309,7 +2329,7 @@ async function rellenarSiagieExcel() {
         const addrNL = XLSX.utils.encode_cell({r:r, c:colNL});
         ws[addrNL] = { t:'s', v: letra };
         escritos++;
-        const need = letra==='C';
+        const need = letra==='C'||c.nivel==='primaria'&&letra==='B';
         const addrCD = XLSX.utils.encode_cell({r:r, c:colCD});
         if (need) {
           const txt = concEnArea(map.area, cp, nombre);
@@ -2353,10 +2373,10 @@ function prepararImpresion() {
     const extra = faltanConc.length > 12 ? '\n… y ' + (faltanConc.length-12) + ' más' : '';
     const ok = confirm(
       'AVISO — Registro oficial (SIAGIE)\n\n' +
-      'Falta conclusión descriptiva en competencias C:\n\n' +
+      'Falta conclusión descriptiva por competencia:\n\n' +
       lista + extra +
-      '\n\nRegla: cada competencia C en Primaria y Secundaria.\n' +
-      'Escríbala en Resumen.\n\n' +
+      '\n\nRegla: Primaria B/C y Secundaria C, por competencia.\n' +
+      'Escríbala en Promedios.\n\n' +
       '¿Desea imprimir de todas formas?'
     );
     if (!ok) return;
@@ -2389,7 +2409,7 @@ function prepararImpresion() {
 
   const escImpresion=v=>String(v||'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
   html+='<h2>Resultados bimestrales por competencia</h2><table class="print-tbl"><thead><tr><th>Estudiante</th>'+competencias().map(cp=>'<th>'+escImpresion(cp)+'</th>').join('')+'</tr></thead><tbody>';
-  alumnos.forEach(al=>{html+='<tr><td>'+escImpresion(al.nombre)+'</td>'+competencias().map(cp=>{if(!competenciaTrabajada(cp))return '<td>No trabajada este bimestre</td>';const r=notaCompAlumno(cp,studentKey(al));return '<td>'+escImpresion(r.letra||'Pendiente')+(r.letra==='C'?'<p>'+escImpresion(concCompAlumno(cp,studentKey(al)))+'</p>':'')+'</td>';}).join('')+'</tr>';});
+  alumnos.forEach(al=>{html+='<tr><td>'+escImpresion(al.nombre)+'</td>'+competencias().map(cp=>{if(!competenciaTrabajada(cp))return '<td>No trabajada este bimestre</td>';const r=notaCompAlumno(cp,studentKey(al));return '<td>'+escImpresion(r.letra||'Pendiente')+(IERegistroAcademico.requiresConclusion(c.nivel,r.letra)?'<p>'+escImpresion(concCompAlumno(cp,studentKey(al)))+'</p>':'')+'</td>';}).join('')+'</tr>';});
   html+='</tbody></table>';
 
   // Detail per competencia
@@ -2642,7 +2662,7 @@ function renderFinales() {
     const capsTxt = caps.length
       ? caps.map(x => (x.fecha?x.fecha.slice(5)+' · ':'') + x.capacidad).join('<br>')
       : 'Sin capacidades aún';
-    head += '<th><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" '+(competenciaTrabajada(cp)?'checked':'')+' '+(bloqueado?'disabled':'')+'>'+cp+'</label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
+    head += '<th><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" '+(competenciaTrabajada(cp)?'checked':'')+' '+(bloqueado?'disabled':'')+'><span>'+cp+'</span></label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
   });
 
   const rows = alumnos.map((al, i) => {
@@ -2674,6 +2694,9 @@ function renderFinales() {
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+(numeroExactoComp(cp,studentKey(al))?pad2(ev.nota)+' · ':'')+ev.letra+'</div>' : '') +
           (Object.keys(original).length&&!original.borrado?'<button type="button" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" '+(lock?'disabled':'')+'>Quitar directo</button>':'')+'</div></td>';
       }
+      const text=concCompAlumno(cp,studentKey(al)),required=IERegistroAcademico.requiresConclusion(c.nivel,ofi.letra);
+      const conclusion='<details class="conclusion-compact"><summary>Conclusión'+(required?' · Obligatoria':'')+'</summary><label>Conclusión descriptiva'+(typeof IEConclusionSuggestions!=='undefined'?IEConclusionSuggestions.html(cp):'')+'<textarea class="academic-conclusion" data-id="'+encN+'" data-comp="'+encC+'" maxlength="2000" '+(required?'required ':'')+(lock?'readonly':'')+'>'+escapeRegistro(text)+'</textarea></label></details>';
+      tds=tds.slice(0,-5)+conclusion+'</td>';
     });
     return '<tr>'+tds+'</tr>';
   }).join('');
@@ -2703,6 +2726,7 @@ function renderFinales() {
       if (n === '') store.finales[k] = {borrado: true, ts: Date.now()};
       else store.finales[k] = { nota20: n, nivel: letra, origen: 'numero', ts: Date.now() };
       saveStore();
+      renderFinales();
     });
   });
   box.querySelectorAll('.fin-cell button[data-val]').forEach(btn => {
@@ -2730,6 +2754,8 @@ function renderFinales() {
   });
   box.querySelectorAll('[data-quitar-directo]').forEach(el=>el.onclick=()=>{const cp=decodeURIComponent(el.dataset.quitarDirecto),id=decodeURIComponent(el.dataset.alumno),k=finalKey(cp,id);if(registroSoloLectura()||bimCerradoDocente()||!competenciaTrabajada(cp)||!leerNota(store.finales,k))return;baselineAcademica();store.finales[k]={borrado:true,ts:Date.now()};saveStore();dirtyAcademico();renderFinales();});
   box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
+  box.querySelectorAll('.academic-conclusion').forEach(el=>el.oninput=()=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value));
+  if(typeof IEConclusionSuggestions!=='undefined')IEConclusionSuggestions.bind(box);
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);
   sincronizarEdicionRegistro();
 }
@@ -2970,12 +2996,18 @@ function promedioNums(arr) {
   return Math.round(v.reduce((a,b)=>a+b,0) / v.length);
 }
 
+function escapeRegistro(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function estadisticaResumenHTML(){const s=IERegistroAcademico.statistics(estudiantes().map(al=>promReferencialAlumno(studentKey(al)).letra));return '<section class="summary-stats"><h3>RESUMEN ESTADÍSTICO</h3><div class="summary-counts">'+[['Matriculados',s.matriculados],['Evaluados',s.evaluados],['No evaluados',s.noEvaluados],['Aprobados',s.aprobados],['Desaprobados',s.desaprobados]].map(([l,n])=>'<span>'+l+': <strong>'+n+'</strong></span>').join('')+'</div><table><thead><tr><th>Nivel</th><th>Frecuencia</th><th>Porcentaje</th></tr></thead><tbody>'+Object.keys(s.niveles).map(l=>'<tr><th>'+l+'</th><td>'+s.niveles[l]+'</td><td>'+s.porcentajes[l].toFixed(1)+' %</td></tr>').join('')+'<tr><th>TOTAL</th><td>'+s.evaluados+'</td><td>'+(s.evaluados?'100':'0')+' %</td></tr></tbody></table><small>Clasificación estadística: AD/A/B aprobados; C desaprobados. Promedio referencial informativo; no determina promoción ni SIAGIE.</small></section>';}
 function renderAvance() {
- const box=document.getElementById('avanceBox'),c=ctxBase(),comps=competencias(),lock=bimCerradoDocente();document.getElementById('lblAvanceCtx').textContent=c.area+' · Bim '+c.bim;
- const esc=x=>String(x||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- let html='<div class="fin-wrap fin-scroll-body"><table class="fin-grid"><thead><tr><th class="fin-nom">Estudiante</th>'+comps.map(cp=>'<th>'+esc(cp)+'</th>').join('')+'<th>Promedio referencial<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
- estudiantes().forEach(al=>{const id=studentKey(al);html+='<tr><th class="fin-nom">'+esc(al.nombre)+'</th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td>No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id),f=leerNota(store.finales,finalKey(cp,id))||{},txt=concCompAlumno(cp,id);html+='<td><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+esc(d.letra||'Pendiente')+'</span><small>'+(d.src==='P'?'Directo':d.src==='C'?'Evidencias':'')+'</small></div>'+(d.letra==='C'?'<label>Conclusión descriptiva · Obligatoria para C'+(typeof IEConclusionSuggestions!=='undefined'?IEConclusionSuggestions.html(cp):'')+'<textarea class="academic-conclusion" data-id="'+encodeURIComponent(id)+'" data-comp="'+encodeURIComponent(cp)+'" maxlength="2000" required '+(lock?'readonly':'')+'>'+esc(txt)+'</textarea></label>':txt?'<small>Conclusión conservada como borrador (no vigente)</small>':'')+'</td>';});const r=promReferencialAlumno(id);html+='<td>'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>';
- box.querySelectorAll('.academic-conclusion').forEach(el=>el.oninput=()=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value));if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);if(typeof IEConclusionSuggestions!=='undefined')IEConclusionSuggestions.bind(box);sincronizarEdicionRegistro();
+ const box=document.getElementById('avanceBox'),c=ctxBase(),comps=competencias();document.getElementById('lblAvanceCtx').textContent=c.area+' · Bim '+c.bim;
+ let html='<div class="fin-wrap fin-scroll-body"><table class="fin-grid"><thead><tr><th class="fin-nom">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'<th>Promedio referencial<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
+ estudiantes().forEach(al=>{const id=studentKey(al);html+='<tr><th class="fin-nom">'+escapeRegistro(al.nombre)+'</th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td>No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id);html+='<td><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+escapeRegistro(d.letra||'Pendiente')+'</span></div></td>';});const r=promReferencialAlumno(id);html+='<td>'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>'+estadisticaResumenHTML();
+ if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
+}
+function imprimirResumen(){
+ renderAvance();const c=ctxBase(),doc=document.getElementById('inpDocente').value||'';
+ document.getElementById('printArea').innerHTML='<div class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>RESUMEN DE RESULTADOS · '+escapeRegistro(c.nivel)+' · '+escapeRegistro(c.grado)+'° '+escapeRegistro(c.seccion)+' · '+escapeRegistro(c.area)+' · Bim '+escapeRegistro(c.bim)+'</h2><p>Docente: '+escapeRegistro(doc)+'</p></div>'+document.getElementById('avanceBox').innerHTML;
+ window.print();
 }
 
 const MOBILE_APP_STORES = {

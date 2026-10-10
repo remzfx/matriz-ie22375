@@ -14,12 +14,12 @@ function ui(){
    const table={id:'registroSummary',querySelector:()=>head,querySelectorAll:()=>[row]};Object.defineProperty(table,'innerHTML',{get:()=>'<table><thead><tr>'+head.html+'</tr></thead><tbody><tr><th>Synthetic Student A</th>'+row.children.map(x=>'<td>'+(x.innerHTML||x.textContent)+'</td>').join('')+'</tr></tbody></table>'});root.children=[table];root.querySelector=sel=>sel==='table'?table:null;
  }
  const calls=[],c=vm.createContext({window:null,document:{getElementById:el,querySelectorAll:()=>[],createElement:tag=>({tagName:tag,dataset:{},innerHTML:'',textContent:'',querySelectorAll:()=>[]}),activeElement:null},console,Date,Map,Set,JSON,confirm:()=>true,addEventListener:(type,f)=>events[type]=f});c.window=c;
- vm.runInContext(read('registro-evaluation.js'),c);
+ vm.runInContext(read('registro-academic-model.js'),c);vm.runInContext(read('registro-evaluation.js'),c);
  const signed=s.token('math');c.IEStudents={validToken:()=>signed};c.IETransversales={request:async(action,p)=>{calls.push({action,...clone(p)});const out=s.route(action,'math',p);if(!out.ok)throw Object.assign(Error(out.error),{code:out.code});return clone(out)}};
  c.getLoginSession=()=>({role:'docente',user:'math',aportesTransversales:{...clone(s.docs[1].aportesTransversales),'Comunicación':['2|A']}});c.ctxBase=()=>({nivel:c.nivel,bim:c.bim,grado:c.grado,seccion:c.seccion,area:c.areaActual});c.estudiantes=()=>s.roster.filter(a=>a.seccion==='A');c.studentKey=a=>'id:'+encodeURIComponent(a.idSiagie);c.registroSoloLectura=()=>false;c.bimCerradoDocente=()=>false;c.registroNubeNoVerificada=()=>false;c.renderStudents=c.renderSesiones=c.renderFinales=c.renderAvance=()=>paints++;c.loadCapsElegidas=()=>{};c.competencias=()=>['Académica'];c.toast=m=>el('toast').textContent=m;
  Object.assign(c,{nivel:'secundaria',bim:'I',grado:2,seccion:'A',areaActual:'Matemática',modoCalif:'num',capsElegidas:[],store:{sessions:[],grades:{},finales:{},capsSel:{},meta:{},concArea:{}}});
  ['competenciaTrabajada','concCompAlumno','numeroExactoComp','promGeneralAlumno','promReferencialAlumno','claveCompetenciaTransversal','esCompetenciaTransversal','competenciasParaEvaluar','capsOficiales','fillCaps','fillComps','normCapItem','tieneCapSel','keyCapsHoy','loadCapsElegidas','saveCapsElegidas','upsertSesionCap'].forEach(n=>vm.runInContext(extract(n),c));
- c.CAPS_CNEB={Académica:['Capacidad académica']};c.saveStore=()=>{};c.hoyISO=()=> '2026-10-14';c.sessionId=x=>JSON.stringify(x);c.loadCapsElegidas=()=>{};
+ c.baselineAcademica=()=>{};c.CAPS_CNEB={Académica:['Capacidad académica']};c.saveStore=()=>{};c.hoyISO=()=> '2026-10-14';c.sessionId=x=>JSON.stringify(x);c.loadCapsElegidas=()=>{};
  vm.runInContext(read('registro-transversales.js'),c);
  return {s,c,el,calls,events,api:c.IERegistroTransversales,run:code=>vm.runInContext(code,c),paints:()=>paints};
 }
@@ -169,7 +169,7 @@ for(const mode of ['letra','num'])test('Transversal Calificar '+mode+' displays 
 
 function academicUi(){
  const f=ui();Object.assign(f.c,{leerNota:(map,k)=>{const v=map[k];return v&&!v.borrado?v:null},pad2:String,numToLetter:f.c.IERegistroEvaluacion.numToLetter,letterToNum:f.c.IERegistroEvaluacion.letterToNum,promedioNums:f.c.IERegistroEvaluacion.promedioNums,eqClass:()=>'',sincronizarEdicionRegistro:()=>{},fixHdrHeight:()=>{},loadStore:()=>{},capsDeComp:()=>[],colsCalificar:()=>[{comp:'Académica',cap:'Cap',origen:'academica'}],capKeyHoy:()=> 'academic-grade',actualizarContadores:()=>{},finalKey:()=> 'secundaria||I||2||A||Matemática||Académica||student',concAreaKey:()=> 'conclusion',requiereConclusion:()=>false,aulaKey:()=> '2|A',bimestreHabilitado:()=>true});
- ['notaDirectaAlumno','notaDesdeSesiones','notaCompAlumno','renderStudents','renderFinales','renderAvance'].forEach(n=>vm.runInContext(extract(n),f.c));return f;
+ ['notaDirectaAlumno','notaDesdeSesiones','notaCompAlumno','renderStudents','renderFinales','escapeRegistro','estadisticaResumenHTML','renderAvance'].forEach(n=>vm.runInContext(extract(n),f.c));return f;
 }
 for(const mode of ['letra','num'])test('Academic Calificar '+mode+' hides reference number of original letter and shows actual numeric grade',()=>{
  const f=academicUi();f.c.modoCalif=mode;f.c.store.grades['academic-grade']={nota20:15,nivel:'A',origen:'letra'};f.c.renderStudents();let html=f.el('stuList').innerHTML;

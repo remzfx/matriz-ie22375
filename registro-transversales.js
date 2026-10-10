@@ -9,7 +9,7 @@
   // Solo contenido editable; orden, equivalencias y metadatos del servidor no son cambios.
   function canonical(evidence){
     const value=v=>{const n=core.valor(v);return n?[n.modo,n.valor]:null;};
-    const sessions=(evidence.sessions||[]).map(s=>[s.fecha,s.comp,s.capacidad]).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    const sessions=(evidence.sessions||[]).map(s=>[s.fecha,s.comp,s.capacidad,...(s.unidad==null?[]:[s.unidad])]).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
     const grades=Object.entries(evidence.grades||{}).flatMap(([k,students])=>Object.entries(students).map(([id,v])=>[k,id,value(v)])).filter(x=>x[2]);
     const directos=Object.entries(evidence.directos||{}).flatMap(([id,comps])=>Object.entries(comps).map(([comp,v])=>[id,comp,value(v)])).filter(x=>x[2]);
     const conclusiones=Object.entries(evidence.conclusiones||{}).flatMap(([id,comps])=>Object.entries(comps).map(([comp,text])=>[id,comp,cleanText(text)])).filter(x=>x[2]);
@@ -60,7 +60,7 @@
   }
   function changed(e){reconcile(e);e.revision=(e.revision||0)+1;if(!e.notice||!e.notice.attention)status(e.dirty?'Competencias transversales con cambios sin guardar.':'Aportes transversales sin cambios pendientes.');}
   function session(comp,cap,fecha){return {comp:claveCompetenciaTransversal(comp),capacidad:cap,fecha};}
-  function add(comp,cap,fecha){const e=current();if(!editable(e))return false;const s=session(comp,cap,fecha);if(!core.CAPS[s.comp]||!core.CAPS[s.comp].includes(cap))return false;const k=core.sessionKey(s);if(!e.evidence.sessions.some(x=>core.sessionKey(x)===k)){e.evidence.sessions.push(s);changed(e);}return true;}
+  function add(comp,cap,fecha,unidad=null){const e=current();if(!editable(e))return false;const s=session(comp,cap,fecha);if(!core.CAPS[s.comp]||!core.CAPS[s.comp].includes(cap))return false;const k=core.sessionKey(s);s.unidad=global.IERegistroAcademico.unit(unidad,e.ctx.bimestre);const old=e.evidence.sessions.find(x=>core.sessionKey(x)===k);if(!old){e.evidence.sessions.push(s);changed(e);}else if((old.unidad??null)!==s.unidad){old.unidad=s.unidad;changed(e);}return true;}
   function columns(fecha){const e=current();return e&&e.loaded?e.evidence.sessions.filter(s=>s.fecha===fecha).map(s=>({comp:core.COMP[s.comp],cap:s.capacidad,origen:'transversal'})):[];}
   function sessions(){const e=current();return e&&e.loaded?e.evidence.sessions.map(s=>({...ctxBase(),...s,comp:core.COMP[s.comp],bim:e.ctx.bimestre,origen:'transversal'})):[];}
   function remove(comp,cap,fecha){const e=current();if(!editable(e))return false;const s=session(comp,cap,fecha),k=core.sessionKey(s);e.evidence.sessions=e.evidence.sessions.filter(x=>core.sessionKey(x)!==k);delete e.evidence.grades[k];Object.keys(e.invalid).filter(x=>x.startsWith(k+'|')).forEach(x=>delete e.invalid[x]);changed(e);return true;}
@@ -120,12 +120,21 @@
       if(k)setGrade(e,k,id,raw);else setDirect(e,id,comp,raw);
     });
   }
+  function conclusionControl(e,id,comp,v){
+    const required=v&&v.nivel==='C',text=((e.evidence.conclusiones||{})[id]||{})[comp]||'',k='conclusion:'+comp+'|'+id;
+        const field=required?'<label>Conclusión descriptiva · Obligatoria para C'+(global.IEConclusionSuggestions?global.IEConclusionSuggestions.html(core.COMP[comp]):'')+'<textarea class="trans-conclusion" data-trans-entry="'+e.id+'" data-trans-id="'+esc(id)+'" data-trans-comp="'+comp+'" maxlength="2000" required '+(!editable(e)||!e.data.soportaConclusiones?'readonly':'')+'>'+esc(Object.prototype.hasOwnProperty.call(e.invalid,k)?e.invalid[k]:text)+'</textarea></label>':text?'<small>Conclusión conservada como borrador</small>':'';
+    return '<details class="conclusion-compact"><summary>Conclusión'+(required?' · Obligatoria':'')+'</summary>'+field+'</details>';
+  }
+  function bindConclusions(root){
+    root.querySelectorAll('.trans-conclusion').forEach(el=>el.oninput=()=>{const live=current();if(live&&String(live.id)===el.dataset.transEntry)setConclusion(live,el.dataset.transId,el.dataset.transComp,el.value);});
+    if(global.IEConclusionSuggestions)global.IEConclusionSuggestions.bind(root);
+  }
   function finals(root){
     const e=current();if(!e||!e.loaded)return;const r=result(e);const table=root.querySelector('table'),thead=table&&table.querySelector('thead'),rows=table&&table.querySelectorAll('tbody tr');if(!thead||!rows)return;
     const academic=competencias().length+1;
     const group=document.createElement('tr');group.innerHTML='<th colspan="'+academic+'">Competencias del área</th><th colspan="2">COMPETENCIAS TRANSVERSALES — APORTE DEL ÁREA</th>';thead.insertBefore(group,thead.firstChild);
     const header=thead.querySelectorAll('tr')[1];header.insertAdjacentHTML('beforeend','<th>TIC</th><th>Gestiona su aprendizaje</th>');
-    estudiantes().forEach((al,i)=>{const id=identity(al,e);if(!rows[i])return;Object.keys(core.COMP).forEach(c=>{const d=(e.evidence.directos[id]||{})[c],calc=(r.calculados[id]||{})[c];rows[i].insertAdjacentHTML('beforeend','<td>'+input(d,id,c,'',true,calc)+(calc?'<small>Cal '+(modoCalif!=='letra'&&calc.nota20!=null?calc.nota20+' · ':'')+calc.nivel+'</small>':'')+'</td>');});});bind(root);
+    estudiantes().forEach((al,i)=>{const id=identity(al,e);if(!rows[i])return;Object.keys(core.COMP).forEach(c=>{const d=(e.evidence.directos[id]||{})[c],calc=(r.calculados[id]||{})[c];rows[i].insertAdjacentHTML('beforeend','<td>'+input(d,id,c,'',true,calc)+(calc?'<small>Cal '+(modoCalif!=='letra'&&calc.nota20!=null?calc.nota20+' · ':'')+calc.nivel+'</small>':'')+conclusionControl(e,id,c,(r.valores[id]||{})[c])+'</td>');});});bind(root);bindConclusions(root);
   }
   function summary(root){
     if(!eligible()||!root)return;const table=root.querySelector('table');if(!table)return;
@@ -134,10 +143,8 @@
     estudiantes().forEach((al,i)=>{const row=rows[i];if(!row)return;const id=identity(al,e);
       Object.keys(core.COMP).forEach(comp=>{let cell=row.querySelector('[data-trans-summary="'+comp+'"]');if(!cell){cell=document.createElement('td');cell.dataset.transSummary=comp;row.appendChild(cell);}
         if(!r){cell.textContent=e&&e.denied?'Sesión rechazada':e&&e.loadFailed?'Pendiente · Reintentar':'Cargando…';return;}
-        const v=(r.valores[id]||{})[comp],required=v&&v.nivel==='C',text=((e.evidence.conclusiones||{})[id]||{})[comp]||'',k='conclusion:'+comp+'|'+id;
-        const field=required?'<label>Conclusión descriptiva · Obligatoria para C'+(global.IEConclusionSuggestions?global.IEConclusionSuggestions.html(core.COMP[comp]):'')+'<textarea class="trans-conclusion" data-trans-entry="'+e.id+'" data-trans-id="'+esc(id)+'" data-trans-comp="'+comp+'" maxlength="2000" required '+(!editable(e)||!e.data.soportaConclusiones?'readonly':'')+'>'+esc(Object.prototype.hasOwnProperty.call(e.invalid,k)?e.invalid[k]:text)+'</textarea></label>':text?'<small>Conclusión conservada como borrador</small>':'';
-        cell.innerHTML=(v?(modoCalif==='num'&&v.modo==='num'?esc(v.valor)+' → ':'')+esc(v.nivel):'Sin aporte')+'<small>'+(v?(r.origenes[id][comp]==='directo'?'Directo':'Evidencias'):'')+'</small>'+field;
-        cell.querySelectorAll('.trans-conclusion').forEach(el=>el.oninput=()=>{const live=current();if(live&&String(live.id)===el.dataset.transEntry)setConclusion(live,el.dataset.transId,el.dataset.transComp,el.value);});
+        const v=(r.valores[id]||{})[comp];
+        cell.innerHTML=(v?(modoCalif==='num'&&v.modo==='num'?esc(v.valor)+' → ':'')+esc(v.nivel):'Sin aporte')+'<small>'+(v?(r.origenes[id][comp]==='directo'?'Directo':'Evidencias'):'')+'</small>';
       });
     });
     if(global.IEConclusionSuggestions)global.IEConclusionSuggestions.bind(root);

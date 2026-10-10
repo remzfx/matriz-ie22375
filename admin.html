@@ -1418,7 +1418,7 @@ async function vaciarSiagieOficial(){
         if(!letra) return;
         ws[XLSX.utils.encode_cell({r:r,c:3+i*2})]={t:'s',v:letra};
         escritos++;
-        const need=letra==='C';
+        const need=letra==='C'||ctx.nivel==='primaria'&&letra==='B';
         if(need){
           const txt=transversal?resultTrans.final.conclusion:concDesdePayload(p,ctx,map.area,cp,nombre,permitirNombre);
           if(txt) ws[XLSX.utils.encode_cell({r:r,c:4+i*2})]={t:'s',v:txt};

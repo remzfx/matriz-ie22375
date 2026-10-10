@@ -1125,7 +1125,7 @@ function validarRegistroIntegral_(payload, ctx) {
     }
     if(!letra)throw Error('Envío integral incompleto: falta resultado por competencia trabajada.');
     const conclusion=leer(payload.concComp,prefix,al);
-    if(letra==='C'&&!(conclusion&&typeof conclusion.texto==='string'&&conclusion.texto.trim()))throw Error('Envío integral incompleto: una competencia C requiere su conclusión específica.');
+    if(model.requiresConclusion(c.nivel,letra)&&!(conclusion&&typeof conclusion.texto==='string'&&conclusion.texto.trim()))throw Error('Envío integral incompleto: la competencia requiere su conclusión específica (Primaria B/C; Secundaria C).');
   }
 }
 function registroEvaluacion_() {
@@ -1161,7 +1161,7 @@ function registroEvaluacion_() {
 }
 function transversalValor_(raw) { return registroEvaluacion_().valor(raw); }
 function transversalEvidencia_(raw,ctx,acceso,ids,ts,previo) {
-  const core=registroEvaluacion_(),obj=x=>x&&typeof x==='object'&&!Array.isArray(x);
+  const core=registroEvaluacion_(),academic=registroAcademico_(),obj=x=>x&&typeof x==='object'&&!Array.isArray(x);
   if(!obj(raw)||raw.schema!==1||!Array.isArray(raw.sessions)||!obj(raw.grades))throw new Error('Guarda sesiones y capacidades, no una valoración directa.');
   const sessions=[],grades={},seen=new Set(),anteriores=previo&&previo.evidencia;
   raw.sessions.forEach(s=>{
@@ -1170,7 +1170,8 @@ function transversalEvidencia_(raw,ctx,acceso,ids,ts,previo) {
     if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha)||p[0]<1||p[1]<1||p[1]>12||p[2]<1||p[2]>dias[p[1]-1])throw new Error('Fecha de sesión inválida.');
     const id=core.sessionKey(s);if(seen.has(id))throw new Error('La capacidad ya está en esa sesión/fecha.');seen.add(id);
     const old=anteriores&&(anteriores.sessions||[]).find(x=>core.sessionKey(x)===id);
-    sessions.push({id,fecha,comp:s.comp,capacidad:s.capacidad,nivel:'secundaria',bimestre:ctx.bimestre,grado:ctx.numero,seccion:ctx.seccion,area:ctx.area,user:normalizarUsuario_(acceso.sesion.user),docente:old?old.docente:(acceso.docente.nombre||acceso.sesion.user),ts:old?old.ts:ts});
+    const unidad=academic.unit(s.unidad,ctx.bimestre);
+    sessions.push({...((unidad===null)?{}:{unidad}),id,fecha,comp:s.comp,capacidad:s.capacidad,nivel:'secundaria',bimestre:ctx.bimestre,grado:ctx.numero,seccion:ctx.seccion,area:ctx.area,user:normalizarUsuario_(acceso.sesion.user),docente:old?old.docente:(acceso.docente.nombre||acceso.sesion.user),ts:old?old.ts:ts});
   });
   Object.keys(raw.grades).forEach(key=>{
     if(!seen.has(key)||!obj(raw.grades[key]))throw new Error('Calificación sin sesión/capacidad válida.');grades[key]={};
@@ -2132,7 +2133,20 @@ function registroAcademico_() {
     return JSON.stringify(clean({sessions:[],concArea:{},asistencia:{},asisFechas:{},asisFechasEstado:{},capsSel:{},...p,
       modeloAcademico:undefined,ts:undefined,meta:{studentAliases:p.meta&&p.meta.studentAliases||{}},competenciasEstado:state,concComp:conc,grades:notes(p.grades),finales:notes(p.finales)}));
   }
+  const unitsForBim = bim => ({I:[0,1,2],II:[3,4],III:[5,6],IV:[7,8]}[bim]||[]).slice();
+  function unit(raw,bim) {
+    if(raw==null||raw==='')return null;
+    if(!['number','string'].includes(typeof raw)||!/^\d$/.test(String(raw))||!unitsForBim(bim).includes(Number(raw)))throw Error('Unidad incompatible con el bimestre.');
+    return Number(raw);
+  }
+  const requiresConclusion = (nivel,letra) => letra==='C'||nivel==='primaria'&&letra==='B';
+  function statistics(letras) {
+    const niveles={AD:0,A:0,B:0,C:0};letras.forEach(l=>{if(Object.prototype.hasOwnProperty.call(niveles,l))niveles[l]++;});
+    const evaluados=Object.values(niveles).reduce((a,b)=>a+b,0);
+    return {matriculados:letras.length,evaluados,noEvaluados:letras.length-evaluados,aprobados:niveles.AD+niveles.A+niveles.B,desaprobados:niveles.C,niveles,porcentajes:Object.fromEntries(Object.entries(niveles).map(([l,n])=>[l,evaluados?n/evaluados*100:0]))};
+  }
   function validate(p,c) {
+    for(const sesion of p.sessions||[])if(sesion.unidad!=null&&sesion.unidad!=='')sesion.unidad=unit(sesion.unidad,c.bim||c.bimestre);
     const comps=(catalog[c.nivel]||{})[c.area]||[],pref=prefix(c);
     for(const field of ['competenciasEstado','concComp']) {
       const map=p[field]||{};
@@ -2148,5 +2162,5 @@ function registroAcademico_() {
     }
     return p;
   }
-  return {catalog,prefix,key,worked,conclusion,canonical,validate};
+  return {catalog,prefix,key,worked,conclusion,canonical,validate,unitsForBim,unit,requiresConclusion,statistics};
 }
