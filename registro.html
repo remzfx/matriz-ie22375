@@ -93,6 +93,15 @@
   .panel-fin.on { display:block; }
   .fin-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   @media screen {
+    .fin-panel-card { padding:10px 12px; }
+    .fin-header { margin-bottom:6px; }
+    .fin-header-top { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }
+    .fin-header-context { flex:1 1 240px; min-width:0; overflow-wrap:anywhere; }
+    .fin-header-top .mode-toggle { flex:0 0 180px; max-width:100%; margin-left:auto; }
+    .fin-header-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin-top:4px; font-size:11px; font-weight:700; }
+    .fin-header-toolbar > div { display:contents; }
+    .fin-header-toolbar > span { max-width:100%; overflow-wrap:anywhere; }
+    .fin-panel-card > button { margin-top:8px; }
     .registro-datos-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
     .registro-datos-grid > div { min-width:0; }
     .registro-datos-meta { display:flex; flex-wrap:wrap; gap:4px 20px; margin-top:8px; font-size:12px; overflow-wrap:anywhere; }
@@ -299,22 +308,22 @@
 
     <!-- PANEL PROMEDIOS DIRECTOS -->
     <div class="panel-fin" id="panelFinales">
-      <div class="card p-3 space-y-3">
-        <div>
-          <div class="flex items-start justify-between gap-2">
-            <div>
+      <div class="card fin-panel-card">
+        <header class="fin-header">
+          <div class="fin-header-top">
+            <div class="fin-header-context">
               <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
             </div>
-            <div class="mode-toggle" style="min-width:180px">
+            <div class="mode-toggle">
               <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
               <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
             </div>
           </div>
-          <p class="text-[11px] text-slate-500 mt-1">Por alumno: si escribes aquí, esta nota manda. Si no, se usa Calificar.</p>
-        </div>
-        <div class="flex flex-wrap gap-2 text-[11px] font-bold" id="finResumen"></div>
-        <a href="transversales.html" id="registroTutorLink" hidden>Consolidar competencias transversales</a><div id="finLista" class="fin-wrap fin-scroll-body"></div>
+          <div class="fin-header-toolbar" id="finResumen"></div>
+          <a href="transversales.html" id="registroTutorLink" hidden>Consolidar competencias transversales</a>
+        </header>
+        <div id="finLista" class="fin-wrap fin-scroll-body"></div>
         <button type="button" class="btn btn-primary w-full text-sm" data-reg-write onclick="guardarRegistroIntegrado(true)">Guardar promedios</button>
       </div>
     </div>

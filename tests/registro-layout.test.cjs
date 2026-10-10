@@ -41,3 +41,14 @@ test('Resumen keeps horizontal sticky names, all result columns and editable C c
  const render=extract('renderAvance');assert.match(render,/<th class="fin-nom">Estudiante/);assert.match(render,/<tr><th class="fin-nom">/);assert.match(render,/Promedio referencial<small style="display:block/);assert.match(render,/academic-conclusion/);assert.match(render,/IERegistroTransversales.summary\(box\)/);
  const start=html.indexOf('id="panelCalificar"'),panel=html.slice(start,html.indexOf('<!-- /panelCalificar -->',start));assert.doesNotMatch(panel,/fin-scroll-body/);
 });
+test('Promedios compact header has context and unchanged segmented mode in row one, informational toolbar in row two before viewport',()=>{
+ const start=html.indexOf('id="panelFinales"'),panel=html.slice(start,html.indexOf('<!-- PANEL ASISTENCIA -->',start)),header=panel.slice(panel.indexOf('<header'),panel.indexOf('</header>')+9);
+ assert.match(header,/<div class="fin-header-top">[\s\S]*fin-header-context[\s\S]*id="lblFinCtx"[\s\S]*class="mode-toggle"/);assert.match(header,/data-modo="letra" onclick="setModoCalif\('letra'\)"/);assert.match(header,/data-modo="num" class="on" onclick="setModoCalif\('num'\)"/);assert.match(header,/<div class="fin-header-toolbar" id="finResumen"><\/div>/);
+ assert.match(panel,/<\/header>\s*<div id="finLista" class="fin-wrap fin-scroll-body">/);assert.doesNotMatch(panel,/space-y-3|Por alumno: si escribes/);for(const id of ['lblFinCtx','finResumen','finLista','registroTutorLink'])assert.equal((panel.match(new RegExp('id="'+id+'"','g'))||[]).length,1);
+});
+test('Promedios toolbar wraps with uniform gaps and nested counters participate in the same flex row without forced full width',()=>{
+ assert.match(html,/\.fin-header-top \{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px;/);assert.match(html,/\.fin-header-context \{ flex:1 1 240px; min-width:0;/);assert.match(html,/\.fin-header-top \.mode-toggle \{ flex:0 0 180px; max-width:100%; margin-left:auto;/);assert.match(html,/\.fin-header-toolbar \{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin-top:4px;/);assert.match(html,/\.fin-header-toolbar > div \{ display:contents; \}/);assert.match(html,/\.fin-header \{ margin-bottom:6px; \}/);
+});
+test('Promedios render keeps academic counters, mode explanation and every calculation identical after header relocation',()=>{
+ assert.equal(extract('renderFinales'),extract('renderFinales',old));assert.match(extract('renderFinales'),/Promedio directo prevalece sobre evidencias/);assert.match(extract('renderFinales'),/Celdas /);for(const level of ['AD','A','B','C'])assert.match(extract('renderFinales'),new RegExp('>'+level+' '));
+});
