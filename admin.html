@@ -62,6 +62,7 @@
 </style>
   <script src="login-bridge.js"></script>
   <script src="students.js"></script>
+  <script src="students-migration.js" onerror="window.__IEStudentsMigrationLoadError=true"></script>
 <script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script>
 <script src="student-identity.js"></script>
 <script src="registro-evaluation.js"></script><script src="transversales-client.js"></script>
@@ -507,6 +508,16 @@ const PERIODOS_CLOUD_KEY = 'ie22375_periodos_cloud_v1';
 
 let estado = null;
 let baseCargada = false, baseVersion = '', baseInicializada = false, bdPendiente = false, bdGuardando = false;
+function verificarModuloEstudiantesAdmin() {
+  const modulo = window.IEMigrateStudents;
+  const listo = !!modulo && ['mostrarBase','importar','verificar','verificarPadron','crearPadron','sincronizarPadron','inicializar','bimestreVista'].every(nombre => typeof modulo[nombre] === 'function');
+  if (listo) return true;
+  const mensaje = 'No se pudo cargar Gestión de estudiantes (students-migration.js). No se verificaron sus indicadores. Recarga la página para reintentar.';
+  ['gestionPrimaria','gestionSecundaria'].forEach(id => { const el=document.getElementById(id); if(el)el.textContent='No verificado'; });
+  ['gestionServidor','migracionEstado'].forEach(id => { const el=document.getElementById(id); if(el)el.textContent=mensaje; });
+  document.querySelectorAll('#tab-import [onclick*="IEMigrateStudents"], #tab-import [onchange*="IEMigrateStudents"]').forEach(el => { el.disabled=true; });
+  return false;
+}
 function estadoBD(mensaje) {
   const el = document.getElementById('bdEstado');
   if (el) el.textContent = mensaje;
@@ -542,7 +553,7 @@ async function cargarEstudiantesAdmin(options) {
   const cached = IEStudents.peek ? IEStudents.peek() : null;
   if (cached && cached.inicializada) {
     aplicarBaseServidor(cached);
-    if(typeof IEMigrateStudents!=='undefined')IEMigrateStudents.mostrarBase(cached, false);
+    if(typeof IEMigrateStudents!=='undefined' && (typeof verificarModuloEstudiantesAdmin!=='function' || verificarModuloEstudiantesAdmin()))IEMigrateStudents.mostrarBase(cached, false);
     estadoBD('Base reciente mostrada al instante. Verificando datos con el servidor…');
   } else {
     baseCargada = false;
@@ -559,7 +570,7 @@ async function cargarEstudiantesAdmin(options) {
     if (!mismaSesion()) { baseCargada=false; actualizarResumen(); estadoBD('La sesión cambió. Vuelve a iniciar sesión; tus cambios pendientes se conservan en esta pestaña.'); return; }
     if (bdPendiente || revision !== (cargarEstudiantesAdmin.revision || 0)) { estadoBD('Hay cambios sin guardar. La actualización recibida no reemplazó tus modificaciones. Puedes guardar, revisar o recargar y confirmar el descarte.'); return; }
     aplicarBaseServidor(fresca);
-    if(typeof IEMigrateStudents!=='undefined')IEMigrateStudents.mostrarBase(fresca, !fresca.offline);
+    if(typeof IEMigrateStudents!=='undefined' && (typeof verificarModuloEstudiantesAdmin!=='function' || verificarModuloEstudiantesAdmin()))IEMigrateStudents.mostrarBase(fresca, !fresca.offline);
   } catch(e) {
     if (!vigenteSolicitud()) return;
     if (!mismaSesion() || e.authorizationRejected) { baseCargada=false; actualizarResumen(); estadoBD('La sesión cambió o fue rechazada. Vuelve a iniciar sesión; tus cambios pendientes se conservan en esta pestaña.'); return; }
@@ -567,7 +578,7 @@ async function cargarEstudiantesAdmin(options) {
     const vigente = IEStudents.peek ? IEStudents.peek() : null;
     if (vigente && vigente.inicializada) {
       aplicarBaseServidor(vigente);
-      if(typeof IEMigrateStudents!=='undefined')IEMigrateStudents.mostrarBase(vigente, false);
+      if(typeof IEMigrateStudents!=='undefined' && (typeof verificarModuloEstudiantesAdmin!=='function' || verificarModuloEstudiantesAdmin()))IEMigrateStudents.mostrarBase(vigente, false);
       estadoBD('Mostrando la última base autorizada de esta sesión. No se pudo actualizar ahora.');
       return;
     }
@@ -577,7 +588,7 @@ async function cargarEstudiantesAdmin(options) {
     actualizarResumen(); fillFiltros(); renderTabla();
     document.getElementById('statAlumnos').textContent = '— alumnos · no disponibles';
     estadoBD('No se pudo cargar la base. ' + e.message);
-    if(typeof IEMigrateStudents!=='undefined')IEMigrateStudents.mostrarBase(null, false, e.message);
+    if(typeof IEMigrateStudents!=='undefined' && (typeof verificarModuloEstudiantesAdmin!=='function' || verificarModuloEstudiantesAdmin()))IEMigrateStudents.mostrarBase(null, false, e.message);
   }
 }
 window.addEventListener('beforeunload', function(e) {
@@ -1871,6 +1882,7 @@ function entrarAppAdmin() {
   showTab('menu');
 }
 loadEstado();
+verificarModuloEstudiantesAdmin();
 if (sesionIndexAdmin()) {
   const baseRapida = IEStudents.peek ? IEStudents.peek() : null;
   if (baseRapida && baseRapida.inicializada) {
