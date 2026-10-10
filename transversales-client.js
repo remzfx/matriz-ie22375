@@ -36,13 +36,14 @@
     if(data.flujoTutor!==true){data=Object.assign({},data,{puedeFinal:false,puedeProcesar:false});const warning=text('p','Solo lectura · Backend anterior pendiente de actualización',container);warning.className='trans-notice';warning.setAttribute('role','status');}
     let mode='letra',competence='tic',draft={},busy=false;const token=global.IEStudents.validToken();
     const toolbar=text('div','',container);toolbar.className='trans-toolbar';
-    const modeGroup=text('div','',toolbar);modeGroup.className='trans-control-group';text('span','Modo de evaluación',modeGroup);
-    const modes=text('div','',modeGroup);modes.className='trans-segment';modes.setAttribute('role','group');modes.setAttribute('aria-label','Modo de evaluación');
-    [['letra','Letras'],['num','0–20']].forEach(([value,label])=>{const button=text('button',label,modes);button.dataset.mode=value;button.onclick=()=>{if(busy)return;mode=value;draw();};});
-    const competenceGroup=text('div','',toolbar);competenceGroup.className='trans-control-group';text('span','Competencia',competenceGroup);
+    const left=text('div','',toolbar);left.className='trans-toolbar-left';
+    const competenceGroup=text('div','',left);competenceGroup.className='trans-control-group trans-competence-group';text('span','Competencia',competenceGroup);
     const tabs=text('div','',competenceGroup);tabs.className='trans-segment';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Competencia transversal');
     Object.entries(COMP).forEach(([cp,label])=>{const tab=text('button',cp==='tic'?'TIC':'Gestiona su aprendizaje',tabs);tab.dataset.competence=cp;tab.setAttribute('role','tab');tab.onclick=()=>{competence=cp;draw();};});
-    const apply=data.puedeFinal?text('button','Aplicar sugeridos a Final',toolbar):null;if(apply)apply.className='btn trans-apply';
+    const apply=data.puedeFinal?text('button','Aplicar sugeridos a Final',left):null;if(apply)apply.className='btn trans-apply';
+    const modeGroup=text('div','',toolbar);modeGroup.className='trans-control-group trans-mode-group';text('span','Modo de evaluación',modeGroup);
+    const modes=text('div','',modeGroup);modes.className='trans-segment';modes.setAttribute('role','group');modes.setAttribute('aria-label','Modo de evaluación');
+    [['letra','Letras'],['num','0–20']].forEach(([value,label])=>{const button=text('button',label,modes);button.dataset.mode=value;button.onclick=()=>{if(busy)return;mode=value;draw();};});
     const completeness=text('p','',container);completeness.className='trans-progress';
     const message=text('p','',container),aportesStatus=text('p','',container);message.className='trans-notice';message.setAttribute('role','status');aportesStatus.className='trans-notice';aportesStatus.setAttribute('role','status');
     const heading=text('div','',container);heading.className='trans-heading-row';const competenceTitle=text('h3','',heading);competenceTitle.className='trans-competence-title';
