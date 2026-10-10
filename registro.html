@@ -12,14 +12,16 @@
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
   .worked-label{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;}
-  .final-cell-layout{display:block;}
-  .final-cell-layout.has-conclusion{display:grid;grid-template-columns:auto minmax(130px,180px);gap:8px;align-items:start;}
-  .final-conclusion{text-align:left;min-width:0;font-size:11px;}
+  .final-cell-layout{display:grid;grid-template-columns:100px minmax(0,1fr);gap:8px;align-items:start;min-width:0;}
+  .final-grade{grid-column:1;width:100px;min-width:100px;display:flex;flex-direction:column;align-items:center;}
+  .final-grade > .fin-cell{width:100%;min-width:0;}
+  .final-grade button{max-width:100%;overflow-wrap:anywhere;}
+  .final-conclusion{text-align:left;min-width:0;width:100%;max-width:180px;font-size:11px;}
   .final-conclusion label{display:block;font-size:10px;font-weight:600;}
   .final-conclusion select,.final-conclusion textarea{width:100%;min-width:0;box-sizing:border-box;font-size:11px;line-height:1.25;padding:4px;}
-  .final-conclusion select{min-height:44px;}
+  .final-conclusion select{min-height:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .final-conclusion textarea{min-height:54px;resize:vertical;margin-top:4px;}
-  @media(max-width:640px){.final-cell-layout.has-conclusion{grid-template-columns:1fr;}.final-conclusion{max-width:180px;}}
+  @media(max-width:640px){.final-conclusion{grid-column:1 / -1;grid-row:2;}}
   .summary-stats{margin:14px 0;padding:12px;border:1px solid #cbd5e1;border-radius:12px;}
   .summary-counts{display:flex;flex-wrap:wrap;gap:12px;}
   .worked-label input[type=checkbox]{width:17px;height:17px;min-height:17px;padding:0;flex:0 0 17px;}
