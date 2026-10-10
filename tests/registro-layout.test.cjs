@@ -38,7 +38,7 @@ test('both secondary header rows stay in one sticky thead without altering trans
  const source=read('registro-transversales.js'),previous=execFileSync('git',['show','321c72933a69830f1f731514513e21c240e1529c:registro-transversales.js'],{cwd:root,encoding:'utf8'});assert.match(source,/thead.insertBefore\(group,thead.firstChild\)/);assert.match(source,/const header=thead.querySelectorAll\('tr'\)\[1\]/);assert.match(html,/\.fin-scroll-body \.fin-grid thead \{ position:sticky/);
 });
 test('Resumen keeps horizontal sticky names, all result columns and no conclusion controls; Calificar gets no vertical viewport',()=>{
- const render=extract('renderAvance');assert.match(render,/<th class="fin-nom">Estudiante/);assert.match(render,/<tr><th class="fin-nom">/);assert.match(render,/Promedio referencial<small style="display:block/);assert.doesNotMatch(render,/academic-conclusion|textarea|concCompAlumno/);assert.match(render,/IERegistroTransversales.summary\(box\)/);
+ const render=extract('renderAvance');assert.match(render,/<th class="fin-nom summary-student-header">Estudiante/);assert.match(render,/<tr><th class="fin-nom summary-student">/);assert.match(render,/Promedio referencial<small style="display:block/);assert.doesNotMatch(render,/academic-conclusion|textarea|concCompAlumno/);assert.match(render,/IERegistroTransversales.summary\(box\)/);
  const start=html.indexOf('id="panelCalificar"'),panel=html.slice(start,html.indexOf('<!-- /panelCalificar -->',start));assert.doesNotMatch(panel,/fin-scroll-body/);
 });
 test('Promedios main desktop row orders context, mode notice and unchanged toggle; cells are below before viewport',()=>{

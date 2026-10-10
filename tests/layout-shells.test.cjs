@@ -26,7 +26,7 @@ test('Registro shares shell-work across header, context, all panels main and low
 test('Tutor consolidates inside Registro; Hub has no obsolete standalone transversal module',()=>{assert.doesNotMatch(read('index.html'),/transversales:\s*\{/);assert.match(read('registro.html'),/COMPETENCIAS TRANSVERSALES/);});
 
 test('Resumen keeps one referential average column and renders its informational subtitle on a smaller separate line',()=>{
- const html=read('registro.html'),headers=[...html.matchAll(/<th>Promedio referencial([\s\S]*?)<\/th>/g)];assert.equal(headers.length,1);assert.match(headers[0][1],/^<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE<\/small>$/);assert.doesNotMatch(headers[0][1],/<th|<td/);
+ const html=read('registro.html'),headers=[...html.matchAll(/<th class="summary-reference">Promedio referencial([\s\S]*?)<\/th>/g)];assert.equal(headers.length,1);assert.match(headers[0][1],/^<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE<\/small>$/);assert.doesNotMatch(headers[0][1],/<th|<td/);
 });
 test('Tutor backend changes keep signed token authentication and permission revocation intact',()=>{const now=read('apps-script/Codigo.js').replace(/\r\n/g,'\n'),before=original('apps-script/Codigo.js');for(const name of ['validarToken_','firmarToken_']){const rx=new RegExp('function '+name+'\\([\\s\\S]*?\\n}');assert.ok(now.match(rx),name);assert.ok(before.match(rx),name);assert.equal(now.match(rx)[0],before.match(rx)[0]);}});
 

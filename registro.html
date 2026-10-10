@@ -135,9 +135,6 @@
   .fin-grid thead th.fin-nom { background:#0f172a; z-index:3; }
   .fin-grid .fin-caps { font-size:10px; font-weight:600; color:#cbd5e1; margin-top:4px; line-height:1.3; }
   /* Resumen: resultados por competencia y promedio referencial informativo. */
-  .fin-grid thead th.av-prom-col { background:#075985; color:#fff; }
-  .fin-grid tbody td.av-prom-col { background:#f0f9ff; }
-  .fin-grid tbody tr:nth-child(even) td.av-prom-col { background:#e0f2fe; }
   .fin-grid td .fin-caps { color:#64748b; }
   .fin-cell { display:flex; flex-direction:column; align-items:center; gap:4px; min-width:92px; }
   @media (max-width:640px) {
@@ -151,6 +148,10 @@
   }
   .fin-cell input { width:3.6rem; text-align:center; font-weight:800; border:1.5px solid #cbd5e1; border-radius:10px; padding:6px 4px; font-size:16px; }
   .fin-cell input[readonly] { background:#f1f5f9; color:#334155; }
+  .fin-grid th.summary-student,.fin-grid th.summary-student-header{text-align:left;padding-left:12px;padding-right:12px;width:200px;min-width:180px;max-width:240px;white-space:normal;overflow-wrap:anywhere;}
+  .summary-student-order,.summary-student-name{display:block;text-align:left;white-space:normal;}
+  .summary-student-order{font-size:10px;font-weight:400;color:#64748b;}
+  .fin-grid .summary-reference{text-align:center;vertical-align:middle;width:160px;min-width:150px;max-width:180px;background:#f0f7ff;color:#334155;border-left:2px solid #cbd5e1;overflow-wrap:anywhere;}
   .asis-chip {
     display:inline-flex; align-items:center; justify-content:center;
     min-width:2rem; height:2rem; border-radius:8px; font-size:12px; font-weight:900;
@@ -181,6 +182,8 @@
     #printArea .fin-grid{min-width:0!important;width:100%;font-size:8pt;}
     #printArea .fin-grid thead,#printArea .fin-grid th{position:static!important;background:white!important;color:black!important;}
     #printArea .fin-grid th,#printArea .fin-grid td{padding:3px;border:1px solid #777;overflow-wrap:anywhere;}
+    #printArea .fin-grid .summary-student,#printArea .fin-grid .summary-student-header{text-align:left;padding-left:6px!important;padding-right:6px!important;}
+    #printArea .fin-grid .summary-reference{text-align:center;vertical-align:middle;background:#f4f8fc!important;color:black!important;border-left:2px solid #94a3b8!important;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
     #printArea tr{break-inside:avoid;}
     #printArea .summary-stats{break-inside:avoid;}
     .print-break { page-break-before: always; }
@@ -3007,8 +3010,8 @@ function escapeRegistro(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&am
 function estadisticaResumenHTML(){const s=IERegistroAcademico.statistics(estudiantes().map(al=>promReferencialAlumno(studentKey(al)).letra));return '<section class="summary-stats"><h3>RESUMEN ESTADÍSTICO</h3><div class="summary-counts">'+[['Matriculados',s.matriculados],['Evaluados',s.evaluados],['No evaluados',s.noEvaluados],['Aprobados',s.aprobados],['Desaprobados',s.desaprobados]].map(([l,n])=>'<span>'+l+': <strong>'+n+'</strong></span>').join('')+'</div><table><thead><tr><th>Nivel</th><th>Frecuencia</th><th>Porcentaje</th></tr></thead><tbody>'+Object.keys(s.niveles).map(l=>'<tr><th>'+l+'</th><td>'+s.niveles[l]+'</td><td>'+s.porcentajes[l].toFixed(1)+' %</td></tr>').join('')+'<tr><th>TOTAL</th><td>'+s.evaluados+'</td><td>'+(s.evaluados?'100':'0')+' %</td></tr></tbody></table><small>Clasificación estadística: AD/A/B aprobados; C desaprobados. Promedio referencial informativo; no determina promoción ni SIAGIE.</small></section>';}
 function renderAvance() {
  const box=document.getElementById('avanceBox'),c=ctxBase(),comps=competencias();document.getElementById('lblAvanceCtx').textContent=c.area+' · Bim '+c.bim;
- let html='<div class="fin-wrap fin-scroll-body"><table class="fin-grid"><thead><tr><th class="fin-nom">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'<th>Promedio referencial<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
- estudiantes().forEach(al=>{const id=studentKey(al);html+='<tr><th class="fin-nom">'+escapeRegistro(al.nombre)+'</th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td>No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id);html+='<td><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+escapeRegistro(d.letra||'Pendiente')+'</span></div></td>';});const r=promReferencialAlumno(id);html+='<td>'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>'+estadisticaResumenHTML();
+ let html='<div class="fin-wrap fin-scroll-body"><table class="fin-grid"><thead><tr><th class="fin-nom summary-student-header">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'<th class="summary-reference">Promedio referencial<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
+ estudiantes().forEach((al,i)=>{const id=studentKey(al);html+='<tr><th class="fin-nom summary-student"><span class="summary-student-order">'+escapeRegistro(al.orden??i+1)+'</span><span class="summary-student-name">'+escapeRegistro(al.nombre)+'</span></th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td>No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id);html+='<td><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+escapeRegistro(d.letra||'Pendiente')+'</span></div></td>';});const r=promReferencialAlumno(id);html+='<td class="summary-reference">'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>'+estadisticaResumenHTML();
  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
 }
 function imprimirResumen(){
