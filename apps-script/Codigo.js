@@ -1269,8 +1269,8 @@ function transversalResumen_(datos,id,comp) {
   const max=Math.max(...Object.values(conteo)), ganadores=Object.keys(conteo).filter(k=>conteo[k]===max), sugerencia=max && ganadores.length===1?ganadores[0]:null;
   const orden=['C','B','A','AD'],indices=aportes.map(a=>orden.indexOf(a.valor.nivel)), faltan=datos.areas.filter(a=>!porArea[a]);
   const empate=max>0 && ganadores.length>1, dispersion=indices.length>1 && Math.max(...indices)-Math.min(...indices)>=2;
-  const sinDocente=datos.areas.filter(a=>!(datos.responsables[a]||[]).length),sinAporte=faltan.filter(a=>!sinDocente.includes(a));
-  return {aportes,pendientes,conteo,recibidos:aportes.length,sugerencia,empate,dispersion,faltan,sinDocente,sinAporte,alerta:empate||dispersion||sinDocente.length>0||(datos.politica.aportesObligatorios&&sinAporte.length>0)};
+  const sinDocente=datos.areas.filter(a=>!(datos.responsables[a]||[]).length),sinAporte=faltan.filter(a=>!sinDocente.includes(a)&&!pendientes.includes(a));
+  return {aportes,pendientes,conteo,recibidos:aportes.length,sugerencia,empate,dispersion,faltan,sinDocente,sinAporte,alerta:empate||dispersion||sinDocente.length>0||(datos.politica.aportesObligatorios&&(sinAporte.length>0||pendientes.length>0))};
 }
 function transversalConclusionPendiente_(final) { return !!(final && final.nivel==='C' && !String(final.conclusion||'').trim()); }
 // Política institucional: ConfigSistema/PERIODOS.anio, nunca la fecha del navegador.
@@ -1357,7 +1357,7 @@ function transversalesRuta_(body) {
           revisado=Object.assign({},audit,{tutor:datos.tutores[0]});
         }else if(action==='procesartransversales'){
           if(!ids.size)throw Error('El padrón del aula está vacío.');
-          if(datos.politica.aportesObligatorios&&datos.estudiantes.some(al=>['tic','autonomia'].some(comp=>transversalResumen_(datos,al.id,comp).sinAporte.length)))throw Error('El año lectivo requiere los aportes de las áreas asignadas antes de procesar.');
+          if(datos.politica.aportesObligatorios&&datos.estudiantes.some(al=>['tic','autonomia'].some(comp=>{const resumen=transversalResumen_(datos,al.id,comp);return resumen.sinAporte.length||resumen.pendientes.length;})))throw Error('El año lectivo requiere los aportes de las áreas asignadas antes de procesar.');
           if(!revisado||revisado.versionAportes!==datos.versionAportes||revisado.tutor.user!==datos.tutores[0].user)throw Error('Requiere revisión explícita de Admin con el Tutor vigente.');
           ids.forEach(id=>['tic','autonomia'].forEach(comp=>{const f=(finales[id]||{})[comp];if(!f||!transversalValor_(f))throw Error('Todos los estudiantes requieren finales TIC y Gestiona.');if(f.versionAportes!==datos.versionAportes)throw Error('Decisión obsoleta: revise con los aportes actuales.');if(transversalConclusionPendiente_(f))throw Error('Conclusión descriptiva final obligatoria para nivel C.');}));
           const aprobados=Object.fromEntries([...ids].map(id=>[id,finales[id]]));
@@ -1738,7 +1738,7 @@ function doPost(e) {
         if(nuevo&&(body.modeloAcademico!==1||body.version==null||Number(body.version)!==prevVersion))return responder_({ok:false,code:'CONFLICT',error:'El registro cambió. Baje y revise antes de guardar.',version:prevVersion});
         const payload=Object.assign({},body.payload||{});
         for(const field of ['concComp','competenciasEstado'])if(payload[field]===undefined&&prev[field]!==undefined)payload[field]=prev[field];
-        try{registroAcademico_().validate(payload,{nivel:nivelR,bim:bimestre,grado:grado,seccion:seccion,area:area});if(body.modeloAcademico===1&&body.envioIntegral===true)validarRegistroIntegral_(payload,ctx);if(body.envioIntegral===true&&ctx.nivel==='secundaria'&&permiso.role==='docente'&&politicaTransversal_().aportesObligatorios)validarTransversalesObligatorias_(ctx,permiso);}catch(e){return responder_({ok:false,error:e.message});}
+        try{registroAcademico_().validate(payload,{nivel:nivelR,bim:bimestre,grado:grado,seccion:seccion,area:area});if(body.modeloAcademico===1&&body.envioIntegral===true)validarRegistroIntegral_(payload,ctx);if(ctx.nivel==='secundaria'&&permiso.role==='docente'&&politicaTransversal_().aportesObligatorios)validarTransversalesObligatorias_(ctx,permiso);}catch(e){return responder_({ok:false,error:e.message});}
         if(permiso.role==='docente'){const meta=payload.meta&&typeof payload.meta==='object'&&!Array.isArray(payload.meta)?payload.meta:{};payload.meta=Object.assign({},meta,{docente:permiso.docente});}
         if(nuevo)payload.modeloAcademico=1;
         if(JSON.stringify(payload).length>49000)return responder_({ok:false,error:'El registro supera el límite seguro de la celda. El borrador se conserva; reduzca el detalle antes de enviar.'});
