@@ -117,7 +117,20 @@ function registroAcademico_() {
     return JSON.stringify(clean({sessions:[],concArea:{},asistencia:{},asisFechas:{},asisFechasEstado:{},capsSel:{},...p,
       modeloAcademico:undefined,ts:undefined,meta:{studentAliases:p.meta&&p.meta.studentAliases||{}},competenciasEstado:state,concComp:conc,grades:notes(p.grades),finales:notes(p.finales)}));
   }
+  const unitsForBim = bim => ({I:[0,1,2],II:[3,4],III:[5,6],IV:[7,8]}[bim]||[]).slice();
+  function unit(raw,bim) {
+    if(raw==null||raw==='')return null;
+    if(!['number','string'].includes(typeof raw)||!/^\d$/.test(String(raw))||!unitsForBim(bim).includes(Number(raw)))throw Error('Unidad incompatible con el bimestre.');
+    return Number(raw);
+  }
+  const requiresConclusion = (nivel,letra) => letra==='C'||nivel==='primaria'&&letra==='B';
+  function statistics(letras) {
+    const niveles={AD:0,A:0,B:0,C:0};letras.forEach(l=>{if(Object.prototype.hasOwnProperty.call(niveles,l))niveles[l]++;});
+    const evaluados=Object.values(niveles).reduce((a,b)=>a+b,0);
+    return {matriculados:letras.length,evaluados,noEvaluados:letras.length-evaluados,aprobados:niveles.AD+niveles.A+niveles.B,desaprobados:niveles.C,niveles,porcentajes:Object.fromEntries(Object.entries(niveles).map(([l,n])=>[l,evaluados?n/evaluados*100:0]))};
+  }
   function validate(p,c) {
+    for(const sesion of p.sessions||[])if(sesion.unidad!=null&&sesion.unidad!=='')sesion.unidad=unit(sesion.unidad,c.bim||c.bimestre);
     const comps=(catalog[c.nivel]||{})[c.area]||[],pref=prefix(c);
     for(const field of ['competenciasEstado','concComp']) {
       const map=p[field]||{};
@@ -133,6 +146,6 @@ function registroAcademico_() {
     }
     return p;
   }
-  return {catalog,prefix,key,worked,conclusion,canonical,validate};
+  return {catalog,prefix,key,worked,conclusion,canonical,validate,unitsForBim,unit,requiresConclusion,statistics};
 }
 if(typeof window!=='undefined')window.IERegistroAcademico=registroAcademico_();

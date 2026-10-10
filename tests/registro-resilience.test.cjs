@@ -16,7 +16,7 @@ function fixture(){
  const calls=[],alerts=[],c=vm.createContext({window:{},Date:class extends Date{static now(){return now;}},AbortController,atob,setTimeout:timer,clearTimeout:key=>timers.delete(key),sessionStorage:storage,localStorage:storage,document:{getElementById:element,querySelectorAll:sel=>main.querySelectorAll(sel),querySelector:()=>main},alert:m=>alerts.push(m),console});
  const response=(name='Synthetic Verified',bimestre='III')=>({ok:true,inicializada:true,version:'v',bimestre,padronInicializado:true,estudiantes:[{nivel:'secundaria',grado:4,seccion:'B',idSiagie:'42',nombre:name}]});
  c.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>response()};};
- new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;
+ new vm.Script(read('registro-academic-model.js')).runInContext(c);c.IERegistroAcademico=c.window.IERegistroAcademico;new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;
  const run=code=>new vm.Script(code).runInContext(c);
  run(`let nivel='secundaria',bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,tokenPadron='',vencimientoCachePadron,sesionActiva=null,notas={},areaActual='Matemática',store={meta:{},grades:{},asistencia:{}},renders=0;
  function recordarPadron(){};function saveStore(){};function renderStudents(){renders++;};function llenarAulasPadron(){};
@@ -26,7 +26,7 @@ function fixture(){
  function fillCaps(){};function loadCapsElegidas(){};function renderChipsCaps(){};function markClean(){};function updateHdr(){};
  function renderSesiones(){renders++};function renderFinales(){};function renderAvance(){};function renderAsistencia(){};
  function consultarEstadoSiagie(){};function recolectarPantalla(){};function guardarMeta(){};function saveCapsElegidas(){};`);
- for(const name of ['registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','bloquearRegistroMientrasValida','pintarPadronInmediato','vigilarCachePadron','cargarPadronRegistro','cambiarBimestreRegistro','reintentarPadronRegistro','onContexto','guardarTodo'])run(extract(name));
+ for(const name of ['registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','bloquearRegistroMientrasValida','pintarPadronInmediato','vigilarCachePadron','cargarPadronRegistro','cambiarBimestreRegistro','reintentarPadronRegistro','actualizarUnidades','onContexto','guardarTodo'])run(extract(name));
  return {c,run,main,writes,cloud,element,tick,calls,alerts,response,storage,timers,now:()=>now};
 }
 test('Fast server verifies the exact roster/session and enables writing without inert',async()=>{

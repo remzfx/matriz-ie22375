@@ -3,7 +3,8 @@
   'use strict';
   const API='https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
   const grading=global.IERegistroEvaluacion,COMP=grading.COMP,CAPS=grading.CAPS;
-  const ACTIONS=['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','revisartransversal','procesartransversales','loadtransversalexport'];
+  const ACTIONS=['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','procesartransversales','loadtransversalexport'];
+  const AREA_LABELS={'Arte y Cultura':'ART','Ciencia y Tecnología':'CYT','Ciencias Sociales':'CCSS','Comunicación':'COM','Desarrollo Personal, Ciudadanía y Cívica':'DPCC','Educación Física':'EFIS','Educación Religiosa':'REL','Educación para el Trabajo (EPT)':'EPT','Educación para el Trabajo':'EPT','Inglés':'ING','Matemática':'MAT'};
   let bridge=null;const pending=new Map();
   function valor(raw){return grading.valor(raw);}
   function start(){if(!bridge&&global.IELoginBridge&&document.body)try{bridge=global.IELoginBridge.create(API,'transversales');}catch(e){}return bridge;}
@@ -32,69 +33,100 @@
   }
   function editor(container,data,ctx,final){
     if(!final)return evidenceEditor(container,data,ctx);
-    let mode='letra',draft={},busy=false;
-    const toolbar=text('div','',container),modeEl=document.createElement('select');
-    [['letra','Letras'],['num','0–20']].forEach(([v,label])=>{const opt=document.createElement('option');opt.value=v;opt.textContent=label;modeEl.appendChild(opt);});toolbar.appendChild(modeEl);
-    text('p','18–20 → AD · 14–17 → A · 11–13 → B · 0–10 → C. Cambiar el modo no modifica valoraciones guardadas.',container);
-    if(data.politica)text('p','Año lectivo '+data.politica.anio+' · Aportes '+(data.politica.aportesObligatorios?'obligatorios':'opcionales')+' para las áreas. La sugerencia no es una nota oficial.',container);
-    const message=text('p','',container),rows=text('div','',container),buttons=text('div','',container);
-    const tutor=(data.tutores||[])[0],reviewLabel=text('label',tutor?'Revisado con el Tutor: '+tutor.nombre:'Sin Tutor asignado',toolbar),review=document.createElement('input');review.type='checkbox';review.checked=!!(data.revisado&&data.revisado.versionAportes===data.versionAportes);review.disabled=!data.puedeRevisar||!data.abierto||!tutor;reviewLabel.appendChild(review);
-    function procesable(){return data.abierto&&data.puedeProcesar&&(data.tutores||[]).length===1&&data.revisado&&data.revisado.versionAportes===data.versionAportes&&!Object.keys(draft).length&&data.estudiantes.length&&data.estudiantes.every(al=>Object.keys(COMP).every(cp=>{const f=data.resultados[al.id][cp].final;return f&&f.versionAportes===data.versionAportes&&(f.nivel!=='C'||String(f.conclusion||'').trim());}));}
-    function changed(id,comp,raw){if(!data.puedeFinal||!data.abierto||busy)return;draft[id]=draft[id]||{};draft[id][comp]=Object.assign({},draft[id][comp]||data.resultados[id][comp].final||{},raw);buttons.querySelectorAll('button').forEach(b=>{if(b.dataset.process)b.disabled=true;});if(raw.modo)draw();}
+    if(data.flujoTutor!==true){data=Object.assign({},data,{puedeFinal:false,puedeProcesar:false});const warning=text('p','Solo lectura · Backend anterior pendiente de actualización',container);warning.className='trans-notice';warning.setAttribute('role','status');}
+    let mode='letra',competence='tic',draft={},busy=false;const token=global.IEStudents.validToken();
+    const toolbar=text('div','',container);toolbar.className='trans-toolbar';
+    const left=text('div','',toolbar);left.className='trans-toolbar-left';
+    const competenceGroup=text('div','',left);competenceGroup.className='trans-control-group trans-competence-group';text('span','Competencia',competenceGroup);
+    const tabs=text('div','',competenceGroup);tabs.className='trans-segment';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Competencia transversal');
+    Object.entries(COMP).forEach(([cp,label])=>{const tab=text('button',cp==='tic'?'TIC':'Gestiona su aprendizaje',tabs);tab.dataset.competence=cp;tab.setAttribute('role','tab');tab.onclick=()=>{competence=cp;draw();};});
+    const apply=data.puedeFinal?text('button','Aplicar sugeridos a Final',left):null;if(apply)apply.className='btn trans-apply';
+    const modeGroup=text('div','',toolbar);modeGroup.className='trans-control-group trans-mode-group';text('span','Modo de evaluación',modeGroup);
+    const modes=text('div','',modeGroup);modes.className='trans-segment';modes.setAttribute('role','group');modes.setAttribute('aria-label','Modo de evaluación');
+    [['letra','Letras'],['num','0–20']].forEach(([value,label])=>{const button=text('button',label,modes);button.dataset.mode=value;button.onclick=()=>{if(busy)return;mode=value;draw();};});
+    const completeness=text('p','',container);completeness.className='trans-progress';
+    const message=text('p','',container),aportesStatus=text('p','',container);message.className='trans-notice';message.setAttribute('role','status');aportesStatus.className='trans-notice';aportesStatus.setAttribute('role','status');
+    const heading=text('div','',container);heading.className='trans-heading-row';const competenceTitle=text('h3','',heading);competenceTitle.className='trans-competence-title';
+    const help=text('details','',heading);help.className='trans-help';text('summary','Cómo funciona la evaluación',help);
+    text('p','18–20 → AD · 14–17 → A · 11–13 → B · 0–10 → C. Cambiar el modo no modifica valoraciones guardadas.',help);
+    if(data.politica)text('p','Año lectivo '+data.politica.anio+' · Solo aportes habilitados por Admin. Sugerencia: mayoría de áreas, un voto efectivo (el más reciente) por área; empate sin sugerencia. La decisión oficial pertenece al Tutor.',help);
+    const rows=text('div','',container),buttons=text('div','',container);buttons.className='trans-actions';
+    function procesable(){return token===global.IEStudents.validToken()&&data.flujoTutor&&Array.isArray(data.aportesPendientes)&&data.aportesPendientes.length===0&&data.abierto&&data.puedeProcesar&&(data.tutores||[]).length===1&&!Object.keys(draft).length&&data.estudiantes.length&&data.estudiantes.every(al=>Object.keys(COMP).every(cp=>{const f=data.resultados[al.id][cp].final;return f&&f.versionAportes===data.versionAportes&&(f.nivel!=='C'||String(f.conclusion||'').trim());}));}
+    function changed(id,comp,raw){if(token!==global.IEStudents.validToken()||!data.puedeFinal||!data.abierto||busy)return;draft[id]=draft[id]||{};draft[id][comp]=Object.assign({},draft[id][comp]||data.resultados[id][comp].final||{},raw);buttons.querySelectorAll('button').forEach(b=>{if(b.dataset.process)b.disabled=true;});if(raw.modo)draw();}
+    if(apply)apply.onclick=()=>{
+      if(busy||!data.abierto||!data.puedeFinal||token!==global.IEStudents.validToken())return;
+      let applied=0;
+      data.estudiantes.forEach(al=>{
+        const result=data.resultados[al.id][competence],record=(draft[al.id]||{})[competence]||result.final;
+        if(record&&['AD','A','B','C'].includes(record.nivel))return;
+        const suggested=result.resumen.sugerencia;
+        if(!['AD','A','B','C'].includes(suggested))return;
+        draft[al.id]=draft[al.id]||{};
+        draft[al.id][competence]=Object.assign({},record||{},valor({modo:'letra',valor:suggested}));
+        applied++;
+      });
+      message.textContent=applied+' sugeridos aplicados como borrador. Revisa antes de guardar y enviar.';
+      draw();
+    };
     function draw(){
+      if(apply)apply.disabled=busy||!data.abierto||token!==global.IEStudents.validToken();
+      if(token!==global.IEStudents.validToken()){data.estudiantes=[];data.aportesPendientes=[];draft={};message.textContent='La sesión cambió. Ingresa nuevamente.';}
+      const pendientes=data.aportesPendientes;
+      aportesStatus.textContent=!data.puedeFinal?'':!Array.isArray(pendientes)?'No se pudo verificar la integridad de los aportes. Actualiza el backend antes de enviar.':pendientes.length?'Envío oficial bloqueado: '+pendientes.length+' aportes incompletos. '+pendientes[0].nombre+' · '+COMP[pendientes[0].comp]+' · '+pendientes[0].area+(pendientes[0].docente?' · '+pendientes[0].docente:'')+' · '+pendientes[0].motivo+'. Puedes guardar la decisión del Tutor como borrador.':'';
+      if(token!==global.IEStudents.validToken()){data.estudiantes=[];draft={};message.textContent='La sesión cambió. Ingresa nuevamente.';}
       rows.replaceChildren();rows.className='trans-grid-wrap';
-      const table=text('table','',rows);table.className='trans-grid';const head=text('thead','',table),hr=text('tr','',head);['N°','Estudiante','TIC','Gestiona su aprendizaje','Estado'].forEach(label=>text('th',label,hr));const tbody=text('tbody','',table);
+      competenceTitle.textContent=competence==='tic'?'SE DESENVUELVE EN LOS ENTORNOS VIRTUALES GENERADOS POR LAS TIC':'GESTIONA SU APRENDIZAJE DE MANERA AUTÓNOMA';
+      tabs.querySelectorAll('button').forEach(b=>{b.setAttribute('aria-selected',String(b.dataset.competence===competence));b.disabled=busy;});
+      completeness.textContent=Object.keys(COMP).map(cp=>{const n=Array.isArray(data.aportesPendientes)?data.estudiantes.filter(al=>!data.aportesPendientes.some(p=>p.id===al.id&&p.comp===cp)).length:0;return (cp==='tic'?'TIC':'Gestiona')+': '+n+'/'+data.estudiantes.length+' estudiantes completos'+(n===data.estudiantes.length?' ✓':' · '+(data.estudiantes.length-n)+' pendientes');}).join(' · ');
+      const table=text('table','',rows);table.className='trans-grid';const head=text('thead','',table),hr=text('tr','',head);['N°','Estudiante'].forEach(label=>text('th',label,hr));data.areas.forEach(area=>{const header=text('th',AREA_LABELS[area]||area,hr);header.className='trans-area-header';header.title=area;});['Sugerido','Final','Conclusión'].forEach(label=>text('th',label,hr));const tbody=text('tbody','',table);
       data.estudiantes.forEach((al,index)=>{
         const card=text('tr','',tbody);text('td',String(index+1),card);const student=text('th',al.nombre,card);student.className='trans-student';student.scope='row';
-        Object.entries(COMP).forEach(([comp,label])=>{
-          const result=data.resultados[al.id][comp],record=(draft[al.id]||{})[comp]||result.final;
-          const td=text('td','',card),cell=text('details','',td);cell.className='trans-detail';
-          const received=result.resumen.recibidos,expected=received+result.resumen.faltan.length;
-          const summary=text('summary',(record&&record.nivel||result.resumen.sugerencia||'—')+' · '+received+'/'+expected+' aportes'+(result.resumen.alerta?' · ⚠':'')+' · '+result.estado,cell);summary.setAttribute('aria-label',al.nombre+' · '+label+' · ver detalle');
-          text('h4',al.nombre+' · '+label,cell);
-          {
-            text('strong','Aportes de las áreas',cell);
-            result.resumen.aportes.forEach(a=>{
-              const aporte=data.aportes.find(x=>x.area===a.area&&x.ts===a.ts);
-              text('p',a.area+' · '+(aporte&&aporte.docente||aporte&&aporte.user||'')+': '+(a.valor.modo==='num'?a.valor.valor+' → ':'')+a.valor.nivel+' · '+(a.origen==='directo'?'directo':'evidencias'),cell);
-              if(a.valor.nivel==='C')text('p','Conclusión del docente: '+(a.conclusion||'Pendiente'),cell);
-              const detail=text('details','',cell);text('summary','Ver evidencias de '+a.area,detail);
-              const evidencia=aporte&&aporte.evidencia;
-              text('p','Aporte efectivo: '+a.valor.nivel+' · origen: '+(a.origen==='directo'?'nota directa':'evidencias'),detail);
-              if(evidencia)(evidencia.sessions||[]).filter(s=>s.comp===comp).forEach(s=>{const g=((evidencia.grades||{})[grading.sessionKey(s)]||{})[al.id];if(g)text('p',s.fecha+' · '+s.capacidad+' · '+g.valor+' → '+g.nivel,detail);});
-            });
-            text('p','AD: '+result.resumen.conteo.AD+' · A: '+result.resumen.conteo.A+' · B: '+result.resumen.conteo.B+' · C: '+result.resumen.conteo.C,cell);
-            (result.resumen.pendientes||[]).forEach(area=>text('p',area+' · Aporte C pendiente de conclusión',cell));
-            (result.resumen.sinAporte||[]).forEach(area=>text('p',area+' · '+((data.responsables&&data.responsables[area]||[]).map(d=>d.nombre).join(', '))+' · Sin aporte',cell));(result.resumen.sinDocente||[]).forEach(area=>text('p',area+' · Sin docente asignado',cell));
-            text('p','Aportes recibidos: '+result.resumen.recibidos+(result.resumen.faltan.length?' · Faltan: '+result.resumen.faltan.join(', '):''),cell);
-            text('strong','Sugerencia del sistema: '+(result.resumen.sugerencia||'Sin sugerencia automática'),cell);
-            if(result.resumen.alerta)text('p','⚠ Requiere revisión colegiada',cell);
-            text('p','Calificación final consolidada',cell);text('p',result.estado,cell);
-            if(result.final)text('p','Decisión guardada: '+(result.final.modo==='num'?result.final.valor+' → ':'')+result.final.nivel+' · '+result.final.justificacion,cell);
-          }
-          const enabled=data.abierto&&data.puedeFinal&&!busy;
-          const input=control(record,mode,raw=>changed(al.id,comp,raw),cell);input.disabled=!enabled;
-          [['justificacion','Justificación de la decisión colegiada'],['conclusion','Conclusión descriptiva']].forEach(([key,label])=>{const wrap=text('label',label,cell),field=document.createElement('textarea');field.setAttribute('aria-label',label);field.placeholder=label;field.value=record&&record[key]||'';field.disabled=!enabled;field.onchange=()=>changed(al.id,comp,{[key]:field.value});wrap.appendChild(field);if(key==='conclusion'&&record&&record.nivel==='C'&&global.IEConclusionSuggestions)global.IEConclusionSuggestions.mount(field,label==='Conclusión descriptiva'?COMP[comp]:label);if(key==='conclusion')text('p','Obligatoria cuando la calificación final es C.',cell);});
+        const comp=competence,result=data.resultados[al.id][comp],record=(draft[al.id]||{})[comp]||result.final;
+        data.areas.forEach(area=>{
+          const cell=text('td','',card),effective=result.resumen.aportes.find(a=>a.area===area),pending=(data.aportesPendientes||[]).filter(p=>p.id===al.id&&p.comp===comp&&p.area===area);
+          cell.className='trans-area-cell';
+          const real=data.aportes.filter(a=>a.area===area&&(a.valores[al.id]||{})[comp]).sort((a,b)=>Number(b.ts)-Number(a.ts))[0];
+          if(!real){cell.textContent='—';return;}
+          const detail=text('details','',cell);
+          const cPending=pending.some(p=>p.motivo==='Aporte C pendiente de conclusión');
+          const label=cPending?'C ⚠':effective?effective.valor.nivel:real.valores[al.id][comp].nivel;
+          detail.className='trans-detail';text('summary',label,detail).setAttribute('aria-label',al.nombre+' · '+area+' · '+COMP[comp]+' · ver aportantes');
+          (data.responsables&&data.responsables[area]||[]).forEach(doc=>{
+            const aporte=data.aportes.find(a=>a.area===area&&a.user===doc.user),v=aporte&&(aporte.valores[al.id]||{})[comp];
+            text('p',area+' · '+doc.nombre+': '+(v?(v.modo==='num'?v.valor+' → ':'')+v.nivel:'Pendiente'),detail);
+            if(v&&v.nivel==='C')text('p','Conclusión del docente: '+((((aporte.evidencia||{}).conclusiones||{})[al.id]||{})[comp]||'Pendiente'),detail);
+            const evidence=text('details','',detail);text('summary','Ver evidencias de '+area,evidence);
+            if(aporte)(aporte.evidencia.sessions||[]).filter(x=>x.comp===comp).forEach(x=>{const g=((aporte.evidencia.grades||{})[grading.sessionKey(x)]||{})[al.id];if(g)text('p','Evidencias · '+x.fecha+' · '+(x.unidad==null?'Sin unidad':'Unidad '+x.unidad)+' · '+x.capacidad+' · '+g.valor+' → '+g.nivel,evidence);});
+          });
+          pending.forEach(p=>text('p',area+' · '+p.motivo,detail));
         });
-        text('td',Object.keys(COMP).map(cp=>data.resultados[al.id][cp].estado).join(' · '),card);
+        text('td',result.resumen.sugerencia||'Sin sugerencia',card);
+        const finalCell=text('td','',card),conclusionCell=text('td','',card);
+        if(!data.puedeFinal){text('p',record&&['AD','A','B','C'].includes(record.nivel)?record.nivel:'Pendiente',finalCell);if(record&&record.nivel==='C'&&record.conclusion)text('p','Conclusión del Tutor: '+record.conclusion,conclusionCell);return;}
+        const enabled=data.abierto&&!busy&&token===global.IEStudents.validToken();
+        const input=control(record,mode,raw=>changed(al.id,comp,raw),finalCell);input.disabled=!enabled;
+        const reason=text('details','',finalCell);text('summary','Justificación'+(result.resumen.empate||result.resumen.dispersion||!result.resumen.sugerencia||record&&record.nivel!==result.resumen.sugerencia?' · Obligatoria':''),reason);const reasonField=text('textarea','',reason);reasonField.placeholder='Justificación de la decisión del Tutor';reasonField.setAttribute('aria-label','Justificación de la decisión del Tutor');reasonField.value=record&&record.justificacion||'';reasonField.disabled=!enabled;reasonField.oninput=()=>changed(al.id,comp,{justificacion:reasonField.value});
+        if(!record||!['AD','A','B','C'].includes(record.nivel)){text('p','Pendiente de definir',conclusionCell);return;}
+        if(record.nivel!=='C'){text('p','No requerida',conclusionCell);return;}
+        const wrap=text('label','Conclusión descriptiva · Obligatoria',conclusionCell),field=text('textarea','',wrap);field.setAttribute('aria-label','Conclusión descriptiva');field.placeholder='Conclusión descriptiva';field.maxLength=2000;field.value=record&&record.conclusion||'';field.disabled=!enabled;field.oninput=()=>changed(al.id,comp,{conclusion:field.value});
+        if(global.IEConclusionSuggestions)global.IEConclusionSuggestions.mount(field,COMP[comp]);
       });
-      modeEl.disabled=busy;buttons.querySelectorAll('button').forEach(b=>{b.disabled=busy||!data.abierto||(b.dataset.process&&!procesable());});
+      modes.querySelectorAll('button').forEach(b=>{b.disabled=busy;b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});buttons.querySelectorAll('button').forEach(b=>{b.disabled=busy||!data.abierto||(b.dataset.process&&!procesable());});
     }
     async function act(action){
-      if(busy)return;
+      if(busy||token!==global.IEStudents.validToken())return;
+      if(action==='procesartransversales'&&!procesable()){message.textContent='Completa los aportes obligatorios y guarda las decisiones vigentes antes del envío oficial.';return;}
       if(action!=='savetransversalfinal'&&Object.keys(draft).length){message.textContent='Guarda la decisión final antes de confirmar.';return;}
       const payload=Object.assign({},ctx,{version:data.version,versionAportes:data.versionAportes});
       if(action==='savetransversalfinal'){if(!Object.keys(draft).length){message.textContent='Sin decisiones nuevas para guardar.';return;}payload.finales=draft;}
-      if(action==='revisartransversal')payload.revisadoConTutor=review.checked;
       busy=true;draw();message.textContent='Guardando…';
-      try{data=await request(action,payload);draft={};review.checked=!!(data.revisado&&data.revisado.versionAportes===data.versionAportes);message.textContent=action==='procesartransversales'?'Snapshot aprobado y procesado. Disponible en Registro General.':'Guardado. Revise con el Tutor antes de procesar.';}catch(e){if(e.code==='SESSION'){data.estudiantes=[];draft={};}message.textContent=e.code==='CONFLICT'?'CONFLICT: cambió en otro dispositivo. Recarga y revisa antes de guardar.':e.message;}
+      try{data=await request(action,payload);draft={};message.textContent=action==='procesartransversales'?'COMPETENCIAS TRANSVERSALES CONSOLIDADAS POR TUTOR · LISTAS PARA REGISTRO OFICIAL':'Decisión del Tutor guardada. Revisa y envía al registro oficial.';}catch(e){if(e.code==='SESSION'){data.estudiantes=[];data.aportesPendientes=[];draft={};}message.textContent=e.code==='CONFLICT'?'CONFLICT: cambió en otro dispositivo. Recarga y revisa antes de guardar.':e.message;}
       finally{busy=false;draw();}
     }
-    if(data.puedeFinal){const save=text('button','Guardar decisión final',buttons);save.onclick=()=>act('savetransversalfinal');}
-    if(data.puedeRevisar){const b=text('button','Registrar revisión con Tutor',buttons);b.onclick=()=>act('revisartransversal');}
-    if(data.puedeProcesar){const b=text('button','Procesar competencias transversales',buttons);b.dataset.process='true';b.onclick=()=>act('procesartransversales');}
-    modeEl.onchange=()=>{mode=modeEl.value;draw();};
-    draw();return {dirty:()=>Object.keys(draft).length>0};
+    if(data.puedeFinal){const save=text('button','Guardar decisión del Tutor',buttons);save.onclick=()=>act('savetransversalfinal');}
+    if(data.puedeProcesar){const b=text('button','ENVIAR AL REGISTRO OFICIAL',buttons);b.dataset.process='true';b.onclick=()=>act('procesartransversales');}
+
+    draw();return {dirty:()=>Object.keys(draft).length>0,busy:()=>busy};
   }
   function evidenceEditor(container,data,ctx){
     const user=String((global.IEStudents.session()||{}).user||'').trim().toLowerCase(),token=global.IEStudents.validToken();
@@ -150,23 +182,29 @@
     modeEl.onchange=()=>{mode=modeEl.value;draw();};date.onchange=compEl.onchange=draw;
     adopt();if(evidence.sessions.length){date.value=evidence.sessions[0].fecha;compEl.value=evidence.sessions[0].comp;}draw();return {dirty:()=>dirty};
   }
-  async function init(){
+  function init(){
     const msg=document.getElementById('transStatus'),aula=document.getElementById('transAula'),bim=document.getElementById('transBim'),box=document.getElementById('transRows');if(!msg)return;
-    let serial=0,active=null,selected=null;
+    let serial=0,active=null,selected=null,disposed=false;const token=global.IEStudents.validToken();
+    const warn=event=>{if(active&&active.dirty()){event.preventDefault();event.returnValue='';}};if(global.addEventListener)global.addEventListener('beforeunload',warn);
+    const controller={canLeave:()=>!(active&&active.busy())&&(!(active&&active.dirty())||confirm('Hay decisiones del Tutor sin guardar. ¿Descartarlas?')),clear:()=>{disposed=true;++serial;active=null;box.replaceChildren();if(global.removeEventListener)global.removeEventListener('beforeunload',warn);},ready:null};
     async function load(){
+      if(disposed)return;if(active&&active.busy()){msg.textContent='Espera a que termine el envío antes de cambiar de aula.';if(selected){aula.value=selected.aula;bim.value=selected.bim;}return;}
       if(active&&active.dirty()&&!confirm('Hay cambios sin guardar. ¿Descartarlos y recargar?')){if(selected){aula.value=selected.aula;bim.value=selected.bim;}return;}
       selected={aula:aula.value,bim:bim.value};active=null;
       const seq=++serial,p=aula.value.split('|');box.replaceChildren();msg.textContent='Cargando aula…';
-      try{const ctx={grado:p[0],seccion:p[1],bimestre:bim.value},data=await request('loadtransversales',ctx);if(seq!==serial)return;active=editor(box,data,ctx,true);msg.textContent=data.abierto?'Admin revisa con Tutor, registra los finales y procesa el snapshot aprobado.':'Bimestre cerrado/bloqueado · Solo lectura';}
+      try{const ctx={grado:p[0],seccion:p[1],bimestre:bim.value},data=await request('loadtransversales',ctx);if(disposed||seq!==serial)return;active=editor(box,data,ctx,true);msg.textContent=data.abierto?(data.puedeFinal?'Tutor: guarda tu decisión final y envía al registro oficial.':'Consulta de solo lectura · decisiones oficiales del Tutor'):'Bimestre cerrado/bloqueado · Solo lectura';}
       catch(e){if(seq===serial)msg.textContent=e.message;}
     }
-    try{
-      const data=await request('loadtransversalesaulas');
+    async function initialize(){try{
+      const data=await request('loadtransversalesaulas');if(disposed||token!==global.IEStudents.validToken())return;
+      aula.replaceChildren();bim.replaceChildren();
       if(!data.aulas.length){msg.textContent='No tiene aulas de tutoría autorizadas.';return;}
       data.aulas.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v.replace('|','° ');aula.appendChild(o);});
-      ['I','II','III','IV'].forEach(v=>{const o=document.createElement('option');o.value=v;const state=(data.periodos&&data.periodos.bimestres||{})[v]||'bloqueado';o.textContent=v+' · '+state+(state==='abierto'?'':' 🔒');bim.appendChild(o);});
+      ['I','II','III','IV'].forEach(v=>{const o=document.createElement('option');o.value=v;const state=(data.periodos&&data.periodos.bimestres||{})[v]||'bloqueado';o.textContent=v+' Bimestre'+(state==='abierto'?'':' 🔒');bim.appendChild(o);});
+      bim.value=['I','II','III','IV'].find(v=>(data.periodos&&data.periodos.bimestres||{})[v]==='abierto')||'I';
       aula.onchange=load;bim.onchange=load;document.getElementById('transReload').onclick=load;await load();
-    }catch(e){msg.textContent=e.message;}
+    }catch(e){if(disposed)return;msg.textContent=e.message;document.getElementById('transReload').onclick=initialize;}}
+    controller.ready=initialize();return controller;
   }
   global.IETransversales={request,valor,COMP,CAPS,editor,init};
   if(document.body)start();else if(document.addEventListener)document.addEventListener('DOMContentLoaded',start,{once:true});
