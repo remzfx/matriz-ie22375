@@ -4,6 +4,7 @@
   const API='https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
   const grading=global.IERegistroEvaluacion,COMP=grading.COMP,CAPS=grading.CAPS;
   const ACTIONS=['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','procesartransversales','loadtransversalexport'];
+  const AREA_LABELS={'Arte y Cultura':'ART','Ciencia y Tecnología':'CYT','Ciencias Sociales':'CCSS','Comunicación':'COM','Desarrollo Personal, Ciudadanía y Cívica':'DPCC','Educación Física':'EFIS','Educación Religiosa':'REL','Educación para el Trabajo':'EPT','Inglés':'ING','Matemática':'MAT'};
   let bridge=null;const pending=new Map();
   function valor(raw){return grading.valor(raw);}
   function start(){if(!bridge&&global.IELoginBridge&&document.body)try{bridge=global.IELoginBridge.create(API,'transversales');}catch(e){}return bridge;}
@@ -53,14 +54,18 @@
       competenceTitle.textContent=competence==='tic'?'SE DESENVUELVE EN LOS ENTORNOS VIRTUALES GENERADOS POR LAS TIC':'GESTIONA SU APRENDIZAJE DE MANERA AUTÓNOMA';
       tabs.querySelectorAll('button').forEach(b=>{b.setAttribute('aria-selected',String(b.dataset.competence===competence));b.disabled=busy;});
       completeness.textContent=Object.keys(COMP).map(cp=>{const n=Array.isArray(data.aportesPendientes)?data.estudiantes.filter(al=>!data.aportesPendientes.some(p=>p.id===al.id&&p.comp===cp)).length:0;return (cp==='tic'?'TIC':'Gestiona')+': '+n+'/'+data.estudiantes.length+' estudiantes completos'+(n===data.estudiantes.length?' ✓':' · '+(data.estudiantes.length-n)+' pendientes');}).join(' · ');
-      const table=text('table','',rows);table.className='trans-grid';const head=text('thead','',table),hr=text('tr','',head);['N°','Estudiante',...data.areas,'Sugerido','Final','Conclusión'].forEach(label=>text('th',label,hr));const tbody=text('tbody','',table);
+      const table=text('table','',rows);table.className='trans-grid';const head=text('thead','',table),hr=text('tr','',head);['N°','Estudiante'].forEach(label=>text('th',label,hr));data.areas.forEach(area=>{const header=text('th',AREA_LABELS[area]||area,hr);header.className='trans-area-header';header.title=area;});['Sugerido','Final','Conclusión'].forEach(label=>text('th',label,hr));const tbody=text('tbody','',table);
       data.estudiantes.forEach((al,index)=>{
         const card=text('tr','',tbody);text('td',String(index+1),card);const student=text('th',al.nombre,card);student.className='trans-student';student.scope='row';
         const comp=competence,result=data.resultados[al.id][comp],record=(draft[al.id]||{})[comp]||result.final;
         data.areas.forEach(area=>{
-          const cell=text('td','',card),detail=text('details','',cell),effective=result.resumen.aportes.find(a=>a.area===area),pending=(data.aportesPendientes||[]).filter(p=>p.id===al.id&&p.comp===comp&&p.area===area);
+          const cell=text('td','',card),effective=result.resumen.aportes.find(a=>a.area===area),pending=(data.aportesPendientes||[]).filter(p=>p.id===al.id&&p.comp===comp&&p.area===area);
+          cell.className='trans-area-cell';
+          const real=data.aportes.filter(a=>a.area===area&&(a.valores[al.id]||{})[comp]).sort((a,b)=>Number(b.ts)-Number(a.ts))[0];
+          if(!real){cell.textContent='—';return;}
+          const detail=text('details','',cell);
           const cPending=pending.some(p=>p.motivo==='Aporte C pendiente de conclusión');
-          const label=cPending?'C ⚠':pending.length?'Pendiente':effective?effective.valor.nivel:'Pendiente';
+          const label=cPending?'C ⚠':effective?effective.valor.nivel:real.valores[al.id][comp].nivel;
           detail.className='trans-detail';text('summary',label,detail).setAttribute('aria-label',al.nombre+' · '+area+' · '+COMP[comp]+' · ver aportantes');
           (data.responsables&&data.responsables[area]||[]).forEach(doc=>{
             const aporte=data.aportes.find(a=>a.area===area&&a.user===doc.user),v=aporte&&(aporte.valores[al.id]||{})[comp];
