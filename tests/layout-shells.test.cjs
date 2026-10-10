@@ -15,29 +15,21 @@ for(const [file,shell] of Object.entries(modules))test(file+' uses its functiona
 test('login stays compact inside shell-auth and Registro entry selector uses the simple form shell',()=>{
  assert.match(read('index.html'),/id="viewLogin" class="shell shell-auth /);assert.match(read('index.html'),/<div class="w-full max-w-sm">/);assert.match(read('registro.html'),/id="viewHome" class="hidden shell shell-auth /);
 });
-test('HTML changes are limited to shells, stylesheet links and approved caption/subtitle presentation; business logic is identical',()=>{
- for(const file of Object.keys(modules)){
-  if(file==='registro.html')continue; // Su contrato UX y las funciones académicas se verifican en registro-layout.test.cjs.
-  let actual=read(file).replace(/\r\n/g,'\n').replace(/shell shell-(?:auth|ops|work|wide) /g,'').replace(/ class="shell shell-wide"/g,'').replace(/  <link rel="stylesheet" href="layout-shells.css" \/>\n/g,'');
-  if(file==='index.html')actual=actual.replace('Aportes · revisión Tutor + Admin','Aportes · consolidación Tutor + AIP');
-  if(file==='registro.html')actual=actual.replace('<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small>','<small>Dato informativo · no SIAGIE</small>');
-  assert.equal(actual,original(file),file);
- }
+test('Unrelated module HTML remains identical to the approved responsive shells base',()=>{
+ const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['auxiliar.html','aula_innovacion.html','primaria.html','secundaria.html','photochecks.html'])assert.equal(read(file).replace(/\r\n/g,'\n'),execFileSync('git',['show',baseNow+':'+file],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n'));
 });
+
 test('Registro shares shell-work across header, context, all panels main and lower bar without per-tab widths',()=>{
  const html=read('registro.html'),wrappers=html.match(/<(?:div|main)\b[^>]*class="[^"\n]*max-w-3xl[^"\n]*"[^>]*>/g);assert.equal(wrappers.length,4);wrappers.forEach(tag=>assert.match(tag,/shell shell-work/));
  const start=html.indexOf('<main class="shell shell-work'),main=html.slice(html.indexOf('>',start)+1,html.indexOf('</main>',start));assert.doesNotMatch(main,/max-w-3xl|shell shell-(?:wide|ops|auth)/g);for(const panel of ['panelCalificar','panelFinales','panelAvance','panelAsistencia'])assert.match(main,new RegExp('id="'+panel+'"'));
 });
-test('Hub transversal caption reflects Tutor and Admin review without obsolete AIP attribution',()=>{
- const module=read('index.html').match(/transversales:\s*\{[^}]+\}/)[0];assert.match(module,/desc:'Aportes · revisión Tutor \+ Admin'/);assert.doesNotMatch(module,/AIP|Tutor \+ AIP/);
-});
+test('Tutor consolidates inside Registro; Hub has no obsolete standalone transversal module',()=>{assert.doesNotMatch(read('index.html'),/transversales:\s*\{/);assert.match(read('registro.html'),/COMPETENCIAS TRANSVERSALES/);});
+
 test('Resumen keeps one referential average column and renders its informational subtitle on a smaller separate line',()=>{
  const html=read('registro.html'),headers=[...html.matchAll(/<th>Promedio referencial([\s\S]*?)<\/th>/g)];assert.equal(headers.length,1);assert.match(headers[0][1],/^<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE<\/small>$/);assert.doesNotMatch(headers[0][1],/<th|<td/);
 });
-test('Apps Script tree is unchanged from the verified main base',()=>{
- const files=execFileSync('git',['ls-tree','-r','--name-only',base,'apps-script/'],{cwd:root,encoding:'utf8'}).trim().split(/\r?\n/);
- for(const file of files)assert.equal(read(file).replace(/\r\n/g,'\n'),original(file),file);
-});
+test('Tutor backend changes keep signed token authentication and permission revocation intact',()=>{const now=read('apps-script/Codigo.js').replace(/\r\n/g,'\n'),before=original('apps-script/Codigo.js');for(const name of ['validarToken_','firmarToken_']){const rx=new RegExp('function '+name+'\\([\\s\\S]*?\\n}');assert.ok(now.match(rx),name);assert.ok(before.match(rx),name);assert.equal(now.match(rx)[0],before.match(rx)[0]);}});
+
 test('critical tables retain horizontal scroll, minimum column sizes and sticky student styling',()=>{
  for(const file of ['registro.html','transversales.html','primaria.html','secundaria.html','admin.html'])assert.match(read(file),/overflow-x(?::\s*auto|-auto)/,file);
  assert.match(read('registro.html'),/\.fin-wrap \{ overflow-x:auto/);assert.match(read('registro.html'),/\.fin-grid th\.fin-nom[^\n]*position:sticky; left:0/);assert.match(read('transversales.html'),/\.trans-grid-wrap\{overflow-x:auto/);assert.match(read('transversales.html'),/\.trans-grid\{[^}]*min-width:900px/);
@@ -46,12 +38,12 @@ test('Photochecks keeps exact print rules, QR dimensions and legacy print wrappe
  const old=original('photochecks.html'),now=read('photochecks.html').replace(/\r\n/g,'\n');assert.equal(now.match(/<style>([\s\S]*?)<\/style>/)[1],old.match(/<style>([\s\S]*?)<\/style>/)[1]);assert.match(now,/<main class="shell shell-wide max-w-4xl mx-auto px-4 py-4">/);
 });
 test('SW changes only static version and shared stylesheet entry, preserving API transport and cache policy',()=>{
- const sw=read('sw.js').replace(/\r\n/g,'\n');assert.match(sw,/CACHE_PREFIX \+ 'v14'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace("CACHE_PREFIX + 'v14'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
+ const sw=read('sw.js').replace(/\r\n/g,'\n');assert.match(sw,/CACHE_PREFIX \+ 'v15'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace("CACHE_PREFIX + 'v15'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
 });
-test('v14 installs actual shared CSS and serves it offline without caching external Apps Script POST',async()=>{
+test('v15 installs actual shared CSS and serves it offline without caching external Apps Script POST',async()=>{
  const setup=new Function('require','__dirname',read('tests/service-worker-static.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname),s=setup(),css=read('layout-shells.css');
  s.network(async req=>new Response(req.url.endsWith('.css')?css:req.url.endsWith('.js')?'/* JS */':'<html>static</html>',{headers:{'Content-Type':req.url.endsWith('.css')?'text/css':req.url.endsWith('.js')?'application/javascript':'text/html'}}));
- s.cache('matriz-ie22375-v13');await s.dispatch('install');await s.dispatch('activate');assert.equal(s.stores.has('matriz-ie22375-v13'),false);assert.equal(s.stores.has('matriz-ie22375-v14'),true);
+ s.cache('matriz-ie22375-v13');await s.dispatch('install');await s.dispatch('activate');assert.equal(s.stores.has('matriz-ie22375-v13'),false);assert.equal(s.stores.has('matriz-ie22375-v15'),true);
  s.offline();const response=await s.dispatch('fetch',{request:s.request('layout-shells.css')});assert.equal(await response.text(),css);assert.equal(response.headers.get('Content-Type'),'text/css');
- const req=new Request('https://script.google.com/macros/s/synthetic/exec',{method:'POST',body:'synthetic'});assert.equal(await s.dispatch('fetch',{request:req}),undefined);assert.equal(await s.cache('matriz-ie22375-v14').match(req),undefined);
+ const req=new Request('https://script.google.com/macros/s/synthetic/exec',{method:'POST',body:'synthetic'});assert.equal(await s.dispatch('fetch',{request:req}),undefined);assert.equal(await s.cache('matriz-ie22375-v15').match(req),undefined);
 });

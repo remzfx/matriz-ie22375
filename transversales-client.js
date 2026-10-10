@@ -3,7 +3,7 @@
   'use strict';
   const API='https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
   const grading=global.IERegistroEvaluacion,COMP=grading.COMP,CAPS=grading.CAPS;
-  const ACTIONS=['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','revisartransversal','procesartransversales','loadtransversalexport'];
+  const ACTIONS=['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','procesartransversales','loadtransversalexport'];
   let bridge=null;const pending=new Map();
   function valor(raw){return grading.valor(raw);}
   function start(){if(!bridge&&global.IELoginBridge&&document.body)try{bridge=global.IELoginBridge.create(API,'transversales');}catch(e){}return bridge;}
@@ -32,16 +32,19 @@
   }
   function editor(container,data,ctx,final){
     if(!final)return evidenceEditor(container,data,ctx);
-    let mode='letra',draft={},busy=false;
+    if(data.flujoTutor!==true){data=Object.assign({},data,{puedeFinal:false,puedeProcesar:false});text('p','Backend anterior: consulta solamente. Requiere actualizar el flujo oficial del Tutor.',container);}
+    let mode='letra',draft={},busy=false;const token=global.IEStudents.validToken();
     const toolbar=text('div','',container),modeEl=document.createElement('select');
     [['letra','Letras'],['num','0–20']].forEach(([v,label])=>{const opt=document.createElement('option');opt.value=v;opt.textContent=label;modeEl.appendChild(opt);});toolbar.appendChild(modeEl);
     text('p','18–20 → AD · 14–17 → A · 11–13 → B · 0–10 → C. Cambiar el modo no modifica valoraciones guardadas.',container);
-    if(data.politica)text('p','Año lectivo '+data.politica.anio+' · Aportes '+(data.politica.aportesObligatorios?'obligatorios':'opcionales')+' para las áreas. La sugerencia no es una nota oficial.',container);
-    const message=text('p','',container),rows=text('div','',container),buttons=text('div','',container);
-    const tutor=(data.tutores||[])[0],reviewLabel=text('label',tutor?'Revisado con el Tutor: '+tutor.nombre:'Sin Tutor asignado',toolbar),review=document.createElement('input');review.type='checkbox';review.checked=!!(data.revisado&&data.revisado.versionAportes===data.versionAportes);review.disabled=!data.puedeRevisar||!data.abierto||!tutor;reviewLabel.appendChild(review);
-    function procesable(){return data.abierto&&data.puedeProcesar&&(data.tutores||[]).length===1&&data.revisado&&data.revisado.versionAportes===data.versionAportes&&!Object.keys(draft).length&&data.estudiantes.length&&data.estudiantes.every(al=>Object.keys(COMP).every(cp=>{const f=data.resultados[al.id][cp].final;return f&&f.versionAportes===data.versionAportes&&(f.nivel!=='C'||String(f.conclusion||'').trim());}));}
-    function changed(id,comp,raw){if(!data.puedeFinal||!data.abierto||busy)return;draft[id]=draft[id]||{};draft[id][comp]=Object.assign({},draft[id][comp]||data.resultados[id][comp].final||{},raw);buttons.querySelectorAll('button').forEach(b=>{if(b.dataset.process)b.disabled=true;});if(raw.modo)draw();}
+    if(data.politica)text('p','Año lectivo '+data.politica.anio+' · Solo aportes habilitados por Admin. Sugerencia: mayoría de áreas, un voto efectivo (el más reciente) por área; empate sin sugerencia. La decisión oficial pertenece al Tutor.',container);
+    const message=text('p','',container),aportesStatus=text('p','',container),rows=text('div','',container),buttons=text('div','',container);
+    function procesable(){return token===global.IEStudents.validToken()&&data.flujoTutor&&Array.isArray(data.aportesPendientes)&&data.aportesPendientes.length===0&&data.abierto&&data.puedeProcesar&&(data.tutores||[]).length===1&&!Object.keys(draft).length&&data.estudiantes.length&&data.estudiantes.every(al=>Object.keys(COMP).every(cp=>{const f=data.resultados[al.id][cp].final;return f&&f.versionAportes===data.versionAportes&&(f.nivel!=='C'||String(f.conclusion||'').trim());}));}
+    function changed(id,comp,raw){if(token!==global.IEStudents.validToken()||!data.puedeFinal||!data.abierto||busy)return;draft[id]=draft[id]||{};draft[id][comp]=Object.assign({},draft[id][comp]||data.resultados[id][comp].final||{},raw);buttons.querySelectorAll('button').forEach(b=>{if(b.dataset.process)b.disabled=true;});if(raw.modo)draw();}
     function draw(){
+      const pendientes=data.aportesPendientes;
+      aportesStatus.textContent=!data.puedeFinal?'':!Array.isArray(pendientes)?'No se pudo verificar la integridad de los aportes. Actualiza el backend antes de enviar.':pendientes.length?'Envío oficial bloqueado: '+pendientes.length+' aportes incompletos. '+pendientes[0].nombre+' · '+COMP[pendientes[0].comp]+' · '+pendientes[0].area+(pendientes[0].docente?' · '+pendientes[0].docente:'')+' · '+pendientes[0].motivo+'. Puedes guardar la decisión del Tutor como borrador.':'';
+      if(token!==global.IEStudents.validToken()){data.estudiantes=[];draft={};message.textContent='La sesión cambió. Ingresa nuevamente.';}
       rows.replaceChildren();rows.className='trans-grid-wrap';
       const table=text('table','',rows);table.className='trans-grid';const head=text('thead','',table),hr=text('tr','',head);['N°','Estudiante','TIC','Gestiona su aprendizaje','Estado'].forEach(label=>text('th',label,hr));const tbody=text('tbody','',table);
       data.estudiantes.forEach((al,index)=>{
@@ -54,7 +57,8 @@
           text('h4',al.nombre+' · '+label,cell);
           {
             text('strong','Aportes de las áreas',cell);
-            result.resumen.aportes.forEach(a=>{
+            const aportesAlumno=data.aportes.map(ap=>({area:ap.area,user:ap.user,ts:ap.ts,valor:(ap.valores[al.id]||{})[comp],origen:(ap.origenes&&ap.origenes[al.id]||{})[comp]||'evidencias',conclusion:((((ap.evidencia||{}).conclusiones||{})[al.id]||{})[comp]||'')})).filter(a=>a.valor);
+            aportesAlumno.forEach(a=>{
               const aporte=data.aportes.find(x=>x.area===a.area&&x.ts===a.ts);
               text('p',a.area+' · '+(aporte&&aporte.docente||aporte&&aporte.user||'')+': '+(a.valor.modo==='num'?a.valor.valor+' → ':'')+a.valor.nivel+' · '+(a.origen==='directo'?'directo':'evidencias'),cell);
               if(a.valor.nivel==='C')text('p','Conclusión del docente: '+(a.conclusion||'Pendiente'),cell);
@@ -63,6 +67,9 @@
               text('p','Aporte efectivo: '+a.valor.nivel+' · origen: '+(a.origen==='directo'?'nota directa':'evidencias'),detail);
               if(evidencia)(evidencia.sessions||[]).filter(s=>s.comp===comp).forEach(s=>{const g=((evidencia.grades||{})[grading.sessionKey(s)]||{})[al.id];if(g)text('p',s.fecha+' · '+s.capacidad+' · '+g.valor+' → '+g.nivel,detail);});
             });
+            Object.entries(data.responsables||{}).forEach(([area,docentes])=>docentes.forEach(doc=>{
+              if(!aportesAlumno.some(a=>a.area===area&&a.user===doc.user)&&!result.resumen.sinAporte.includes(area))text('p',area+' · '+doc.nombre+' · Sin aporte',cell);
+            }));
             text('p','AD: '+result.resumen.conteo.AD+' · A: '+result.resumen.conteo.A+' · B: '+result.resumen.conteo.B+' · C: '+result.resumen.conteo.C,cell);
             (result.resumen.pendientes||[]).forEach(area=>text('p',area+' · Aporte C pendiente de conclusión',cell));
             (result.resumen.sinAporte||[]).forEach(area=>text('p',area+' · '+((data.responsables&&data.responsables[area]||[]).map(d=>d.nombre).join(', '))+' · Sin aporte',cell));(result.resumen.sinDocente||[]).forEach(area=>text('p',area+' · Sin docente asignado',cell));
@@ -72,29 +79,29 @@
             text('p','Calificación final consolidada',cell);text('p',result.estado,cell);
             if(result.final)text('p','Decisión guardada: '+(result.final.modo==='num'?result.final.valor+' → ':'')+result.final.nivel+' · '+result.final.justificacion,cell);
           }
-          const enabled=data.abierto&&data.puedeFinal&&!busy;
+          if(!data.puedeFinal){if(record&&record.conclusion)text('p','Conclusión del Tutor: '+record.conclusion,cell);return;}
+          const enabled=data.abierto&&data.puedeFinal&&!busy&&token===global.IEStudents.validToken();
           const input=control(record,mode,raw=>changed(al.id,comp,raw),cell);input.disabled=!enabled;
-          [['justificacion','Justificación de la decisión colegiada'],['conclusion','Conclusión descriptiva']].forEach(([key,label])=>{const wrap=text('label',label,cell),field=document.createElement('textarea');field.setAttribute('aria-label',label);field.placeholder=label;field.value=record&&record[key]||'';field.disabled=!enabled;field.onchange=()=>changed(al.id,comp,{[key]:field.value});wrap.appendChild(field);if(key==='conclusion'&&record&&record.nivel==='C'&&global.IEConclusionSuggestions)global.IEConclusionSuggestions.mount(field,label==='Conclusión descriptiva'?COMP[comp]:label);if(key==='conclusion')text('p','Obligatoria cuando la calificación final es C.',cell);});
+          [['justificacion','Justificación de la decisión del Tutor'],['conclusion','Conclusión descriptiva']].forEach(([key,label])=>{const wrap=text('label',label,cell),field=document.createElement('textarea');field.setAttribute('aria-label',label);field.placeholder=label;field.value=record&&record[key]||'';field.disabled=!enabled;field.oninput=()=>changed(al.id,comp,{[key]:field.value});wrap.appendChild(field);if(key==='conclusion'&&record&&record.nivel==='C'&&global.IEConclusionSuggestions)global.IEConclusionSuggestions.mount(field,label==='Conclusión descriptiva'?COMP[comp]:label);if(key==='conclusion')text('p','Obligatoria cuando la calificación final es C.',cell);});
         });
         text('td',Object.keys(COMP).map(cp=>data.resultados[al.id][cp].estado).join(' · '),card);
       });
       modeEl.disabled=busy;buttons.querySelectorAll('button').forEach(b=>{b.disabled=busy||!data.abierto||(b.dataset.process&&!procesable());});
     }
     async function act(action){
-      if(busy)return;
+      if(busy||token!==global.IEStudents.validToken())return;
+      if(action==='procesartransversales'&&!procesable()){message.textContent='Completa los aportes obligatorios y guarda las decisiones vigentes antes del envío oficial.';return;}
       if(action!=='savetransversalfinal'&&Object.keys(draft).length){message.textContent='Guarda la decisión final antes de confirmar.';return;}
       const payload=Object.assign({},ctx,{version:data.version,versionAportes:data.versionAportes});
       if(action==='savetransversalfinal'){if(!Object.keys(draft).length){message.textContent='Sin decisiones nuevas para guardar.';return;}payload.finales=draft;}
-      if(action==='revisartransversal')payload.revisadoConTutor=review.checked;
       busy=true;draw();message.textContent='Guardando…';
-      try{data=await request(action,payload);draft={};review.checked=!!(data.revisado&&data.revisado.versionAportes===data.versionAportes);message.textContent=action==='procesartransversales'?'Snapshot aprobado y procesado. Disponible en Registro General.':'Guardado. Revise con el Tutor antes de procesar.';}catch(e){if(e.code==='SESSION'){data.estudiantes=[];draft={};}message.textContent=e.code==='CONFLICT'?'CONFLICT: cambió en otro dispositivo. Recarga y revisa antes de guardar.':e.message;}
+      try{data=await request(action,payload);draft={};message.textContent=action==='procesartransversales'?'COMPETENCIAS TRANSVERSALES CONSOLIDADAS POR TUTOR · LISTAS PARA REGISTRO OFICIAL':'Decisión del Tutor guardada. Revisa y envía al registro oficial.';}catch(e){if(e.code==='SESSION'){data.estudiantes=[];draft={};}message.textContent=e.code==='CONFLICT'?'CONFLICT: cambió en otro dispositivo. Recarga y revisa antes de guardar.':e.message;}
       finally{busy=false;draw();}
     }
-    if(data.puedeFinal){const save=text('button','Guardar decisión final',buttons);save.onclick=()=>act('savetransversalfinal');}
-    if(data.puedeRevisar){const b=text('button','Registrar revisión con Tutor',buttons);b.onclick=()=>act('revisartransversal');}
-    if(data.puedeProcesar){const b=text('button','Procesar competencias transversales',buttons);b.dataset.process='true';b.onclick=()=>act('procesartransversales');}
+    if(data.puedeFinal){const save=text('button','Guardar decisión del Tutor',buttons);save.onclick=()=>act('savetransversalfinal');}
+    if(data.puedeProcesar){const b=text('button','ENVIAR AL REGISTRO OFICIAL',buttons);b.dataset.process='true';b.onclick=()=>act('procesartransversales');}
     modeEl.onchange=()=>{mode=modeEl.value;draw();};
-    draw();return {dirty:()=>Object.keys(draft).length>0};
+    draw();return {dirty:()=>Object.keys(draft).length>0,busy:()=>busy};
   }
   function evidenceEditor(container,data,ctx){
     const user=String((global.IEStudents.session()||{}).user||'').trim().toLowerCase(),token=global.IEStudents.validToken();
@@ -150,23 +157,28 @@
     modeEl.onchange=()=>{mode=modeEl.value;draw();};date.onchange=compEl.onchange=draw;
     adopt();if(evidence.sessions.length){date.value=evidence.sessions[0].fecha;compEl.value=evidence.sessions[0].comp;}draw();return {dirty:()=>dirty};
   }
-  async function init(){
+  function init(){
     const msg=document.getElementById('transStatus'),aula=document.getElementById('transAula'),bim=document.getElementById('transBim'),box=document.getElementById('transRows');if(!msg)return;
-    let serial=0,active=null,selected=null;
+    let serial=0,active=null,selected=null,disposed=false;const token=global.IEStudents.validToken();
+    const warn=event=>{if(active&&active.dirty()){event.preventDefault();event.returnValue='';}};if(global.addEventListener)global.addEventListener('beforeunload',warn);
+    const controller={canLeave:()=>!(active&&active.busy())&&(!(active&&active.dirty())||confirm('Hay decisiones del Tutor sin guardar. ¿Descartarlas?')),clear:()=>{disposed=true;++serial;active=null;box.replaceChildren();if(global.removeEventListener)global.removeEventListener('beforeunload',warn);},ready:null};
     async function load(){
+      if(disposed)return;if(active&&active.busy()){msg.textContent='Espera a que termine el envío antes de cambiar de aula.';if(selected){aula.value=selected.aula;bim.value=selected.bim;}return;}
       if(active&&active.dirty()&&!confirm('Hay cambios sin guardar. ¿Descartarlos y recargar?')){if(selected){aula.value=selected.aula;bim.value=selected.bim;}return;}
       selected={aula:aula.value,bim:bim.value};active=null;
       const seq=++serial,p=aula.value.split('|');box.replaceChildren();msg.textContent='Cargando aula…';
-      try{const ctx={grado:p[0],seccion:p[1],bimestre:bim.value},data=await request('loadtransversales',ctx);if(seq!==serial)return;active=editor(box,data,ctx,true);msg.textContent=data.abierto?'Admin revisa con Tutor, registra los finales y procesa el snapshot aprobado.':'Bimestre cerrado/bloqueado · Solo lectura';}
+      try{const ctx={grado:p[0],seccion:p[1],bimestre:bim.value},data=await request('loadtransversales',ctx);if(disposed||seq!==serial)return;active=editor(box,data,ctx,true);msg.textContent=data.abierto?(data.puedeFinal?'Tutor: guarda tu decisión final y envía al registro oficial.':'Consulta de solo lectura · decisiones oficiales del Tutor'):'Bimestre cerrado/bloqueado · Solo lectura';}
       catch(e){if(seq===serial)msg.textContent=e.message;}
     }
-    try{
-      const data=await request('loadtransversalesaulas');
+    async function initialize(){try{
+      const data=await request('loadtransversalesaulas');if(disposed||token!==global.IEStudents.validToken())return;
+      aula.replaceChildren();bim.replaceChildren();
       if(!data.aulas.length){msg.textContent='No tiene aulas de tutoría autorizadas.';return;}
       data.aulas.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v.replace('|','° ');aula.appendChild(o);});
       ['I','II','III','IV'].forEach(v=>{const o=document.createElement('option');o.value=v;const state=(data.periodos&&data.periodos.bimestres||{})[v]||'bloqueado';o.textContent=v+' · '+state+(state==='abierto'?'':' 🔒');bim.appendChild(o);});
       aula.onchange=load;bim.onchange=load;document.getElementById('transReload').onclick=load;await load();
-    }catch(e){msg.textContent=e.message;}
+    }catch(e){if(disposed)return;msg.textContent=e.message;document.getElementById('transReload').onclick=initialize;}}
+    controller.ready=initialize();return controller;
   }
   global.IETransversales={request,valor,COMP,CAPS,editor,init};
   if(document.body)start();else if(document.addEventListener)document.addEventListener('DOMContentLoaded',start,{once:true});
