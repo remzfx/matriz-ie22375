@@ -1,39 +1,51 @@
-# Gestión de estudiantes: diagnóstico de carga
+# Gestión de estudiantes: diagnóstico y garantías
 
-Base revisada: merge PR #67, 27c5f3694d5bba56fe3bb98cfaae6710fb1b179a. No se consultaron datos reales ni se desplegó código.
+Base del PR: merge #67, 27c5f3694d5bba56fe3bb98cfaae6710fb1b179a. Corrección final revisada sobre ca8d94ecc6f314578853b581340f14a5e7bac09d. No se consultaron datos reales ni se desplegó código.
 
-## Flujo actual
+## Flujo y matrícula
 
-Admin consulta IEStudents.peek(): caché autorizada del mismo token, hasta 24h y limitada por expiración. Si existe, aplicarBaseServidor pinta inmediatamente y habilita la edición local. Luego IEStudents.load realiza lectura protegida loadstudents, deduplicada. La lectura tiene hasta dos intentos de 12s y pausa de 1.2s: aproximadamente 25.2s, más preparación del puente. fetchJSON limita fetch y lectura JSON. Fallos transitorios pueden devolver offline:true desde caché; rechazo explícito no habilita fallback. checkedLoad rechaza base no inicializada. inspect permite consultar esa base vacía para inicialización manual.
+Admin muestra caché autorizada del mismo token, con vigencia máxima de 24h limitada por expiración. Luego consulta loadstudents protegido. La lectura sin puente tiene hasta dos intentos de 12s y pausa de 1.2s, más preparación del puente. fetchJSON limita fetch y cuerpo; una respuesta offline no verifica producción. Actualizar consulta utiliza inspect protegido para solicitar una lectura nueva, sin considerar caché una verificación.
 
-## Diagnóstico inicial de carga (estos defectos de transporte/edición no se corrigen en este PR)
+BASE_ACTUAL conserva todos los importados. El padrón seleccionado abierto contiene solo DEFINITIVA; TRASLADADO conserva IDs, códigos e historial en la base. Otros estados, incluido uno ausente, requieren revisión y bloquean sync/seed antes de escribir. Inicializar, guardar y restaurar la base siguen conservando todos los estados. No se filtran ni se migran automáticamente los padrones históricos.
 
-1. cargarEstudiantesAdmin recibe forceNetwork:true pero no lee ese campo: Actualizar consulta usa el mismo load deduplicado. No demuestra una solicitud nueva independiente. Propuesta: definir lectura explícita con contrato de verificación; no limpiar datos para forzar red.
-2. load puede devolver offline:true; el mensaje principal distingue esa respuesta, pero una caché previa con offline ausente es pintada por aplicarBaseServidor como servidor antes del mensaje posterior. Los nuevos indicadores visuales distinguen caché, servidor y error; no autorizan escrituras.
-3. Una recarga confirma descarte al comienzo, pero aplicarBaseServidor vuelve a asignar estado y bdPendiente=false al resolver la red. Si se edita durante esa espera desde caché, la respuesta tardía puede perder el borrador local. Reproducción: caché → load pendiente → edición/saveEstado → respuesta → borrador reemplazado. Propuesta: guardar revisión local/ID de petición y no aplicar una respuesta si hubo edición posterior; solicitar descarte explícito. Requiere corrección funcional posterior, sin cambiar silenciosamente este flujo.
-4. verificar() muestra base de servidor en migracionPreview aunque listas internas contienen CSV. Reproducción: CSV con alumno de prueba A → verificar servidor con B → vista visible B, escritura seguiría enviando A. Corrección mínima aprobada e implementada: conservar la vista previa de cada nivel con CSV seleccionado; presentar la consulta de servidor en los indicadores y la comparación. Las pruebas verifican que vista previa y payload mantienen el mismo CSV, incluso cuando solo se seleccionó un nivel. No se cambia el envío ni la sincronización.
-5. Importación manual mergeNivel identifica por nombre, no ID: dos alumnos con el mismo nombre pueden confluir. Se conserva ese flujo en herramientas avanzadas con aviso; usar el flujo SIAGIE principal para matrícula. Propuesta posterior: merge por IDs/códigos y revisión de ambigüedades, manteniendo compatibilidad histórica.
+Gestión muestra importados, vigentes, trasladados y otros estados dinámicamente. Comparación informativa por ID/código exactos, sin fuzzy matching ni segundo sincronizador. Cada CSV seleccionado mantiene su vista previa al consultar el servidor. Crear padrón requiere base inicializada, padrón ausente y bimestre abierto verificado. El backend conserva la autoridad.
 
-## Presentación añadida
+Registro, matrices y Registro General consultan loadRoster por bimestre. Tutor consulta loadtransversales y el backend resuelve el padrón de ese contexto. Si todavía no hay padrón, permanece la compatibilidad BASE_ACTUAL con padronInicializado:false, sin creación automática.
 
-Comparación informativa de CSV contra una consulta de servidor: ID/código exacto, sin fuzzy matching. Duplicados, conflicto de IDs y alumnos sin identidad requieren revisión. No se inventan conteos de nuevos/ausentes si hay ambigüedad. TRASLADADO se cuenta desde estadoMatricula y no se excluye. El análisis no cambia payloads ni confirmaciones; no introduce un segundo sincronizador.
+## Publicación y recuperación
 
-Padrón: cantidad solo tras respuesta online; estado de periodo se consulta con fetchJSON (presupuesto de 12s), sin usar estado de localStorage como verificación. Crear se muestra únicamente con base inicializada, padrón ausente y periodo verificado abierto; backend conserva la autoridad. Si el periodo no se verifica, se indica No verificado.
+Causa anterior: syncstudents usaba una sola lista para base y padrón; después de separarlas publicaba dos punteros sucesivos. Una interrupción podía hacer visible solo uno.
 
-## Límites
+Solución: bajo ScriptLock y control de versión, preparar ambas versiones inmutables completas sin publicar punteros individuales. Una sola fila ESTUDIANTES_COMMIT contiene schema:1, el ID de operación, la versión/partes de BASE_ACTUAL y la versión/partes del PADRON del bimestre. Esa fila completa es el punto de publicación.
 
-No se puede atribuir una demora de producción a red/Sheets/cold start sin telemetría real; estos hallazgos se derivan del código y pruebas sintéticas. No se usan copias históricas ni datos reales. Validación visual desktop/móvil y prueba manual de CSV vigentes por Admin pendientes. No merge ni deploy.
+El lector recorre cronológicamente los punteros antiguos y los marcadores válidos. Un marcador incompleto/ilegible no confirma nada. El índice de caché incluye el número de filas de Sheets y la reconstrucción incluye la versión: preparar datos o confirmar una operación no reutiliza índices anteriores. No hay una segunda fuente de verdad. Los punteros históricos siguen siendo legibles y los de otros bimestres no cambian.
 
-## Corrección aprobada de matrícula y padrón
+Las dos respuestas llevan operacionConfirmada con el mismo ID, permitiendo comparar la pareja mediante lecturas protegidas. Las lecturas efectuadas a distintos instantes pueden observar operaciones diferentes si hay otra actualización concurrente; no son una transacción entre solicitudes.
 
-Revisión sobre HEAD 4317f4d62a3103665a5414b3d6572d99417f1a6c. Causa: syncstudents usaba una sola versión para BASE_ACTUAL y PADRON_<bimestre>; seedstudentsroster apuntaba al conjunto completo de la base.
+Si se pierde la confirmación o su respuesta, se devuelve SYNC_UNCONFIRMED, nunca éxito. El marcador puede haber persistido: consultar base y padrón en servidor antes de volver a operar. Si no persistió, se leen las versiones anteriores; si persistió completo, las nuevas. No se reintentan escrituras automáticamente. Datos preparados sin marcador quedan como filas históricas no visibles; no se eliminan automáticamente.
 
-BASE_ACTUAL conserva todos los CSV, incluidos los trasladados y sus identificadores. Solo el padrón seleccionado abierto se construye con estado DEFINITIVA. TRASLADADO permanece en la base; cualquier otro estado, incluido uno ausente, detiene creación/sincronización y solicita revisión antes de escribir. No se infiere un estado para bases históricas incompletas: Admin debe revisar un CSV vigente. Inicialización, edición y restauración de la base siguen conservando todos los estados.
+El mismo protocolo protege enriquecimientos que afectan simultáneamente base y padrón. students.js mantiene cachés separadas por token/ámbito; CONFLICT, PERIOD_CLOSED y SYNC_UNCONFIRMED conservan la caché autorizada para consulta, sin considerarla confirmación actual. Rechazos de autorización siguen retirando la autorización.
 
-syncstudents prepara dos versiones inmutables de datos antes de publicar sus punteros. Su respuesta contiene la base completa con su propia versión y el padrón autorizado con otra versión. students.js conserva ambos conjuntos en sus ámbitos correspondientes; una respuesta antigua de lectura no puede reemplazar el padrón recién sincronizado. No se modifican notas, conclusiones, asistencias ni snapshots. No hay una transacción de Sheets: un fallo de servicio durante la publicación de punteros aún requiere consultar el resultado antes de volver a operar; no se reintentan escrituras automáticamente.
+## Borradores Admin
 
-Crear un padrón ausente cerrado/bloqueado se rechaza. Un padrón existente se devuelve sin reescribirlo. Los padrones históricos y su composición permanecen intactos.
+Causa: aplicarBaseServidor sustituía estado y bdPendiente al llegar una respuesta tardía.
 
-Registro (Calificar/Promedios/Resumen/Asistencia) usa loadRoster del bimestre; Registro General también. Tutor carga loadtransversales con bimestre y el servidor usa leerPadronEstudiantes_ para ese contexto. Primaria/Secundaria ya usan loadRoster cuando hay bimestre. No se cambian estos consumidores. Se conserva la compatibilidad existente: si no hay padrón, la lectura devuelve BASE_ACTUAL con padronInicializado:false; no se convierte esa lectura en una creación automática.
+Solución: cada consulta registra número de solicitud, revisión local y token. saveEstado incrementa la revisión. Una respuesta anterior se ignora; si hubo edición o hay cambios pendientes, no se sustituye el borrador ni su baseVersion original. Ante error de red también se conserva el borrador. Al guardar con una versión antigua, el backend devuelve conflicto y el borrador permanece.
 
-Gestión muestra cantidades dinámicas de importados, vigentes, trasladados y estados por revisar. La confirmación diferencia el total de base del total académico. Las pruebas 265/257/8 usan exclusivamente identidades sintéticas y verifican versiones separadas, historia, periodos cerrados, permisos y caché por bimestre. No se accedió a datos de producción.
+El mensaje ofrece guardar, revisar o recargar. Recargar con cambios pendientes requiere confirmación explícita de descarte. Cambiar/cerrar sesión impide aplicar la respuesta anterior y deshabilita edición; el borrador no se elimina de memoria. Las cantidades dejan de presentarse como autorizadas. No se introdujo almacenamiento persistente adicional de borradores; abandonar/cerrar la pestaña sigue sujeto a la advertencia existente.
+
+## Identificadores y periodos cerrados
+
+enrichstudents valida periodo y ambas listas antes de escribir. Si existe un padrón cerrado/bloqueado, devuelve PERIOD_CLOSED sin modificar siquiera la base. Si no hay padrón, el enriquecimiento de base no crea uno, incluso en un periodo cerrado.
+
+Prioridad de asociación: ID/código exactos existentes; como compatibilidad, nombre normalizado exacto y único dentro del aula. Nunca nombres parecidos. Duplicados de entrada, homónimos ambiguos, reutilización de ID/código y conflictos con identidad existente requieren revisión; no se sobrescriben IDs conflictivos. No hay excepción extraordinaria para historia cerrada.
+
+subirPlantillaAula diferencia plantilla guardada de asociación rechazada. La respuesta conserva cantidades de IDs realmente asociados. No se modifican notas, claves académicas ni snapshots.
+
+## Validación y límites
+
+Pruebas sintéticas 265/257/8: base completa, padrón abierto filtrado, IDs conservados, historia y padrones cerrados intactos. Fallos simulados antes de escribir, tras preparar base, tras preparar padrón, marcador parcial, tras confirmar y tras flush. También: caché→edición→respuesta tardía, respuestas invertidas, error de red, conflicto al guardar, descarte explícito y cambio/cierre de sesión.
+
+No se atribuye una demora productiva a cold start/Sheets/red sin telemetría. No se eliminaron filas preparadas sin confirmación. El flujo manual avanzado de combinar por nombre permanece fuera de esta corrección y requiere revisión cuidadosa.
+
+Validación visual real pendiente: Browser Use no pudo conectar con la vista local. Validación manual futura: desplegar solo tras autorización, usar CSV SIAGIE vigentes revisados, comprobar conteos, IDs de operación y muestras históricas con lectura de servidor, probar interrupción y relogin. Nunca tomar offline/caché como validación productiva. SW v18 y lógica académica intactos. Sin merge, deploy ni cambios a datos reales.

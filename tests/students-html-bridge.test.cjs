@@ -124,7 +124,7 @@ test('Admin paints authorized cache immediately and withdraws it if RPC rejects 
   const {s,f}=setup();await f.c.IEStudents.load();admin(f);s.block();const task=f.c.cargarEstudiantesAdmin();
   assert.match(f.elements.get('statAlumnos').textContent,/^7 alumnos/);s.resolve({ok:false,code:'SESSION',error:'Sesión revocada.'});await task;
   assert.equal(f.c.IEStudents.peek(),null);assert.doesNotMatch(f.elements.get('statAlumnos').textContent,/7 alumnos|0 alumnos/);
-  assert.match(f.elements.get('bdEstado').textContent,/No se pudo cargar la base/);
+  assert.match(f.elements.get('bdEstado').textContent,/sesión cambió o fue rechazada/i);
 });
 test('all protected student consumers load bridge before students.js, with safe offline JS support',()=>{
   for(const file of ['admin.html','registro.html','primaria.html','secundaria.html','auxiliar.html','photochecks.html','index.html']) {

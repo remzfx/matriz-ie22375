@@ -531,6 +531,12 @@ async function cargarEstudiantesAdmin(options) {
   if (bdGuardando) return;
   if (bdPendiente && !confirm('Hay cambios sin guardar. ¿Descartarlos y recargar la base del servidor?')) return;
 
+  const solicitud = (cargarEstudiantesAdmin.serial || 0) + 1;
+  cargarEstudiantesAdmin.serial = solicitud;
+  const token = IEStudents.validToken ? IEStudents.validToken() : '';
+  if (IEStudents.validToken && !token) { baseCargada=false; actualizarResumen(); estadoBD('La sesión cambió. Vuelve a iniciar sesión; tus cambios pendientes se conservan en esta pestaña.'); return; }
+  if (bdPendiente) bdPendiente = false; // Explicit discard was confirmed above.
+
   // La caché está ligada al token exacto y limitada por su expiración.
   // Se usa solo para pintar el panel de inmediato; el servidor sigue siendo autoritativo.
   const cached = IEStudents.peek ? IEStudents.peek() : null;
@@ -544,11 +550,20 @@ async function cargarEstudiantesAdmin(options) {
     estadoBD('Cargando estudiantes con la sesión Admin…');
   }
 
+  const revision = cargarEstudiantesAdmin.revision || 0;
+  const vigenteSolicitud = () => solicitud === cargarEstudiantesAdmin.serial;
+  const mismaSesion = () => !IEStudents.validToken || (token && IEStudents.validToken() === token);
   try {
-    const fresca = await IEStudents.load();
+    const fresca = await (options.forceNetwork && IEStudents.inspect ? IEStudents.inspect() : IEStudents.load());
+    if (!vigenteSolicitud()) return;
+    if (!mismaSesion()) { baseCargada=false; actualizarResumen(); estadoBD('La sesión cambió. Vuelve a iniciar sesión; tus cambios pendientes se conservan en esta pestaña.'); return; }
+    if (bdPendiente || revision !== (cargarEstudiantesAdmin.revision || 0)) { estadoBD('Hay cambios sin guardar. La actualización recibida no reemplazó tus modificaciones. Puedes guardar, revisar o recargar y confirmar el descarte.'); return; }
     aplicarBaseServidor(fresca);
     if(typeof IEMigrateStudents!=='undefined')IEMigrateStudents.mostrarBase(fresca, !fresca.offline);
   } catch(e) {
+    if (!vigenteSolicitud()) return;
+    if (!mismaSesion() || e.authorizationRejected) { baseCargada=false; actualizarResumen(); estadoBD('La sesión cambió o fue rechazada. Vuelve a iniciar sesión; tus cambios pendientes se conservan en esta pestaña.'); return; }
+    if (bdPendiente || revision !== (cargarEstudiantesAdmin.revision || 0)) { estadoBD('Hay cambios sin guardar. No se pudo actualizar: '+e.message+'. Tus modificaciones se conservan.'); return; }
     const vigente = IEStudents.peek ? IEStudents.peek() : null;
     if (vigente && vigente.inicializada) {
       aplicarBaseServidor(vigente);
@@ -572,6 +587,7 @@ window.addEventListener('beforeunload', function(e) {
 function loadEstado() { estado = IEStudents.empty(); }
 
 function saveEstado() {
+  cargarEstudiantesAdmin.revision = (cargarEstudiantesAdmin.revision || 0) + 1;
   bdPendiente = true;
   actualizarResumen();
   estadoBD('Cambios pendientes en esta pestaña. Pulsa Guardar BD para sincronizar con el servidor.');
@@ -1299,7 +1315,7 @@ async function subirPlantillaAula(grado, seccion, inputId){
     if(!data.ok){ if(msg) msg.textContent=data.error||'Error'; return; }
     let ids={enriquecidosBase:0,enriquecidosPadron:0};
     try{ ids=await enriquecerIdentidadesDesdeMatriz(buf,nivel,bim,grado,seccion); }
-    catch(e){ if(msg) msg.textContent='Plantilla guardada, pero faltó asociar ID SIAGIE: '+e.message; renderAulasSiagie(); return; }
+    catch(e){ if(msg) msg.textContent='Plantilla guardada; asociación de ID SIAGIE no completada: '+e.message; renderAulasSiagie(); return; }
     if(msg) msg.textContent='Guardado: '+inp.files[0].name+' · ID SIAGIE asociados: '+Math.max(ids.enriquecidosBase||0,ids.enriquecidosPadron||0);
     renderAulasSiagie();
   }catch(e){ if(msg) msg.textContent='No se pudo sincronizar con la nube. Verifique la conexión e intente nuevamente.'; }

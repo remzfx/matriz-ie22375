@@ -53,10 +53,12 @@
       if (base[al.nivel]) base[al.nivel].estudiantes.push(al);
     });
     base.version = response.version;
+    if(response.operacionConfirmada)base.operacionConfirmada=response.operacionConfirmada;
     base.inicializada = response.inicializada;
     base.bimestre = response.bimestre || '';
     base.padronInicializado = response.padronInicializado !== false;
     base.fuentePadron = response.fuentePadron || '';
+    ['enriquecidosBase','enriquecidosPadron'].forEach(k=>{if(Number.isInteger(response[k]))base[k]=response[k];});
     return base;
   }
   function peek(scope) {
@@ -138,7 +140,7 @@
   }
   async function request(action, data) {
     data = data || {};
-    const token = validToken(), scope = 'students:' + (action === 'syncstudents' ? 'actual' : (data.bimestre || 'actual'));
+    const token = validToken(), scope = 'students:' + (['syncstudents','enrichstudents'].includes(action) ? 'actual' : (data.bimestre || 'actual'));
     if (!token) { clear(); throw error('SESSION','Sesión ausente o vencida. Vuelve a iniciar sesión.'); }
     const epoch = authorizationEpoch;
     const requestId = (latestRequest.get(scope) || 0) + 1;
@@ -159,6 +161,7 @@
           // Un backend antiguo/método incorrecto no verifica permisos. Solo trabajo local previamente autorizado; nunca habilita subida a la nube.
           if (response.code === 'METHOD_NOT_ALLOWED' || /acción no válida/i.test(response.error || ''))
             throw error('API_INCOMPATIBLE','El backend no reconoce la lectura de estudiantes. Verifique la implementación de Apps Script.',true);
+          if (['CONFLICT','PERIOD_CLOSED','SYNC_UNCONFIRMED'].includes(response.code)) throw error(response.code,response.error || 'Consulta el estado del servidor antes de volver a operar.');
           const denied = error('DENIED',response.error || 'Sesión inválida o sin autorización.');
           denied.authorizationRejected = response.code === 'SESSION' || /sesión.*(?:inválida|vencida|autorización)/i.test(response.error || '');
           throw denied;
@@ -175,7 +178,7 @@
             sessionStorage.setItem('ie22375_aux_timing_v1',JSON.stringify(datos));
           } catch(e) {}
         }
-        if (action === 'syncstudents' && response.padron && response.padron.ok && response.padron.bimestre === data.bimestre && Array.isArray(response.padron.estudiantes)) {
+        if (['syncstudents','enrichstudents'].includes(action) && response.padron && response.padron.ok && response.padron.bimestre === data.bimestre && Array.isArray(response.padron.estudiantes)) {
           const rosterScope = 'students:' + data.bimestre;
           latestRequest.set(rosterScope, (latestRequest.get(rosterScope) || 0) + 1);
           remember(toBase(response.padron),token,rosterScope);
@@ -184,7 +187,7 @@
       } catch(e) {
         last = e;
         if (validToken() !== token || epoch !== authorizationEpoch) throw error('SESSION','La sesión cambió. Vuelve a iniciar sesión.');
-        if (!e.retryable) { clear(); status(e.message); throw e; }
+        if (!e.retryable) { if (read || e.authorizationRejected) clear(); status(e.message); throw e; }
         if (attempt + 1 < attempts) await new Promise(resolve => setTimeout(resolve,1200));
       }
     }

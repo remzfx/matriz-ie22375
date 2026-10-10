@@ -356,7 +356,7 @@ test('Admin shows authorized cached student base immediately while refreshing se
   assert.match(src, /IEStudents\.peek \? IEStudents\.peek\(\) : null/);
   assert.match(src, /Base reciente mostrada al instante\. Verificando datos con el servidor/);
   assert.match(src, /cargarEstudiantesAdmin\(\{forceNetwork:true\}\)/);
-  assert.match(src, /const fresca = await IEStudents\.load\(\)/);
+  assert.match(src, /options\.forceNetwork && IEStudents\.inspect/);
 });
 
 
