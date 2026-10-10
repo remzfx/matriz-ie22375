@@ -8,12 +8,12 @@ function element(tag){
   insertBefore(x,before){x.parentElement=this;this.children.splice(this.children.indexOf(before),0,x);},replaceChildren(){this.children=[];},
   querySelectorAll(tag){return this.children.flatMap(c=>[...(c.tagName===tag?[c]:[]),...c.querySelectorAll(tag)]);}};return e;
 }
-function view({level='A',conclusion='',role='math',saved=true,complete=true}={}){
+function view({level='A',conclusion='',role='math',saved=true,complete=true,recordOverride}={}){
  const s=fixture();if(complete)s.complete();if(saved)assert.equal(s.final('math',level,'Synthetic justification',undefined,conclusion).ok,true);
  const f=client(role==='admin'?'admin':'docente'),requests=[];f.c.document.createElement=element;
  f.c.window.IEStudents.fetchJSON=async(url,opts)=>{const {action,token,...body}=JSON.parse(opts.body);requests.push({action,...clone(body)});return clone(s.route(action,role,body));};
  f.run(read('conclusion-suggestions.js'));f.run(read('transversales-client.js'));
- const box=element('div'),data=clone(s.load(role)),api=f.c.window.IETransversales.editor(box,data,s.ctx,true);
+ const box=element('div'),data=clone(s.load(role));if(recordOverride!==undefined)data.resultados[s.id].tic.final=clone(recordOverride);const api=f.c.window.IETransversales.editor(box,data,s.ctx,true);
  const rows=()=>box.querySelectorAll('tbody')[0].querySelectorAll('tr');
  const cell=()=>rows()[0].querySelectorAll('td').at(-1);
  const finalControl=()=>rows()[0].querySelectorAll('select').find(x=>x.attributes['aria-label']==='Calificación final o aporte');
@@ -75,4 +75,19 @@ test('Closed C retains text in a disabled editor and cannot write',()=>{
  const v=view({level:'C',conclusion:'Closed retained text'}),box=element('div'),data=clone(v.s.load('math'));data.abierto=false;
  v.f.c.window.IETransversales.editor(box,data,v.s.ctx,true);const field=box.querySelectorAll('textarea').find(e=>e.placeholder==='Conclusión descriptiva');
  assert.equal(field.value,'Closed retained text');assert.equal(field.disabled,true);assert.equal(v.requests.length,0);
+});
+for(const record of [null,{nivel:''},{nivel:'INVALID'}])test('Tutor without valid FINAL shows pending and cannot send: '+JSON.stringify(record),async()=>{
+ const v=view({saved:false,recordOverride:record});assert.equal(v.cell().querySelectorAll('p')[0].textContent,'Pendiente de definir');
+ assert.equal(v.cell().querySelectorAll('textarea').length,0);assert.equal(v.cell().querySelectorAll('select').length,0);
+ assert.equal(v.api.dirty(),false);assert.equal(v.process().disabled,true);await v.process().onclick();assert.equal(v.requests.length,0);
+});
+for(const record of [null,{nivel:''},{nivel:'INVALID'}])test('Admin without valid FINAL stays readonly: '+JSON.stringify(record),()=>{
+ const v=view({saved:false,role:'admin',recordOverride:record}),row=v.box.querySelectorAll('tbody')[0].querySelectorAll('tr')[0];
+ assert.ok(row.querySelectorAll('p').some(p=>p.textContent==='Pendiente'));assert.equal(v.box.querySelectorAll('textarea').length,0);
+ assert.equal(v.cell().querySelectorAll('select').length,0);assert.equal(v.api.dirty(),false);assert.equal(v.requests.length,0);
+});
+for(const level of ['A','B','AD'])test('Draft conclusion survives C to '+level+' and back to C',()=>{
+ const v=view({saved:false});v.setLevel('C');v.field().value='Preserved draft text';v.field().oninput();v.setLevel(level);
+ assert.equal(v.cell().querySelectorAll('p')[0].textContent,'No requerida');assert.equal(v.field(),undefined);
+ v.setLevel('C');assert.equal(v.field().value,'Preserved draft text');assert.equal(v.requests.length,0);
 });
