@@ -128,16 +128,19 @@
     estudiantes().forEach((al,i)=>{const id=identity(al,e);if(!rows[i])return;Object.keys(core.COMP).forEach(c=>{const d=(e.evidence.directos[id]||{})[c],calc=(r.calculados[id]||{})[c];rows[i].insertAdjacentHTML('beforeend','<td>'+input(d,id,c,'',true,calc)+(calc?'<small>Cal '+(modoCalif!=='letra'&&calc.nota20!=null?calc.nota20+' · ':'')+calc.nivel+'</small>':'')+'</td>');});});bind(root);
   }
   function summary(root){
-    if(!eligible()||!root)return;const e=current(),r=result(e),box=document.createElement('section');box.id='registroTransResumen';box.className='fin-wrap';
-    const heading='<h3>COMPETENCIAS TRANSVERSALES — APORTE DEL ÁREA</h3>',head='<table class="fin-grid"><thead><tr><th>Estudiante</th><th>TIC</th><th>Gestiona su aprendizaje</th></tr></thead>';
-    if(!r)box.innerHTML=heading+head+'</table><p role="status">'+(e&&e.denied?'Sesión transversal rechazada. Vuelve a iniciar sesión.':e&&e.loadFailed?'No se pudieron cargar las competencias transversales. Pulsa Reintentar.':'Cargando competencias transversales…')+'</p>';
-    else box.innerHTML=heading+head+'<tbody>'+estudiantes().map(al=>{const id=identity(al,e);return '<tr><th>'+esc(al.nombre)+'</th>'+Object.keys(core.COMP).map(comp=>{
-      const v=(r.valores[id]||{})[comp],required=!!v&&v.nivel==='C',text=((e.evidence.conclusiones||{})[id]||{})[comp]||'',k='conclusion:'+comp+'|'+id;
-      const field=required?'<label>Conclusión descriptiva · Obligatoria para C<textarea class="trans-conclusion" data-trans-entry="'+e.id+'" data-trans-id="'+esc(id)+'" data-trans-comp="'+comp+'" maxlength="2000" required aria-label="Conclusión descriptiva '+esc(core.COMP[comp])+'" '+(!editable(e)||!e.data.soportaConclusiones?'readonly':'')+'>'+esc(Object.prototype.hasOwnProperty.call(e.invalid,k)?e.invalid[k]:text)+'</textarea></label>':text?'<small>Conclusión conservada como borrador (no vigente).</small>':'';
-      return '<td>'+(v?(modoCalif==='num'&&v.modo==='num'?esc(v.valor)+' → ':'')+esc(v.nivel):'—')+'<small>'+(v?(r.origenes[id][comp]==='directo'?'Directo':'Evidencias'):'Sin aporte')+'</small>'+field+'</td>';
-    }).join('')+'</tr>';}).join('')+'</tbody></table>';
-    const old=root.querySelector('#registroTransResumen');if(old)old.replaceWith(box);else root.appendChild(box);
-    box.querySelectorAll('.trans-conclusion').forEach(el=>el.oninput=()=>{const live=current();if(live&&String(live.id)===el.dataset.transEntry)setConclusion(live,el.dataset.transId,el.dataset.transComp,el.value);});
+    if(!eligible()||!root)return;const table=root.querySelector('table');if(!table)return;
+    const head=table.querySelector('thead tr'),rows=table.querySelectorAll('tbody tr'),e=current(),r=result(e);
+    if(!head.querySelector('[data-trans-summary]'))head.insertAdjacentHTML('beforeend','<th data-trans-summary="tic">TIC</th><th data-trans-summary="autonomia">Gestiona su aprendizaje</th>');
+    estudiantes().forEach((al,i)=>{const row=rows[i];if(!row)return;const id=identity(al,e);
+      Object.keys(core.COMP).forEach(comp=>{let cell=row.querySelector('[data-trans-summary="'+comp+'"]');if(!cell){cell=document.createElement('td');cell.dataset.transSummary=comp;row.appendChild(cell);}
+        if(!r){cell.textContent=e&&e.denied?'Sesión rechazada':e&&e.loadFailed?'Pendiente · Reintentar':'Cargando…';return;}
+        const v=(r.valores[id]||{})[comp],required=v&&v.nivel==='C',text=((e.evidence.conclusiones||{})[id]||{})[comp]||'',k='conclusion:'+comp+'|'+id;
+        const field=required?'<label>Conclusión descriptiva · Obligatoria para C'+(global.IEConclusionSuggestions?global.IEConclusionSuggestions.html(core.COMP[comp]):'')+'<textarea class="trans-conclusion" data-trans-entry="'+e.id+'" data-trans-id="'+esc(id)+'" data-trans-comp="'+comp+'" maxlength="2000" required '+(!editable(e)||!e.data.soportaConclusiones?'readonly':'')+'>'+esc(Object.prototype.hasOwnProperty.call(e.invalid,k)?e.invalid[k]:text)+'</textarea></label>':text?'<small>Conclusión conservada como borrador</small>':'';
+        cell.innerHTML=(v?(modoCalif==='num'&&v.modo==='num'?esc(v.valor)+' → ':'')+esc(v.nivel):'Sin aporte')+'<small>'+(v?(r.origenes[id][comp]==='directo'?'Directo':'Evidencias'):'')+'</small>'+field;
+        cell.querySelectorAll('.trans-conclusion').forEach(el=>el.oninput=()=>{const live=current();if(live&&String(live.id)===el.dataset.transEntry)setConclusion(live,el.dataset.transId,el.dataset.transComp,el.value);});
+      });
+    });
+    if(global.IEConclusionSuggestions)global.IEConclusionSuggestions.bind(root);
   }
   async function save(integral=false){
     capture();const e=current();if(!e)return true;if(e.conflict){status('CONFLICT: recarga y revisa el aporte; tu borrador se conserva.',true);return false;}if(e.saving){const ok=await e.saving;return ok&&!e.dirty;}if(!e.dirty)return true;if(Object.keys(e.invalid).length){status('Hay notas transversales inválidas. Corrige los valores antes de guardar; el borrador se conserva.',true,'invalid');return false;}
@@ -149,12 +152,12 @@
   }
   async function syncForUpload(){
     if(!eligible())return false;
-    const k=key();capture();const e=current();if(e&&e.saving)await e.saving;
+    const k=key();capture();const e=current();if(!e)return true;const hasEvidence=(e.evidence.sessions||[]).length||Object.keys(e.evidence.directos||{}).length||Object.keys(e.evidence.grades||{}).length;if(!hasEvidence&&!e.dirty)return true;if(e.saving)await e.saving;
     if(key()!==k)return false;
     if(current())current().loadFailed=false;
     await load(false,true);
     const live=current();if(key()!==k||!editable(live)||live.loadFailed||live.conflict||!live.data.soportaConclusiones)return false;
-    if(missingConclusions(live)){status('Falta conclusión descriptiva en competencias transversales con nivel C. Complétala en Resumen antes de enviar el área.',true);refreshSummary();return false;}
+    if(missingConclusions(live)){status('Falta conclusión descriptiva en competencias transversales con nivel C. El aporte queda pendiente; las notas académicas siguen disponibles.',true);refreshSummary();return false;}
     const ok=await save(true);return ok&&key()===k&&!live.dirty&&!live.conflict&&!live.denied&&!missingConclusions(live);
   }
   if(global.addEventListener)global.addEventListener('beforeunload',event=>{if([...drafts.values()].some(e=>e.dirty)){event.preventDefault();event.returnValue='';}});

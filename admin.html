@@ -47,7 +47,7 @@
 </style>
   <script src="login-bridge.js"></script>
   <script src="students.js"></script>
-<script src="registro-academic-model.js" defer></script>
+<script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script>
 <script src="student-identity.js"></script>
 <script src="registro-evaluation.js"></script><script src="transversales-client.js"></script>
 </head>
@@ -103,6 +103,8 @@
       <button class="navbtn chip chip-off" data-tab="docentes" onclick="showTab('docentes')">Docentes</button>
       <button class="navbtn chip chip-off" data-tab="auxiliares" onclick="showTab('auxiliares')">Auxiliares</button>
       <button class="navbtn chip chip-off" data-tab="config" onclick="showTab('config')">Respaldo</button>
+      <button class="navbtn chip chip-off" data-tab="registroGeneral" onclick="showTab('registroGeneral')">Registro General</button>
+      <a class="chip chip-off" href="transversales.html">Competencias transversales</a>
     </nav>
   </header>
 
@@ -276,6 +278,15 @@
     </section>
 
     <!-- PERIODOS -->
+    <section id="tab-registroGeneral" class="tab hidden">
+      <h2 class="font-black text-lg">Registro General · Secundaria</h2>
+      <p class="text-sm">Áreas académicas recibidas y resultados transversales procesados por Admin.</p>
+      <label>Aula<select id="generalAula" onchange="renderRegistroGeneral()"></select></label>
+      <label>Bimestre<select id="generalBim" onchange="renderRegistroGeneral()"><option>I</option><option>II</option><option>III</option><option>IV</option></select></label>
+      <button class="btn" onclick="renderRegistroGeneral()">Actualizar Registro General</button>
+      <a class="btn" href="transversales.html">Competencias transversales</a>
+      <div id="generalStatus" role="status"></div><div id="generalRows" class="overflow-x-auto"></div>
+    </section>
     <section id="tab-periodos" class="tab hidden">
       <div class="card p-4">
         <h2 class="font-black text-lg mb-3">Control de bimestres</h2>
@@ -568,6 +579,30 @@ function logout() {
   location.replace('index.html');
 }
 
+async function renderRegistroGeneral() {
+  const serial=(renderRegistroGeneral.serial||0)+1;renderRegistroGeneral.serial=serial;
+  const status=document.getElementById('generalStatus'),box=document.getElementById('generalRows'),select=document.getElementById('generalAula'),bim=document.getElementById('generalBim').value;
+  status.textContent='Verificando Registro General en servidor…';box.replaceChildren();
+  try {
+    const db=await IEStudents.loadRoster(bim);if(serial!==renderRegistroGeneral.serial)return;if(db.offline)throw Error('Registro General requiere verificación actual del servidor.');
+    const todos=(db.secundaria||{}).estudiantes||[],aulas=[...new Set(todos.map(a=>a.grado+'|'+a.seccion))].sort(),selected=select.value;
+    select.replaceChildren();aulas.forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=a.replace('|','° ');select.appendChild(o);});if(aulas.includes(selected))select.value=selected;
+    const parts=select.value.split('|');if(!parts[0])throw Error('El padrón no contiene aulas de Secundaria.');
+    const ctx={nivel:'secundaria',bim,grado:parts[0],seccion:parts[1]},alumnos=todos.filter(a=>String(a.grado)===ctx.grado&&a.seccion===ctx.seccion);
+    const [items,trans]=await Promise.all([fetchRegAula(ctx),IETransversales.request('loadtransversalexport',{grado:ctx.grado,seccion:ctx.seccion,bimestre:bim})]);if(serial!==renderRegistroGeneral.serial)return;
+    const by=Object.fromEntries(items.map(x=>[x.area,x.payload||{}])),areas=IERegistroAcademico.catalog.secundaria;let completas=0;
+    Object.entries(areas).forEach(([area,comps])=>{
+      const p=by[area],row=document.createElement('details'),title=document.createElement('summary');let ok=!!p;
+      title.textContent=area;row.appendChild(title);
+      comps.forEach(comp=>{const line=document.createElement('p');line.textContent=comp;row.appendChild(line);if(!p){ok=false;return;}const estado=(p.competenciasEstado||{})[[ctx.nivel,bim,ctx.grado,ctx.seccion,area,comp].join('||')];if(estado&&estado.trabajada===false){line.textContent+=' · No trabajada';return;}
+        alumnos.forEach(al=>{const L=letraDesdePayload(p,ctx,area,comp,al),text=document.createElement('p');text.textContent=al.nombre+' · '+(L||'Pendiente')+(L==='C'?' · '+(concDesdePayload(p,ctx,area,comp,al)||'Conclusión pendiente'):'');row.appendChild(text);if(!L||L==='C'&&!concDesdePayload(p,ctx,area,comp,al))ok=false;});
+      });title.textContent+=' · '+(ok?'Completa':'Pendiente');if(ok)completas++;box.appendChild(row);
+    });
+    const table=document.createElement('table'),head=document.createElement('tr');['Estudiante','TIC procesado','Gestiona procesado'].forEach(t=>{const th=document.createElement('th');th.textContent=t;head.appendChild(th);});table.appendChild(head);
+    alumnos.forEach(al=>{const row=document.createElement('tr'),name=document.createElement('th');name.textContent=al.nombre;row.appendChild(name);['tic','autonomia'].forEach(cp=>{const td=document.createElement('td'),r=(trans.resultados[studentKey(al)]||{})[cp],f=r&&r.listo&&r.final;td.textContent=f?f.nivel+(f.nivel==='C'?' · '+f.conclusion:''):'Pendiente de procesamiento';row.appendChild(td);});table.appendChild(row);});box.appendChild(table);
+    const estadoTrans=trans.exportable?'Procesadas':trans.procesado?'Obsoletas · requiere reprocesar':'Pendientes';status.textContent='Áreas académicas: '+completas+'/'+Object.keys(areas).length+' completas · Transversales: '+estadoTrans+' · Registro general: '+(completas===Object.keys(areas).length&&trans.exportable?'Completo':'Incompleto');
+  }catch(e){if(serial===renderRegistroGeneral.serial)status.textContent=e.message+' · Reintente Actualizar Registro General.';}
+}
 function showTab(id) {
   document.querySelectorAll('.tab').forEach(t => t.classList.add('hidden'));
   const el = document.getElementById('tab-' + id);
@@ -583,6 +618,7 @@ function showTab(id) {
   if (id === 'horario') initHorarioUI();
   if (id === 'menu') actualizarResumen();
   if (id === 'siagie') renderAulasSiagie();
+  if (id === 'registroGeneral') renderRegistroGeneral();
   if (id === 'whatsapp') bajarGruposWa();
 }
 
@@ -1326,7 +1362,7 @@ async function vaciarSiagieOficial(){
   items.forEach(it=>{ by[it.area]=it.payload||{}; });
   let transversales=null;
   if(ctx.nivel==='secundaria'){
-    try{transversales=await IETransversales.request('loadtransversalexport',{bimestre:ctx.bim,grado:ctx.grado,seccion:ctx.seccion});}
+    try{transversales=await IETransversales.request('loadtransversalexport',{bimestre:ctx.bim,grado:ctx.grado,seccion:ctx.seccion});if(!transversales.flujoAdmin)throw Error('El backend debe actualizarse al flujo de procesamiento Admin.');}
     catch(e){alert('No se pudo verificar la consolidación transversal: '+e.message);return;}
   }
   let padron;
@@ -1392,7 +1428,7 @@ async function vaciarSiagieOficial(){
   });
   if(pendientesAcademicos.length){msg.textContent='Competencias académicas pendientes: '+pendientesAcademicos.join(' · ');return;}
   if(transversales){
-    try{const vigente=await IETransversales.request('loadtransversalexport',{bimestre:ctx.bim,grado:ctx.grado,seccion:ctx.seccion});if(vigente.version!==transversales.version||vigente.versionAportes!==transversales.versionAportes){alert('La consolidación cambió durante el vaciado. Recargue y exporte nuevamente.');return;}}
+    try{const vigente=await IETransversales.request('loadtransversalexport',{bimestre:ctx.bim,grado:ctx.grado,seccion:ctx.seccion});if(vigente.version!==transversales.version||vigente.versionAportes!==transversales.versionAportes||vigente.versionProcesado!==transversales.versionProcesado||(transversales.exportable&&vigente.exportable===false)){alert('La consolidación cambió durante el vaciado. Recargue y exporte nuevamente.');return;}}
     catch(e){alert('No se pudo confirmar la versión transversal para exportar.');return;}
   }
   if(pendientesTrans.length){
