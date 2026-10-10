@@ -11,6 +11,11 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
+  .session-competence-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:10px;align-items:start;}
+  .session-competence-grid>div{min-width:0;}
+  .session-competence-grid label{display:block;margin-bottom:4px;}
+  .session-competence-grid select{width:100%;min-width:0;box-sizing:border-box;}
+  @media(max-width:640px){.session-competence-grid{grid-template-columns:minmax(0,1fr);}}
   .worked-label{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;}
   .final-cell-layout{display:grid;grid-template-columns:100px minmax(0,1fr);gap:8px;align-items:start;min-width:0;}
   .final-grade{grid-column:1;width:100px;min-width:100px;display:flex;flex-direction:column;align-items:center;}
@@ -437,14 +442,16 @@
           <select id="selUnidad" onchange="cambiarUnidadSesion()"><option value="">Sin unidad</option></select>
         </div>
       </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Competencia</label>
-        <select id="selComp" onchange="onCompChange()"></select>
-      </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Capacidades (CNEB)</label>
-        <select id="selCap" onchange="onCapSel()"></select>
-        <p class="text-[10px] text-slate-400 mt-1" id="lblNCaps"></p>
+      <div class="session-competence-grid">
+        <div class="session-competence-field">
+          <label class="text-[10px] font-bold text-slate-500" for="selComp">Competencia</label>
+          <select id="selComp" onchange="onCompChange()"></select>
+        </div>
+        <div class="session-capabilities-field">
+          <label class="text-[10px] font-bold text-slate-500" for="selCap">Capacidades (CNEB)</label>
+          <select id="selCap" onchange="onCapSel()" aria-describedby="lblNCaps"></select>
+          <p class="text-[10px] text-slate-400 mt-1" id="lblNCaps"></p>
+        </div>
       </div>
       <div id="wrapCapOtra" class="hidden">
         <label class="text-[10px] font-bold text-slate-500">Capacidad / evidencia a evaluar</label>
