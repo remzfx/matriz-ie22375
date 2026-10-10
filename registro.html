@@ -94,13 +94,15 @@
   .fin-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   @media screen {
     .fin-panel-card { padding:10px 12px; }
-    .fin-header { margin-bottom:6px; }
-    .fin-header-top { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }
-    .fin-header-context { flex:1 1 240px; min-width:0; overflow-wrap:anywhere; }
-    .fin-header-top .mode-toggle { flex:0 0 180px; max-width:100%; margin-left:auto; }
-    .fin-header-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin-top:4px; font-size:11px; font-weight:700; }
-    .fin-header-toolbar > div { display:contents; }
-    .fin-header-toolbar > span { max-width:100%; overflow-wrap:anywhere; }
+    .fin-header { margin-bottom:4px; }
+    .fin-header-main { display:flex; align-items:center; gap:6px 10px; }
+    .fin-header-context { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+    .fin-mode-info { flex:0 1 auto; min-width:0; max-width:100%; }
+    .fin-mode-info > span { display:block; padding:4px 8px; font-size:11px; line-height:1.2; border-radius:8px; overflow-wrap:anywhere; }
+    .fin-header-main .mode-toggle { flex:0 0 180px; max-width:100%; }
+    .fin-header-aux { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:3px; font-size:10px; font-weight:700; color:#64748b; }
+    @media (max-width:1023px) { .fin-header-main { flex-wrap:wrap; } }
+    @media (max-width:640px) { .fin-header-context { flex-basis:100%; } }
     .fin-panel-card > button { margin-top:8px; }
     .registro-datos-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
     .registro-datos-grid > div { min-width:0; }
@@ -310,18 +312,21 @@
     <div class="panel-fin" id="panelFinales">
       <div class="card fin-panel-card">
         <header class="fin-header">
-          <div class="fin-header-top">
+          <div class="fin-header-main">
             <div class="fin-header-context">
               <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
             </div>
+            <div class="fin-mode-info" id="finModeInfo"></div>
             <div class="mode-toggle">
               <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
               <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
             </div>
           </div>
-          <div class="fin-header-toolbar" id="finResumen"></div>
-          <a href="transversales.html" id="registroTutorLink" hidden>Consolidar competencias transversales</a>
+          <div class="fin-header-aux">
+            <div id="finResumen"></div>
+            <a href="transversales.html" id="registroTutorLink" hidden>Consolidar competencias transversales</a>
+          </div>
         </header>
         <div id="finLista" class="fin-wrap fin-scroll-body"></div>
         <button type="button" class="btn btn-primary w-full text-sm" data-reg-write onclick="guardarRegistroIntegrado(true)">Guardar promedios</button>
@@ -2594,14 +2599,15 @@ function renderFinales() {
   const comps = competencias();
   const box = document.getElementById('finLista');
   const res = document.getElementById('finResumen');
+  const modeInfo = document.getElementById('finModeInfo');
   const bloqueado = bimCerradoDocente();
   const alumnos = estudiantes();
-  if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; return; }
+  if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; modeInfo.innerHTML=''; return; }
 
   const capsPor = {};
   comps.forEach(cp => { capsPor[cp] = capsDeComp(cp); });
 
-  res.innerHTML = (bloqueado
+  modeInfo.innerHTML = (bloqueado
     ? '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>'
     : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">'+(modoCalif==='letra'?'Letras':'0–20')+' · Promedio directo prevalece sobre evidencias</span>');
 
@@ -2649,12 +2655,7 @@ function renderFinales() {
   }).join('');
 
   box.innerHTML = '<table class="fin-grid"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table>';
-  res.innerHTML += '<div class="w-full flex flex-wrap gap-2 mt-1">' +
-    '<span class="px-2 py-1 rounded-lg bg-slate-50">Celdas '+cV+'/'+cTot+'</span>' +
-    '<span class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800">AD '+cAD+'</span>' +
-    '<span class="px-2 py-1 rounded-lg bg-green-50 text-green-800">A '+cA+'</span>' +
-    '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">B '+cB+'</span>' +
-    '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">C '+cC+'</span></div>';
+  res.innerHTML = '<span>Celdas '+cV+'/'+cTot+'</span>';
 
   box.querySelectorAll('.fin-nota').forEach(inp => {
     inp.addEventListener('change', function() {
