@@ -46,7 +46,7 @@
     width:100%; font-size:16px; background:#fff; color:#0f172a; min-height:44px;
   }
   select { appearance:auto; -webkit-appearance:menulist; }
-  .area-btn { font-size:12px; padding:.45rem .7rem; border-radius:10px; font-weight:800; background:#f1f5f9; color:#475569; border:0; cursor:pointer; }
+  .area-btn { transition:background .15s,color .15s; font-size:12px; padding:.45rem .7rem; border-radius:10px; font-weight:800; background:#f1f5f9; color:#475569; border:0; cursor:pointer; }
   .area-btn.on { background:#0ea5e9; color:#fff; }
   .sticky-top { position:sticky; top:0; z-index:40; }
   .mobile-safe-header { padding-top: env(safe-area-inset-top, 0px); }
@@ -203,6 +203,13 @@
   }
 .trans-grid-wrap{overflow-x:auto;max-width:100%;margin:1rem 0}.trans-grid{border-collapse:collapse;min-width:900px;width:100%}.trans-grid th,.trans-grid td{padding:.65rem;border:1px solid #cbd5e1;vertical-align:top}.trans-grid td textarea{width:180px;max-width:100%;min-height:80px;box-sizing:border-box;}.trans-grid td select,.trans-grid td input{max-width:180px;min-height:44px;}.trans-grid td{min-width:80px;}.trans-grid .trans-student{position:sticky;left:0;background:#fff;min-width:220px;max-width:260px;z-index:1;text-align:left}.trans-detail>summary{min-height:44px;cursor:pointer;padding:.3rem;max-width:280px}.trans-detail[open]{min-width:290px;max-width:390px}.trans-detail textarea{display:block;width:100%;min-height:88px}.trans-detail input,.trans-detail select{min-height:44px}@media(max-width:640px){.trans-grid .trans-student{min-width:170px;max-width:180px}.trans-detail>summary{min-width:170px}}.trans-grid th.trans-area-header,.trans-grid td.trans-area-cell{width:56px;min-width:48px;padding:6px;text-align:center;vertical-align:middle;font-size:11px}.trans-grid .trans-area-cell>.trans-detail>summary{display:flex;align-items:center;justify-content:center;list-style:none;min-width:0;max-width:none;min-height:44px;padding:0}.trans-grid .trans-area-cell>.trans-detail>summary::-webkit-details-marker{display:none}
 
+
+/* Compact Tutor controls: table geometry remains unchanged. */
+.trans-tutor-header h2{margin:0;font-size:18px;font-weight:700;color:#16324a}.trans-tutor-header p{margin:3px 0;font-size:13px;color:#64748b}.trans-tutor-header .trans-flow{font-size:12px}
+.trans-context{display:grid;grid-template-columns:minmax(0,240px) minmax(0,200px) auto;gap:12px;align-items:end;margin:12px 0}.trans-context label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#475569;min-width:0}.trans-context select{box-sizing:border-box;width:100%;min-width:0;margin:0;min-height:44px;padding:8px 10px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:14px}.trans-context button{justify-self:start;margin:0;min-height:44px;padding:8px 14px}
+.trans-toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:8px 0}.trans-control-group{display:flex;flex-direction:column;gap:4px;min-width:0}.trans-control-group>span{font-size:12px;color:#64748b;font-weight:600}.trans-segment{display:flex;flex-wrap:wrap;gap:4px}.trans-segment button{margin:0;padding:8px 12px;border:1px solid #dbe3ed;border-radius:8px;background:#f1f5f9;color:#334155;font-size:13px;transition:background .15s,color .15s}.trans-segment button[aria-pressed="true"],.trans-segment button[aria-selected="true"]{background:#075985;border-color:#075985;color:#fff;font-weight:600}.trans-segment button:hover:not(:disabled){border-color:#075985}.trans-segment button:focus-visible,.trans-context button:focus-visible{outline:2px solid #0ea5e9;outline-offset:2px}.trans-apply{margin:0;padding:8px 12px;background:#fff;color:#075985;border:1px solid #94a3b8;border-radius:8px;font-size:13px}
+.trans-progress{margin:8px 0;font-size:12px;color:#475569}.trans-notice{margin:6px 0;font-size:13px;line-height:1.4;padding:8px 10px;border-left:3px solid #0ea5e9;background:#f0f7ff}.trans-notice:empty{display:none}#transStatus{margin:6px 0;font-size:13px;color:#475569}.trans-heading-row{display:flex;flex-wrap:wrap;align-items:start;gap:8px 16px;margin:8px 0}.trans-competence-title{flex:1 1 280px;margin:0;font-size:14px;line-height:1.4;font-weight:600;color:#16324a}.trans-help{font-size:12px;max-width:100%;min-width:0}.trans-help>summary{cursor:pointer;min-height:32px;color:#075985}.trans-help p{max-width:640px;margin:4px 0;line-height:1.5}.trans-actions{display:flex;flex-wrap:wrap;gap:8px}.trans-actions button{margin:0}
+@media(max-width:640px){.trans-context{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.trans-context button{grid-column:1/-1}.trans-toolbar{gap:10px}.trans-heading-row{gap:6px}.trans-tutor-header h2{font-size:16px}}
 </style>
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
@@ -325,11 +332,8 @@
     </div>
 
     <section id="registroTutorPanel" hidden class="card p-3">
-      <h2>COMPETENCIAS TRANSVERSALES · Tutor</h2>
-      <p>Aportes habilitados → decisión del Tutor → registro oficial.</p>
-      <label>Aula tutorada <select id="transAula"></select></label>
-      <label>Bimestre <select id="transBim"></select></label>
-      <button type="button" class="btn btn-ghost" id="transReload">Reintentar / actualizar</button>
+      <header class="trans-tutor-header"><h2>COMPETENCIAS TRANSVERSALES</h2><p>Consolidación y decisión pedagógica del Tutor</p><p class="trans-flow">Aportes docentes → Decisión del Tutor → Registro oficial</p></header>
+      <div class="trans-context"><label>Aula tutorada <select id="transAula"></select></label><label>Bimestre <select id="transBim"></select></label><button type="button" class="btn btn-ghost" id="transReload">Actualizar ↻</button></div>
       <p id="transStatus" role="status">Verificando tutorías…</p><div id="transRows"></div>
     </section>
     <div id="registroAcademicoPanel">
@@ -1583,7 +1587,7 @@ function renderAreas() {
     const short = a.length > 24 ? a.slice(0,22)+'…' : a;
     return `<button type="button" class="area-btn ${on}" data-a="${encodeURIComponent(a)}" onclick="setArea(decodeURIComponent(this.dataset.a))">${short}</button>`;
   }).join('') : '<span class="text-xs text-slate-400">Sin áreas asignadas para esta aula.</span>';
-  const ses=getLoginSession();if(nivel==='secundaria'&&ses&&ses.role==='docente'&&(ses.tutorAulas||[]).length)document.getElementById('areaBtns').insertAdjacentHTML('beforeend','<button type="button" class="area-btn" onclick="abrirTutorRegistro()">COMPETENCIAS TRANSVERSALES</button>');
+  const ses=getLoginSession();if(nivel==='secundaria'&&ses&&ses.role==='docente'&&(ses.tutorAulas||[]).length)document.getElementById('areaBtns').insertAdjacentHTML('beforeend','<button type="button" class="area-btn '+(document.getElementById('registroTutorPanel').hidden?'':'on')+'" onclick="abrirTutorRegistro()">COMPETENCIAS TRANSVERSALES</button>');
 }
 
 let tutorRegistroController=null;

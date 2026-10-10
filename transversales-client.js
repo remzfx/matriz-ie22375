@@ -33,17 +33,23 @@
   }
   function editor(container,data,ctx,final){
     if(!final)return evidenceEditor(container,data,ctx);
-    if(data.flujoTutor!==true){data=Object.assign({},data,{puedeFinal:false,puedeProcesar:false});text('p','Backend anterior: consulta solamente. Requiere actualizar el flujo oficial del Tutor.',container);}
+    if(data.flujoTutor!==true){data=Object.assign({},data,{puedeFinal:false,puedeProcesar:false});const warning=text('p','Solo lectura · Backend anterior pendiente de actualización',container);warning.className='trans-notice';warning.setAttribute('role','status');}
     let mode='letra',competence='tic',draft={},busy=false;const token=global.IEStudents.validToken();
-    const toolbar=text('div','',container),modeEl=document.createElement('select');
-    [['letra','Letras'],['num','0–20']].forEach(([v,label])=>{const opt=document.createElement('option');opt.value=v;opt.textContent=label;modeEl.appendChild(opt);});toolbar.appendChild(modeEl);
-    const tabs=text('div','',toolbar);tabs.setAttribute('role','tablist');
-    Object.entries(COMP).forEach(([cp,label])=>{const tab=text('button',cp==='tic'?'TIC':'GESTIONA SU APRENDIZAJE',tabs);tab.dataset.competence=cp;tab.setAttribute('role','tab');tab.onclick=()=>{competence=cp;draw();};});
-    const apply=data.puedeFinal?text('button','Aplicar sugeridos a Final',toolbar):null;
-    const competenceTitle=text('h3','',container),completeness=text('p','',container);
-    text('p','18–20 → AD · 14–17 → A · 11–13 → B · 0–10 → C. Cambiar el modo no modifica valoraciones guardadas.',container);
-    if(data.politica)text('p','Año lectivo '+data.politica.anio+' · Solo aportes habilitados por Admin. Sugerencia: mayoría de áreas, un voto efectivo (el más reciente) por área; empate sin sugerencia. La decisión oficial pertenece al Tutor.',container);
-    const message=text('p','',container),aportesStatus=text('p','',container),rows=text('div','',container),buttons=text('div','',container);
+    const toolbar=text('div','',container);toolbar.className='trans-toolbar';
+    const modeGroup=text('div','',toolbar);modeGroup.className='trans-control-group';text('span','Modo de evaluación',modeGroup);
+    const modes=text('div','',modeGroup);modes.className='trans-segment';modes.setAttribute('role','group');modes.setAttribute('aria-label','Modo de evaluación');
+    [['letra','Letras'],['num','0–20']].forEach(([value,label])=>{const button=text('button',label,modes);button.dataset.mode=value;button.onclick=()=>{if(busy)return;mode=value;draw();};});
+    const competenceGroup=text('div','',toolbar);competenceGroup.className='trans-control-group';text('span','Competencia',competenceGroup);
+    const tabs=text('div','',competenceGroup);tabs.className='trans-segment';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Competencia transversal');
+    Object.entries(COMP).forEach(([cp,label])=>{const tab=text('button',cp==='tic'?'TIC':'Gestiona su aprendizaje',tabs);tab.dataset.competence=cp;tab.setAttribute('role','tab');tab.onclick=()=>{competence=cp;draw();};});
+    const apply=data.puedeFinal?text('button','Aplicar sugeridos a Final',toolbar):null;if(apply)apply.className='btn trans-apply';
+    const completeness=text('p','',container);completeness.className='trans-progress';
+    const message=text('p','',container),aportesStatus=text('p','',container);message.className='trans-notice';message.setAttribute('role','status');aportesStatus.className='trans-notice';aportesStatus.setAttribute('role','status');
+    const heading=text('div','',container);heading.className='trans-heading-row';const competenceTitle=text('h3','',heading);competenceTitle.className='trans-competence-title';
+    const help=text('details','',heading);help.className='trans-help';text('summary','Cómo funciona la evaluación',help);
+    text('p','18–20 → AD · 14–17 → A · 11–13 → B · 0–10 → C. Cambiar el modo no modifica valoraciones guardadas.',help);
+    if(data.politica)text('p','Año lectivo '+data.politica.anio+' · Solo aportes habilitados por Admin. Sugerencia: mayoría de áreas, un voto efectivo (el más reciente) por área; empate sin sugerencia. La decisión oficial pertenece al Tutor.',help);
+    const rows=text('div','',container),buttons=text('div','',container);buttons.className='trans-actions';
     function procesable(){return token===global.IEStudents.validToken()&&data.flujoTutor&&Array.isArray(data.aportesPendientes)&&data.aportesPendientes.length===0&&data.abierto&&data.puedeProcesar&&(data.tutores||[]).length===1&&!Object.keys(draft).length&&data.estudiantes.length&&data.estudiantes.every(al=>Object.keys(COMP).every(cp=>{const f=data.resultados[al.id][cp].final;return f&&f.versionAportes===data.versionAportes&&(f.nivel!=='C'||String(f.conclusion||'').trim());}));}
     function changed(id,comp,raw){if(token!==global.IEStudents.validToken()||!data.puedeFinal||!data.abierto||busy)return;draft[id]=draft[id]||{};draft[id][comp]=Object.assign({},draft[id][comp]||data.resultados[id][comp].final||{},raw);buttons.querySelectorAll('button').forEach(b=>{if(b.dataset.process)b.disabled=true;});if(raw.modo)draw();}
     if(apply)apply.onclick=()=>{
@@ -104,7 +110,7 @@
         const wrap=text('label','Conclusión descriptiva · Obligatoria',conclusionCell),field=text('textarea','',wrap);field.setAttribute('aria-label','Conclusión descriptiva');field.placeholder='Conclusión descriptiva';field.maxLength=2000;field.value=record&&record.conclusion||'';field.disabled=!enabled;field.oninput=()=>changed(al.id,comp,{conclusion:field.value});
         if(global.IEConclusionSuggestions)global.IEConclusionSuggestions.mount(field,COMP[comp]);
       });
-      modeEl.disabled=busy;buttons.querySelectorAll('button').forEach(b=>{b.disabled=busy||!data.abierto||(b.dataset.process&&!procesable());});
+      modes.querySelectorAll('button').forEach(b=>{b.disabled=busy;b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});buttons.querySelectorAll('button').forEach(b=>{b.disabled=busy||!data.abierto||(b.dataset.process&&!procesable());});
     }
     async function act(action){
       if(busy||token!==global.IEStudents.validToken())return;
@@ -118,7 +124,7 @@
     }
     if(data.puedeFinal){const save=text('button','Guardar decisión del Tutor',buttons);save.onclick=()=>act('savetransversalfinal');}
     if(data.puedeProcesar){const b=text('button','ENVIAR AL REGISTRO OFICIAL',buttons);b.dataset.process='true';b.onclick=()=>act('procesartransversales');}
-    modeEl.onchange=()=>{mode=modeEl.value;draw();};
+
     draw();return {dirty:()=>Object.keys(draft).length>0,busy:()=>busy};
   }
   function evidenceEditor(container,data,ctx){

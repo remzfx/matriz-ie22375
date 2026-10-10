@@ -67,7 +67,7 @@ for(const level of ['A','B','AD','C'])test('Admin '+level+' is readonly and disp
 });
 test('Presentation changes and tabs do not persist data or generate snapshots',()=>{
  const v=view({level:'C',conclusion:'Kept text'}),before=JSON.stringify(v.s.tables.get('TransversalesProcesado')?.rows||[]),writes=v.s.state.writes;
- const mode=v.box.querySelectorAll('select')[0];mode.value='num';mode.onchange();mode.value='letra';mode.onchange();
+ v.box.querySelectorAll('button').find(b=>b.dataset.mode==='num').onclick();v.box.querySelectorAll('button').find(b=>b.dataset.mode==='letra').onclick();
  for(const cp of ['autonomia','tic'])v.box.querySelectorAll('button').find(b=>b.dataset.competence===cp).onclick();
  assert.equal(v.field().value,'Kept text');assert.equal(v.api.dirty(),false);assert.equal(v.requests.length,0);assert.equal(v.s.state.writes,writes);assert.equal(JSON.stringify(v.s.tables.get('TransversalesProcesado')?.rows||[]),before);
 });

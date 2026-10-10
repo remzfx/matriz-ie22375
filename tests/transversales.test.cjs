@@ -222,9 +222,9 @@ test('real evidence grid retains numeric originals on view switch, rounds edited
 });
 test('Tutor editor never prefills suggestion and prevents unsaved official send; Admin is readonly',async()=>{
  const server=fixture();server.aporte('math','A');const f=client('docente'),el=dom();f.c.document.createElement=el;f.run(read('transversales-client.js'));
- const box=el('div'),edit=f.c.window.IETransversales.editor(box,clone(server.load('math')),server.ctx,true),input=box.querySelectorAll('select')[1];assert.equal(input.value,'');input.value='B';input.onchange();assert.equal(edit.dirty(),true);
+ const box=el('div'),edit=f.c.window.IETransversales.editor(box,clone(server.load('math')),server.ctx,true),input=box.querySelectorAll('select')[0];assert.equal(input.value,'');input.value='B';input.onchange();assert.equal(edit.dirty(),true);
  const process=box.querySelectorAll('button').find(b=>b.textContent==='ENVIAR AL REGISTRO OFICIAL');await process.onclick();assert.equal(f.calls.length,0);
- const data=clone(server.load('admin')),readonly=el('div');f.c.window.IETransversales.editor(readonly,data,server.ctx,true);assert.equal(readonly.querySelectorAll('button').filter(b=>!b.dataset.competence).length,0);assert.ok(readonly.querySelectorAll('textarea').every(e=>e.disabled));
+ const data=clone(server.load('admin')),readonly=el('div');f.c.window.IETransversales.editor(readonly,data,server.ctx,true);assert.equal(readonly.querySelectorAll('button').filter(b=>!b.dataset.competence&&!b.dataset.mode).length,0);assert.ok(readonly.querySelectorAll('textarea').every(e=>e.disabled));
 });
 for(const [entrada,nivel,normalizado] of [[13.4,'B',13],[13.5,'A',14],[17.5,'AD',18]])test('numeric '+entrada+' rounds exactly as Registro before deriving level in frontend/backend and persisted decisions',()=>{
  const s=fixture(),f=client();f.run(extract('registro.html','numToLetter'));f.run(extract('registro.html','pad2'));f.run(read('transversales-client.js'));
