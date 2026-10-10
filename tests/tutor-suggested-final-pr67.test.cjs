@@ -33,3 +33,16 @@ test('Pending draft conclusion and justification survive applying C',()=>{const 
 test('Apply, explicit save and official send are separate actions',async()=>{const v=setup('A');v.apply().onclick();assert.equal(v.requests.length,0);await v.box.querySelectorAll('button').find(b=>b.textContent==='Guardar decisión del Tutor').onclick();assert.equal(v.requests.length,1);assert.equal(v.requests[0].action,'savetransversalfinal');assert.equal(v.requests[0].finales[v.s.id].tic.nivel,'A');assert.equal(v.requests[0].finales[v.s.id].autonomia,undefined);assert.equal(v.s.load('math').exportable,false);});
 test('Admin has no mass edit button',()=>{const v=setup('A',{role:'admin'});assert.equal(v.apply(),undefined);});
 test('Session change blocks applying suggestions',()=>{const v=setup('A');v.f.c.window.IEStudents.validToken=()=> 'changed';v.apply().onclick();assert.equal(v.api.dirty(),false);assert.equal(v.requests.length,0);});
+
+for(const active of ['I','II','III','IV'])test('Bimestre labels hide state while retaining configured state and internal values: '+active,async()=>{
+ const states=Object.fromEntries(['I','II','III','IV'].map(v=>[v,v===active?'abierto':v==='IV'?'bloqueado':'cerrado']));
+ const initial={ok:true,aulas:['2|A'],periodos:{bimestres:states}},before=JSON.stringify(initial),calls=[];
+ const m=mounted(async body=>{calls.push(body);return body.action==='loadtransversalesaulas'?initial:{ok:false,error:'Synthetic read-only response'};});
+ await m.controller.ready;
+ assert.equal(m.el('transBim').value,active);assert.equal(calls[1].bimestre,active);
+ const options=m.el('transBim').querySelectorAll('option');
+ assert.deepEqual(options.map(o=>o.value),['I','II','III','IV']);
+ for(const o of options){assert.equal(o.textContent,o.value+' Bimestre'+(states[o.value]==='abierto'?'':' 🔒'));assert.doesNotMatch(o.textContent,/abierto|cerrado|bloqueado/);}
+ assert.equal(JSON.stringify(initial),before);assert.equal(states[active],'abierto');
+ if(active==='III')assert.equal(options[0].textContent,'I Bimestre 🔒');
+});

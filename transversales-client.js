@@ -193,7 +193,7 @@
       aula.replaceChildren();bim.replaceChildren();
       if(!data.aulas.length){msg.textContent='No tiene aulas de tutoría autorizadas.';return;}
       data.aulas.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v.replace('|','° ');aula.appendChild(o);});
-      ['I','II','III','IV'].forEach(v=>{const o=document.createElement('option');o.value=v;const state=(data.periodos&&data.periodos.bimestres||{})[v]||'bloqueado';o.textContent=v+' · '+state+(state==='abierto'?'':' 🔒');bim.appendChild(o);});
+      ['I','II','III','IV'].forEach(v=>{const o=document.createElement('option');o.value=v;const state=(data.periodos&&data.periodos.bimestres||{})[v]||'bloqueado';o.textContent=v+' Bimestre'+(state==='abierto'?'':' 🔒');bim.appendChild(o);});
       bim.value=['I','II','III','IV'].find(v=>(data.periodos&&data.periodos.bimestres||{})[v]==='abierto')||'I';
       aula.onchange=load;bim.onchange=load;document.getElementById('transReload').onclick=load;await load();
     }catch(e){if(disposed)return;msg.textContent=e.message;document.getElementById('transReload').onclick=initialize;}}
