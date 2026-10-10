@@ -11,6 +11,8 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
+  .worked-label{display:flex;align-items:center;gap:6px;font-size:11px;}
+  .worked-label input[type=checkbox]{width:17px;height:17px;min-height:17px;padding:0;flex:0 0 17px;}
   .card { background:#fff; border-radius:16px; box-shadow:0 6px 24px rgba(15,23,42,.08); }
   .btn { border-radius:12px; font-weight:700; padding:.55rem 1rem; transition:.15s; border:0; cursor:pointer; }
   .btn-primary { background:#0284c7; color:#fff; }
@@ -157,7 +159,7 @@
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
 <script src="student-identity.js"></script>
-<script src="registro-academic-model.js" defer></script><script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script>
+<script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script><script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script>
 </head>
 <body class="min-h-screen text-slate-800">
 <script>window.__IE_NEED_ROLES=['primaria','secundaria','admin'];</script>
@@ -662,8 +664,9 @@ async function subirRegistroNube() {
   }
   if (!nivel || !areaActual) { toast('Elija área primero'); return; }
   const ses = getLoginSession() || {}, integral = nivel==='secundaria' && ses.role==='docente';
-  if (integral && typeof IERegistroTransversales==='undefined') { toast('No se envió el área completa. Las competencias transversales están pendientes. Corrige o reintenta.'); return false; }
-  if (integral) IERegistroTransversales.capture();
+  const adapter=integral&&typeof IERegistroTransversales!=='undefined'?IERegistroTransversales:null;
+  const tokenTransSubida=adapter?IEStudents.validToken():null;
+  if (adapter) adapter.capture();
   const invalidas = Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!=='' && (!Number.isFinite(Number(inp.value)) || Number(inp.value)<0 || Number(inp.value)>20));
   if (invalidas) { toast('Hay notas académicas inválidas. Corrige los valores antes de enviar el área.'); return false; }
   if (guardarTodo() === false) { toast('Espera a que cargue el padrón del bimestre.'); return; }
@@ -673,25 +676,14 @@ async function subirRegistroNube() {
   let payload = sliceRegistroArea();
   const tokenSubida = (getLoginSession() || {}).token || '';
   const contextoSubida = JSON.stringify(c);
-  if (integral) {
-    if (!await IERegistroTransversales.syncForUpload()) {
-      toast(IERegistroTransversales.missingConclusions() ? 'Falta conclusión descriptiva en competencias transversales con nivel C. Complétala en Resumen antes de enviar el área.' : 'No se envió el área completa. Las competencias transversales están pendientes. Corrige o reintenta.');
-      return false;
-    }
-    if (registroNubeNoVerificada() || tokenSubida!==((getLoginSession()||{}).token||'') || contextoSubida!==JSON.stringify(ctxBase())) {
-      toast('Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Reintenta.');
-      return false;
-    }
-    // Recolectar también lo escrito mientras se verificaba el aporte transversal.
-    const invalidasAhora = Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!=='' && (!Number.isFinite(Number(inp.value)) || Number(inp.value)<0 || Number(inp.value)>20));
-    if (invalidasAhora || guardarTodo()===false) {
-      toast('Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Corrige las notas y reintenta.');
-      return false;
-    }
-    payload = sliceRegistroArea();
-  }
+  let aporteSincronizado=true;
+  if(adapter){try{aporteSincronizado=await adapter.syncForUpload();}catch(e){aporteSincronizado=false;}}
+  if(adapter&&(tokenTransSubida!==IEStudents.validToken()||(adapter.current()||{}).denied)){toast('La sesión transversal cambió o fue rechazada. Vuelva a iniciar sesión.');return false;}
+  if(registroNubeNoVerificada()||tokenSubida!==((getLoginSession()||{}).token||'')||contextoSubida!==JSON.stringify(ctxBase())){toast('El contexto o la sesión cambió. Trabajo local conservado.');return false;}
+  if(adapter){const invalidasAhora=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!==''&&(!Number.isFinite(Number(inp.value))||Number(inp.value)<0||Number(inp.value)>20));if(invalidasAhora||guardarTodo()===false){toast('Hay cambios académicos inválidos o sin guardar. Corrige y reintenta.');return false;}const info=informeSiagie();if(!info.ok){toast('Área académica pendiente: '+[...info.faltanNota,...info.faltanConc].slice(0,3).join(' · '));return false;}}
+  payload=sliceRegistroArea();
   const academicBaseline=typeof IERegistroAcademico!=='undefined'?baselineAcademica():null;
-  if(academicBaseline&&academicBaseline.version!==null&&IERegistroAcademico.canonical(payload)===academicBaseline.baseline){toast('Sin cambios académicos pendientes');return true;}
+  if(academicBaseline&&academicBaseline.version!==null&&IERegistroAcademico.canonical(payload)===academicBaseline.baseline){toast(aporteSincronizado?'Sin cambios académicos pendientes':'Notas académicas sin cambios. El aporte transversal quedó pendiente.');return true;}
   try {
     const res = await fetch(CLOUD_API_URL, {
       method: 'POST',
@@ -719,19 +711,12 @@ async function subirRegistroNube() {
     if(data.code==='CONFLICT'){toast('CONFLICT: el registro académico cambió en otro dispositivo. Baje y revise; el trabajo local se conserva.');return false;}
     if (!data.ok) retirarVerificacionNube(tokenSubida, c.bim, data);
     if(data.ok&&academicBaseline&&IERegistroAcademico.canonical(sliceRegistroArea())!==IERegistroAcademico.canonical(payload)){toast('Se guardó la versión enviada. Hay cambios locales posteriores pendientes; vuelve a enviar el área.');return false;}
-    if (data.ok && integral) {
-      IERegistroTransversales.capture();
-      const aporte = IERegistroTransversales.current();
-      if (!aporte || aporte.dirty || tokenSubida!==((getLoginSession()||{}).token||'') || contextoSubida!==JSON.stringify(ctxBase())) {
-        toast('El envío confirmó la versión anterior. Hay cambios posteriores pendientes; vuelve a enviar el área.');
-        return false;
-      }
-    }
-    toast(data.ok ? (integral ? 'Área enviada correctamente · Notas académicas y competencias transversales sincronizadas.' : 'Notas en la nube (' + c.area + ')') : (integral ? 'Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Reintenta.' : (data.error || 'Error al subir')));
+    if(adapter){adapter.capture();const aporte=adapter.current();if(aporte&&aporte.dirty)aporteSincronizado=false;}
+    toast(data.ok?(aporteSincronizado?'Notas académicas enviadas.':'Notas académicas enviadas. El aporte transversal quedó pendiente.'):(data.error||'No se pudo confirmar el envío académico.'));
     return !!data.ok;
   } catch (e) {
     retirarVerificacionNube(tokenSubida, c.bim);
-    toast(integral ? 'Competencias transversales sincronizadas, pero el registro académico no pudo confirmarse en la nube. Reintenta.' : 'No se pudo confirmar la subida. Notas conservadas localmente; verifica el servidor antes de volver a subir.');
+    toast('No se pudo confirmar la subida académica. Notas conservadas localmente; verifica el servidor antes de volver a subir.');
     return false;
   }
   })();
@@ -2583,7 +2568,7 @@ function renderFinales() {
     const capsTxt = caps.length
       ? caps.map(x => (x.fecha?x.fecha.slice(5)+' · ':'') + x.capacidad).join('<br>')
       : 'Sin capacidades aún';
-    head += '<th><label><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" '+(competenciaTrabajada(cp)?'checked':'')+' '+(bloqueado?'disabled':'')+'>Competencia trabajada</label><div>'+cp+'</div>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
+    head += '<th><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" '+(competenciaTrabajada(cp)?'checked':'')+' '+(bloqueado?'disabled':'')+'>'+cp+'</label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
   });
 
   const rows = alumnos.map((al, i) => {
@@ -2920,8 +2905,8 @@ function renderAvance() {
  const box=document.getElementById('avanceBox'),c=ctxBase(),comps=competencias(),lock=bimCerradoDocente();document.getElementById('lblAvanceCtx').textContent=c.area+' · Bim '+c.bim;
  const esc=x=>String(x||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let html='<div class="fin-wrap"><table class="fin-grid"><thead><tr><th>Estudiante</th>'+comps.map(cp=>'<th>'+esc(cp)+'</th>').join('')+'<th>Promedio referencial<small>Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
- estudiantes().forEach(al=>{const id=studentKey(al);html+='<tr><th>'+esc(al.nombre)+'</th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td>No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id),f=leerNota(store.finales,finalKey(cp,id))||{},txt=concCompAlumno(cp,id);html+='<td><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+esc(d.letra||'Pendiente')+'</span><small>'+(d.src==='P'?'Directo':d.src==='C'?'Evidencias':'')+'</small></div>'+(d.letra==='C'?'<label>Conclusión descriptiva · Obligatoria para C<textarea class="academic-conclusion" data-id="'+encodeURIComponent(id)+'" data-comp="'+encodeURIComponent(cp)+'" maxlength="2000" required '+(lock?'readonly':'')+'>'+esc(txt)+'</textarea></label>':txt?'<small>Conclusión conservada como borrador (no vigente)</small>':'')+'</td>';});const r=promReferencialAlumno(id);html+='<td>'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>';
- box.querySelectorAll('.academic-conclusion').forEach(el=>el.oninput=()=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value));if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);sincronizarEdicionRegistro();
+ estudiantes().forEach(al=>{const id=studentKey(al);html+='<tr><th>'+esc(al.nombre)+'</th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td>No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id),f=leerNota(store.finales,finalKey(cp,id))||{},txt=concCompAlumno(cp,id);html+='<td><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+esc(d.letra||'Pendiente')+'</span><small>'+(d.src==='P'?'Directo':d.src==='C'?'Evidencias':'')+'</small></div>'+(d.letra==='C'?'<label>Conclusión descriptiva · Obligatoria para C'+(typeof IEConclusionSuggestions!=='undefined'?IEConclusionSuggestions.html(cp):'')+'<textarea class="academic-conclusion" data-id="'+encodeURIComponent(id)+'" data-comp="'+encodeURIComponent(cp)+'" maxlength="2000" required '+(lock?'readonly':'')+'>'+esc(txt)+'</textarea></label>':txt?'<small>Conclusión conservada como borrador (no vigente)</small>':'')+'</td>';});const r=promReferencialAlumno(id);html+='<td>'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>';
+ box.querySelectorAll('.academic-conclusion').forEach(el=>el.oninput=()=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value));if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);if(typeof IEConclusionSuggestions!=='undefined')IEConclusionSuggestions.bind(box);sincronizarEdicionRegistro();
 }
 
 const MOBILE_APP_STORES = {

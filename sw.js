@@ -1,12 +1,12 @@
 /* Service Worker — respaldo estático versionado, siempre network-first. */
 const CACHE_PREFIX = 'matriz-ie22375-';
-const CACHE = CACHE_PREFIX + 'v12';
+const CACHE = CACHE_PREFIX + 'v13';
 const MAX_STATIC_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const PRECACHE = [
-  './', './index.html', './primaria.html', './secundaria.html', './auxiliar.html',
+  './', './index.html', './admin.html', './primaria.html', './secundaria.html', './auxiliar.html',
   './manifest.json', './icon-192.png', './icon-512.png',
   './students.js', './matrix-teachers.js', './student-identity.js', './auxiliar-permissions.js', './login-bridge.js',
-  './registro.html', './registro-academic-model.js', './transversales.html', './transversales-client.js', './registro-evaluation.js', './registro-transversales.js', './students-migration.js', './aula_innovacion.js'
+  './registro.html', './registro-academic-model.js','./conclusion-suggestions.js', './transversales.html', './transversales-client.js', './registro-evaluation.js', './registro-transversales.js', './students-migration.js', './aula_innovacion.js'
 ];
 const STATIC_URLS = new Set(PRECACHE.map(path => new URL(path, self.registration.scope).href));
 // Puente de lectura: comparte una petición en curso entre Hub y Auxiliar al navegar.
