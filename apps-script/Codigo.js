@@ -43,6 +43,66 @@ function asegurarWa_() {
   }
   return sh;
 }
+
+function versionAsistenciaIngreso_(fila) {
+  // Incluye contenido y revisión: también detecta cambios externos/legacy sin migrarlos.
+  const valores = Array.from({length:12}, function(_, i) { return fila[i] == null ? '' : String(fila[i]); });
+  return 'asis1:' + Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(
+    'asistencia-version:' + JSON.stringify(valores), secretoToken_(), Utilities.Charset.UTF_8)).replace(/=+$/, '');
+}
+function contenidoAsistenciaIngreso_(it) {
+  return [String(it.marca || ''), String(it.hora || ''), String(it.via || ''), String(it.motivo || '')];
+}
+function guardarAsistenciaIngreso_(body, items) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    // Revalida revocación y alcance dentro del mismo lock que configuración y escritura.
+    const sesion = sesionRutaEscritura_(body.token, ['admin','auxiliar']);
+    if (!sesion || items.some(function(it) { return !autorizaNivelAuxiliar_(sesion,it.nivel); })) {
+      return {ok:false,code:'SESSION',error:'Sesión inválida o revocada. Vuelve a iniciar sesión.'};
+    }
+    const vistos = Object.create(null);
+    if (items.some(function(it) { if (vistos[it.clave]) return true; vistos[it.clave]=true; return false; })) {
+      return {ok:false,code:'INVALID_BATCH',error:'El lote repite una clave; no se escribió ninguna marca.'};
+    }
+    const sh = asegurarAsis_(), last = sh.getLastRow(), mapa = Object.create(null), resultados = [];
+    if (last >= 2) sh.getRange(2,1,last-1,12).getValues().forEach(function(row,i) {
+      const clave = String(row[0]);
+      mapa[clave] = mapa[clave] ? {duplicada:true} : {fila:i+2,row:row};
+    });
+    let guardados=0, repetidos=0, conflictos=0;
+    items.forEach(function(it) {
+      const actual=mapa[it.clave], row=actual && actual.row;
+      const version=row ? versionAsistenciaIngreso_(row) : '';
+      const rechazar=function(motivo) { conflictos++;resultados.push({clave:it.clave,estado:'conflicto',motivo:motivo,version:version}); };
+      if (actual && actual.duplicada) { rechazar('DUPLICATE_KEY');return; }
+      if (['P','F','T','J'].indexOf(it.marca) < 0) { rechazar('INVALID_MARK');return; }
+      const contenido=contenidoAsistenciaIngreso_(it);
+      if (row && JSON.stringify(contenido) === JSON.stringify([String(row[6]||''),String(row[7]||''),String(row[8]||''),String(row[10]||'')])) {
+        repetidos++;resultados.push({clave:it.clave,estado:'repetida',version:version});return;
+      }
+      if ((row && it.versionBase !== version) || (!row && it.versionBase)) { rechazar('VERSION_CONFLICT');return; }
+      const ausente=it.ts == null || it.ts === '', ts=ausente ? 0 : Number(it.ts), ahora=Date.now();
+      const formato=typeof it.ts==='number' || (typeof it.ts==='string' && /^\d+$/.test(it.ts));
+      if ((!ausente && (!formato || !Number.isSafeInteger(ts) || ts <= 0 || ts > ahora+300000)) || (row && ausente)) { rechazar('INVALID_TIMESTAMP');return; }
+      const anterior=row && Number(row[9]);
+      if (row && anterior > 0 && anterior <= ahora+300000 && ts <= anterior) { rechazar('CLOCK_OR_STALE');return; }
+      // El reloj no da autoridad: se requiere CAS aun cuando el timestamp parezca más nuevo.
+      const rev=row && Number(row[11]);
+      const revision=(Number.isSafeInteger(rev) && rev >= 0 ? rev : 0)+1;
+      const nueva=[it.clave,it.fecha,it.nivel,it.grado,it.seccion,it.nombre,contenido[0],contenido[1],contenido[2],ts,contenido[3],revision];
+      const fila=actual ? actual.fila : sh.getLastRow()+1;
+      if (sh.getLastColumn() < 12) sh.getRange(1,12).setValue('revisionServidor');
+      sh.getRange(fila,1,1,12).setValues([nueva]);
+      mapa[it.clave]={fila:fila,row:nueva};guardados++;
+      resultados.push({clave:it.clave,estado:'aceptada',version:versionAsistenciaIngreso_(nueva)});
+    });
+    SpreadsheetApp.flush();
+    return {ok:conflictos===0,protocoloAsistencia:1,code:conflictos ? 'CONFLICT' : 'OK',guardados:guardados,repetidos:repetidos,conflictos:conflictos,resultados:resultados,
+      error:conflictos ? 'Hay marcas en conflicto. Se conservaron las demás aceptadas; baja y revisa antes de resolver.' : ''};
+  } finally { lock.releaseLock(); }
+}
 function asegurarDoc_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName('DocentesAcceso');
@@ -1504,7 +1564,7 @@ function doGet(e) {
       const last = sh.getLastRow();
       const items = [];
       if (last >= 2) {
-        const data = sh.getRange(2, 1, last, 11).getValues();
+        const data = sh.getRange(2, 1, last - 1, 12).getValues();
         for (let i = 0; i < data.length; i++) {
           if (fecha && String(data[i][1]) !== fecha) continue;
           const nivelItem = String(data[i][2]).toLowerCase();
@@ -1520,11 +1580,12 @@ function doGet(e) {
             hora: data[i][7],
             via: data[i][8],
             ts: data[i][9],
-            motivo: data[i][10]
+            motivo: data[i][10],
+            version: versionAsistenciaIngreso_(data[i])
           });
         }
       }
-      return responder_({ ok: true, fecha: fecha, items: items, total: items.length });
+      return responder_({ ok: true, protocoloAsistencia: 1, fecha: fecha, items: items, total: items.length });
     }
 
     if (action === 'loadreg') {
@@ -1769,7 +1830,7 @@ function doPost(e) {
     if (action === 'saveasis') {
       const sesion = sesionRutaEscritura_(body.token, ['admin', 'auxiliar']);
       if (!sesion) {
-        return responder_({ ok: false, error: 'Sesión inválida o sin autorización para asistencia de ingreso.' });
+        return responder_({ ok: false, code:'SESSION', error: 'Sesión inválida o sin autorización para asistencia de ingreso.' });
       }
       const originales = Array.isArray(body.items) ? body.items : [body];
       const items = originales.map(function (item) {
@@ -1778,36 +1839,7 @@ function doPost(e) {
       if ((body.nivel && !autorizaNivelAuxiliar_(sesion,body.nivel)) || items.some(function (item) { return !item || !autorizaNivelAuxiliar_(sesion,item.nivel); })) {
         return responder_({ ok: false, error: 'Contexto de asistencia inválido o nivel no autorizado; no se guardó ningún item.' });
       }
-      const sh = asegurarAsis_();
-      const last = sh.getLastRow();
-      const mapa = {};
-      if (last >= 2) {
-        const claves = sh.getRange(2, 1, last, 1).getValues();
-        for (let i = 0; i < claves.length; i++) mapa[String(claves[i][0])] = i + 2;
-      }
-      let n = 0;
-      items.forEach(function (it) {
-        const clave = it.clave;
-        if (!clave || clave === '||||') return;
-        let fila = mapa[clave];
-        if (!fila) {
-          fila = sh.getLastRow() + 1;
-          mapa[clave] = fila;
-        }
-        sh.getRange(fila, 1).setValue(clave);
-        sh.getRange(fila, 2).setValue(it.fecha || '');
-        sh.getRange(fila, 3).setValue(it.nivel || '');
-        sh.getRange(fila, 4).setValue(it.grado || '');
-        sh.getRange(fila, 5).setValue(it.seccion || '');
-        sh.getRange(fila, 6).setValue(it.nombre || '');
-        sh.getRange(fila, 7).setValue(it.marca || '');
-        sh.getRange(fila, 8).setValue(it.hora || '');
-        sh.getRange(fila, 9).setValue(it.via || '');
-        sh.getRange(fila, 10).setValue(it.ts || Date.now());
-        sh.getRange(fila, 11).setValue(it.motivo || '');
-        n++;
-      });
-      return responder_({ ok: true, guardados: n, msg: 'Asistencia guardada' });
+      return responder_(guardarAsistenciaIngreso_(body, items));
     }
 
     if (action === 'savereg') {

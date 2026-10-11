@@ -29,6 +29,7 @@ function setup() {
           getValue: () => rows[r - 1]?.[c - 1] ?? '',
           getValues: () => Array.from({length: nr}, (_, i) => Array.from({length: nc}, (_, j) => rows[r - 1 + i]?.[c - 1 + j] ?? '')),
           setValue(value) {state.writes++; rows[r - 1] ||= []; rows[r - 1][c - 1] = value; return this;},
+          setValues(values) {state.writes++;for(let i=0;i<nr;i++){rows[r-1+i] ||= [];for(let j=0;j<nc;j++)rows[r-1+i][c-1+j]=values[i][j];}return this;},
           setFontWeight() {return this;}
         };
       }
@@ -205,7 +206,7 @@ for (const [file, name, helper, role, action] of [
       listarPlantillasSiagie() {}, renderAulasSiagie() {}, aulasDelNivel: () => [], loadGruposWa: () => [], saveGruposWaLocal() {},
       guardarCfg() {}, saveHS() {}, paqueteAip: () => ({plan: 'synthetic'}), alert() {}, toast() {}, renderLista() {},
       completarFaltasAlSubir: () => 0, loadAsis: () => ({key: {marca: 'P'}}), asisKey: () => 'key',
-      recToItem: () => request(s, 'saveasis', token).items[0]
+      prepararSubidaAsistencia:async()=>true,resolverSubidaAsistencia(){},confirmarSubidaAsistencia(){},recToItem: () => request(s, 'saveasis', token).items[0]
     });
     new vm.Script(clientFunction(file, helper)).runInContext(context);
     new vm.Script(clientFunction(file, name)).runInContext(context);

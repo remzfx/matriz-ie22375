@@ -87,6 +87,7 @@ function client(niveles=['primaria'],role='auxiliar'){
  const elements=new Map(),el=id=>{if(!elements.has(id))elements.set(id,{value:id.includes('Nivel')?niveles[0]||'primaria':id==='inpFecha'?'2026-10-05':'1',innerHTML:'',textContent:'',hidden:false});return elements.get(id)};
  const c=vm.createContext({window:{},document:{getElementById:el},sessionStorage:storage,localStorage:storage,atob,Date,setTimeout,clearTimeout,console,toast(){},URLSearchParams,
   hoyISO:()=> '2026-10-05',horaAhora:()=> '09:00',ventanasDe:()=>[{hasta:'08:00'}],hmAMin:()=>480,minutosAhora:()=>600,renderLista(){},fetch:async()=>({ok:true,json:async()=>({ok:true})})});
+ c.prepararSubidaAsistencia=async()=>true;c.resolverSubidaAsistencia=()=>{};c.confirmarSubidaAsistencia=()=>{};
  const run=s=>new vm.Script(s).runInContext(c);run(read('students.js'));c.IEStudents=c.window.IEStudents;run(read('auxiliar-permissions.js'));c.IEAuxPermissions=c.window.IEAuxPermissions;
  run("let BD={primaria:{estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Primary'}]},secundaria:{estudiantes:[{nivel:'secundaria',grado:1,seccion:'A',nombre:'Synthetic Secondary'}]}},ASIS_KEY='synthetic-attendance';let horarioVerificado=true;");
  for(const name of ['todosAlumnos','jornadaCerrada','loadAsis','saveAsis','asisKey','setRec','completarFaltasAlSubir','onNivel','onGrado','ctx','loadGruposWa','textoListaAula','recToItem','subirTodoNube','bajarNube','tokenSesionAuxiliar'])run(extract('auxiliar.html',name));
