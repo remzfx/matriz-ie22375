@@ -1543,18 +1543,21 @@ function doGet(e) {
     const rolesLectura = {
       loadreg: ['admin', 'docente'], loadnivel: ['admin', 'docente'], load: ['admin', 'docente'],
       loadtpl: ['admin'], loadtplstatus: ['admin', 'docente'],
-      loadasis: ['admin', 'auxiliar'], loadaip: ['admin', 'pip'],
+      loadasis: ['admin', 'auxiliar'], asisprotocol: ['admin', 'auxiliar'], loadaip: ['admin', 'pip'],
       loadwa: ['admin', 'auxiliar'], classroom: ['admin']
     };
     const roles = Object.prototype.hasOwnProperty.call(rolesLectura, action) ? rolesLectura[action] : null;
     const acceso = roles ? sesionLectura_(p.token, roles) : null;
     if (roles && !acceso) {
-      return responder_({ ok: false, error: 'Sesión inválida o sin autorización para esta lectura.' });
+      return responder_({ ok: false, code: action === 'asisprotocol' ? 'SESSION' : undefined, error: 'Sesión inválida o sin autorización para esta lectura.' });
     }
 
     if (action === 'ping') {
       return responder_({ ok: true, msg: 'API Matriz IE 22375 — áreas + asistencia + registro + docentes' });
     }
+
+    // Verificación de compatibilidad autenticada y sin lectura de AsistenciaIngreso.
+    if (action === 'asisprotocol') return responder_({ok:true,protocoloAsistencia:1});
 
     if ((action === 'loadasis' || action === 'loadwa') && p.nivel && !autorizaNivelAuxiliar_(acceso.sesion,String(p.nivel))) return responder_({ok:false,error:'Nivel no autorizado.'});
 
@@ -1803,7 +1806,7 @@ function doPost(e) {
     const action = String(body.action || 'saveArea').toLowerCase();
     if (['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','confirmtransversaltutor','confirmtransversalaip','revisartransversal','procesartransversales','loadtransversalexport'].includes(action)) return responder_(transversalesRuta_(body));
 
-    if (['loadreg', 'loadnivel', 'load', 'loadasis', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
+    if (['loadreg', 'loadnivel', 'load', 'loadasis', 'asisprotocol', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
       return doGet({ parameter: body });
     }
 
