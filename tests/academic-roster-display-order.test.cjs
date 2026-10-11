@@ -115,3 +115,20 @@ test('actual Auxiliar attendance report numbers the complete classroom with no g
  p.c.IEAuxPermissions.permite=()=>true;p.run(extract('auxiliar.html','textoListaAula'));const report=p.c.textoListaAula('secundaria',2,'A','2026-10-10');
  assert.match(report.txt,/1\. Synthetic First/);assert.match(report.txt,/2\. Synthetic Later/);assert.doesNotMatch(report.txt,/undefined|13\. |10\. /);assert.equal(p.run('BD.secundaria.estudiantes[0].orden'),13);
 });
+
+test('Admin status distinguishes source totals from the selected list and table filters for every query type',async()=>{
+ const p=page();
+ for(const [tipo,source,total,list] of [['vigentes','PADRON_III',403,403],['trasladados','BASE_ACTUAL',415,12],['todos','BASE_ACTUAL',415,415]]){
+  p.el('consultaTipo').value=tipo;await p.c.consultarEstudiantes();
+  const status=p.el('consultaFuente').textContent;
+  assert.ok(status.startsWith(source+' · Verificado por servidor'));
+  assert.ok(status.includes('Total '+(tipo==='vigentes'?'del padrón':'de la base')+': '+total+' registros'));
+  assert.ok(status.includes('Listado '+tipo[0].toUpperCase()+tipo.slice(1)+': '+list+' registros (ambos niveles)'));
+  assert.equal(['primaria','secundaria'].reduce((n,nivel)=>n+p.c.estudiantesConsulta(nivel).length,0),list);
+  if(tipo==='trasladados'){assert.match(p.el('bdCount').textContent,/^8 alumno/);p.el('filtroBuscar').value='not present';p.c.renderTabla();assert.match(p.el('bdCount').textContent,/^0 alumno/);p.el('filtroBuscar').value='';}
+ }
+});
+test('Admin cached roster status retains explicit source and unverified state alongside its list count',async()=>{
+ const p=page();p.c.IEStudents.loadRoster=async()=>({...roster(),offline:true});await p.c.consultarEstudiantes();
+ assert.match(p.el('consultaFuente').textContent,/PADRON_III · Caché autorizada, servidor no verificado · Total del padrón: 403 registros.*Listado Vigentes: 403 registros \(ambos niveles\)/);
+});

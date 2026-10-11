@@ -556,7 +556,9 @@ async function consultarEstudiantes() {
     } else {
       consultaBase=tipo==='trasladados' ? {...base, primaria:{...base.primaria,estudiantes:base.primaria.estudiantes.filter(a=>String(a.estadoMatricula).trim().toUpperCase()==='TRASLADADO')},secundaria:{...base.secundaria,estudiantes:base.secundaria.estudiantes.filter(a=>String(a.estadoMatricula).trim().toUpperCase()==='TRASLADADO')}} : base;
       const alumnos=['primaria','secundaria'].flatMap(n=>base[n].estudiantes);
-      status.textContent=(tipo==='vigentes'?'PADRON_'+bim:'BASE_ACTUAL')+' · '+(base.offline?'Caché autorizada, servidor no verificado':'Verificado por servidor')+' · '+alumnos.length+' registros · '+alumnos.filter(a=>a.estadoMatricula==='DEFINITIVA').length+' DEFINITIVA · '+alumnos.filter(a=>a.estadoMatricula==='TRASLADADO').length+' trasladados';
+      const consultados=['primaria','secundaria'].flatMap(n=>consultaBase[n].estudiantes);
+      const etiquetaConsulta={vigentes:'Vigentes',trasladados:'Trasladados',todos:'Todos'}[tipo];
+      status.textContent=(tipo==='vigentes'?'PADRON_'+bim:'BASE_ACTUAL')+' · '+(base.offline?'Caché autorizada, servidor no verificado':'Verificado por servidor')+' · Total '+(tipo==='vigentes'?'del padrón':'de la base')+': '+alumnos.length+' registros · '+alumnos.filter(a=>a.estadoMatricula==='DEFINITIVA').length+' DEFINITIVA · '+alumnos.filter(a=>a.estadoMatricula==='TRASLADADO').length+' trasladados · Listado '+etiquetaConsulta+': '+consultados.length+' registros (ambos niveles)';
     }
     fillFiltros();renderTabla();
   } catch(e) {
