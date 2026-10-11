@@ -30,7 +30,8 @@ function setup() {
           getValues: () => Array.from({length: nr}, (_, i) => Array.from({length: nc}, (_, j) => rows[r - 1 + i]?.[c - 1 + j] ?? '')),
           setValue(value) {state.writes++; rows[r - 1] ||= []; rows[r - 1][c - 1] = value; return this;},
           setValues(values) {state.writes++;for(let i=0;i<nr;i++){rows[r-1+i] ||= [];for(let j=0;j<nc;j++)rows[r-1+i][c-1+j]=values[i][j];}return this;},
-          setFontWeight() {return this;}
+          setFontWeight() {return this;},
+          setNumberFormat() {return this;}
         };
       }
     };
