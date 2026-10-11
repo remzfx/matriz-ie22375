@@ -43,12 +43,21 @@ function setup() {
   sheet('EstadosAreas', [['clave', 'nivel', 'bimestre', 'grado', 'seccion', 'area', 'docente', 'totalEstudiantes', 'actualizado', 'json']]);
   const props = {IE22375_TOKEN_SECRET: 'synthetic-test-secret', IE22375_ADMIN_PASS: 'synthetic-admin-password', IE22375_AUXILIAR_PASS: 'synthetic-aux-password', IE22375_PIP_PASS: 'synthetic-pip-password'};
   const c = vm.createContext({
-    SpreadsheetApp: {getActiveSpreadsheet: () => ({getSheetByName: name => tables.get(name), insertSheet: name => sheet(name, [])}), flush() {}},
+    SpreadsheetApp: {getActiveSpreadsheet: () => ({getSheetByName: name => tables.get(name), insertSheet: name => sheet(name, []), getSpreadsheetTimeZone: () => 'America/Lima'}), flush() {}},
     CacheService: {getScriptCache: () => ({get: key => cacheEntries.get(key) || null, put: (key, value, ttl) => {assert.equal(state.held, true); assert.equal(ttl, 21600); cacheEntries.set(key, value);}, remove: key => {assert.equal(state.held, true); cacheEntries.delete(key);}})},
     LockService: {getScriptLock: () => ({waitLock() {assert.equal(state.held, false); state.held = true;}, releaseLock() {assert.equal(state.held, true); state.held = false;}})},
     PropertiesService: {getScriptProperties: () => ({getProperty: key => props[key], setProperty: (key, value) => props[key] = value})},
     Utilities: {
       Charset: {UTF_8: 'utf8'},
+      formatDate: (date, zone, pattern) => {
+        const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+          timeZone:zone, year:'numeric',month:'2-digit',day:'2-digit',
+          hour:'2-digit',minute:'2-digit',hourCycle:'h23'
+        }).formatToParts(date).map(p=>[p.type,p.value]));
+        return pattern==='yyyy-MM-dd'
+          ? parts.year+'-'+parts.month+'-'+parts.day
+          : parts.hour+':'+parts.minute;
+      },
       newBlob: value => ({getBytes: () => [...Buffer.from(value)], getDataAsString: () => Buffer.from(value).toString('utf8')}),
       base64EncodeWebSafe: value => Buffer.from(value).toString('base64url'),
       base64Decode: value => [...Buffer.from(value, 'base64')],
