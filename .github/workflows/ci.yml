@@ -1,0 +1,53 @@
+name: CI — pruebas y comprobaciones locales
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Pruebas, sintaxis y dependencias
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          # Las regresiones existentes comparan contra commits históricos aprobados.
+          fetch-depth: 0
+
+      - name: Preparar Node.js LTS fijado
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.13.0'
+
+      - name: Validar sintaxis y dependencias locales
+        run: node scripts/check-source.cjs
+
+      - name: Ejecutar suite completa
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test --test-reporter=tap tests/*.test.cjs | tee "$RUNNER_TEMP/test-results.txt"
+
+      - name: Resumen de pruebas
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Suite de pruebas'
+            if [ -f "$RUNNER_TEMP/test-results.txt" ]; then
+              grep -E '^# (tests|pass|fail|cancelled|skipped|todo) ' "$RUNNER_TEMP/test-results.txt" || echo 'La ejecución se interrumpió antes del resumen; revisar el fallo del job.'
+            else
+              echo 'La suite no se ejecutó: revisar las comprobaciones anteriores.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comprobar espacios y conflictos del diff
+        run: git diff --check HEAD^ HEAD
