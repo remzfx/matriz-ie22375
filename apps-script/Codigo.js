@@ -44,9 +44,20 @@ function asegurarWa_() {
   return sh;
 }
 
+function valorAsistenciaIngreso_(valor, columna) {
+  // Sheets devuelve Date en fechas/horas que el cliente envió como texto.
+  // Normalizar antes de firmar Y de responder: las versiones deben sobrevivir a getValues().
+  if ((columna === 1 || columna === 7) &&
+      Object.prototype.toString.call(valor) === '[object Date]' &&
+      Number.isFinite(valor.getTime())) {
+    const zona = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+    return Utilities.formatDate(valor, zona, columna === 1 ? 'yyyy-MM-dd' : 'HH:mm');
+  }
+  return valor == null ? '' : String(valor);
+}
 function versionAsistenciaIngreso_(fila) {
   // Incluye contenido y revisión: también detecta cambios externos/legacy sin migrarlos.
-  const valores = Array.from({length:12}, function(_, i) { return fila[i] == null ? '' : String(fila[i]); });
+  const valores = Array.from({length:12}, function(_, i) { return valorAsistenciaIngreso_(fila[i], i); });
   return 'asis1:' + Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(
     'asistencia-version:' + JSON.stringify(valores), secretoToken_(), Utilities.Charset.UTF_8)).replace(/=+$/, '');
 }
@@ -1574,13 +1585,13 @@ function doGet(e) {
           if (!autorizaNivelAuxiliar_(acceso.sesion,nivelItem) || (p.nivel && p.nivel !== nivelItem)) continue;
           items.push({
             clave: data[i][0],
-            fecha: data[i][1],
+            fecha: valorAsistenciaIngreso_(data[i][1], 1),
             nivel: data[i][2],
             grado: data[i][3],
             seccion: data[i][4],
             nombre: data[i][5],
             marca: data[i][6],
-            hora: data[i][7],
+            hora: valorAsistenciaIngreso_(data[i][7], 7),
             via: data[i][8],
             ts: data[i][9],
             motivo: data[i][10],
