@@ -90,7 +90,7 @@ function client(niveles=['primaria'],role='auxiliar'){
  c.prepararSubidaAsistencia=async()=>true;c.resolverSubidaAsistencia=()=>{};c.confirmarSubidaAsistencia=()=>{};
  const run=s=>new vm.Script(s).runInContext(c);run(read('students.js'));c.IEStudents=c.window.IEStudents;run(read('auxiliar-permissions.js'));c.IEAuxPermissions=c.window.IEAuxPermissions;
  run("let BD={primaria:{estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Primary'}]},secundaria:{estudiantes:[{nivel:'secundaria',grado:1,seccion:'A',nombre:'Synthetic Secondary'}]}},ASIS_KEY='synthetic-attendance';let horarioVerificado=true;");
- for(const name of ['todosAlumnos','jornadaCerrada','loadAsis','saveAsis','asisKey','setRec','completarFaltasAlSubir','onNivel','onGrado','ctx','loadGruposWa','textoListaAula','recToItem','subirTodoNube','bajarNube','tokenSesionAuxiliar'])run(extract('auxiliar.html',name));
+ for(const name of ['todosAlumnos','jornadaCerrada','loadAsis','saveAsis','asisKey','setRec','pendienteMarcaAsistencia','completarFaltasAlSubir','onNivel','onGrado','ctx','loadGruposWa','textoListaAula','recToItem','subirTodoNube','bajarNube','tokenSesionAuxiliar'])run(extract('auxiliar.html',name));
  run("const WA_KEY='synthetic-wa',CLOUD_API_URL='synthetic';");
  return {c,run,el,data,storage,token};
 }
