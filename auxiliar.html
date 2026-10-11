@@ -493,17 +493,38 @@ function pendienteMarcaAsistencia(rec) {
   return !rec || !rec.versionServidor || rec.firmaConfirmada !== firmaMarcaAsistencia(rec);
 }
 async function prepararSubidaAsistencia() {
-  // Comprobación protegida previa: el backend antiguo no debe recibir escrituras nuevas.
+  // Consulta autenticada, sin descargar el historial de asistencia por cada QR.
   const token=tokenSesionAuxiliar();
-  const res=await fetchLecturaNube(CLOUD_API_URL+'?action=loadasis');
-  const data=JSON.parse(await res.text());
-  if (token !== tokenSesionAuxiliar()) {toast('La sesión cambió. Marcas locales conservadas.');return false;}
-  if (!data.ok || data.protocoloAsistencia !== 1) {
-    rechazarSesionAsistencia(data,token);
-    toast(data.ok ? 'Backend anterior: subida bloqueada hasta actualizar asistencia. Marcas locales conservadas.' : (data.error||'Sesión no verificada. Marcas locales conservadas.'));
-    return false;
+  if (!token) {toast('Inicia sesión antes de subir asistencia. Marcas locales conservadas.');return false;}
+  const anterior=prepararSubidaAsistencia.estado;
+  if (anterior && anterior.token===token) {
+    if (anterior.hasta>Date.now()) return true;
+    if (anterior.pendiente) return anterior.pendiente;
   }
-  return true;
+  const pendiente=(async()=>{
+    const res=await fetchLecturaNube(CLOUD_API_URL+'?action=asisprotocol');
+    const data=JSON.parse(await res.text());
+    if (token!==tokenSesionAuxiliar()) {
+      toast('La sesión cambió. Marcas locales conservadas.');
+      return false;
+    }
+    if (!data.ok || data.protocoloAsistencia!==1) {
+      rechazarSesionAsistencia(data,token);
+      toast(data.ok ? 'Backend anterior: subida bloqueada hasta actualizar asistencia. Marcas locales conservadas.' : (data.error||'Sesión no verificada. Marcas locales conservadas.'));
+      return false;
+    }
+    return true;
+  })();
+  prepararSubidaAsistencia.estado={token,hasta:0,pendiente};
+  try {
+    const ok=await pendiente;
+    if (ok && token===tokenSesionAuxiliar() && prepararSubidaAsistencia.estado?.pendiente===pendiente)
+      prepararSubidaAsistencia.estado={token,hasta:Date.now()+30000,pendiente:null};
+    return ok;
+  } finally {
+    if (prepararSubidaAsistencia.estado?.pendiente===pendiente)
+      prepararSubidaAsistencia.estado=null; // No cachear errores o respuestas negativas.
+  }
 }
 function rechazarSesionAsistencia(data,token) {
   if (data.code!=='SESSION' || typeof retirarSesionAuxiliar!=='function' || !retirarSesionAuxiliar(token)) return;
@@ -557,11 +578,33 @@ function combinarBajadaAsistencia(data, snapshot) {
   toast('Nube: '+(data.items||[]).length+' marcas consultadas'+(pendientes?' · '+pendientes+' locales conservadas. Revisa antes de subir.':''));
 }
 function resolverSubidaAsistencia(items) {
-  const all=loadAsis(), candidatos=items.filter(it=>all[it.clave] && all[it.clave].remoto && pendienteMarcaAsistencia(all[it.clave]));
-  if (!candidatos.length || !confirm(candidatos.length+' marcas locales difieren de la nube. ¿Guardarlas como una nueva decisión manual sobre la versión consultada? Se actualizará su timestamp de modificación, conservando marca, hora y motivo. Si la nube vuelve a cambiar, se rechazará el envío.')) return;
-  candidatos.forEach(it=>{const rec=all[it.clave];rec.versionServidor=rec.remoto.version;rec.ts=Date.now();it.versionBase=rec.versionServidor;it.ts=rec.ts;});
-  // Decisión explícita nueva: conserva el contenido pendiente, nunca confirma recepción.
-  saveAsis(all);
+  const all=loadAsis(),autorizados=[];
+  let cambios=false,cancelados=0;
+  items.forEach(it=>{
+    const rec=all[it.clave];
+    if (!rec || !rec.remoto || !pendienteMarcaAsistencia(rec)) {autorizados.push(it);return;}
+    const campos=String(it.clave).split('||');
+    const nombre=campos.slice(4).join('||')||it.nombre||'Sin identificación';
+    const remoto=rec.remoto;
+    if (typeof remoto.version!=='string' || !remoto.version.startsWith('asis1:')) {cancelados++;return;}
+    const mensaje='Conflicto de asistencia de ingreso\n\n'
+      +'Estudiante: '+nombre+'\n'
+      +'Fecha: '+(campos[0]||it.fecha||'Sin fecha')+'\n'
+      +'Aula: '+(campos[1]||it.nivel)+' · '+(campos[2]||it.grado)+'° '+(campos[3]||it.seccion)+'\n'
+      +'Marca en este dispositivo: '+(rec.marca||'Sin marca')+'\n'
+      +'Marca en la nube: '+(remoto.marca||'Sin marca')+'\n\n'
+      +'¿Conservar la marca LOCAL como una nueva decisión manual? Se actualizará su timestamp, sin cambiar hora ni motivo. Si la nube cambió, se rechazará por versión.';
+    if (!confirm(mensaje)) {cancelados++;return;}
+    rec.versionServidor=remoto.version;
+    rec.ts=Date.now();
+    it.versionBase=rec.versionServidor;
+    it.ts=rec.ts;
+    autorizados.push(it);
+    cambios=true;
+  });
+  if (cambios) saveAsis(all);
+  if (cancelados) toast('Se conservaron '+cancelados+' conflictos locales sin subir; revísalos antes de resolver.');
+  return autorizados;
 }
 async function subirUnoNube(al) {
   if (!IEAuxPermissions.permite(al.nivel)) return false;
@@ -569,6 +612,7 @@ async function subirUnoNube(al) {
     const k = asisKey(al);
     const rec = loadAsis()[k];
     if (!rec) return;
+    if (rec.remoto && pendienteMarcaAsistencia(rec)) {toast('Conflicto de '+al.nombre+'. Usa Subir asistencia para revisar ambas marcas.');return false;}
     const token=tokenSesionAuxiliar();
     if (!await prepararSubidaAsistencia() || token !== tokenSesionAuxiliar()) return;
     const items=[recToItem(k,rec)];
@@ -596,14 +640,16 @@ async function subirTodoNube() {
   const faltas = completarFaltasAlSubir();
   if (faltas) renderLista();
   const all = loadAsis();
-  const items = Object.keys(all).map(k => recToItem(k, all[k])).filter(it => it.marca && IEAuxPermissions.permite(it.nivel));
-  if (!items.length) { toast('No hay marcas para subir'); return; }
+  const pendientes=Object.keys(all).filter(k=>all[k] && pendienteMarcaAsistencia(all[k]));
+  const items=pendientes.map(k=>recToItem(k,all[k])).filter(it=>it.marca && IEAuxPermissions.permite(it.nivel));
+  if (!items.length) {toast('Asistencia al día: no hay marcas pendientes para subir.');return;}
   try {
     const token=tokenSesionAuxiliar();
     if (!await prepararSubidaAsistencia() || token !== tokenSesionAuxiliar()) return;
-    resolverSubidaAsistencia(items);
-    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'saveasis',token:token,items:items})});
-    confirmarSubidaAsistencia(JSON.parse(await res.text()),items,token);
+    const autorizados=resolverSubidaAsistencia(items);
+    if (!autorizados.length) {toast('Las marcas en conflicto se conservaron localmente; no se envió ninguna.');return false;}
+    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'saveasis',token:token,items:autorizados})});
+    confirmarSubidaAsistencia(JSON.parse(await res.text()),autorizados,token);
   } catch(e) {toast('No se confirmó la subida. Las marcas locales se conservan.');}
 }
 async function bajarNube() {
