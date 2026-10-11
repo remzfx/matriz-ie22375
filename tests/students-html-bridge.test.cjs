@@ -101,28 +101,28 @@ test('students/token never enter URL or CacheStorage and RPC cannot be used to w
 function admin(f) {
   f.run(`let estado=IEStudents.empty(),baseCargada=false,baseInicializada=false,baseVersion='',bdPendiente=false,bdGuardando=false;
     function estadoBD(message){document.getElementById('bdEstado').textContent=message;}
-    function estudiantesDe(nivel){return estado[nivel].estudiantes;}function loadDocentes(){return [];}function fillFiltros(){};function renderTabla(){}`);
-  for(const name of ['actualizarResumen','aplicarBaseServidor','cargarEstudiantesAdmin'])f.run(extract('admin.html',name));
+    function estudiantesDe(nivel){return estado[nivel].estudiantes;}function loadDocentes(){return [];}function fillFiltros(){};function renderTabla(){};let resumenMenuAdmin={token:'',base:null,padron:null,bimestre:'',baseEstado:'Pendiente',padronEstado:'Pendiente'},resumenMenuSecuencia=0;function bajarPeriodosNube(){return Promise.resolve(null);}`);
+  for(const name of ['escapeConsulta','leerPeriodosConsultaAdmin','conteosResumenAdmin','actualizarResumen','cargarResumenMenuAdmin','aplicarBaseServidor','cargarEstudiantesAdmin'])f.run(extract('admin.html',name));
 }
 test('Admin shows unknown counts during slow load, then a real 415-student response updates summaries',async()=>{
-  const {s,f,server}=setup();admin(f);s.block();f.c.actualizarResumen();const task=f.c.cargarEstudiantesAdmin();
-  assert.match(f.elements.get('statAlumnos').textContent,/— alumnos.*verificando/);assert.doesNotMatch(f.elements.get('resumenRapido').innerHTML,/\(0\)/);
+  const {s,f,server}=setup();admin(f);s.block();const menu=f.c.cargarResumenMenuAdmin();const task=f.c.cargarEstudiantesAdmin();
+  assert.match(f.elements.get('statAlumnos').textContent,/— alumnos.*Consultando/);assert.doesNotMatch(f.elements.get('resumenRapido').innerHTML,/\(0\)/);
   const estudiantes=Array.from({length:415},(_,i)=>({nivel:i<200?'primaria':'secundaria',grado:1,seccion:i<200?'Única':'A',orden:i+1,nombre:'Synthetic '+i}));
   const saved=server.post({action:'savestudents',token:f.session.token,version:server.load(f.session.token).version,base:{primaria:{estudiantes:estudiantes.filter(a=>a.nivel==='primaria')},secundaria:{estudiantes:estudiantes.filter(a=>a.nivel==='secundaria')}}});
   assert.equal(saved.ok,true);
-  const response=server.c.studentsBridgeCargar({token:f.session.token});assert.equal(response.estudiantes.length,415);s.resolve(response);await task;
-  assert.equal(f.elements.get('statAlumnos').textContent,'415 alumnos (200 prim. / 215 sec.)');
-  assert.match(f.elements.get('resumenRapido').innerHTML,/Primaria<\/b> \(200\)/);assert.match(f.elements.get('resumenRapido').innerHTML,/Secundaria<\/b> \(215\)/);
+  const response=server.c.studentsBridgeCargar({token:f.session.token});assert.equal(response.estudiantes.length,415);s.resolve(response);await task;await menu;
+  assert.match(f.elements.get('statAlumnos').textContent,/Base histórica completa.*200 Primaria \/ 215 Secundaria \/ Total 415.*Verificado por servidor/);
+  assert.match(f.elements.get('resumenRapido').innerHTML,/Base histórica.*415 estudiantes/);assert.match(f.elements.get('statVigentes').textContent,/No se pudo verificar el bimestre abierto/);
 });
 test('Admin failure without cache states unavailable; only a confirmed initialized empty base shows zero',async()=>{
-  const {s,f}=setup();admin(f);s.block();const task=f.c.cargarEstudiantesAdmin();s.fail();await task;
+  const {s,f}=setup();admin(f);s.block();const menu=f.c.cargarResumenMenuAdmin();const task=f.c.cargarEstudiantesAdmin();s.fail();await task;await menu;
   assert.match(f.elements.get('bdEstado').textContent,/No se pudo cargar la base/);assert.doesNotMatch(f.elements.get('statAlumnos').textContent,/0 alumnos/);
   s.resolve({ok:true,inicializada:false,estudiantes:[]});f.c.aplicarBaseServidor({inicializada:false,primaria:{estudiantes:[]},secundaria:{estudiantes:[]}});assert.doesNotMatch(f.elements.get('statAlumnos').textContent,/0 alumnos/);
-  f.c.aplicarBaseServidor({inicializada:true,primaria:{estudiantes:[]},secundaria:{estudiantes:[]}});assert.match(f.elements.get('statAlumnos').textContent,/^0 alumnos/);
+  f.c.IEStudents.load=async()=>({inicializada:true,primaria:{estudiantes:[]},secundaria:{estudiantes:[]}});await f.c.cargarResumenMenuAdmin();assert.match(f.elements.get('statAlumnos').textContent,/Total 0.*Verificado por servidor/);
 });
 test('Admin paints authorized cache immediately and withdraws it if RPC rejects the session',async()=>{
-  const {s,f}=setup();await f.c.IEStudents.load();admin(f);s.block();const task=f.c.cargarEstudiantesAdmin();
-  assert.match(f.elements.get('statAlumnos').textContent,/^7 alumnos/);s.resolve({ok:false,code:'SESSION',error:'Sesión revocada.'});await task;
+  const {s,f}=setup();await f.c.IEStudents.load();admin(f);s.block();const menu=f.c.cargarResumenMenuAdmin();const task=f.c.cargarEstudiantesAdmin();
+  assert.match(f.elements.get('statAlumnos').textContent,/Total 7.*Caché autorizada; servidor no verificado/);s.resolve({ok:false,code:'SESSION',error:'Sesión revocada.'});await task;await menu;
   assert.equal(f.c.IEStudents.peek(),null);assert.doesNotMatch(f.elements.get('statAlumnos').textContent,/7 alumnos|0 alumnos/);
   assert.match(f.elements.get('bdEstado').textContent,/sesión cambió o fue rechazada/i);
 });

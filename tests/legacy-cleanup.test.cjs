@@ -40,8 +40,9 @@ function admin(session, oldFlag = false) {
   const context = vm.createContext({
     document, window: {addEventListener() {}}, localStorage: storage, sessionStorage: storage,
     location: {replace: value => redirects.push(value)}, alert: value => alerts.push(value), confirm: () => true,
-    Blob, URL: {createObjectURL: () => 'synthetic-blob-url'}, console,
+    setTimeout:()=>0,clearTimeout(){},Blob, URL: {createObjectURL: () => 'synthetic-blob-url'}, console,
     IEStudents: {
+      validToken:()=>session && (session.role==='admin'||session.user==='admin') ? session.token||'synthetic-session-token' : '',
       empty: () => JSON.parse(JSON.stringify(fixture)),
       load: async () => ({...JSON.parse(JSON.stringify(fixture)), version: 'synthetic-version', inicializada: true}),
       save: async (base, version) => {studentWrites.push({action:'savestudents',base:JSON.parse(JSON.stringify(base)),version});return {...JSON.parse(JSON.stringify(base)),version:'saved-version',inicializada:true};},

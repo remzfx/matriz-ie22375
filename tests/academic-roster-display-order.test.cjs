@@ -14,7 +14,7 @@ function page(){
  s.c.IEStudents.inspect=async()=>{requests.push('inspect');return base();};
  s.c.IEStudents.save=()=>assert.fail('No writes from queries');s.c.confirm=()=>true;
  s.run("let estado=IEStudents.empty(),baseCargada=true,baseInicializada=true,baseVersion='original',bdPendiente=false,bdGuardando=false,consultaBase=null,consultaClave='',consultaToken='',consultaSecuencia=0,modoEdicionBase=false;function fillFiltros(){}function estadoBD(){}function aplicarBaseServidor(b){estado=b;}function permitirEdicionBD(){return true;}function saveEstado(){throw Error('Query attempted mutation');}");
- for(const name of ['escapeConsulta','estudiantesDe','estudiantesConsulta','renderTabla','consultarEstudiantes','iniciarConsultaEstudiantes','activarEdicionBase','eliminarAlumno','agregarAlumno','guardarBD'])s.run(extract('admin.html',name));
+ for(const name of ['escapeConsulta','estudiantesDe','estudiantesConsulta','renderTabla','consultarEstudiantes','iniciarConsultaEstudiantes','leerPeriodosConsultaAdmin','activarEdicionBase','eliminarAlumno','agregarAlumno','guardarBD'])s.run(extract('admin.html',name));
  return {...s,el,requests,token,changeToken:v=>current=v};
 }
 for(const [nivel,total,vigentes,trasladados] of [['primaria',150,146,4],['secundaria',265,257,8]])test(nivel+': synthetic complete, active and transferred counts stay separated',async()=>{
