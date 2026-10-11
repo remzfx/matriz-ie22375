@@ -169,3 +169,100 @@ test('Protected upload and download integrate with server CAS using only synthet
  const stale=f.c.recToItem(f.key,{...f.c.loadAsis()[f.key],marca:'F',ts:Date.now()+1});assert.equal(s.save([stale]).code,'CONFLICT');
  f.c.combinarBajadaAsistencia(s.load());assert.equal(f.c.loadAsis()[f.key].marca,'J');assert.equal(f.c.loadAsis()[f.key].motivo,'Synthetic reason');
 });
+
+
+test('Authenticated assistance protocol probe is lightweight and never opens attendance sheet',()=>{
+ const s=backend();
+ assert.equal(s.tables.has('AsistenciaIngreso'),false);
+ const response=s.post({action:'asisprotocol',token:s.admin});
+ assert.equal(response.ok,true);
+ assert.equal(response.protocoloAsistencia,1);
+ assert.equal(s.tables.has('AsistenciaIngreso'),false);
+ const unauth=s.post({action:'asisprotocol',token:'synthetic-invalid'});
+ assert.equal(unauth.ok,false);assert.equal(unauth.code,'SESSION');
+ assert.equal(s.tables.has('AsistenciaIngreso'),false);
+});
+
+test('QR uploads verify only a lightweight protocol, reusing a bounded success cache',async()=>{
+ const f=client();
+ await f.c.subirUnoNube(f.al);
+ f.c.setRec(f.al,'F','manual','');
+ await f.c.subirUnoNube(f.al);
+ f.c.setRec(f.al,'P','manual','');
+ await f.c.subirUnoNube(f.al);
+ assert.equal(f.writes.length,3);
+ assert.equal(f.reads.length,1);
+ assert.ok(f.reads.every(url=>url.includes('action=asisprotocol')));
+ assert.ok(f.reads.every(url=>!url.includes('loadasis')));
+});
+
+test('Concurrent protocol checks share a single in-flight request',async()=>{
+ const f=client();let resolve,consultas=0;
+ f.c.fetchLecturaNube=()=>{consultas++;return new Promise(r=>resolve=r);};
+ const a=f.c.prepararSubidaAsistencia(),b=f.c.prepararSubidaAsistencia();
+ assert.equal(consultas,1);
+ resolve({text:async()=>JSON.stringify({ok:true,protocoloAsistencia:1})});
+ assert.equal(await a,true);assert.equal(await b,true);
+ assert.equal(f.c.prepararSubidaAsistencia.estado.token,'synthetic-token');
+ assert.equal(await f.c.prepararSubidaAsistencia(),true);
+ assert.equal(consultas,1);
+});
+
+test('A new or revoked session cannot reuse a previously successful capability probe',async()=>{
+ const f=client();
+ await f.c.prepararSubidaAsistencia();assert.equal(f.reads.length,1);
+ f.changeToken('synthetic-new-token');
+ f.c.fetchLecturaNube=async url=>{f.reads.push(url);return {text:async()=>JSON.stringify({ok:false,code:'SESSION',error:'revoked'})};};
+ f.c.retirarSesionAuxiliar=()=>true;
+ assert.equal(await f.c.prepararSubidaAsistencia(),false);
+ assert.equal(f.reads.length,2);
+ assert.equal(f.c.prepararSubidaAsistencia.estado,null);
+});
+
+test('Mass upload sends only unconfirmed marks and never resends a confirmed mark',async()=>{
+ const f=client();
+ await f.c.subirTodoNube();assert.equal(f.writes.length,1);
+ assert.equal(f.c.pendienteMarcaAsistencia(f.c.loadAsis()[f.key]),false);
+ await f.c.subirTodoNube();assert.equal(f.writes.length,1);
+ assert.match(f.messages.at(-1),/no hay marcas pendientes/);
+ f.c.setRec(f.al,'F','manual','');
+ await f.c.subirTodoNube();assert.equal(f.writes.length,2);
+ assert.equal(f.writes[1].items.length,1);
+ assert.equal(f.writes[1].items[0].marca,'F');
+});
+
+test('Mass upload continues to include legacy string marks as pending',async()=>{
+ const f=client();f.c.saveAsis({[f.key]:'P'});
+ await f.c.subirTodoNube();
+ assert.equal(f.writes.length,1);
+ assert.equal(f.writes[0].items[0].marca,'P');
+ assert.equal(f.writes[0].items[0].versionBase,'');
+});
+
+test('Per-student conflict confirmation shows exact student/date/class and both marks',()=>{
+ const f=client(),remote={...f.c.recToItem(f.key,f.rec),marca:'F',version:'asis1:remote'};
+ f.c.combinarBajadaAsistencia({protocoloAsistencia:1,items:[remote]});
+ let prompt;
+ f.c.confirm=m=>{prompt=m;return true;};
+ const items=[f.c.recToItem(f.key,f.c.loadAsis()[f.key])];
+ const accepted=f.c.resolverSubidaAsistencia(items);
+ assert.equal(accepted.length,1);
+ assert.match(prompt,/Synthetic Student/);
+ assert.match(prompt,/2026-10-11/);
+ assert.match(prompt,/primaria.*1.*Única/);
+ assert.match(prompt,/Marca en este dispositivo: P/);
+ assert.match(prompt,/Marca en la nube: F/);
+ assert.equal(accepted[0].versionBase,'asis1:remote');
+ assert.equal(f.c.loadAsis()[f.key].marca,'P');
+});
+
+test('Cancellation retains a conflicting local edit and never sends it to the cloud',async()=>{
+ const f=client(),remote={...f.c.recToItem(f.key,f.rec),marca:'F',version:'asis1:remote'};
+ f.c.combinarBajadaAsistencia({protocoloAsistencia:1,items:[remote]});
+ const before=f.memory.get('synthetic-asis');
+ let dialogs=0;f.c.confirm=()=>{dialogs++;return false;};
+ await f.c.subirTodoNube();
+ assert.equal(dialogs,1);assert.equal(f.writes.length,0);
+ assert.equal(f.memory.get('synthetic-asis'),before);
+ assert.match(f.messages.at(-1),/no se envi/);
+});
