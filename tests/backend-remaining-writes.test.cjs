@@ -206,7 +206,7 @@ for (const [file, name, helper, role, action] of [
       listarPlantillasSiagie() {}, renderAulasSiagie() {}, aulasDelNivel: () => [], loadGruposWa: () => [], saveGruposWaLocal() {},
       guardarCfg() {}, saveHS() {}, paqueteAip: () => ({plan: 'synthetic'}), alert() {}, toast() {}, renderLista() {},
       completarFaltasAlSubir: () => 0, loadAsis: () => ({key: {marca: 'P'}}), asisKey: () => 'key',
-      prepararSubidaAsistencia:async()=>true,resolverSubidaAsistencia(){},confirmarSubidaAsistencia(){},recToItem: () => request(s, 'saveasis', token).items[0]
+      prepararSubidaAsistencia:async()=>true,pendienteMarcaAsistencia:()=>true,resolverSubidaAsistencia:items=>items,confirmarSubidaAsistencia(){},recToItem: () => request(s, 'saveasis', token).items[0]
     });
     new vm.Script(clientFunction(file, helper)).runInContext(context);
     new vm.Script(clientFunction(file, name)).runInContext(context);
