@@ -105,6 +105,10 @@ function guardarAsistenciaIngreso_(body, items) {
       const nueva=[it.clave,it.fecha,it.nivel,it.grado,it.seccion,it.nombre,contenido[0],contenido[1],contenido[2],ts,contenido[3],revision];
       const fila=actual ? actual.fila : sh.getLastRow()+1;
       if (sh.getLastColumn() < 12) sh.getRange(1,12).setValue('revisionServidor');
+      // Evita que Sheets convierta ISO y HH:mm en Date (y cambie la versión).
+      // Solo se formatean las dos celdas del registro autorizado, nunca el historial.
+      sh.getRange(fila,2).setNumberFormat('@');
+      sh.getRange(fila,8).setNumberFormat('@');
       sh.getRange(fila,1,1,12).setValues([nueva]);
       mapa[it.clave]={fila:fila,row:nueva};guardados++;
       resultados.push({clave:it.clave,estado:'aceptada',version:versionAsistenciaIngreso_(nueva)});
