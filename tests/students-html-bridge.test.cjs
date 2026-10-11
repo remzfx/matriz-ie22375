@@ -102,7 +102,8 @@ function admin(f) {
   f.run(`let estado=IEStudents.empty(),baseCargada=false,baseInicializada=false,baseVersion='',bdPendiente=false,bdGuardando=false;
     function estadoBD(message){document.getElementById('bdEstado').textContent=message;}
     function estudiantesDe(nivel){return estado[nivel].estudiantes;}function loadDocentes(){return [];}function fillFiltros(){};function renderTabla(){};let resumenMenuAdmin={token:'',base:null,padron:null,bimestre:'',baseEstado:'Pendiente',padronEstado:'Pendiente'},resumenMenuSecuencia=0;function bajarPeriodosNube(){return Promise.resolve(null);}`);
-  for(const name of ['escapeConsulta','leerPeriodosConsultaAdmin','conteosResumenAdmin','actualizarResumen','cargarResumenMenuAdmin','aplicarBaseServidor','cargarEstudiantesAdmin'])f.run(extract('admin.html',name));
+  f.run("const LS_PER='ie22375_admin_periodos';");
+  for(const name of ['defaultPeriodos','loadPeriodos','escapeConsulta','leerPeriodosConsultaAdmin','conteosResumenAdmin','actualizarResumen','cargarResumenMenuAdmin','aplicarBaseServidor','cargarEstudiantesAdmin'])f.run(extract('admin.html',name));
 }
 test('Admin shows unknown counts during slow load, then a real 415-student response updates summaries',async()=>{
   const {s,f,server}=setup();admin(f);s.block();const menu=f.c.cargarResumenMenuAdmin();const task=f.c.cargarEstudiantesAdmin();

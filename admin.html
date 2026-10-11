@@ -853,7 +853,7 @@ function actualizarResumen() {
   html+='<div class="text-slate-500 mt-2"><b>Base histórica — BASE_ACTUAL:</b> '+(hist?hist.total+' estudiantes, incluidos '+(hist.trasPrimaria+hist.trasSecundaria)+' trasladados':'Sin cantidades confirmadas')+' · '+escapeConsulta(baseEstado)+'</div>';
   if (typeof loadDocentes==='function') {const docs=loadDocentes();html+='<div class="text-slate-500 mt-1">Docentes prim.: '+docs.filter(d=>d.nivel==='primaria').length+' · sec.: '+docs.filter(d=>d.nivel==='secundaria').length+'</div>';}
   document.getElementById('resumenRapido').innerHTML=html;
-  if (estado) document.getElementById('hdrAnio').textContent='Año '+(estado.anio||2026);
+  document.getElementById('hdrAnio').textContent='Año '+(loadPeriodos().anio||2026);
 }
 function cargarResumenMenuAdmin(forzar=false) {
   const token=IEStudents.validToken();
@@ -1157,6 +1157,7 @@ async function bajarPeriodosNube() {
 function initPeriodosUI() {
   const per = loadPeriodos();
   document.getElementById('cfgAnio').value = per.anio || 2026;
+  document.getElementById('hdrAnio').textContent = 'Año ' + (per.anio || 2026);
   const box = document.getElementById('listaBimestres');
   const labels = { abierto: 'Abierto', cerrado: 'Cerrado', bloqueado: 'Bloqueado' };
   const colors = { abierto: 'chip-open', cerrado: 'chip-closed', bloqueado: 'chip-off' };
@@ -1181,7 +1182,7 @@ async function savePeriodos() {
     per.bimestres[sel.getAttribute('data-bim')] = sel.value;
   });
   localStorage.setItem(LS_PER, JSON.stringify(per));
-  if (estado) { estado.anio = per.anio; saveEstado(); }
+  // Periodos tiene almacenamiento propio; no modifica el borrador de estudiantes.
   initPeriodosUI();
 
   try {

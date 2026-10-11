@@ -3,11 +3,11 @@ const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 const {page,base,roster,extract}=new Function('require','__dirname',read('tests/academic-roster-display-order.test.cjs').split('for(const [nivel,total')[0]+'\nreturn {page,base,roster,extract};')(require,__dirname);
 function menu(){
  const p=page(),calls=[];
- p.run("let resumenMenuAdmin={token:'',base:null,padron:null,bimestre:'',baseEstado:'Pendiente',padronEstado:'Pendiente'},resumenMenuSecuencia=0;");
+ p.run("const LS_PER='ie22375_admin_periodos';let resumenMenuAdmin={token:'',base:null,padron:null,bimestre:'',baseEstado:'Pendiente',padronEstado:'Pendiente'},resumenMenuSecuencia=0;");
  p.c.IEStudents.peek=()=>null;p.c.IEStudents.load=async()=>{calls.push('base');return base();};
  p.c.IEStudents.loadRoster=async b=>{calls.push('roster:'+b);return roster(b);};
  p.c.bajarPeriodosNube=async()=>{calls.push('periodos');return {anio:2026,bimestres:{I:'cerrado',II:'cerrado',III:'abierto',IV:'bloqueado'}};};
- for(const name of ['conteosResumenAdmin','actualizarResumen','cargarResumenMenuAdmin'])p.run(extract('admin.html',name));
+ for(const name of ['defaultPeriodos','loadPeriodos','conteosResumenAdmin','actualizarResumen','cargarResumenMenuAdmin'])p.run(extract('admin.html',name));
  return {...p,calls};
 }
 test('Admin menu distinguishes historical 415, actual academic 403 and transferred 12 from protected separate sources',async()=>{
