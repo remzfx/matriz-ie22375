@@ -1,3 +1,4 @@
+const withoutPr73Escaping=require('./html-escape-snapshot.cjs');
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{execFileSync}=require('node:child_process');
 const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8'),base='0c6c39732e64ef670b4f106f369cf9df0f7c58ca';
 const original=p=>execFileSync('git',['show',base+':'+p],{cwd:root,encoding:'utf8',maxBuffer:8*1024*1024}).replace(/\r\n/g,'\n');
@@ -17,7 +18,7 @@ test('login stays compact inside shell-auth and Registro entry selector uses the
 });
 test('Unrelated module HTML remains identical to the approved responsive shells base',()=>{
  const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['auxiliar.html','aula_innovacion.html','primaria.html','secundaria.html','photochecks.html']){
- let current=read(file).replace(/\r\n/g,'\n');
+ let current=withoutPr73Escaping(read(file));
  if(file==='auxiliar.html')current=current.replace('<script src="student-identity.js"></script>\n','').replace('return IEStudentIdentity.numbered(list.filter(a => Number(a.grado) === g && String(a.seccion) === String(c.seccion)), c.nivel);','return list.filter(a => Number(a.grado) === g && String(a.seccion) === String(c.seccion));').replace("'+al.numeroVisual+'", "'+(i+1)+'").replace('lineas.push(al.numeroVisual','lineas.push((i+1)').replace('const list = IEStudentIdentity.numbered((((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion)), nivel);','const list = (((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion));');
  assert.equal(current,execFileSync('git',['show',baseNow+':'+file],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n'));
  }

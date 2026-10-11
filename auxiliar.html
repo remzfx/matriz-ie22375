@@ -422,7 +422,7 @@ function onNivel() {
   const list = ((BD[nivel] || {}).estudiantes) || [];
   const grados = [...new Set(list.map(a => a.grado))].sort((a,b)=>a-b);
   document.getElementById('selGrado').innerHTML = grados.length
-    ? grados.map(g => '<option value="'+g+'">'+g+'°</option>').join('')
+    ? grados.map(g => '<option value="'+escapeAuxiliar(g)+'">'+escapeAuxiliar(g)+'°</option>').join('')
     : '<option value="">—</option>';
   if (!list.length) {
     document.getElementById('lblAula').textContent = 'Sin alumnos cargados. Revisa la sesión/conexión y la base oficial de Admin.';
@@ -441,7 +441,7 @@ function onGrado() {
     secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
     if (!secs.length) secs = ['Única'];
   }
-  document.getElementById('selSeccion').innerHTML = secs.map(s => '<option value="'+s+'">'+s+'</option>').join('');
+  document.getElementById('selSeccion').innerHTML = secs.map(s => '<option value="'+escapeAuxiliar(s)+'">'+escapeAuxiliar(s)+'</option>').join('');
   renderLista();
 }
 
@@ -554,6 +554,8 @@ async function bajarNube() {
   } catch(e) { toast('No se pudo bajar. Actualiza el Apps Script.'); }
 }
 
+function escapeAuxiliar(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 function renderLista() {
   const c = ctx();
   const q = (document.getElementById('inpBuscar').value || '').trim().toLowerCase();
@@ -571,15 +573,15 @@ function renderLista() {
       const rec = getRec(al);
       const m = rec.marca;
       if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++; else cS++;
-      const hora = rec.hora ? '<span class="text-[10px] text-slate-500 font-bold">'+rec.hora+'</span>' : '';
-      const enc = encodeURIComponent(al.nombre);
+      const hora = rec.hora ? '<span class="text-[10px] text-slate-500 font-bold">'+escapeAuxiliar(rec.hora)+'</span>' : '';
+      const enc = escapeAuxiliar(encodeURIComponent(al.nombre));
       const motivoBox = m==='J'
-        ? '<input class="mt-1 text-xs w-full" data-motivo="'+enc+'" placeholder="Motivo de la justificación" value="'+(rec.motivo||'').replace(/"/g,'&quot;')+'">'
+        ? '<input class="mt-1 text-xs w-full" data-motivo="'+enc+'" placeholder="Motivo de la justificación" value="'+escapeAuxiliar(rec.motivo||'')+'">'
         : '';
       return '<div class="row">' +
         '<div class="flex gap-2 items-center">' +
-        '<div class="text-xs font-bold text-slate-400 w-6">'+al.numeroVisual+'</div>' +
-        '<div class="flex-1 min-w-0 font-bold text-sm truncate">'+al.nombre+' '+hora+'</div>' +
+        '<div class="text-xs font-bold text-slate-400 w-6">'+escapeAuxiliar(al.numeroVisual)+'</div>' +
+        '<div class="flex-1 min-w-0 font-bold text-sm truncate">'+escapeAuxiliar(al.nombre)+' '+hora+'</div>' +
         '<div class="flex gap-1">' +
         ['P','F','T','J'].map(v => '<button type="button" class="chip '+(m===v?v:'')+'" data-n="'+enc+'" data-v="'+v+'">'+v+'</button>').join('') +
         '</div></div>'+motivoBox+'</div>';

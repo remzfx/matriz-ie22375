@@ -1468,7 +1468,7 @@ function llenarAulasPadron(n) {
   }
 
   const selGrado = document.getElementById('selGrado');
-  selGrado.innerHTML = grados.map(g => `<option value="${g}">${g}°</option>`).join('');
+  selGrado.innerHTML = grados.map(g => `<option value="${escapeRegistro(g)}">${escapeRegistro(g)}°</option>`).join('');
 
   if (!grados.length) {
     estadoPadron('No hay estudiantes disponibles para este contexto.',!padronVerificadoServidor);
@@ -1493,7 +1493,7 @@ function onGrado(options) {
       return allowed.has(s) || allowed.has(norm) || allowed.has('ÚNICA') && (s === 'UNICA' || s === 'Única' || s === 'ÚNICA');
     });
   }
-  document.getElementById('selSeccion').innerHTML = secs.map(s => `<option value="${s}">${s}</option>`).join('');
+  document.getElementById('selSeccion').innerHTML = secs.map(s => `<option value="${escapeRegistro(s)}">${escapeRegistro(s)}</option>`).join('');
   document.getElementById('wrapSeccion').style.display = (secs.length <= 1 && nivel==='primaria') ? 'none' : 'block';
   if (!options || !options.sinContexto) onContexto();
 }
@@ -1594,7 +1594,7 @@ function renderAreas() {
   document.getElementById('areaBtns').innerHTML = lista.length ? lista.map(a => {
     const on = a === areaActual && document.getElementById('registroTutorPanel').hidden ? 'on' : '';
     const short = a.length > 24 ? a.slice(0,22)+'…' : a;
-    return `<button type="button" class="area-btn ${on}" data-a="${encodeURIComponent(a)}" onclick="setArea(decodeURIComponent(this.dataset.a))">${short}</button>`;
+    return `<button type="button" class="area-btn ${on}" data-a="${encodeURIComponent(a)}" onclick="setArea(decodeURIComponent(this.dataset.a))">${escapeRegistro(short)}</button>`;
   }).join('') : '<span class="text-xs text-slate-400">Sin áreas asignadas para esta aula.</span>';
   const ses=getLoginSession();if(nivel==='secundaria'&&ses&&ses.role==='docente'&&(ses.tutorAulas||[]).length)document.getElementById('areaBtns').insertAdjacentHTML('beforeend','<button type="button" class="area-btn '+(document.getElementById('registroTutorPanel').hidden?'':'on')+'" onclick="abrirTutorRegistro()">COMPETENCIAS TRANSVERSALES</button>');
 }
@@ -1622,7 +1622,7 @@ function setArea(a) {
 }
 
 function fillComps() {
-  const option=c=>`<option value="${c.replace(/"/g,'&quot;')}">${c}${!esCompetenciaTransversal(c)&&!competenciaTrabajada(c)?' · No trabajada este bimestre':''}</option>`;
+  const option=c=>`<option value="${escapeRegistro(c)}">${escapeRegistro(c)}${!esCompetenciaTransversal(c)&&!competenciaTrabajada(c)?' · No trabajada este bimestre':''}</option>`;
   const comps=competenciasParaEvaluar(),academicas=competencias(),trans=comps.filter(esCompetenciaTransversal);
   document.getElementById('selComp').innerHTML=(trans.length?'<optgroup label="Competencias del área">'+academicas.map(option).join('')+'</optgroup><optgroup label="Competencias transversales">'+trans.map(option).join('')+'</optgroup>':academicas.map(option).join(''))||'<option value="">Sin competencias</option>';
   fillCaps();
@@ -1637,7 +1637,7 @@ function fillCaps() {
   const comp = (document.getElementById('selComp')||{}).value || '';
   const caps = capsOficiales(comp);
   sel.innerHTML = '<option value="">Elige la capacidad…</option>' +
-    caps.map(c => '<option value="'+c.replace(/"/g,'&quot;')+'">'+c+'</option>').join('') +
+    caps.map(c => '<option value="'+escapeRegistro(c)+'">'+escapeRegistro(c)+'</option>').join('') +
     (esCompetenciaTransversal(comp)?'':'<option value="__otra__">Otra (escribir)</option>');
   const hint = document.getElementById('lblNCaps');
   if (hint) hint.textContent = caps.length ? (caps.length + ' capacidades oficiales de esta competencia') : 'Sin listado oficial; use Otra (escribir)';
@@ -1861,8 +1861,8 @@ function renderSesiones() {
   box.innerHTML = fechas.map(f => {
     const on = f === fechaAct ? 'on' : '';
     return `<span class="sess-chip ${on}" style="display:inline-flex;align-items:center;gap:4px">
-      <button type="button" data-fecha="${f}" style="border:0;background:transparent;font:inherit;font-weight:700;cursor:pointer;padding:0;color:inherit">Sesión ${f}</button>
-      <button type="button" title="Borrar el día" data-delfecha="${f}" style="border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0">×</button>
+      <button type="button" data-fecha="${escapeRegistro(f)}" style="border:0;background:transparent;font:inherit;font-weight:700;cursor:pointer;padding:0;color:inherit">Sesión ${escapeRegistro(f)}</button>
+      <button type="button" title="Borrar el día" data-delfecha="${escapeRegistro(f)}" style="border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0">×</button>
     </span>`;
   }).join('');
   box.onclick = function(ev) {
@@ -2059,12 +2059,12 @@ function renderStudents() {
   cols.forEach((col, i) => {
     head += '<th>C'+(i+1)+
       ' <button type="button" title="Borrar esta capacidad" data-reg-write onclick="quitarCapGrilla('+i+')" style="border:0;background:#fecaca;color:#991b1b;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0;margin-left:4px">×</button>'+
-      '<div class="fin-caps">'+(col.comp||'')+'<br>'+(col.cap||'')+'</div></th>';
+      '<div class="fin-caps">'+escapeRegistro(col.comp||'')+'<br>'+escapeRegistro(col.cap||'')+'</div></th>';
   });
 
   let cAD=0,cA=0,cB=0,cC=0;
   const rows = list.map((al, i) => {
-    let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
+    let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+escapeRegistro(al.nombre)+'</div></td>';
     cols.forEach(col => {
       if(col.origen==='transversal'){tds+=IERegistroTransversales.cell(al,col,fecha);return;}
       const noTrabajada=!competenciaTrabajada(col.comp);
@@ -2685,11 +2685,11 @@ function renderFinales() {
     const capsTxt = caps.length
       ? caps.map(x => (x.fecha?x.fecha.slice(5)+' · ':'') + x.capacidad).join('<br>')
       : 'Sin capacidades aún';
-    head += '<th><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" '+(competenciaTrabajada(cp)?'checked':'')+' '+(bloqueado?'disabled':'')+'><span>'+cp+'</span></label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
+    head += '<th><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" '+(competenciaTrabajada(cp)?'checked':'')+' '+(bloqueado?'disabled':'')+'><span>'+escapeRegistro(cp)+'</span></label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
   });
 
   const rows = alumnos.map((al, i) => {
-    let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+al.nombre+'</div></td>';
+    let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+escapeRegistro(al.nombre)+'</div></td>';
     comps.forEach(cp => {
       const lock = bloqueado||!competenciaTrabajada(cp);
       const dir = notaDirectaAlumno(cp, studentKey(al));
@@ -2950,8 +2950,8 @@ function renderAsistencia() {
     boxF.innerHTML = fechas.map(f => {
       const on = f === asisFechaActiva ? 'on' : '';
       return `<span style="display:inline-flex;align-items:center;gap:2px">
-        <button type="button" class="asis-date-btn ${on}" data-af="${f}">${f}</button>
-        <button type="button" title="Quitar fecha" data-adel="${f}" style="border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:18px;height:18px;font-weight:900;cursor:pointer;line-height:18px;padding:0">×</button>
+        <button type="button" class="asis-date-btn ${on}" data-af="${escapeRegistro(f)}">${escapeRegistro(f)}</button>
+        <button type="button" title="Quitar fecha" data-adel="${escapeRegistro(f)}" style="border:0;background:#fee2e2;color:#b91c1c;border-radius:999px;width:18px;height:18px;font-weight:900;cursor:pointer;line-height:18px;padding:0">×</button>
       </span>`;
     }).join('');
   }
@@ -2971,18 +2971,18 @@ function renderAsistencia() {
   }
 
   let cP=0,cF=0,cT=0,cJ=0;
-  lista.innerHTML = `<div class="text-[11px] font-bold text-slate-500 mb-2">Marcando: ${asisFechaActiva}</div>` +
+  lista.innerHTML = `<div class="text-[11px] font-bold text-slate-500 mb-2">Marcando: ${escapeRegistro(asisFechaActiva)}</div>` +
     alumnos.map((al, i) => {
       const k = asisMarkKey(asisFechaActiva, studentKey(al));
       const rec = asisGet(leerNota(store.asistencia, k));
       const m = rec.marca;
       if (m==='P') cP++; else if (m==='F') cF++; else if (m==='T') cT++; else if (m==='J') cJ++;
-      const horaTxt = rec.hora ? `<span class="text-[10px] text-slate-500 font-bold">${rec.hora}</span>` : '';
+      const horaTxt = rec.hora ? `<span class="text-[10px] text-slate-500 font-bold">${escapeRegistro(rec.hora)}</span>` : '';
       const enc = encodeURIComponent(studentKey(al));
       return `<div class="stu-row">
         <div class="flex gap-2 items-center">
           <div class="text-xs font-bold text-slate-400 w-6">${i+1}</div>
-          <div class="flex-1 min-w-0 font-bold text-sm truncate">${al.nombre} ${horaTxt}</div>
+          <div class="flex-1 min-w-0 font-bold text-sm truncate">${escapeRegistro(al.nombre)} ${horaTxt}</div>
           <div class="flex gap-1 shrink-0">
             ${['P','F','T','J'].map(v =>
               `<button type="button" class="asis-chip ${m===v?v:''}" data-an="${enc}" data-av="${v}">${v}</button>`
