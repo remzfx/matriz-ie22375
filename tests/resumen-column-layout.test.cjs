@@ -5,7 +5,7 @@ function view(){const f=ui();f.c.estudiantes=()=>[{idSiagie:'summary-1',orden:21
 function css(selector){const start=html.indexOf(selector);assert.ok(start>=0,selector);return html.slice(start,html.indexOf('}',start)+1);}
 test('Summary header and student number/name share left aligned padded column',()=>{
  const f=view();assert.match(f.rendered,/<th class="fin-nom summary-student-header">Estudiante<\/th>/);
- assert.match(f.rendered,/<th class="fin-nom summary-student"><span class="summary-student-order">217<\/span><span class="summary-student-name">Synthetic Long Student Name With Several Words<\/span>/);
+ assert.match(f.rendered,/<th class="fin-nom summary-student"><span class="summary-student-order">1<\/span><span class="summary-student-name">Synthetic Long Student Name With Several Words<\/span>/);
  const rule=css('.fin-grid th.summary-student,');assert.match(rule,/text-align:left/);assert.match(rule,/padding-left:12px;padding-right:12px/);
 });
 test('Long summary names wrap naturally at adequate width without mobile shrinking override',()=>{
@@ -47,5 +47,5 @@ test('Not-worked and pending results share middle/center alignment with referenc
 test('Print copies centered competence classes, preserving A4 print function and all other presentation',()=>{
  const f=ui();f.grade(f.comps[0],15);f.c.print=()=>{};const start=html.indexOf('function imprimirResumen()');vm.runInContext(html.slice(start,html.indexOf('\n}',start)+2),f.c);f.c.imprimirResumen();assert.match(f.el('printArea').innerHTML,/<td class="summary-competence">/);
  const old=require('node:child_process').execFileSync('git',['show','8726757011c8c259667741791b60644b20247053:registro.html'],{encoding:'utf8',maxBuffer:4*1024*1024});
- const normalized=x=>x.replace(/\r\n/g,'\n');const restored=normalized(html).replace('  .fin-grid td.summary-competence{vertical-align:middle;text-align:center;}\n','').replaceAll('<td class="summary-competence">','<td>');const summary=x=>x.slice(x.indexOf('function renderAvance()'),x.indexOf('const MOBILE_APP_STORES'));assert.equal(summary(restored),summary(normalized(old)));const styles=x=>x.slice(x.indexOf('.fin-grid th.summary-student,'),x.indexOf('.asis-chip'));assert.equal(styles(restored),styles(normalized(old)));
+ const normalized=x=>x.replace(/\r\n/g,'\n');const restored=normalized(html).replace('  .fin-grid td.summary-competence{vertical-align:middle;text-align:center;}\n','').replaceAll('<td class="summary-competence">','<td>');const summary=x=>x.slice(x.indexOf('function renderAvance()'),x.indexOf('const MOBILE_APP_STORES')).replace('al.numeroVisual??i+1','al.orden??i+1');assert.equal(summary(restored),summary(normalized(old)));const styles=x=>x.slice(x.indexOf('.fin-grid th.summary-student,'),x.indexOf('.asis-chip'));assert.equal(styles(restored),styles(normalized(old)));
 });

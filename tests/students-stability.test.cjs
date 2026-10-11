@@ -67,7 +67,7 @@ function adminFixture(){
  const base={version:'old',inicializada:true,primaria:{estudiantes:[{nombre:'Synthetic cached'}]},secundaria:{estudiantes:[]}};
  s.c.IEStudents={peek:()=>clone(base),validToken:()=>token,load:()=>new Promise((resolve,reject)=>requests.push({resolve,reject})),empty:()=>({})};
  s.c.document.getElementById=()=>({textContent:''});
- s.run('let estado=null,baseVersion="",baseCargada=false,baseInicializada=false,bdPendiente=false,bdGuardando=false;function actualizarResumen(){};function fillFiltros(){};function renderTabla(){};');
+ s.run('let modoEdicionBase=true;let estado=null,baseVersion="",baseCargada=false,baseInicializada=false,bdPendiente=false,bdGuardando=false;function actualizarResumen(){};function fillFiltros(){};function renderTabla(){};');
  s.c.estadoBD=m=>messages.push(m);
  for(const n of ['aplicarBaseServidor','cargarEstudiantesAdmin','saveEstado','guardarBD'])s.run(extract('admin.html',n));
  s.c.permitirEdicionBD=()=>true;

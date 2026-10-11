@@ -16,7 +16,11 @@ test('login stays compact inside shell-auth and Registro entry selector uses the
  assert.match(read('index.html'),/id="viewLogin" class="shell shell-auth /);assert.match(read('index.html'),/<div class="w-full max-w-sm">/);assert.match(read('registro.html'),/id="viewHome" class="hidden shell shell-auth /);
 });
 test('Unrelated module HTML remains identical to the approved responsive shells base',()=>{
- const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['auxiliar.html','aula_innovacion.html','primaria.html','secundaria.html','photochecks.html'])assert.equal(read(file).replace(/\r\n/g,'\n'),execFileSync('git',['show',baseNow+':'+file],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n'));
+ const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['auxiliar.html','aula_innovacion.html','primaria.html','secundaria.html','photochecks.html']){
+ let current=read(file).replace(/\r\n/g,'\n');
+ if(file==='auxiliar.html')current=current.replace('<script src="student-identity.js"></script>\n','').replace('return IEStudentIdentity.numbered(list.filter(a => Number(a.grado) === g && String(a.seccion) === String(c.seccion)), c.nivel);','return list.filter(a => Number(a.grado) === g && String(a.seccion) === String(c.seccion));').replace("'+al.numeroVisual+'", "'+(i+1)+'").replace('lineas.push(al.numeroVisual','lineas.push((i+1)').replace('const list = IEStudentIdentity.numbered((((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion)), nivel);','const list = (((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion));');
+ assert.equal(current,execFileSync('git',['show',baseNow+':'+file],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n'));
+ }
 });
 
 test('Registro shares shell-work across header, context, all panels main and lower bar without per-tab widths',()=>{
@@ -38,12 +42,12 @@ test('Photochecks keeps exact print rules, QR dimensions and legacy print wrappe
  const old=original('photochecks.html'),now=read('photochecks.html').replace(/\r\n/g,'\n');assert.equal(now.match(/<style>([\s\S]*?)<\/style>/)[1],old.match(/<style>([\s\S]*?)<\/style>/)[1]);assert.match(now,/<main class="shell shell-wide max-w-4xl mx-auto px-4 py-4">/);
 });
 test('SW changes only static version and shared stylesheet entry, preserving API transport and cache policy',()=>{
- const sw=read('sw.js').replace(/\r\n/g,'\n');assert.match(sw,/CACHE_PREFIX \+ 'v18'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace("CACHE_PREFIX + 'v18'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
+ const sw=read('sw.js').replace(/\r\n/g,'\n');assert.match(sw,/CACHE_PREFIX \+ 'v19'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace("CACHE_PREFIX + 'v19'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
 });
-test('v18 installs actual shared CSS and serves it offline without caching external Apps Script POST',async()=>{
+test('v19 installs actual shared CSS and serves it offline without caching external Apps Script POST',async()=>{
  const setup=new Function('require','__dirname',read('tests/service-worker-static.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname),s=setup(),css=read('layout-shells.css');
  s.network(async req=>new Response(req.url.endsWith('.css')?css:req.url.endsWith('.js')?'/* JS */':'<html>static</html>',{headers:{'Content-Type':req.url.endsWith('.css')?'text/css':req.url.endsWith('.js')?'application/javascript':'text/html'}}));
- s.cache('matriz-ie22375-v13');await s.dispatch('install');await s.dispatch('activate');assert.equal(s.stores.has('matriz-ie22375-v13'),false);assert.equal(s.stores.has('matriz-ie22375-v18'),true);
+ s.cache('matriz-ie22375-v13');await s.dispatch('install');await s.dispatch('activate');assert.equal(s.stores.has('matriz-ie22375-v13'),false);assert.equal(s.stores.has('matriz-ie22375-v19'),true);
  s.offline();const response=await s.dispatch('fetch',{request:s.request('layout-shells.css')});assert.equal(await response.text(),css);assert.equal(response.headers.get('Content-Type'),'text/css');
- const req=new Request('https://script.google.com/macros/s/synthetic/exec',{method:'POST',body:'synthetic'});assert.equal(await s.dispatch('fetch',{request:req}),undefined);assert.equal(await s.cache('matriz-ie22375-v18').match(req),undefined);
+ const req=new Request('https://script.google.com/macros/s/synthetic/exec',{method:'POST',body:'synthetic'});assert.equal(await s.dispatch('fetch',{request:req}),undefined);assert.equal(await s.cache('matriz-ie22375-v19').match(req),undefined);
 });
