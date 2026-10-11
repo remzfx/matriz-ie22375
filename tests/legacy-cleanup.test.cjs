@@ -52,6 +52,7 @@ function admin(session, oldFlag = false) {
   });
   // Synthetic students only; no production fixture is printed or persisted by these tests.
   const fixture = {anio: 2026, primaria: {estudiantes: [], docentes: []}, secundaria: {estudiantes: [], docentes: []}};
+  new vm.Script(read('student-identity.js')).runInContext(context);context.IEStudentIdentity=context.window.IEStudentIdentity;
   for (const script of inline(html)) new vm.Script(script).runInContext(context);
   return {context, elements, memory, redirects, alerts, downloads, studentWrites};
 }
@@ -110,7 +111,7 @@ test('Admin import/edit/save/restore uses server revisions and leaves old local 
   s.elements.get('importModo').value='replace';s.elements.get('importNivel').value='primaria';
   s.context.procesarImport();assert.equal(s.context.estudiantesDe('primaria').length,1);
   const alumno=s.context.estudiantesDe('primaria')[0];alumno.nombre='Synthetic Edited Student';
-  s.context.saveEstado();await s.context.guardarBD();
+  s.context.saveEstado();await s.context.activarEdicionBase();await s.context.guardarBD();
   assert.equal(s.studentWrites[0].action,'savestudents');assert.equal(s.studentWrites[0].version,'synthetic-version');
   assert.equal(s.studentWrites[0].base.primaria.estudiantes[0].nombre,'Synthetic Edited Student');
   await s.context.restaurarBDOficial();
@@ -124,14 +125,14 @@ test('Legacy CSV parser default remains compatible with previous grade/section f
   s.context.window._importCSV=s.context.parseCSV(csv);
   s.elements.get('importModo').value='replace';s.elements.get('importNivel').value='primaria';s.context.procesarImport();
   assert.equal(s.context.estudiantesDe('primaria').length,1);assert.equal(s.context.estudiantesDe('primaria')[0].grado,1);
-  await s.context.guardarBD();assert.equal(s.studentWrites[0].base.primaria.estudiantes.length,1);
+  await s.context.activarEdicionBase();await s.context.guardarBD();assert.equal(s.studentWrites[0].base.primaria.estudiantes.length,1);
 });
 
 test('Active Admin CSV upload includes transferred students before private save',async()=>{
   const s=admin({user:'admin',role:'admin'});await s.context.cargarEstudiantesAdmin();
   const csv='NumeroDeOrden;ApellidoPaterno;ApellidoMaterno;NombreEstudiante;Grado;Seccion;EstadoMatricula;Nivel\n1;SYNTHETIC;ONE;STUDENT;PRIMERO;UNICA;DEFINITIVA;primaria\n2;SYNTHETIC;TWO;STUDENT;PRIMERO;UNICA;TRASLADADO;primaria';
   await s.elements.get('importFile').listeners.change({target:{files:[{name:'synthetic.csv',text:async()=>csv}]}});
-  s.elements.get('importModo').value='replace';s.elements.get('importNivel').value='primaria';s.context.procesarImport();await s.context.guardarBD();
+  s.elements.get('importModo').value='replace';s.elements.get('importNivel').value='primaria';s.context.procesarImport();await s.context.activarEdicionBase();await s.context.guardarBD();
   assert.equal(s.studentWrites[0].base.primaria.estudiantes.length,2);
   assert.equal(s.studentWrites[0].base.primaria.estudiantes[1].estadoMatricula,'TRASLADADO');
 });
@@ -140,7 +141,7 @@ test('Failed Admin save keeps the reviewed draft and displays the error', async(
   s.context.window._importJSON={primaria:{estudiantes:[{grado:1,seccion:'Única',nombre:'Synthetic Draft'}]},secundaria:{estudiantes:[]}};
   s.elements.get('importModo').value='replace';s.elements.get('importNivel').value='ambos';s.context.procesarImport();
   s.context.IEStudents.save=async()=>{throw Error('Synthetic conflict');};
-  await s.context.guardarBD();assert.equal(s.context.estudiantesDe('primaria')[0].nombre,'Synthetic Draft');
+  await s.context.activarEdicionBase();await s.context.guardarBD();assert.equal(s.context.estudiantesDe('primaria')[0].nombre,'Synthetic Draft');
   assert.equal(s.elements.get('bdEstado').textContent,'Synthetic conflict');
 });
 test('Admin cannot edit or save an empty placeholder while students are loading',()=>{

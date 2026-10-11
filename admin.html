@@ -189,9 +189,12 @@
     <section id="tab-bd" class="tab hidden">
       <div class="card p-4">
         <div class="flex flex-wrap gap-2 items-end mb-3">
+          <div><label for="consultaBimestre">Bimestre</label><select id="consultaBimestre" onchange="consultarEstudiantes()"><option value="">Selecciona</option><option>I</option><option>II</option><option>III</option><option>IV</option></select></div>
+          <div><label for="consultaTipo">Consulta</label><select id="consultaTipo" onchange="consultarEstudiantes()"><option value="vigentes">Vigentes</option><option value="trasladados">Trasladados</option><option value="todos">Todos</option></select></div>
+          <button class="btn btn-ghost text-sm" onclick="consultarEstudiantes()">Actualizar consulta</button>
           <div>
             <label class="text-[11px] font-bold text-slate-500">Nivel</label>
-            <select id="filtroNivel" onchange="renderTabla()">
+            <select id="filtroNivel" onchange="fillFiltros();renderTabla()">
               <option value="primaria">Primaria</option>
               <option value="secundaria">Secundaria</option>
             </select>
@@ -210,18 +213,22 @@
           </div>
         </div>
         <div class="text-xs text-slate-500 mb-1" id="bdCount"></div>
-        <p class="text-[11px] text-slate-400 mb-2">Lista SIAGIE vigente, incluidos estudiantes trasladados.</p>
+        <p id="consultaFuente" role="status" class="text-xs text-slate-500 mb-2">Consulta de solo lectura. Selecciona el bimestre.</p>
         <div class="overflow-auto max-h-[60vh] border border-slate-100 rounded-xl">
           <table class="data">
-            <thead><tr><th>Nº</th><th>Grado</th><th>Sección</th><th>Apellidos y nombres</th><th></th></tr></thead>
+            <thead><tr><th>Nº</th><th>Grado</th><th>Sección</th><th>Apellidos y nombres</th><th>Estado de matrícula</th><th></th></tr></thead>
             <tbody id="bdBody"></tbody>
           </table>
         </div>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <button class="btn btn-ghost text-sm" onclick="agregarAlumno()">+ Agregar alumno</button>
-          <button class="btn btn-primary text-sm" onclick="guardarBD()">Guardar cambios</button>
-          <button class="btn btn-ghost text-sm" onclick="exportarJSON()">Descargar JSON</button>
-        </div>
+        <details class="mt-3"><summary>Edición excepcional de BASE_ACTUAL</summary>
+          <p class="text-xs text-slate-500">No edita padrones ni elimina historial. La actualización regular se realiza desde Gestión de estudiantes con SIAGIE.</p>
+          <button class="btn btn-ghost text-sm" onclick="activarEdicionBase()">Habilitar edición excepcional</button>
+          <div id="edicionBaseControles" hidden class="mt-3 flex flex-wrap gap-2">
+            <button class="btn btn-ghost text-sm" onclick="agregarAlumno()">+ Agregar alumno</button>
+            <button class="btn btn-primary text-sm" onclick="guardarBD()">Guardar cambios</button>
+          </div>
+          <button class="btn btn-ghost text-sm" onclick="exportarJSON()">Descargar base completa JSON</button>
+        </details>
       </div>
     </section>
 
@@ -507,6 +514,77 @@ const LS_PER = 'ie22375_admin_periodos';
 const PERIODOS_CLOUD_KEY = 'ie22375_periodos_cloud_v1';
 
 let estado = null;
+let consultaBase = null, consultaClave = '', consultaToken = '', consultaSecuencia = 0, modoEdicionBase = false;
+function escapeConsulta(value) { return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function estudiantesConsulta(nivel) {
+  if (modoEdicionBase) return estudiantesDe(nivel);
+  if (!consultaBase || consultaToken !== IEStudents.validToken()) return [];
+  return ((consultaBase[nivel] || {}).estudiantes || []);
+}
+async function iniciarConsultaEstudiantes() {
+  const sel=document.getElementById('consultaBimestre');
+  if (!sel.value) {
+    const seq=++consultaSecuencia;
+    let timer;
+    const per=await Promise.race([bajarPeriodosNube(), new Promise(r=>{timer=setTimeout(()=>r(null),12000);})]);
+    clearTimeout(timer);
+    if (seq!==consultaSecuencia || sel.value) return;
+    const abierto=per && ['I','II','III','IV'].find(b=>per.bimestres[b]==='abierto');
+    if (!abierto) { document.getElementById('consultaFuente').textContent='No se pudo determinar el bimestre abierto del servidor. Selecciona uno para consultar.'; return; }
+    sel.value=abierto;
+  }
+  return consultarEstudiantes();
+}
+async function consultarEstudiantes() {
+  if (bdPendiente && !confirm('Hay cambios excepcionales pendientes. ¿Ocultar la edición y consultar? El borrador se conserva sin guardar.')) return;
+  modoEdicionBase=false;
+  document.getElementById('edicionBaseControles').hidden=true;
+  const bim=document.getElementById('consultaBimestre').value, tipo=document.getElementById('consultaTipo').value;
+  const token=IEStudents.validToken(), clave=bim+'|'+tipo, seq=++consultaSecuencia;
+  const status=document.getElementById('consultaFuente');
+  if (consultaClave!==clave || consultaToken!==token) {consultaBase=null;consultaClave=clave;consultaToken=token;fillFiltros();renderTabla();}
+  if (!token) {consultaBase=null;renderTabla();status.textContent='Sesión vencida. Vuelve a iniciar sesión.';return;}
+  if (!['I','II','III','IV'].includes(bim)) {status.textContent='Selecciona el bimestre.';return;}
+  status.textContent='Consultando '+(tipo==='vigentes'?'PADRON_'+bim:'BASE_ACTUAL')+'…';
+  try {
+    const base=await (tipo==='vigentes' ? IEStudents.loadRoster(bim) : IEStudents.inspect());
+    if (seq!==consultaSecuencia) return;
+    if (token!==IEStudents.validToken()) {consultaBase=null;fillFiltros();renderTabla();status.textContent='La sesión cambió. Vuelve a iniciar sesión.';return;}
+    if (base.offline && consultaBase && !consultaBase.offline) {status.textContent='Sin verificación nueva. Se conserva la última consulta de este padrón; Reintenta con Actualizar consulta.';return;}
+    if (tipo==='vigentes' && (base.bimestre!==bim || !base.padronInicializado)) {
+      consultaBase=null;status.textContent='Este bimestre no tiene padrón académico propio. BASE_ACTUAL no es un padrón histórico.';
+    } else {
+      consultaBase=tipo==='trasladados' ? {...base, primaria:{...base.primaria,estudiantes:base.primaria.estudiantes.filter(a=>String(a.estadoMatricula).trim().toUpperCase()==='TRASLADADO')},secundaria:{...base.secundaria,estudiantes:base.secundaria.estudiantes.filter(a=>String(a.estadoMatricula).trim().toUpperCase()==='TRASLADADO')}} : base;
+      const alumnos=['primaria','secundaria'].flatMap(n=>base[n].estudiantes);
+      status.textContent=(tipo==='vigentes'?'PADRON_'+bim:'BASE_ACTUAL')+' · '+(base.offline?'Caché autorizada, servidor no verificado':'Verificado por servidor')+' · '+alumnos.length+' registros · '+alumnos.filter(a=>a.estadoMatricula==='DEFINITIVA').length+' DEFINITIVA · '+alumnos.filter(a=>a.estadoMatricula==='TRASLADADO').length+' trasladados';
+    }
+    fillFiltros();renderTabla();
+  } catch(e) {
+    if (seq!==consultaSecuencia) return;
+    if (token!==IEStudents.validToken() || e.code==='SESSION' || e.code==='FORBIDDEN') {consultaBase=null;status.textContent='Sesión rechazada. Vuelve a iniciar sesión.';}
+    else status.textContent='No se pudo verificar el servidor: '+e.message+'. Reintenta con Actualizar consulta.';
+    fillFiltros();renderTabla();
+  }
+}
+async function activarEdicionBase() {
+  if (!confirm('¿Habilitar edición excepcional de la base completa? No modifica padrones. No retires trasladados de la base para ocultarlos del padrón.')) return;
+  if (bdPendiente) {
+    ++consultaSecuencia;modoEdicionBase=true;document.getElementById('edicionBaseControles').hidden=false;
+    document.getElementById('consultaFuente').textContent='Borrador excepcional pendiente de BASE_ACTUAL. Conserva su versión original; los padrones no se modifican.';
+    fillFiltros();renderTabla();return;
+  }
+  const token=IEStudents.validToken(), seq=++consultaSecuencia;
+  try {
+    const base=await IEStudents.inspect();
+    if (seq!==consultaSecuencia || token!==IEStudents.validToken() || !token) return;
+    if (base.offline || !base.inicializada) throw Error('La edición requiere base inicializada y verificada en servidor.');
+    aplicarBaseServidor(base);
+    modoEdicionBase=true;
+    document.getElementById('edicionBaseControles').hidden=false;
+    document.getElementById('consultaFuente').textContent='Edición excepcional de BASE_ACTUAL completa. Los padrones no se modifican.';
+    fillFiltros();renderTabla();
+  } catch(e) {document.getElementById('consultaFuente').textContent=e.message;}
+}
 let baseCargada = false, baseVersion = '', baseInicializada = false, bdPendiente = false, bdGuardando = false;
 function verificarModuloEstudiantesAdmin() {
   const modulo = window.IEMigrateStudents;
@@ -615,22 +693,22 @@ async function renderRegistroGeneral() {
   const status=document.getElementById('generalStatus'),box=document.getElementById('generalRows'),select=document.getElementById('generalAula'),bim=document.getElementById('generalBim').value;
   status.textContent='Verificando Registro General en servidor…';box.replaceChildren();
   try {
-    const db=await IEStudents.loadRoster(bim);if(serial!==renderRegistroGeneral.serial)return;if(db.offline)throw Error('Registro General requiere verificación actual del servidor.');
+    const db=await IEStudents.loadRoster(bim);if(serial!==renderRegistroGeneral.serial)return;if(db.offline)throw Error('Registro General requiere verificación actual del servidor.');if(db.padronInicializado===false)throw Error('Este bimestre no tiene padrón académico propio.');
     const todos=(db.secundaria||{}).estudiantes||[],aulas=[...new Set(todos.map(a=>a.grado+'|'+a.seccion))].sort(),selected=select.value;
     select.replaceChildren();aulas.forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=a.replace('|','° ');select.appendChild(o);});if(aulas.includes(selected))select.value=selected;
     const parts=select.value.split('|');if(!parts[0])throw Error('El padrón no contiene aulas de Secundaria.');
-    const ctx={nivel:'secundaria',bim,grado:parts[0],seccion:parts[1]},alumnos=todos.filter(a=>String(a.grado)===ctx.grado&&a.seccion===ctx.seccion);
+    const ctx={nivel:'secundaria',bim,grado:parts[0],seccion:parts[1]},alumnos=IEStudentIdentity.numbered(todos.filter(a=>String(a.grado)===ctx.grado&&a.seccion===ctx.seccion),'secundaria');
     const [items,trans]=await Promise.all([fetchRegAula(ctx),IETransversales.request('loadtransversalexport',{grado:ctx.grado,seccion:ctx.seccion,bimestre:bim})]);if(serial!==renderRegistroGeneral.serial)return;
     const by=Object.fromEntries(items.map(x=>[x.area,x.payload||{}])),areas=IERegistroAcademico.catalog.secundaria;let completas=0;
     Object.entries(areas).forEach(([area,comps])=>{
       const p=by[area],row=document.createElement('details'),title=document.createElement('summary');let ok=!!p;
       title.textContent=area;row.appendChild(title);
       comps.forEach(comp=>{const line=document.createElement('p');line.textContent=comp;row.appendChild(line);if(!p){ok=false;return;}const estado=(p.competenciasEstado||{})[[ctx.nivel,bim,ctx.grado,ctx.seccion,area,comp].join('||')];if(estado&&estado.trabajada===false){line.textContent+=' · No trabajada';return;}
-        alumnos.forEach(al=>{const L=letraDesdePayload(p,ctx,area,comp,al),text=document.createElement('p');text.textContent=al.nombre+' · '+(L||'Pendiente')+(L==='C'?' · '+(concDesdePayload(p,ctx,area,comp,al)||'Conclusión pendiente'):'');row.appendChild(text);if(!L||L==='C'&&!concDesdePayload(p,ctx,area,comp,al))ok=false;});
+        alumnos.forEach(al=>{const L=letraDesdePayload(p,ctx,area,comp,al),text=document.createElement('p');text.textContent=al.numeroVisual+'. '+al.nombre+' · '+(L||'Pendiente')+(L==='C'?' · '+(concDesdePayload(p,ctx,area,comp,al)||'Conclusión pendiente'):'');row.appendChild(text);if(!L||L==='C'&&!concDesdePayload(p,ctx,area,comp,al))ok=false;});
       });title.textContent+=' · '+(ok?'Completa':'Pendiente');if(ok)completas++;box.appendChild(row);
     });
     const table=document.createElement('table'),head=document.createElement('tr');['Estudiante','TIC oficial Tutor','Gestiona oficial Tutor'].forEach(t=>{const th=document.createElement('th');th.textContent=t;head.appendChild(th);});table.appendChild(head);
-    alumnos.forEach(al=>{const row=document.createElement('tr'),name=document.createElement('th');name.textContent=al.nombre;row.appendChild(name);['tic','autonomia'].forEach(cp=>{const td=document.createElement('td'),r=(trans.resultados[studentKey(al)]||{})[cp],f=r&&r.listo&&r.final;td.textContent=f?f.nivel+(f.nivel==='C'?' · '+f.conclusion:''):'Pendiente de envío por Tutor';row.appendChild(td);});table.appendChild(row);});box.appendChild(table);
+    alumnos.forEach(al=>{const row=document.createElement('tr'),name=document.createElement('th');name.textContent=al.numeroVisual+'. '+al.nombre;row.appendChild(name);['tic','autonomia'].forEach(cp=>{const td=document.createElement('td'),r=(trans.resultados[studentKey(al)]||{})[cp],f=r&&r.listo&&r.final;td.textContent=f?f.nivel+(f.nivel==='C'?' · '+f.conclusion:''):'Pendiente de envío por Tutor';row.appendChild(td);});table.appendChild(row);});box.appendChild(table);
     const estadoTrans=trans.exportable?'Enviadas por Tutor':trans.procesado?'Desactualizadas · requiere reenvío del Tutor':'Pendientes';status.textContent='Áreas académicas: '+completas+'/'+Object.keys(areas).length+' completas · Transversales: '+estadoTrans+' · Registro general: '+(completas===Object.keys(areas).length&&trans.exportable?'Completo':'Incompleto');
   }catch(e){if(serial===renderRegistroGeneral.serial)status.textContent=e.message+' · Reintente Actualizar Registro General.';}
 }
@@ -644,7 +722,7 @@ function showTab(id) {
   });
   if (id === 'auxiliares') cargarAuxiliares();
   if (id === 'docentes') { initDocentesUI(); }
-  if (id === 'bd') { fillFiltros(); renderTabla(); }
+  if (id === 'bd') { iniciarConsultaEstudiantes(); }
   if (id === 'periodos') { initPeriodosUI(); bajarPeriodosNube().then(function(p){ if(p) initPeriodosUI(); }); }
   if (id === 'horario') initHorarioUI();
   if (id === 'menu') actualizarResumen();
@@ -659,7 +737,7 @@ function estudiantesDe(nivel) {
 
 function fillFiltros() {
   const nivel = document.getElementById('filtroNivel').value;
-  const list = estudiantesDe(nivel);
+  const list = estudiantesConsulta(nivel);
   const grados = [...new Set(list.map(s => s.grado))].sort((a,b)=>a-b);
   const secs = [...new Set(list.map(s => s.seccion))].sort();
   const gSel = document.getElementById('filtroGrado');
@@ -676,12 +754,11 @@ function renderTabla() {
   const g = document.getElementById('filtroGrado').value;
   const s = document.getElementById('filtroSeccion').value;
   const q = (document.getElementById('filtroBuscar').value || '').toLowerCase().trim();
-  let list = estudiantesDe(nivel);
+  let list = IEStudentIdentity.numbered(estudiantesConsulta(nivel), nivel);
   if (g) list = list.filter(x => String(x.grado) === String(g));
   if (s) list = list.filter(x => x.seccion === s);
   if (q) list = list.filter(x => (x.nombre||'').toLowerCase().includes(q));
-  list = [...list].sort((a,b) => a.grado - b.grado || String(a.seccion).localeCompare(b.seccion,'es') || (a.orden||0) - (b.orden||0) || String(a.nombre).localeCompare(b.nombre,'es'));
-  const totalNivel = estudiantesDe(nivel).length;
+  const totalNivel = estudiantesConsulta(nivel).length;
   document.getElementById('bdCount').textContent =
     list.length + ' alumno(s) mostrados' +
     (list.length !== totalNivel ? ' · Total en ' + nivel + ': ' + totalNivel : ' (total del nivel)');
@@ -689,17 +766,18 @@ function renderTabla() {
   body.innerHTML = list.map((al, idx) => {
     const id = encodeURIComponent(al.nombre + '|' + al.grado + '|' + al.seccion);
     return `<tr>
-      <td>${idx+1}</td>
+      <td>${al.numeroVisual}</td>
       <td>${al.grado}°</td>
       <td>${al.seccion}</td>
-      <td>${al.nombre}</td>
-      <td><button class="text-red-600 text-xs font-bold" onclick="eliminarAlumno('${nivel}','${id}')">Quitar</button></td>
+      <td>${escapeConsulta(al.nombre)}</td>
+      <td>${escapeConsulta(al.estadoMatricula || 'Sin estado')}</td>
+      <td>${modoEdicionBase ? `<button class="text-red-600 text-xs font-bold" onclick="eliminarAlumno('${nivel}','${id}')">Quitar</button>` : ''}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="5" class="text-slate-400">Sin resultados</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="text-slate-400">Sin resultados</td></tr>';
 }
 
 function eliminarAlumno(nivel, idEnc) {
-  if (!permitirEdicionBD()) return;
+  if (!modoEdicionBase || !permitirEdicionBD()) return;
   const id = decodeURIComponent(idEnc);
   if (!confirm('¿Quitar este alumno de la BD oficial?')) return;
   estado[nivel].estudiantes = estudiantesDe(nivel).filter(a => (a.nombre+'|'+a.grado+'|'+a.seccion) !== id);
@@ -708,7 +786,7 @@ function eliminarAlumno(nivel, idEnc) {
 }
 
 function agregarAlumno() {
-  if (!permitirEdicionBD()) return;
+  if (!modoEdicionBase || !permitirEdicionBD()) return;
   const nivel = document.getElementById('filtroNivel').value;
   const nombre = prompt('Apellidos y nombres (APELLIDOS, NOMBRES):');
   if (!nombre || !nombre.trim()) return;
@@ -725,7 +803,7 @@ function agregarAlumno() {
 }
 
 async function guardarBD() {
-  if (!permitirEdicionBD()) return;
+  if (!modoEdicionBase || !permitirEdicionBD()) return;
   if (!baseInicializada) { alert('Primero confirma la base oficial inicial en Importar.'); return; }
   bdGuardando = true;
   estadoBD('Guardando estudiantes en el servidor…');

@@ -54,6 +54,7 @@
   </style>
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
+<script src="student-identity.js"></script>
   <script src="auxiliar-permissions.js"></script>
   <link rel="stylesheet" href="layout-shells.css" />
 </head>
@@ -412,7 +413,7 @@ function alumnosAula() {
   const c = ctx();
   const list = ((BD[c.nivel] || {}).estudiantes) || [];
   const g = parseInt(c.grado, 10);
-  return list.filter(a => Number(a.grado) === g && String(a.seccion) === String(c.seccion));
+  return IEStudentIdentity.numbered(list.filter(a => Number(a.grado) === g && String(a.seccion) === String(c.seccion)), c.nivel);
 }
 
 function onNivel() {
@@ -577,7 +578,7 @@ function renderLista() {
         : '';
       return '<div class="row">' +
         '<div class="flex gap-2 items-center">' +
-        '<div class="text-xs font-bold text-slate-400 w-6">'+(i+1)+'</div>' +
+        '<div class="text-xs font-bold text-slate-400 w-6">'+al.numeroVisual+'</div>' +
         '<div class="flex-1 min-w-0 font-bold text-sm truncate">'+al.nombre+' '+hora+'</div>' +
         '<div class="flex gap-1">' +
         ['P','F','T','J'].map(v => '<button type="button" class="chip '+(m===v?v:'')+'" data-n="'+enc+'" data-v="'+v+'">'+v+'</button>').join('') +
@@ -684,7 +685,7 @@ async function cargarGruposWaAuxiliar() {
 
 function textoListaAula(nivel, grado, seccion, fecha) {
   if (!IEAuxPermissions.permite(nivel)) throw new Error('Nivel no autorizado.');
-  const list = (((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion));
+  const list = IEStudentIdentity.numbered((((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion)), nivel);
   let cP=0,cF=0,cT=0,cJ=0;
   const lineas = [], faltas = [];
   list.forEach((al, i) => {
@@ -694,7 +695,7 @@ function textoListaAula(nivel, grado, seccion, fecha) {
     if (m==='F' || !rec.marca) faltas.push(al.nombre + (!rec.marca ? ' (sin marca)' : ''));
     const hora = (m==='P'||m==='T'||m==='J') && rec.hora ? '  ' + rec.hora : '';
     const mot = (m==='J' && rec.motivo) ? ' ('+rec.motivo+')' : '';
-    lineas.push((i+1)+'. '+al.nombre+'  '+m+hora+mot);
+    lineas.push(al.numeroVisual+'. '+al.nombre+'  '+m+hora+mot);
   });
   return {
     list, cP, cF, cT, cJ,

@@ -40,6 +40,21 @@
     if(matches.length!==1)return undefined;
     const record=mapa[matches[0]];return record&&record.borrado?undefined:record;
   }
+  // Presentation only: never replace SIAGIE order or use the ordinal as an identity.
+  function numbered(list, nivel) {
+    const counters = new Map();
+    return (list || []).map((al, index) => ({al, index})).sort((a,b) =>
+      String(a.al.nivel || nivel || '').localeCompare(String(b.al.nivel || nivel || '')) ||
+      Number(a.al.grado || 0)-Number(b.al.grado || 0) ||
+      String(a.al.seccion || '').localeCompare(String(b.al.seccion || ''), 'es') ||
+      ((Number(a.al.orden)>0 ? Number(a.al.orden) : Infinity)-(Number(b.al.orden)>0 ? Number(b.al.orden) : Infinity) || a.index-b.index)
+    ).map(({al}) => {
+      const aula=JSON.stringify([al.nivel || nivel || '', String(al.grado || ''), String(al.seccion || '')]);
+      const numeroVisual=(counters.get(aula) || 0)+1;
+      counters.set(aula, numeroVisual);
+      return {...al, numeroVisual};
+    });
+  }
   global.studentKey=studentKey;
-  global.IEStudentIdentity={normalizarNombre,recordar,leer};
+  global.IEStudentIdentity={normalizarNombre,recordar,leer,numbered};
 })(window);

@@ -79,8 +79,8 @@
       tabs.querySelectorAll('button').forEach(b=>{b.setAttribute('aria-selected',String(b.dataset.competence===competence));b.disabled=busy;});
       completeness.textContent=Object.keys(COMP).map(cp=>{const n=Array.isArray(data.aportesPendientes)?data.estudiantes.filter(al=>!data.aportesPendientes.some(p=>p.id===al.id&&p.comp===cp)).length:0;return (cp==='tic'?'TIC':'Gestiona')+': '+n+'/'+data.estudiantes.length+' estudiantes completos'+(n===data.estudiantes.length?' ✓':' · '+(data.estudiantes.length-n)+' pendientes');}).join(' · ');
       const table=text('table','',rows);table.className='trans-grid';const head=text('thead','',table),hr=text('tr','',head);['N°','Estudiante'].forEach(label=>text('th',label,hr));data.areas.forEach(area=>{const header=text('th',AREA_LABELS[area]||area,hr);header.className='trans-area-header';header.title=area;});['Sugerido','Final','Conclusión'].forEach(label=>text('th',label,hr));const tbody=text('tbody','',table);
-      data.estudiantes.forEach((al,index)=>{
-        const card=text('tr','',tbody);text('td',String(index+1),card);const student=text('th',al.nombre,card);student.className='trans-student';student.scope='row';
+      global.IEStudentIdentity.numbered(data.estudiantes).forEach((al,index)=>{
+        const card=text('tr','',tbody);text('td',String(al.numeroVisual),card);const student=text('th',al.nombre,card);student.className='trans-student';student.scope='row';
         const comp=competence,result=data.resultados[al.id][comp],record=(draft[al.id]||{})[comp]||result.final;
         data.areas.forEach(area=>{
           const cell=text('td','',card),effective=result.resumen.aportes.find(a=>a.area===area),pending=(data.aportesPendientes||[]).filter(p=>p.id===al.id&&p.comp===comp&&p.area===area);
