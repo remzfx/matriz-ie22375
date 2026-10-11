@@ -1224,7 +1224,7 @@ async function listarPlantillasSiagie() {
     const items = (data && data.items) || [];
     if (!items.length) { box.innerHTML = '<p class="text-slate-400">Aún no hay plantillas habilitadas.</p>'; return; }
     box.innerHTML = '<b>Habilitados</b><ul class="list-disc pl-5 mt-1">' + items.map(it =>
-      '<li>'+it.nivel+' · Bim '+it.bimestre+' · '+it.grado+'° '+it.seccion+' · '+it.filename+'</li>'
+      '<li>'+escapeConsulta(it.nivel)+' · Bim '+escapeConsulta(it.bimestre)+' · '+escapeConsulta(it.grado)+'° '+escapeConsulta(it.seccion)+' · '+escapeConsulta(it.filename)+'</li>'
     ).join('') + '</ul>';
   } catch(e) { box.textContent = 'No se pudo leer la nube. Verifique la conexión e intente nuevamente.'; }
 }
@@ -1889,10 +1889,10 @@ function renderDocentes() {
             ).join(' · ')
           : (d.nivel === 'primaria' ? 'Grados: '+(d.grados||[]).map(g=>g+'°').join(', ')+' · Áreas regulares sin Educación Física' : 'Áreas: ' + (d.areas||[]).join(' · ') +
              ((d.aulas&&d.aulas.length) ? (' · Aulas: ' + d.aulas.map(a=>a.replace('|','° ')).join(', ')) : '')));
-    return '<div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2" data-doc-id="'+d.id+'">' +
-      '<div><div class="font-bold">' + (d.nombre||d.user) + ' <span class="text-slate-400 font-normal">(@'+d.user+')</span></div>' +
-      '<div class="text-xs text-slate-500">' + d.nivel + ' · ' + filtro + ((d.tutorAulas||[]).length?' · Tutor: '+d.tutorAulas.join(', '):'')+' · Aportes TIC/Gestiona: '+(Object.entries(d.aportesTransversales||{}).map(([area,aulas])=>area+' → '+aulas.join(', ')).join(' · ')||'Sin asignación') + '</div>' +
-      '<div class="text-xs text-slate-400">Clave: ' + d.pass + '</div></div>' +
+    return '<div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-2" data-doc-id="'+escapeConsulta(d.id)+'">' +
+      '<div><div class="font-bold">' + escapeConsulta(d.nombre||d.user) + ' <span class="text-slate-400 font-normal">(@'+escapeConsulta(d.user)+')</span></div>' +
+      '<div class="text-xs text-slate-500">' + escapeConsulta(d.nivel) + ' · ' + escapeConsulta(filtro) + ((d.tutorAulas||[]).length?' · Tutor: '+escapeConsulta(d.tutorAulas.join(', ')):'')+' · Aportes TIC/Gestiona: '+escapeConsulta(Object.entries(d.aportesTransversales||{}).map(([area,aulas])=>area+' → '+aulas.join(', ')).join(' · ')||'Sin asignación') + '</div>' +
+      '<div class="text-xs text-slate-400">Clave: ' + escapeConsulta(d.pass) + '</div></div>' +
       '<div class="flex gap-1">' +
       '<button type="button" class="btn btn-ghost text-xs !py-1 btn-doc-edit">Editar</button>' +
       '<button type="button" class="btn btn-ghost text-xs !py-1 text-red-600 btn-doc-del">Eliminar</button>' +
