@@ -266,3 +266,45 @@ test('Cancellation retains a conflicting local edit and never sends it to the cl
  assert.equal(f.memory.get('synthetic-asis'),before);
  assert.match(f.messages.at(-1),/no se envi/);
 });
+
+
+test('Sheets auto-converts ISO dates and HH:mm times into Date objects: valid update works, stale CAS fails',()=>{
+ const s=backend(),sh=s.c.asegurarAsis_(),getRange=sh.getRange.bind(sh);
+ // Mimic observed Apps Script getValues(): date and time become Date objects
+ // as soon as setValues() reaches the actual spreadsheet.
+ sh.getRange=function(r,c,nr,nc){
+  const range=getRange(r,c,nr,nc);
+  if(r>=2 && c===1 && nc===12){
+   const original=range.setValues;
+   range.setValues=function(values){
+    const typed=values.map(raw=>{
+     const row=[...raw];
+     row[1]=new Date(String(raw[1])+'T00:00:00-05:00');
+     row[7]=new Date('1899-12-30T'+String(raw[7])+':00-05:00');
+     return row;
+    });
+    return original.call(this,typed);
+   };
+  }
+  return range;
+ };
+ const initial=s.item({marca:'P',hora:'08:00'});
+ const first=s.save([initial]);assert.equal(first.ok,true);
+ const row=sh.rows[1];
+ assert.equal(Object.prototype.toString.call(row[1]),'[object Date]');
+ assert.equal(Object.prototype.toString.call(row[7]),'[object Date]');
+ const loaded=s.load().items[0];
+ assert.equal(loaded.fecha,initial.fecha);
+ assert.equal(loaded.hora,initial.hora);
+ assert.equal(loaded.version,first.resultados[0].version,'read version must match the server receipt');
+ const next=s.save([s.item({marca:'T',hora:'08:15',ts:s.stamp+1000,versionBase:first.resultados[0].version})]);
+ assert.equal(next.ok,true,JSON.stringify(next));assert.equal(next.guardados,1);
+ const second=s.load().items[0];
+ assert.equal(second.marca,'T');assert.equal(second.hora,'08:15');
+ assert.equal(second.version,next.resultados[0].version);
+ const late=s.save([s.item({marca:'F',hora:'08:30',ts:s.stamp+2000,versionBase:first.resultados[0].version})]);
+ assert.equal(late.code,'CONFLICT');
+ assert.equal(late.resultados[0].motivo,'VERSION_CONFLICT');
+ assert.equal(s.load().items[0].marca,'T');
+ assert.equal(sh.rows.length,2,'must retain exactly one student row');
+});
