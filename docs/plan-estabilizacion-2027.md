@@ -256,6 +256,8 @@ pruebas reales de Apps Script.
 El workflow `CI — pruebas y comprobaciones locales` corre en PR hacia main y
 push a main, con permiso de lectura y sin secretos. El resumen del job informa
 totales aprobados/fallidos/omitidos; si una comprobación falla, el job falla.
+El checkout obtiene el historial completo porque varias regresiones existentes
+comparan archivos contra commits históricos aprobados; no se omiten esas pruebas.
 El workflow manual de despliegue Apps Script se conserva sin cambios.
 
 Revertir este primer PR retira CI/documentación/comprobadores; no requiere

@@ -19,7 +19,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          fetch-depth: 2
+          # Las regresiones existentes comparan contra commits históricos aprobados.
+          fetch-depth: 0
 
       - name: Preparar Node.js LTS fijado
         uses: actions/setup-node@v4
