@@ -37,7 +37,7 @@ test('Asistencia is blocked until Administration configures its own periods; gra
 test('Bimonthly attendance validates verified roster; transferred students cannot be marked',()=>{
  const f=fixture();assert.equal(f.set({}).ok,true);
  const wrong=f.save([f.item('Synthetic Transferred')]);
- assert.equal(wrong.code,'ROSTER_CONFLICT');assert.equal(f.s.tables.has('AsistenciaIngreso'),false);
+ assert.equal(wrong.code,'ROSTER_CONFLICT',JSON.stringify(wrong));assert.equal(f.s.tables.has('AsistenciaIngreso'),false);
  const valid=f.save([f.item()]);
  assert.equal(valid.ok,true);
  const current=f.load();
@@ -47,7 +47,7 @@ test('Bimonthly attendance validates verified roster; transferred students canno
 });
 test('Closing an attendance period atomically freezes history without closing the grade period',()=>{
  const f=fixture();assert.equal(f.set({}).ok,true);
- const save=f.save([f.item()]);assert.equal(save.ok,true);
+ const save=f.save([f.item()]);assert.equal(save.ok,true,JSON.stringify(save));
  const before=JSON.stringify(f.s.tables.get('AsistenciaIngreso').rows);
  assert.equal(f.set({III:'cerrado'}).ok,true);
  const later=f.save([f.item('Synthetic Active',{marca:'F',versionBase:save.resultados[0].version,ts:Date.now()})]);
@@ -73,7 +73,7 @@ test('Year, bimestre and authorized student must match the scope of every batch'
 });
 test('Reading attendance remains possible after closure and restricts its year and bimestre',()=>{
  const f=fixture();assert.equal(f.set({}).ok,true);
- assert.equal(f.save([f.item()]).ok,true);
+ const first=f.save([f.item()]);assert.equal(first.ok,true,JSON.stringify(first));
  assert.equal(f.set({III:'cerrado'}).ok,true);
  assert.equal(f.load('III',2026).items.length,1);
  assert.equal(f.load('IV',2026).items.length,0);
