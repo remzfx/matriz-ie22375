@@ -86,3 +86,32 @@ test('Offline-only preview mirrors header and footer without touching production
  assert.match(preview,/sin conexión|sin conexión/i);
  assert.doesNotMatch(preview,/script\.google\.com|\/macros\/s\/|CLOUD_API_URL|fetch\s*\(/);
 });
+test('Attendance form displays Fecha Año Bimestre on same row and Nivel Grado Sección on second row',()=>{
+ const form=source.slice(source.indexOf('<main id="vistaAsis"'),source.indexOf('    <input type="search" id="inpBuscar"'));
+ const first=form.match(/<div class="asis-fila-fecha">([\s\S]*?)<p id="asisEstado"/);
+ assert.ok(first,'First compact row');
+ const firstIds=['inpFecha','asisAnio','selBimestre'];
+ firstIds.forEach(id=>assert.match(first[1],new RegExp('id="'+id+'"')));
+ assert.ok(firstIds.every((id,i)=>i===0||first[1].indexOf(firstIds[i-1])<first[1].indexOf(id)));
+ const second=form.match(/<div class="asis-fila-aula">([\s\S]*?)$/);
+ assert.ok(second,'Second compact row');
+ const secondIds=['selNivel','selGrado','selSeccion'];
+ secondIds.forEach(id=>assert.match(second[1],new RegExp('id="'+id+'"')));
+ assert.ok(secondIds.every((id,i)=>i===0||second[1].indexOf(secondIds[i-1])<second[1].indexOf(id)));
+ assert.match(source,/\.asis-fila-fecha\s*\{\s*display:grid;\s*grid-template-columns:minmax\(0,1\.8fr\)/);
+ assert.match(source,/\.asis-fila-aula\s*\{\s*display:grid;\s*grid-template-columns:minmax\(0,1\.5fr\)/);
+ assert.match(source,/@media \(max-width:440px\)/);
+ assert.match(source,/\.asis-field select, \.asis-field input\[type=date\]\s*\{/);
+ for(const id of [...firstIds,...secondIds])assert.equal((source.match(new RegExp('id="'+id+'"','g'))||[]).length,1);
+});
+test('QR real and safe scanner buttons share compact action row above the student list',()=>{
+ const form=source.slice(source.indexOf('<main id="vistaAsis"'),source.indexOf('<div id="lista"'));
+ assert.match(form,/class="asis-scan-actions"/);
+ assert.match(form,/onclick="toggleScan\(\)"/);
+ assert.match(form,/onclick="toggleScan\(true\)">Probar lector QR \(sin registrar\)/);
+ assert.ok(form.indexOf('class="asis-scan-actions"')<form.indexOf('id="lista"')||form.includes('class="asis-scan-actions"'));
+ assert.match(source,/\.asis-scan-actions\s*\{\s*display:grid;\s*grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
+ assert.match(preview,/class="cols cols-aula"/);
+ assert.match(preview,/Probar lector QR \(sin registrar\)/);
+ assert.doesNotMatch(preview,/getUserMedia|Html5Qrcode/,'Offline preview must remain visual-only');
+});
