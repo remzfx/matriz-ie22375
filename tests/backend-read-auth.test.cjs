@@ -277,6 +277,9 @@ for(const [file,name,helper,role,action] of [
     IEStudents:{fetchJSON:async(url,options)=>(await context.fetch(url,options)).json(),loadRoster:async()=>({primaria:{estudiantes:[]},secundaria:{estudiantes:[]}})},
     XLSX:{read:()=>({SheetNames:[]}),write:()=>new Uint8Array()},fetchRegAula:async()=>[],areasDeNivel:()=>[],estudiantesDe:()=>[]
   });
+  if(file==='auxiliar.html' && name==='bajarNube'){
+    context.anioAsistencia=()=>2026;context.bimestreAsistencia=()=> 'III';
+  }
   if(file==='auxiliar.html' && name==='bajarGruposWa'){
     new vm.Script("let waPendiente=null,waToken='',waActualizado=0;function enviarGruposHoy(){}").runInContext(context);
     context.IEStudents.validToken=()=>token;

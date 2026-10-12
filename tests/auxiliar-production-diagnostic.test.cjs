@@ -9,6 +9,9 @@ function extract(name){
 }
 function fixture(nivel){
   const server=studentsFixture(),rows=server.tables.get('ConfigSistema').rows;
+  server.c.bimestreAbierto_=()=>true;
+  const roster=server.post({action:'seedstudentsroster',token:server.admin,version:server.init.version,bimestre:'III'});
+  assert.equal(roster.ok,true,'Synthetic III roster must be confirmed before auxiliary loading');
   rows.splice(rows.findIndex(r=>r[0]==='AUXILIAR_ACCESOS'),1);
   let version=0;
   const configure=()=>{
@@ -31,8 +34,8 @@ function fixture(nivel){
   run([...read('index.html').matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1]);context.mostrarHub=()=>{};
   run(read('students.js'));context.IEStudents=context.window.IEStudents;
   run(read('auxiliar-permissions.js'));context.IEAuxPermissions=context.window.IEAuxPermissions;
-  run("let BD=null,cargandoEstudiantesAux=false;const auxiliarInicio=performance.now(),WA_KEY='ie22375_wa_grupos_v1';function toast(){};function onNivel(){}");
-  for(const name of ['hoyISO','medirAuxiliar','loadGruposWa','enviarGruposHoy','actualizarGradosGrupos','pintarBaseAuxiliar','retirarSesionAuxiliar','ensureBD'])run(extract(name));
+  run("let BD=null,cargandoEstudiantesAux=false;const auxiliarInicio=performance.now(),WA_KEY='ie22375_wa_grupos_v1';function toast(){};function onNivel(){};function bimestreAsistencia(){return 'III'};function mostrarEstadoAsistencia(){};async function verificarCierreAsistencia(){return true}");
+  for(const name of ['hoyISO','medirAuxiliar','loadGruposWa','enviarGruposHoy','actualizarGradosGrupos','fijarNiveles','pintarBaseAuxiliar','retirarSesionAuxiliar','ensureBD'])run(extract(name));
   return {server,configure,context,run,el,stored,local,calls};
 }
 
@@ -48,7 +51,7 @@ for(const nivel of ['primaria','secundaria'])test('Fresh '+nivel+' auxiliary log
 test('Revocation rejects students, removes cached authorization and displays a persistent session error',async()=>{
   const s=fixture('secundaria');await s.context.intentarLogin();await s.context.ensureBD();
   const token=s.context.getSession().token;s.configure();
-  await assert.rejects(s.context.ensureBD(),e=>e.code==='DENIED'&&/sesión/i.test(e.message));
+  assert.equal(await s.context.ensureBD(),false);
   assert.equal(s.server.c.validarToken_(token),null);assert.equal(s.context.IEStudents.peek(),null);
   assert.match(s.el('studentsStatus').textContent,/sesión/i);assert.doesNotMatch(s.el('studentsStatus').textContent,/cargando/i);
   assert.equal(s.context.getSession(),null);
@@ -59,7 +62,7 @@ test('Revocation rejects students, removes cached authorization and displays a p
 test('Successful auxiliary student loading finishes with a count and no retry',async()=>{
   const s=fixture('secundaria');await s.context.intentarLogin();await s.context.ensureBD();
   assert.ok(s.run('BD.secundaria.estudiantes.length')>0);
-  assert.match(s.el('studentsStatus').textContent,/estudiantes cargados/);
+  assert.match(s.el('studentsStatus').textContent,/estudiantes vigentes/);
   assert.equal(s.el('studentsRetry').hidden,true);
 });
 
@@ -75,7 +78,7 @@ for(const failure of ['pending WhatsApp','failed schedule'])test('Students rende
   s.run(html.slice(bootstrap,html.indexOf('</script>',bootstrap)));
   for(let i=0;i<40;i++)await Promise.resolve();
   assert.ok(painted>=2);assert.ok(s.run('BD.secundaria.estudiantes.length')>0);
-  assert.match(s.el('studentsStatus').textContent,/estudiantes cargados/);
+  assert.match(s.el('studentsStatus').textContent,/estudiantes vigentes/);
 });
 
 test('An HTTP 404 is a transport failure before login JSON parsing, not a denied account response',async()=>{
@@ -89,7 +92,7 @@ test('An HTTP 404 is a transport failure before login JSON parsing, not a denied
 
 test('Every production Web App endpoint uses the verified deployment ID',()=>{
   const urls=[];
-  for(const file of fs.readdirSync(path.join(__dirname,'..')).filter(f=>/\.(?:html|js)$/.test(f)))
+  for(const file of fs.readdirSync(path.join(__dirname,'..')).filter(f=>/\.(?:html|js)$/.test(f)&&f!=='preview-lector-qr-iphone-pr75.html'))
     urls.push(...Array.from(read(file).matchAll(/https:\/\/script\.google\.com\/macros\/s\/[^\s"'<>]+/g),m=>m[0]));
   assert.equal(urls.length,10);
   assert.deepEqual([...new Set(urls)],['https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec']);
@@ -100,7 +103,7 @@ test('Explicit auxiliary revocation preserves pending attendance and removes bot
   s.local.set('ie22375_session_v1',s.stored.get('ie22375_session_v1'));
   const attendance=JSON.stringify({synthetic:{marca:'P',ts:42}});
   s.local.set('ie22375_asistencia_colegio_v1',attendance);s.configure();
-  await assert.rejects(s.context.ensureBD());
+  assert.equal(await s.context.ensureBD(),false);
   assert.equal(s.local.get('ie22375_asistencia_colegio_v1'),attendance);
   assert.equal(s.local.has('ie22375_session_v1'),false);assert.equal(s.stored.has('ie22375_session_v1'),false);
   assert.equal(s.el('studentsRetry').hidden,true);assert.equal(s.el('studentsRelogin').hidden,false);
@@ -110,7 +113,7 @@ for(const status of [404,500,503])test('HTTP '+status+' loading failure shows re
   const s=fixture('primaria');await s.context.intentarLogin();const token=s.context.getSession().token;
   s.context.setTimeout=(fn,ms)=>{if(ms===1200)queueMicrotask(fn);return 0;};s.context.clearTimeout=()=>{};
   s.context.fetch=async()=>({ok:false,status});
-  await assert.rejects(s.context.ensureBD(),e=>e.code==='HTTP');
+  assert.equal(await s.context.ensureBD(),false);
   assert.equal(s.context.getSession().token,token);assert.equal(s.el('studentsRetry').hidden,false);
   assert.equal(s.el('studentsRelogin').hidden,true);assert.doesNotMatch(s.el('studentsStatus').textContent,/cargando/i);
 });
@@ -119,10 +122,10 @@ test('Network failure can recover with the retry button without reloading or los
   const s=fixture('secundaria');await s.context.intentarLogin();const network=s.context.fetch;
   s.context.setTimeout=(fn,ms)=>{if(ms===1200)queueMicrotask(fn);return 0;};s.context.clearTimeout=()=>{};
   s.context.fetch=async()=>{throw Error('synthetic network down');};
-  await assert.rejects(s.context.ensureBD());assert.match(s.el('studentsStatus').textContent,/reintentar/i);
+  assert.equal(await s.context.ensureBD(),false);assert.match(s.el('studentsStatus').textContent,/conectar|red|padrón|servidor/i);
   assert.equal(s.el('studentsRetry').hidden,false);assert.ok(s.context.getSession());
   s.context.fetch=network;await s.context.ensureBD();
-  assert.match(s.el('studentsStatus').textContent,/estudiantes cargados/);assert.equal(s.el('studentsRetry').hidden,true);
+  assert.match(s.el('studentsStatus').textContent,/estudiantes vigentes/);assert.equal(s.el('studentsRetry').hidden,true);
 });
 
 test('A late rejection for an old token cannot remove a newer login',async()=>{

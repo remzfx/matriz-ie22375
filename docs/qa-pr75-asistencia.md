@@ -1,0 +1,112 @@
+# PR #75 — Guía de pruebas de integración aisladas
+
+**Estado:** no autorizado para producción. Este documento describe qué comprobar en una COPIA; no constituye una orden de desplegar o fusionar.
+
+## Entorno reutilizado del PR #74 — no crear otro
+
+- **Google Sheets de pruebas existente:** `IE22375_PR74_PRUEBAS`. La comprobación de solo lectura confirmó las pestañas `Hoja 1`, `AsistenciaIngreso` y `ConfigSistema`. No utilizar la hoja oficial `Matriz IE 22375 - Datos` ni su copia de respaldo como entorno de pruebas.
+- **Estado observado:** `AsistenciaIngreso` conserva registros **ficticios** del PR #74 con esquema de **12 columnas** (hasta `revisionServidor`); `ConfigSistema` contiene configuraciones de auxiliares de prueba. No se observó todavía un registro `ASISTENCIA_PERIODOS` en las filas consultadas.
+- El proyecto Apps Script **vinculado a esta hoja** y el archivo de pruebas `PruebasPR74.gs` ya se utilizaron para pruebas de concurrencia. Reutilizar ese proyecto; **no modificar el Apps Script oficial**.
+- **Diferencia pendiente con PR #75:** instalar/ejecutar el backend v2 en el **mismo proyecto de pruebas**, comprobar el esquema de 15 columnas y preparar un `PADRON_III` sintético confirmado. No copiar estudiantes reales ni crear datos de ejemplo en producción.
+- Antes de cualquier prueba desde una página HTML, verificar que su URL de API corresponde al Web App de **pruebas**, nunca al de producción. En particular, abrir archivos del PR directamente puede seguir apuntando al backend oficial; no utilizar esas páginas para escrituras.
+- **Despliegue del proyecto de pruebas:** lo realiza exclusivamente el propietario y solo después de identificar explícitamente el Script ID de prueba; el workflow general `Deploy Apps Script` de `main` apunta normalmente a la implementación oficial y **no sirve para este ensayo**.
+- La suite automatizada de GitHub Actions es una comprobación separada. No marca estas pruebas de integración como aprobadas hasta disponer de resultados reales del Apps Script de pruebas.
+
+**Orden corto:** (1) backend v2 en Apps Script aislado; (2) comprobar `asisprotocol`, `loadasisperiodos` y `PADRON_III` de prueba; (3) ensayar guardado/cierre/historial, estadísticas y QR móvil desde un frontend de pruebas HTTPS; (4) revisar resultados y autorizar merge. Ninguno de estos pasos implica despliegue oficial.
+
+## Evidencia de integración real en el entorno PR74 reutilizado (12-10-2026)
+
+Se ejecutaron de forma interactiva, **solo en el Apps Script independiente** `IE22375_PR74_APPS_SCRIPT_PRUEBAS`, las siguientes funciones. El usuario compartió capturas con los registros de ejecución exitosos:
+
+| Verificación | Evidencia y resultado |
+| --- | --- |
+| `verificarEntornoPR74` | Hoja `IE22375_PR74_PRUEBAS` verificada; pestañas AsistenciaIngreso y ConfigSistema. |
+| `verificarPR75SoloLectura` | Funciones v2 presentes, año 2026, III bloqueado, 12 columnas previas; no escribió. |
+| `probarPR75CierreIndependiente` | Abrió y cerró III; conservó historia de asistencia y no cambió configuración de notas. |
+| `probarPR75BloqueoEscritura` | `saveasis` con III cerrado devolvió `PERIOD_CLOSED`; historial sin cambios. |
+| `probarPR75GuardadoYEstadisticas` | Padrón ficticio de 2 estudiantes; guardó P en III (15 columnas), estadísticas primaria P=1/total=1, conservó las filas antiguas y cerró III en `finally`. |
+
+**Confirmación de lectura directa** de la hoja aislada mediante el conector Google Sheets: `AsistenciaIngreso` tiene encabezados de 15 columnas, filas históricas con 12 valores y una nueva fila ficticia de 15 valores (fecha 2026-10-12, primaria, P, año 2026, bimestre III); `ConfigSistema` contiene pares de apertura/cierre y su último cierre deja III=`cerrado`; `EstudiantesBase` presenta el marcador `ESTUDIANTES_COMMIT` con los datos ficticios. No se consultó ni escribió la hoja oficial.
+
+**Aún pendientes para autorizar merge:** validación real del lector en iPhone/Android mediante frontend HTTPS **apuntando al Apps Script aislado**, prueba de interfaz de Admin y Auxiliar con cierre/estadísticas, y preparación verificada del backend v2 que utilizará la página publicada. El uso local del editor Apps Script no equivale a desplegar Web App en el entorno real. No fusionar ni desplegar automáticamente.
+
+## Reglas innegociables
+
+- El propietario autoriza expresamente el merge (lo ejecuta ChatGPT) y efectúa personalmente cualquier despliegue desde GitHub/Apps Script.
+- No alterar la implementación pública de Apps Script, ni la hoja oficial, ni el sitio publicado para ejecutar estas pruebas.
+- Probar con una copia privada de Google Sheets y un proyecto/implementación Apps Script de prueba vinculado exclusivamente a esa copia.
+- Las páginas de prueba `admin.html` y `auxiliar.html` deben apuntar a la URL de la **implementación de prueba**; el código fuente normalmente apunta a producción. No visitar una página de prueba que aún use `CLOUD_API_URL` de producción para experimentar con escrituras.
+- No cargar información identificable de estudiantes en repositorios públicos, capturas públicas ni comentarios del PR.
+- No asumir que las pruebas sintéticas en GitHub Actions equivalen a una prueba real de Google Apps Script/Sheets.
+
+## Matriz de escenarios — copia exclusivamente
+
+| Caso | Procedimiento | Resultado esperado |
+| --- | --- | --- |
+| 1. Autorización y estado inicial | Abrir Auxiliar antes de configurar `ASISTENCIA_PERIODOS` | Solo lectura, sin cambios en asistencia |
+| 2. Independencia | Cambiar cierre de asistencia del III, sin tocar notas | Se rechaza `saveasis` si está cerrado; `savereg` sigue su propia configuración |
+| 3. Lectura tras cierre | Registrar marca en bimestre abierto, cerrar y volver a consultar | Se ve la marca histórica; no se altera al cerrar |
+| 4. Traslado entre padrones | Usar un estudiante en II y ausente en `PADRON_III` | Su marca del II continúa en el II; no figura para marcar en el III |
+| 5. Matrícula vigente | Comparar III con padrón certificado | No usar `BASE_ACTUAL`; cuando corresponda a la misma fuente oficial, 257 secundaria y 146 primaria |
+| 6. Actualización padrón III | Sincronizar nuevo padrón en la copia | No elimina registros de días o bimestres anteriores |
+| 7. Conflicto dos dispositivos | Abrir misma marca en 2 móviles, editar en ambos y subir | Versionado CAS; sin sobreescritura silenciosa |
+| 8. Cierre con local pendiente | Crear marca local, cerrar en Admin de prueba y subir | Backend rechaza; la marca local se conserva para revisión |
+| 9. QR y carga masiva | Con cierre confirmado y permiso, registrar varias marcas | Registros con identidad y nombre oficial; sin duplicados |
+| 10. Aulas y niveles | Entrar como auxiliar de Primaria y Secundaria separadamente | Cada cuenta solo ve/escribe niveles autorizados |
+| 11. Historial previo v1 | Cargar filas antiguas de `AsistenciaIngreso` sin año ni bimestre y consultar por fecha/nivel | Aparecen únicamente en «Archivo anterior (solo lectura)» y no se mezclan con el padrón moderno |
+| 12. Seguridad histórica | Intentar combinar `historico=1` con un bimestre, o leer otro nivel | Solicitud rechazada o alcance restringido, sin escrituras |
+| 13. Teléfono sin conexión | Fallar red de forma controlada y volver a entrar | No se confirma falsamente una sincronización; marcas locales permanecen |
+| 14. Retrocompatibilidad | Comparar registros reales representativos antes/después en copia | Ninguna fila histórica se borra, reescribe ni asigna artificialmente a un bimestre |
+| 15. Estadística del día | Seleccionar fecha, nivel y bimestre en Auxiliar; actualizar resumen | Presentes, faltas, tardanzas, justificadas y sin registrar suman exactamente el padrón oficial |
+| 16. Ejemplo de 257 alumnos | Registrar sintéticamente 250/3/4 para el día 11; 230/20/7 para el 12; 230/14/13 para el 13 | Tabla y gráfico mensual muestran las tres fechas sin confundir tardanzas con faltas |
+| 17. Registros parciales | Marcar una parte del padrón y consultar antes de subir otras marcas | La diferencia se muestra «Sin registrar», no como falta ni justificación |
+| 18. Estadística en bimestre cerrado | Cerrar asistencia del bimestre en la copia y volver a consultar estadísticas | Conserva consulta histórica; sin autorizaciones de escritura |
+| 19. Permisos estadísticos | Auxiliar de Primaria intenta consultar estadísticas de Secundaria | Se rechaza la consulta; API devuelve solo agregados, nunca nombres o códigos de estudiantes |
+| 20. Integridad y anomalías | Duplicar deliberadamente una fila de prueba y consultar | No cuenta dos veces a un estudiante; presenta aviso de duplicados para revisión |
+
+| 21. Photochecks usa padrón III | Seleccionar III en Photochecks en la copia y comparar con la lista de Asistencia | Ambos muestran los mismos estudiantes vigentes de ese bimestre; ningún traslado entra desde BASE_ACTUAL |
+| 22. Padrón no confirmado | Simular fallo del servidor, caché offline y bimestre sin PADRON confirmado | Generar aula, generar nivel e imprimir quedan bloqueados; no se reutilizan carnets anteriores |
+| 23. QR e impresión | Abrir `preview-photochecks-pr75.html` local y después probar el módulo con alumnos ficticios en copia | QR visible, compatible con lector Auxiliar, diseño institucional y A4 dos por fila, opción Guardar como PDF |
+| 24. Cambiar bimestre | Generar carnet de muestra en III, cambiar a IV y esperar respuesta de copia | Se limpia la vista y no se imprime un carnet de III atribuido a IV |
+
+## Revisión de premerge: sincronización controlada (bloqueante)
+
+- El botón **Subir asistencia** envía únicamente las marcas locales ya creadas para la **fecha seleccionada**. Las otras fechas permanecen pendientes hasta que se consulten y suban por separado.
+- Nunca convierte automáticamente **Sin registrar** en **Falta** al pulsar subir; las ausencias requieren marca manual/acción explícita revisada.
+- Verificar que las marcas de varios niveles autorizados del mismo día se mantienen en la subida; el servidor valida año, bimestre, identidad y permisos.
+- Comprobar ante cierre/traslado/error que las marcas locales permanezcan sin confirmación y que el backend no acepte escrituras.
+
+### Bloqueo de publicación y orden seguro
+
+- El frontend del PR #75 requiere `asisprotocol` **v2**, `loadasisperiodos`, `loadasisstats`, `saveasisperiodos` y padrón bimestral. El Apps Script publicado anteriormente no ofrece todas estas capacidades: **no fusionar mientras la implementación vigente no esté compatible**, porque GitHub Pages puede publicar el frontend al fusionar.
+- Ejecutar antes los escenarios de integración en una **copia independiente de Apps Script + Sheets**, incluidos permisos, QR real Safari/iOS, cierre, historial y concurrencia.
+- Solo tras aprobar en copia: el propietario despliega primero un backend v2 compatible (respaldo previo y comprobación autenticada, sin cambiar frontend aún), autoriza merge; ChatGPT ejecuta merge y el propietario maneja los despliegues posteriores. Si GitHub Pages se publica por merge, confirmar funcionamiento del frontend contra el backend preparado.
+## Comprobación visual del formulario compacto (Android, iPhone y escritorio)
+
+1. Confirmar que **Fecha | Año lectivo | Bimestre** estén en la misma fila y **Nivel | Grado | Sección** en la siguiente, sin desplazamiento horizontal ni recortes.
+2. Probar Safari/iPhone y Chrome/Android a aproximadamente 360–390 px de ancho, además de escritorio. La tipografía de los selectores conserva tamaño 16 px para evitar zoom automático al tocar campos.
+3. Verificar que solo aparezca **Escanear QR**, encima de la lista de estudiantes, con «Subir asistencia» como acción separada.
+4. Con el bimestre cerrado o sin verificar, usar «Escanear QR» para comprobar un código del aula, de otra aula autorizada y uno ficticio: debe reconocer sin modificar ni historial local ni nube. Con el bimestre abierto, debe marcar localmente pero sin subir a la nube hasta «Subir asistencia».
+5. Cerrar la cámara mientras todavía hay decodificaciones pendientes y volver a abrir en modo de escritura: las lecturas pendientes de la sesión previa se ignoran.
+6. Si **Año lectivo** muestra «—» y **Cierre sin verificar: solo lectura**, verificar la API `loadasisperiodos` del proyecto Apps Script de **prueba**. No desbloquear escrituras manualmente ni modificar producción.
+
+## Prueba segura del lector QR en iPhone (un único botón)
+
+**No probar con datos escolares en producción antes de una autorización.** Realizarla en una implementación aislada, o después de una publicación expresamente aprobada.
+
+1. Abre Safari en iPhone, navega al sitio HTTPS de prueba y entra al módulo Asistencia con una cuenta autorizada. La app Cámara nativa no registra asistencia: este QR tiene formato de texto escolar.
+2. Muestra el photocheck QR en otra pantalla o impreso. No puede leerse con la cámara un QR que esté en la misma pantalla del iPhone.
+3. Pulsa «Escanear QR» y permite la cámara. Si la asistencia está cerrada o sin verificar, el lector entra automáticamente en «Solo lectura», sin guardar datos.
+4. Enfoca el QR a 15–25 cm. El mensaje «QR leído» confirma el reconocimiento; un QR ficticio se decodifica pero no coincide con el padrón.
+5. En solo lectura, comprueba que los conteos y los registros locales/de nube no cambian. En bimestre abierto, el escáner marca solamente en el dispositivo; «Subir asistencia» es la única acción que sincroniza.
+6. Si no carga el lector, verifica internet (la librería de lectura aún depende de Html5Qrcode externo). Si hay problemas de permisos, revísalos en Safari/Ajustes. Si la página no es HTTPS, no se puede solicitar la cámara.
+7. Cierra la cámara. Si el periodo está abierto, NO utilices estudiantes reales para una prueba de grabación sin autorización: sus marcas sí quedan guardadas localmente, aunque no se envían automáticamente.
+
+Las pruebas automáticas solo comprueban el código; hace falta validar físicamente Safari/iPhone en un sitio seguro.
+## Criterios para solicitar aprobación final
+
+1. La CI del último commit del PR pasa sin errores.
+2. Los 24 escenarios de integración anteriores se verifican en copia con evidencia mínima sin datos personales.
+3. Los padrones por bimestre consultados se verifican contra su fuente oficial.
+4. Se dispone de respaldo independiente de Sheets y del Apps Script actual.
+5. El propietario autoriza explícitamente el merge, ChatGPT lo ejecuta y el propietario realiza exclusivamente los despliegues. Hasta entonces, PR en borrador, sin fusión y sin despliegue.

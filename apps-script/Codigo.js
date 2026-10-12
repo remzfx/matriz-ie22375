@@ -73,6 +73,22 @@ function guardarAsistenciaIngreso_(body, items) {
     if (!sesion || items.some(function(it) { return !autorizaNivelAuxiliar_(sesion,it.nivel); })) {
       return {ok:false,code:'SESSION',error:'Sesión inválida o revocada. Vuelve a iniciar sesión.'};
     }
+    const configAsis=obtenerAsistenciaPeriodos_();
+    if (!items.length || items.some(function(it){return !asistenciaAbierta_(configAsis,it.anio,it.bimestre);}))
+      return {ok:false,code:'PERIOD_CLOSED',error:'Asistencia del bimestre cerrada, bloqueada o sin configurar. Solo lectura.'};
+    // La nómina es la fotografía oficial del bimestre, no BASE_ACTUAL.
+    const bimestre=items[0].bimestre,anio=items[0].anio;
+    if (items.some(function(it){return it.bimestre!==bimestre || it.anio!==anio;}))
+      return {ok:false,code:'INVALID_BATCH',error:'No se mezclan años ni bimestres en la misma subida.'};
+    const padron=leerPadronEstudiantes_(hojaEstudiantes_(),bimestre);
+    if (!padron) return {ok:false,code:'ROSTER_MISSING',error:'No existe un padrón confirmado para el bimestre seleccionado.'};
+    const admitidos=new Set(padron.estudiantes.map(function(al){
+      return [String(al.nivel),String(gradoEscritura_(al.grado)),seccionEscritura_(al.seccion),
+        identidadParaAsistencia_(al),String(al.nombre)].join('||');
+    }));
+    if (items.some(function(it){
+      return !admitidos.has([it.nivel,it.grado,seccionEscritura_(it.seccion),it.idEstudiante,it.nombre].join('||'));
+    })) return {ok:false,code:'ROSTER_CONFLICT',error:'La nómina del bimestre cambió. Recarga el padrón antes de registrar asistencia.'};
     const vistos = Object.create(null);
     if (items.some(function(it) { if (vistos[it.clave]) return true; vistos[it.clave]=true; return false; })) {
       return {ok:false,code:'INVALID_BATCH',error:'El lote repite una clave; no se escribió ninguna marca.'};
@@ -102,19 +118,19 @@ function guardarAsistenciaIngreso_(body, items) {
       // El reloj no da autoridad: se requiere CAS aun cuando el timestamp parezca más nuevo.
       const rev=row && Number(row[11]);
       const revision=(Number.isSafeInteger(rev) && rev >= 0 ? rev : 0)+1;
-      const nueva=[it.clave,it.fecha,it.nivel,it.grado,it.seccion,it.nombre,contenido[0],contenido[1],contenido[2],ts,contenido[3],revision];
+      const nueva=[it.clave,it.fecha,it.nivel,it.grado,it.seccion,it.nombre,contenido[0],contenido[1],contenido[2],ts,contenido[3],revision,it.anio,it.bimestre,it.idEstudiante];
       const fila=actual ? actual.fila : sh.getLastRow()+1;
-      if (sh.getLastColumn() < 12) sh.getRange(1,12).setValue('revisionServidor');
+      if (sh.getLastColumn() < 15) sh.getRange(1,12,1,4).setValues([['revisionServidor','anio','bimestre','idEstudiante']]);
       // Evita que Sheets convierta ISO y HH:mm en Date (y cambie la versión).
       // Solo se formatean las dos celdas del registro autorizado, nunca el historial.
       sh.getRange(fila,2).setNumberFormat('@');
       sh.getRange(fila,8).setNumberFormat('@');
-      sh.getRange(fila,1,1,12).setValues([nueva]);
+      sh.getRange(fila,1,1,15).setValues([nueva]);
       mapa[it.clave]={fila:fila,row:nueva};guardados++;
       resultados.push({clave:it.clave,estado:'aceptada',version:versionAsistenciaIngreso_(nueva)});
     });
     SpreadsheetApp.flush();
-    return {ok:conflictos===0,protocoloAsistencia:1,code:conflictos ? 'CONFLICT' : 'OK',guardados:guardados,repetidos:repetidos,conflictos:conflictos,resultados:resultados,
+    return {ok:conflictos===0,protocoloAsistencia:2,code:conflictos ? 'CONFLICT' : 'OK',guardados:guardados,repetidos:repetidos,conflictos:conflictos,resultados:resultados,
       error:conflictos ? 'Hay marcas en conflicto. Se conservaron las demás aceptadas; baja y revisa antes de resolver.' : ''};
   } finally { lock.releaseLock(); }
 }
@@ -560,6 +576,10 @@ function sesionRutaEscritura_(token, roles) {
   return sesion && roles.indexOf(sesion.role) >= 0 ? sesion : null;
 }
 
+function identidadParaAsistencia_(al) {
+  const id=String(al.idSiagie || '').trim(),codigo=String(al.codigoEstudiante || '').trim();
+  return id ? 'siagie:' + id : codigo ? 'codigo:' + codigo : 'nombre:' + String(al.nombre || '').trim().toUpperCase();
+}
 function itemAsistenciaAutorizado_(item) {
   // La estructura se valida aquí; el permiso por nivel se valida antes de escribir el lote.
   const nivel = String(item.nivel || '').trim().toLowerCase();
@@ -567,6 +587,11 @@ function itemAsistenciaAutorizado_(item) {
   const seccion = seccionEscritura_(item.seccion);
   const fecha = typeof item.fecha === 'string' ? item.fecha.trim() : '';
   const nombre = typeof item.nombre === 'string' ? item.nombre.trim() : '';
+  const anio=Number(item.anio),bimestre=String(item.bimestre || '').trim().toUpperCase();
+  const idEstudiante=String(item.idEstudiante || '').trim();
+  if (!Number.isInteger(anio) || anio < 2020 || anio > 2100 ||
+    !/^(I|II|III|IV)$/.test(bimestre) || String(anio) !== fecha.slice(0,4) ||
+    !idEstudiante || idEstudiante.length > 250 || /[|\u0000-\u001f]/.test(idEstudiante)) return null;
   if ((nivel !== 'primaria' && nivel !== 'secundaria') || !grado ||
       (nivel === 'secundaria' && grado > 5) || !seccion ||
       !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !nombre ||
@@ -574,7 +599,8 @@ function itemAsistenciaAutorizado_(item) {
   return Object.assign({}, item, {
     fecha: fecha, nivel: nivel, grado: String(grado),
     seccion: seccion === 'ÚNICA' ? 'Única' : seccion, nombre: nombre,
-    clave: [fecha, nivel, grado, seccion === 'ÚNICA' ? 'Única' : seccion, nombre].join('||')
+    anio:anio,bimestre:bimestre,idEstudiante:idEstudiante,
+    clave: [anio,bimestre,fecha,nivel,grado,seccion === 'ÚNICA' ? 'Única' : seccion,idEstudiante].join('||')
   });
 }
 
@@ -618,6 +644,122 @@ function bimestreAbierto_(bimestre) {
   return String(per.bimestres[String(bimestre)] || 'bloqueado').toLowerCase() === 'abierto';
 }
 
+
+// Cierre de asistencia independiente de los periodos de calificaciones.
+function obtenerAsistenciaPeriodos_() {
+  const academico = obtenerPeriodosConfig_();
+  const anioDefecto = Number(academico && academico.anio) || new Date().getFullYear();
+  const bloqueados = {I:'bloqueado',II:'bloqueado',III:'bloqueado',IV:'bloqueado'};
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ConfigSistema');
+  if (!sh || sh.getLastRow() < 2) return {anio:anioDefecto,bimestres:bloqueados,ts:0,configurada:false};
+  const rows = sh.getRange(2,1,sh.getLastRow()-1,3).getValues();
+  let best = null;
+  rows.forEach(function(row) {
+    if (String(row[0]) !== 'ASISTENCIA_PERIODOS') return;
+    const ts = Number(row[1]);
+    try {
+      const cfg = JSON.parse(String(row[2] || ''));
+      if (!Number.isSafeInteger(ts) || !cfg || !cfg.bimestres) return;
+      if (!best || ts > best.ts) best={anio:Number(cfg.anio),bimestres:cfg.bimestres,ts:ts,configurada:true};
+    } catch (err) {}
+  });
+  return best || {anio:anioDefecto,bimestres:bloqueados,ts:0,configurada:false};
+}
+function asistenciaAbierta_(cfg, anio, bimestre) {
+  return !!cfg && cfg.configurada && Number(cfg.anio) === Number(anio) &&
+    /^(I|II|III|IV)$/.test(String(bimestre)) &&
+    String(cfg.bimestres[bimestre] || 'bloqueado') === 'abierto';
+}
+// Conteos oficiales de solo lectura: un estudiante del PADRON_bimestre se cuenta una sola vez
+// por fecha. Las ausencias sin marca se indican como «sin registrar», nunca como F.
+function estadisticasAsistenciaIngreso_(p, sesion) {
+  const nivel=String(p.nivel || '').trim().toLowerCase();
+  const anio=Number(p.anio),bimestre=String(p.bimestre || '').toUpperCase();
+  const fecha=String(p.fecha || ''),mes=String(p.mes || '');
+  const calendario=mes ? mes : fecha.slice(0,7);
+  if (!['primaria','secundaria'].includes(nivel) || !autorizaNivelAuxiliar_(sesion,nivel))
+    return {ok:false,code:'SCOPE',error:'Nivel no autorizado para estadísticas.'};
+  if (!Number.isInteger(anio) || anio<2020 || anio>2100 ||
+      !/^(I|II|III|IV)$/.test(bimestre) ||
+      !/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(calendario) ||
+      Number(calendario.slice(0,4))!==anio ||
+      (!!fecha===!!mes) ||
+      (fecha && !/^(20\d{2}|2100)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(fecha)))
+    return {ok:false,code:'INVALID_PERIOD',error:'Indica año, bimestre, nivel y una fecha o mes válido.'};
+  if (fecha) {
+    const d=new Date(fecha+'T00:00:00Z');
+    if (!Number.isFinite(d.getTime()) || d.toISOString().slice(0,10)!==fecha)
+      return {ok:false,code:'INVALID_PERIOD',error:'Fecha inválida.'};
+  }
+  const padron=leerPadronEstudiantes_(hojaEstudiantes_(),bimestre);
+  if (!padron) return {ok:false,code:'ROSTER_MISSING',error:'Falta el padrón oficial confirmado del bimestre.'};
+  const autorizados=new Set();
+  padron.estudiantes.forEach(function(al) {
+    if (String(al.nivel).toLowerCase()!==nivel) return;
+    autorizados.add([nivel,String(gradoEscritura_(al.grado)),
+      seccionEscritura_(al.seccion),identidadParaAsistencia_(al)].join('||'));
+  });
+  const total=autorizados.size,dias=new Map(),diasMes=mes ? new Date(anio,Number(calendario.slice(5,7)),0).getDate() : 0;
+  function dia(iso) {
+    if (!dias.has(iso)) dias.set(iso,{fecha:iso,P:0,F:0,T:0,J:0,sinMarca:total,
+      registrados:0,duplicados:0,totalEstudiantes:total});
+    return dias.get(iso);
+  }
+  if (fecha) dia(fecha);
+  const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('AsistenciaIngreso');
+  if (sh && sh.getLastRow()>1) {
+    const filas=sh.getRange(2,1,sh.getLastRow()-1,15).getValues(),marcas=new Map();
+    filas.forEach(function(row) {
+      if (Number(row[12])!==anio || String(row[13])!==bimestre ||
+          String(row[2]).toLowerCase()!==nivel) return;
+      const iso=valorAsistenciaIngreso_(row[1],1);
+      if (iso.slice(0,7)!==calendario || (fecha && iso!==fecha) ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
+      const estudiante=[nivel,String(gradoEscritura_(row[3])),seccionEscritura_(row[4]),String(row[14])].join('||');
+      if (!autorizados.has(estudiante)) return;
+      const marca=String(row[6]).toUpperCase();
+      if (!['P','F','T','J'].includes(marca)) return;
+      const key=iso+'||'+estudiante;
+      if (marcas.has(key)) {
+        // Ante duplicados físicos, no inventar una preferencia: mantener el conteo
+        // sin incrementar y comunicar la anomalía para su revisión.
+        marcas.get(key).duplicado=true;
+      } else marcas.set(key,{fecha:iso,marca:marca,duplicado:false});
+    });
+    marcas.forEach(function(reg) {
+      const d=dia(reg.fecha);
+      if (reg.duplicado) {d.duplicados++;return;}
+      d[reg.marca]++;d.registrados++;
+    });
+  }
+  // La vista mensual solo muestra los días con alguna marca o anomalía en el archivo;
+  // el resto del mes no se presenta engañosamente como días de ausencias.
+  const resultado=Array.from(dias.values()).sort(function(a,b){return a.fecha.localeCompare(b.fecha);});
+  resultado.forEach(function(d){d.sinMarca=Math.max(0,total-d.registrados);});
+  return {ok:true,protocoloAsistencia:2,origen:'nube',anio:anio,bimestre:bimestre,nivel:nivel,
+    fecha:fecha,mes:mes,totalEstudiantes:total,dias:resultado,diasDelMes:diasMes,
+    advertencia:'Datos confirmados en la nube; sin marca no equivale a falta.'};
+}
+
+function guardarAsistenciaPeriodos_(body) {
+  const lock=LockService.getScriptLock();lock.waitLock(30000);
+  try {
+    if (!validarToken_(body.token,'admin')) return {ok:false,code:'SESSION',error:'Solo Administración puede cambiar el cierre de asistencia.'};
+    const actual=obtenerAsistenciaPeriodos_(),cfg=body.periodos||{};
+    const anio=Number(cfg.anio),estados=['abierto','cerrado','bloqueado'];
+    if (!Number.isInteger(anio) || anio<2020 || anio>2100 || !cfg.bimestres ||
+      ['I','II','III','IV'].some(function(b){return estados.indexOf(cfg.bimestres[b])<0;}))
+      return {ok:false,code:'INVALID_PERIOD',error:'Año y estados de asistencia inválidos.'};
+    if (Number(body.version) !== actual.ts)
+      return {ok:false,code:'CONFLICT',error:'La configuración de asistencia cambió. Actualiza antes de guardar.',periodos:actual};
+    // Un cierre no borra datos ni afecta al cierre de calificaciones.
+    const ts=Math.max(Date.now(),actual.ts+1);
+    const guardado={anio:anio,bimestres:{I:cfg.bimestres.I,II:cfg.bimestres.II,III:cfg.bimestres.III,IV:cfg.bimestres.IV}};
+    asegurarConfig_().appendRow(['ASISTENCIA_PERIODOS',ts,JSON.stringify(guardado)]);
+    SpreadsheetApp.flush();
+    return {ok:true,periodos:Object.assign({},guardado,{ts:ts,configurada:true})};
+  } finally {lock.releaseLock();}
+}
 
 function asegurarAip_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1558,7 +1700,7 @@ function doGet(e) {
     const rolesLectura = {
       loadreg: ['admin', 'docente'], loadnivel: ['admin', 'docente'], load: ['admin', 'docente'],
       loadtpl: ['admin'], loadtplstatus: ['admin', 'docente'],
-      loadasis: ['admin', 'auxiliar'], asisprotocol: ['admin', 'auxiliar'], loadaip: ['admin', 'pip'],
+      loadasis: ['admin', 'auxiliar'], loadasisstats: ['admin', 'auxiliar'], loadasisperiodos: ['admin', 'auxiliar'], asisprotocol: ['admin', 'auxiliar'], loadaip: ['admin', 'pip'],
       loadwa: ['admin', 'auxiliar'], classroom: ['admin']
     };
     const roles = Object.prototype.hasOwnProperty.call(rolesLectura, action) ? rolesLectura[action] : null;
@@ -1572,20 +1714,31 @@ function doGet(e) {
     }
 
     // Verificación de compatibilidad autenticada y sin lectura de AsistenciaIngreso.
-    if (action === 'asisprotocol') return responder_({ok:true,protocoloAsistencia:1});
+    if (action === 'asisprotocol') return responder_({ok:true,protocoloAsistencia:2});
+    if (action === 'loadasisperiodos') return responder_({ok:true,periodos:obtenerAsistenciaPeriodos_()});
+    if (action === 'loadasisstats') return responder_(estadisticasAsistenciaIngreso_(p,acceso.sesion));
 
     if ((action === 'loadasis' || action === 'loadwa') && p.nivel && !autorizaNivelAuxiliar_(acceso.sesion,String(p.nivel))) return responder_({ok:false,error:'Nivel no autorizado.'});
 
     if (action === 'loadasis') {
       const fecha = String(p.fecha || '');
+      const anio=p.anio==null?'':String(p.anio),bimestre=String(p.bimestre || '').toUpperCase();
+      // Archivo previo al protocolo v2: no se asigna un bimestre que no fue registrado.
+      const historicoAnterior=String(p.historico || '')==='1';
+      if (historicoAnterior && (anio || bimestre || !fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !['primaria','secundaria'].includes(nivel)))
+        return responder_({ok:false,code:'INVALID_PERIOD',error:'La consulta del archivo anterior requiere fecha y nivel, sin bimestre.'});
+      if ((anio || bimestre) && (!/^(20\d{2}|2100)$/.test(anio) || !/^(I|II|III|IV)$/.test(bimestre)))
+        return responder_({ok:false,code:'INVALID_PERIOD',error:'Indica año y bimestre para consultar asistencia.'});
       const sh = asegurarAsis_();
       const last = sh.getLastRow();
       const items = [];
       if (last >= 2) {
-        const data = sh.getRange(2, 1, last - 1, 12).getValues();
+        const data = sh.getRange(2, 1, last - 1, 15).getValues();
         for (let i = 0; i < data.length; i++) {
           // Sheets puede devolver Date para filas históricas; comparar en la zona horaria del archivo.
           if (fecha && valorAsistenciaIngreso_(data[i][1], 1) !== fecha) continue;
+          if (anio && (String(data[i][12]) !== anio || String(data[i][13]) !== bimestre)) continue;
+          if (historicoAnterior && (String(data[i][12] || '') || String(data[i][13] || ''))) continue;
           const nivelItem = String(data[i][2]).toLowerCase();
           if (!autorizaNivelAuxiliar_(acceso.sesion,nivelItem) || (p.nivel && p.nivel !== nivelItem)) continue;
           items.push({
@@ -1600,11 +1753,12 @@ function doGet(e) {
             via: data[i][8],
             ts: data[i][9],
             motivo: data[i][10],
+            anio: data[i][12] || '',bimestre: data[i][13] || '',idEstudiante: data[i][14] || '',
             version: versionAsistenciaIngreso_(data[i])
           });
         }
       }
-      return responder_({ ok: true, protocoloAsistencia: 1, fecha: fecha, items: items, total: items.length });
+      return responder_({ ok: true, protocoloAsistencia: 2, fecha: fecha, anio:anio,bimestre:bimestre,historicoAnterior:historicoAnterior,items: items, total: items.length });
     }
 
     if (action === 'loadreg') {
@@ -1822,7 +1976,7 @@ function doPost(e) {
     const action = String(body.action || 'saveArea').toLowerCase();
     if (['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','confirmtransversaltutor','confirmtransversalaip','revisartransversal','procesartransversales','loadtransversalexport'].includes(action)) return responder_(transversalesRuta_(body));
 
-    if (['loadreg', 'loadnivel', 'load', 'loadasis', 'asisprotocol', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
+    if (['loadreg', 'loadnivel', 'load', 'loadasis', 'loadasisstats', 'loadasisperiodos', 'asisprotocol', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
       return doGet({ parameter: body });
     }
 
@@ -1845,6 +1999,8 @@ function doPost(e) {
       if (!validarToken_(body.token,'admin')) return responder_({ok:false,error:'Sesión administrativa inválida.'});
       return responder_(action === 'loadauxiliares' ? respuestaAuxiliares_(obtenerAuxiliaresConfig_()) : guardarAuxiliar_(body));
     }
+
+    if (action === 'saveasisperiodos') return responder_(guardarAsistenciaPeriodos_(body));
 
     if (action === 'saveasis') {
       const sesion = sesionRutaEscritura_(body.token, ['admin', 'auxiliar']);

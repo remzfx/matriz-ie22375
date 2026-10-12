@@ -38,6 +38,7 @@ test('SIAGIE template status encodes all five dynamic fields without changing th
 function auxiliary(){
  const al={nombre:sample,numeroVisual:1},rec={marca:'J',hora:sample,motivo:sample,ts:123},writes=[];
  const p=page('auxiliar.html',['escapeAuxiliar','renderLista'],{ctx:()=>({nivel:'primaria',grado:1,seccion:'Única',fecha:'2026-10-11'}),alumnosAula:()=>[al],getRec:()=>rec,
+ mostrarEstadoAsistencia(){},asistenciaEscribible:()=>true,
  setRec:(a,marca,via,motivo)=>{writes.push({a,marca,via,motivo});rec.marca=marca;rec.motivo=motivo;},prompt:()=>sample,toast(){}});
  return {...p,al,rec,writes};
 }

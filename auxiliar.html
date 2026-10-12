@@ -24,7 +24,7 @@
     .btn-down { background:#e0f2fe; color:#075985; border:1px solid #7dd3fc; }
     .btn-up { background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; }
     .btn-danger { background:#fee2e2; color:#991b1b; }
-    select, input[type=date], input[type=search] {
+    select, input[type=date], input[type=month], input[type=search] {
       width:100%; border:1.5px solid #cbd5e1; border-radius:12px; padding:.65rem .75rem; font-size:16px; min-height:48px; background:#fff;
       max-width:100%; box-sizing:border-box;
     }
@@ -43,8 +43,71 @@
     .chip.T { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
     .chip.J { background:#e0e7ff; border-color:#a5b4fc; color:#3730a3; }
     .row { padding:.55rem 0; border-bottom:1px solid #f1f5f9; }
+    /* Formulario compacto en 2 filas de 3 campos, adaptable a móviles. */
+    .asis-fila-fecha { display:grid; grid-template-columns:minmax(0,1.8fr) minmax(0,.8fr) minmax(0,.85fr); gap:8px; align-items:end; }
+    .asis-fila-aula { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,.65fr) minmax(0,1fr); gap:8px; align-items:end; }
+    .asis-field { min-width:0; }
+    .asis-field label { display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:5px; }
+    .asis-field select, .asis-field input[type=date] {
+      display:block; min-width:0; width:100%; min-height:44px; padding:.5rem .55rem; border-radius:10px;
+    }
+    #asisAnio { min-height:44px; padding:.55rem .4rem; border:1.5px solid #e2e8f0; border-radius:10px;
+      display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; color:#0f172a; }
+    @media (max-width:440px) {
+      .asis-fila-fecha, .asis-fila-aula { gap:5px; }
+      .asis-fila-fecha { grid-template-columns:minmax(0,1.8fr) minmax(0,.7fr) minmax(0,.78fr); }
+      .asis-fila-aula { grid-template-columns:minmax(0,1.4fr) minmax(0,.67fr) minmax(0,1fr); }
+      .asis-field select, .asis-field input[type=date] { padding:.45rem .28rem; font-size:16px; }
+      .asis-field label { font-size:10px; }
+      #asisAnio { padding:.5rem .2rem; font-size:14px; }
+    }
     #scanBox { display:none; }
     #scanBox.on { display:block; }
+    .asis-kpi { padding:.6rem .4rem; border:1px solid #e2e8f0; border-radius:12px; text-align:center; background:#f8fafc; }
+    .asis-kpi strong { display:block; font-size:1.4rem; font-weight:900; font-variant-numeric:tabular-nums; }
+    .asis-kpi span { display:block; font-size:.65rem; font-weight:800; line-height:1.2; }
+    .asis-chart { display:flex; gap:9px; overflow-x:auto; padding:8px 2px 12px; align-items:flex-end; min-height:190px; }
+    .asis-chart-col { flex:0 0 32px; text-align:center; font-size:11px; font-weight:800; }
+    .asis-chart-bar { display:flex; flex-direction:column-reverse; height:145px; width:28px; background:#e2e8f0; border-radius:5px 5px 0 0; overflow:hidden; margin:0 auto 5px; }
+    .asis-chart-bar span { flex-shrink:0; display:block; }
+    .asis-P { background:#15803d; }.asis-F { background:#dc2626; }.asis-T { background:#d97706; }
+    .asis-J { background:#4f46e5; }.asis-S { background:#cbd5e1; }
+    .asis-legend { display:inline-flex; align-items:center; gap:4px; font-size:11px; }
+    .asis-legend i { width:9px; height:9px; border-radius:2px; display:inline-block; }
+    /* Resumen diario compacto y fijo: no compite con la lista ni con las acciones. */
+    .asis-day-footer { position:fixed; bottom:0; left:0; right:0; z-index:29; background:#fff;
+      border-top:1px solid #cbd5e1; box-shadow:0 -6px 24px rgba(15,23,42,.08);
+      padding:7px 12px calc(7px + env(safe-area-inset-bottom, 0px)); }
+    .asis-day-inner { max-width:1000px; margin:0 auto; }
+    .asis-day-top { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:4px 10px;
+      margin-bottom:6px; line-height:1.25; }
+    .asis-day-heading { font-size:12px; font-weight:900; color:#0f172a; }
+    .asis-day-detail { font-size:11px; color:#475569; font-weight:600; }
+    .asis-day-counter-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:5px 12px; }
+    #asisDiaKPIs { display:flex; align-items:center; flex-wrap:wrap; gap:5px; }
+    #asisDiaKPIs .asis-kpi { display:inline-flex; align-items:center; gap:5px;
+      padding:5px 8px; border-radius:9px; background:#f8fafc; border:1px solid #e2e8f0; }
+    #asisDiaKPIs .asis-kpi strong { display:inline; font-size:14px; line-height:1; font-weight:900; }
+    #asisDiaKPIs .asis-kpi span { display:inline; font-size:10px; line-height:1.1; }
+    .asis-day-state { display:flex; gap:6px; align-items:center; font-size:10px; color:#64748b; }
+    .asis-day-state .btn { padding:5px 8px; font-size:11px; min-height:28px; }
+    #asisStatsBoton[hidden] { display:none !important; }
+    .btn-estadisticas-header { color:#e0f2fe; background:rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.4); padding:.7rem .6rem; font-size:12px; white-space:nowrap; }
+    #asisStatsPanel { scroll-margin-top:110px; }
+    #vistaAsis { padding-bottom:calc(150px + env(safe-area-inset-bottom, 0px)); }
+    @media (max-width:540px) {
+      .asis-day-footer { padding-left:8px; padding-right:8px; }
+      .asis-day-heading { font-size:11px; }
+      .asis-day-detail { font-size:10px; }
+      #asisDiaKPIs { flex:1 1 100%; justify-content:space-between; gap:3px; }
+      #asisDiaKPIs .asis-kpi { flex:1 1 auto; justify-content:center; gap:3px; padding:5px 4px; }
+      #asisDiaKPIs .asis-kpi strong { font-size:12px; }
+      #asisDiaKPIs .asis-kpi span { font-size:9px; }
+      .asis-day-state { width:100%; justify-content:flex-end; }
+      #vistaAsis { padding-bottom:calc(172px + env(safe-area-inset-bottom, 0px)); }
+      .btn-estadisticas-header { padding:.65rem .45rem; font-size:11px; }
+    }
     #reader { width:100%; min-height:240px; background:#000; border-radius:12px; overflow:hidden; }
     #reader video, #reader canvas, #reader img {
       width:100% !important; max-height:280px !important; object-fit:cover !important;
@@ -85,7 +148,11 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <div class="font-black leading-tight" id="tituloModulo">Asistencia de ingreso</div>
       <div class="text-[11px] text-teal-100/80 leading-tight">Lector QR · iPhone y Android</div>
     </div>
-    <a href="index.html" class="btn btn-ghost btn-inicio text-sm shrink-0">Inicio</a>
+    <div class="flex items-center gap-2 shrink-0">
+      <button type="button" id="asisStatsBoton" class="btn btn-estadisticas-header"
+        aria-expanded="false" aria-controls="asisStatsPanel" onclick="verEstadisticasAsistencia()">Estadísticas</button>
+      <a href="index.html" class="btn btn-ghost btn-inicio text-sm shrink-0">Inicio</a>
+    </div>
   </div>
 </header>
 
@@ -98,36 +165,58 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
   <div class="card p-3 space-y-3">
     <div id="scanBox" class="space-y-2">
       <div id="reader"></div>
-      <p class="text-[11px] text-slate-500" id="scanMsg">Apunta al photocheck.</p>
+      <p class="text-[11px] text-slate-600 font-semibold" id="scanMsg" role="status">Enfoca un photocheck. Si la asistencia está cerrada, solo se comprobará su lectura.</p>
       <label class="btn btn-ghost w-full" style="display:block;text-align:center">
         Leer QR desde foto
         <input id="inpFotoQR" type="file" accept="image/*" capture="environment" hidden onchange="leerFotoQR(this)">
       </label>
       <button type="button" class="btn btn-danger w-full" onclick="stopScan()">Cerrar cámara</button>
     </div>
-    <div>
-      <label class="text-[10px] font-bold text-slate-500">Fecha</label>
-      <input type="date" id="inpFecha" onchange="renderLista()">
+    <div class="asis-fila-fecha">
+      <div class="asis-field">
+        <label for="inpFecha">Fecha</label>
+        <input type="date" id="inpFecha" onchange="invalidarArchivoAsistencia();invalidarEstadisticasAsistencia();renderLista();actualizarEstadisticaDia()">
+      </div>
+      <div class="asis-field">
+        <label for="asisAnio">Año lectivo</label>
+        <div id="asisAnio" aria-label="Año lectivo verificado">—</div>
+      </div>
+      <div class="asis-field">
+        <label for="selBimestre">Bimestre</label>
+        <select id="selBimestre" onchange="cambiarBimestreAsistencia()"><option>I</option><option>II</option><option selected>III</option><option>IV</option></select>
+      </div>
     </div>
-    <div>
-      <label class="text-[10px] font-bold text-slate-500">Nivel</label>
-      <span id="selNivelScope" hidden></span>
-      <select id="selNivel" onchange="onNivel()">
-        <option value="primaria">Primaria</option>
-        <option value="secundaria">Secundaria</option>
-      </select>
-    </div>
-    <div class="grid grid-cols-2 gap-2">
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Grado</label>
+    <p id="asisEstado" class="text-xs font-bold text-amber-700" role="status">Verificando cierre de asistencia…</p>
+    <div class="asis-fila-aula">
+      <div class="asis-field">
+        <label for="selNivel">Nivel</label>
+        <span id="selNivelScope" hidden></span>
+        <select id="selNivel" onchange="invalidarArchivoAsistencia();invalidarEstadisticasAsistencia();onNivel();actualizarEstadisticaDia()">
+          <option value="primaria">Primaria</option>
+          <option value="secundaria">Secundaria</option>
+        </select>
+      </div>
+      <div class="asis-field">
+        <label for="selGrado">Grado</label>
         <select id="selGrado" onchange="onGrado()"></select>
       </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Sección</label>
+      <div class="asis-field">
+        <label for="selSeccion">Sección</label>
         <select id="selSeccion" onchange="renderLista()"></select>
       </div>
     </div>
     <input type="search" id="inpBuscar" placeholder="Buscar alumno…" oninput="renderLista()">
+    <section id="asisStatsPanel" class="card p-3 space-y-3" hidden aria-label="Estadísticas mensuales de asistencia">
+      <h2 class="font-black text-base">Estadísticas de asistencia por bimestre</h2>
+      <label class="block text-xs font-bold text-slate-600" for="asisStatsMes">Mes de consulta</label>
+      <input id="asisStatsMes" type="month" onchange="cargarEstadisticasMensuales()">
+      <p id="asisStatsEstado" class="text-xs text-slate-600" role="status"></p>
+      <p id="asisStatsInfo" class="text-sm font-bold"></p>
+      <div id="asisStatsLeyenda" class="flex flex-wrap gap-2"></div>
+      <div id="asisStatsGrafico" role="img" aria-label="Gráfico de asistencia por días"></div>
+      <div id="asisStatsTabla" class="overflow-x-auto"></div>
+      <p class="text-[11px] text-slate-500">P: presente, T: tardanza, F: falta, J: justificada. Los días sin ningún registro confirmado no se grafican. Datos oficiales del padrón seleccionado.</p>
+    </section>
     <div class="actions">
       <button type="button" class="btn btn-primary" onclick="toggleScan()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>Escanear QR</button>
       <button type="button" class="btn btn-ok" onclick="marcarTodos('P')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>Todos presente</button>
@@ -136,6 +225,12 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <div class="grid grid-cols-2 gap-2">
         <button type="button" class="btn btn-up" onclick="subirTodoNube()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20V9M7 13l5-5 5 5M5 4h14"/></svg>Subir asistencia</button>
         <button type="button" class="btn btn-down" onclick="bajarNube()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Bajar asistencia</button>
+      </div>
+      <div class="rounded-xl border p-3 mt-2 space-y-2">
+        <button type="button" class="btn btn-down w-full" onclick="consultarHistorialAnterior()">Consultar archivo anterior (solo lectura)</button>
+        <p class="text-xs text-slate-600">Asistencias registradas antes de usar padrones bimestrales. No tienen bimestre certificado y no se mezclan ni modifican.</p>
+        <p id="asisLegadoEstado" class="text-xs text-slate-600" role="status"></p>
+        <div id="asisLegadoLista" class="text-xs space-y-1"></div>
       </div>
     </div>
   </div>
@@ -153,9 +248,25 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     <div id="lista"></div>
   </div>
   <p class="text-[11px] text-center text-slate-400 pb-6">
-    Primaria presente 07:30–08:15 · tardanza después. Secundaria presente 12:30–13:15 · tardanza después. J justificación manual. Al subir a la nube, sin marca = falta si ya cerró la jornada.
+    Primaria presente 07:30–08:15 · tardanza después. Secundaria presente 12:30–13:15 · tardanza después. J justificación manual. «Sin marca» no equivale a falta: las faltas se registran expresamente; «Subir asistencia» envía solo marcas existentes de la fecha seleccionada.
   </p>
 </main>
+
+<footer id="asisResumenDiario" class="asis-day-footer" aria-label="Resumen diario de asistencia">
+  <div class="asis-day-inner">
+    <div class="asis-day-top">
+      <span class="asis-day-heading">Estadística del día · nube</span>
+      <span id="asisDiaDetalle" class="asis-day-detail">Esperando padrón oficial…</span>
+    </div>
+    <div class="asis-day-counter-row">
+      <div id="asisDiaKPIs" aria-label="Conteos diarios confirmados"></div>
+      <div class="asis-day-state">
+        <span id="asisDiaEstado" role="status">Consultando registros confirmados…</span>
+        <button type="button" class="btn btn-down" onclick="actualizarEstadisticaDia()" aria-label="Actualizar estadísticas del día">Actualizar</button>
+      </div>
+    </div>
+  </div>
+</footer>
 
 <main id="vistaGrupos" class="hidden shell shell-ops max-w-lg mx-auto px-4 py-4 space-y-3">
   <div class="card p-3 space-y-3">
@@ -303,6 +414,39 @@ function toast(m) {
   setTimeout(() => el.classList.add('hidden'), 2200);
 }
 
+let configAsistencia=null,asistenciaVerificada=false;
+function bimestreAsistencia(){return document.getElementById('selBimestre').value||'III';}
+function anioAsistencia(){return configAsistencia?Number(configAsistencia.anio):0;}
+function identidadAsistencia(al){
+ const id=String(al.idSiagie||'').trim(),c=String(al.codigoEstudiante||'').trim();
+ return id?'siagie:'+id:c?'codigo:'+c:'nombre:'+String(al.nombre||'').trim().toUpperCase();
+}
+function asistenciaEscribible(){
+ const f=document.getElementById('inpFecha').value||hoyISO();
+ return asistenciaVerificada&&configAsistencia&&configAsistencia.configurada&&
+ configAsistencia.bimestres[bimestreAsistencia()]==='abierto'&&f.slice(0,4)===String(anioAsistencia());
+}
+function mostrarEstadoAsistencia(){
+ const el=document.getElementById('asisEstado'),b=bimestreAsistencia();
+ document.getElementById('asisAnio').textContent=anioAsistencia()||'—';
+ el.textContent=!asistenciaVerificada?'Cierre sin verificar: solo lectura.':
+ !configAsistencia.configurada?'Asistencia sin configurar. Solo lectura.':
+ asistenciaEscribible()?'Bimestre '+b+' abierto para asistencia.':'Bimestre '+b+' cerrado, bloqueado o fecha fuera del año: solo lectura.';
+ el.className='text-sm font-bold '+(asistenciaEscribible()?'text-emerald-700':'text-amber-700');
+}
+async function verificarCierreAsistencia(){
+ asistenciaVerificada=false;mostrarEstadoAsistencia();
+ const token=tokenSesionAuxiliar();
+ try{
+  const res=await fetchLecturaNube(CLOUD_API_URL+'?action=loadasisperiodos'),data=JSON.parse(await res.text());
+  if(token!==tokenSesionAuxiliar()||!data.ok||!data.periodos)throw Error(data.error||'Sin confirmación del cierre.');
+  configAsistencia=data.periodos;asistenciaVerificada=true;mostrarEstadoAsistencia();return true;
+ }catch(e){configAsistencia=null;asistenciaVerificada=false;mostrarEstadoAsistencia();return false;}
+}
+async function cambiarBimestreAsistencia(){
+ invalidarEstadisticasAsistencia();invalidarArchivoAsistencia();BD=IEStudents.empty();document.getElementById('lista').innerHTML='';mostrarEstadoAsistencia();
+ return ensureBD();
+}
 function loadBD() { return IEStudents.empty(); }
 function loadAsis() {
   try {
@@ -324,7 +468,7 @@ function ctx() {
 }
 function asisKey(al) {
   const fecha = (document.getElementById('inpFecha').value || hoyISO());
-  return [fecha, al.nivel, al.grado, al.seccion, al.nombre].join('||');
+  return [anioAsistencia(),bimestreAsistencia(),fecha,al.nivel,al.grado,al.seccion,identidadAsistencia(al)].join('||');
 }
 let BD = null;
 function fijarNiveles(j) {
@@ -333,80 +477,58 @@ function fijarNiveles(j) {
   ((j.secundaria && j.secundaria.estudiantes) || []).forEach(a => { a.nivel = 'secundaria'; });
   return j;
 }
-let cargandoEstudiantesAux = false;
-const auxiliarInicio = performance.now();
-try {sessionStorage.removeItem('ie22375_aux_timing_v1');}catch(e){}
+const auxiliarInicio=performance.now();
+try{sessionStorage.removeItem('ie22375_aux_timing_v1');}catch(e){}
 function medirAuxiliar(etapa,inicio) {
   try {
-    const raw = sessionStorage.getItem('ie22375_aux_timing_v1');
-    const datos = raw ? JSON.parse(raw) : {};
-    datos[etapa] = Math.round(performance.now() - inicio);
-    sessionStorage.setItem('ie22375_aux_timing_v1',JSON.stringify(datos));
+    const d=JSON.parse(sessionStorage.getItem('ie22375_aux_timing_v1')||'{}');
+    d[etapa]=Math.round(performance.now()-inicio);
+    sessionStorage.setItem('ie22375_aux_timing_v1',JSON.stringify(d));
   } catch(e) {}
 }
-function pintarBaseAuxiliar(base) {
-  BD = base;
-  IEAuxPermissions.configurar();
-  onNivel();
-  actualizarGradosGrupos();
-  if (!IEAuxPermissions.niveles().some(nivel=>BD[nivel].estudiantes.length)) document.getElementById('lista').innerHTML='';
+function pintarBaseAuxiliar(base){
+ BD=fijarNiveles(base);IEAuxPermissions.configurar();onNivel();actualizarGradosGrupos();
+ if(!IEAuxPermissions.niveles().some(n=>BD[n].estudiantes.length))document.getElementById('lista').innerHTML='';
 }
-
-function retirarSesionAuxiliar(token) {
-  const actual = IEStudents.session();
-  if (!actual || actual.token !== token) return false;
-  IEStudents.clear();
-  BD = IEStudents.empty();
-  document.getElementById('lista').innerHTML = '';
-  document.getElementById('waCola').innerHTML = '';
-  document.getElementById('selGradoGrupos').innerHTML = '<option value="">—</option>';
-  document.getElementById('selGrado').innerHTML = '<option value="">—</option>';
-  document.getElementById('selSeccion').innerHTML = '';
-  sessionStorage.removeItem('ie22375_session_v1');
-  localStorage.removeItem('ie22375_session_v1');
-  return true;
+function retirarSesionAuxiliar(token){
+ const actual=IEStudents.session();if(!actual||actual.token!==token)return false;
+ IEStudents.clear();BD=IEStudents.empty();
+ document.getElementById('lista').innerHTML='';document.getElementById('waCola').innerHTML='';
+ document.getElementById('selGradoGrupos').innerHTML='<option value="">—</option>';
+ document.getElementById('selGrado').innerHTML='<option value="">—</option>';
+ document.getElementById('selSeccion').innerHTML='';
+ sessionStorage.removeItem('ie22375_session_v1');localStorage.removeItem('ie22375_session_v1');return true;
 }
-async function ensureBD() {
-  if (cargandoEstudiantesAux) return false;
-  cargandoEstudiantesAux = true;
-  const token = IEStudents.validToken();
-  const estado = document.getElementById('studentsStatus');
-  const retry = document.getElementById('studentsRetry');
-  const relogin = document.getElementById('studentsRelogin');
-  const cache = IEStudents.peek();
-  if (cache) { pintarBaseAuxiliar(cache); medirAuxiliar('cachePaintMs',auxiliarInicio); }
-  else pintarBaseAuxiliar(IEStudents.empty());
-  estado.textContent = cache ? 'Mostrando datos locales · verificando servidor…' : 'Cargando estudiantes…';
-  retry.hidden = true; relogin.hidden = true;
-  const inicioLectura = performance.now();
-  try {
-    const base = await IEStudents.load();
-    medirAuxiliar('studentsResponseMs',inicioLectura);
-    pintarBaseAuxiliar(base);
-    medirAuxiliar('finalPaintMs',auxiliarInicio);
-    const cantidad = IEAuxPermissions.niveles().reduce((n,nivel) => n + BD[nivel].estudiantes.length,0);
-    estado.textContent = 'Datos actualizados · ' + cantidad + ' estudiantes cargados.' + (BD.offline ? ' Lista temporal sin conexión; reintenta para verificar el servidor.' : '');
-    retry.hidden = !BD.offline;
-    return true;
-  } catch(e) {
-    const vigente = e.retryable && IEStudents.validToken() === token && IEStudents.peek();
-    BD = vigente || IEStudents.empty();
-    if (e.code === 'SESSION' || e.authorizationRejected) {
-      retirarSesionAuxiliar(token || (IEStudents.session() || {}).token);
-      estado.textContent = 'Sesión inválida o revocada. Vuelve a iniciar sesión.';
-      relogin.hidden = false;
-    } else {
-      estado.textContent = (vigente ? 'Mostrando datos locales. ' : '') + (e.message || 'No se pudieron cargar estudiantes.') + ' Puedes reintentar.';
-      retry.hidden = false;
-    }
-    if (vigente) { pintarBaseAuxiliar(vigente); throw e; }
-    IEAuxPermissions.configurar();
-    document.getElementById('selGrado').innerHTML = '<option value="">—</option>';
-    document.getElementById('selSeccion').innerHTML = '';
-    document.getElementById('lblAula').textContent = estado.textContent;
-    document.getElementById('lista').innerHTML = '';
-    throw e;
-  } finally { cargandoEstudiantesAux = false; }
+async function ensureBD(){
+ const serial=(ensureBD.serial||0)+1;ensureBD.serial=serial;
+ const bim=bimestreAsistencia(),token=IEStudents.validToken();
+ const estado=document.getElementById('studentsStatus'),retry=document.getElementById('studentsRetry'),relogin=document.getElementById('studentsRelogin');
+ const cache=IEStudents.peekRoster(bim);
+ if(cache&&cache.padronInicializado&&cache.bimestre===bim)pintarBaseAuxiliar(cache);
+ else pintarBaseAuxiliar(IEStudents.empty());
+ estado.textContent=cache?'Padrón '+bim+' local · comprobando servidor…':'Cargando padrón '+bim+'…';
+ retry.hidden=true;relogin.hidden=true;
+ const inicio=performance.now();
+ try{
+  const base=await IEStudents.loadRoster(bim);
+  if(serial!==ensureBD.serial||bim!==bimestreAsistencia()||token!==IEStudents.validToken())return false;
+  if(!base.padronInicializado||base.fuentePadron!=='bimestre'||base.bimestre!==bim)
+   throw Error('Padrón '+bim+' no confirmado. No se usará la base general.');
+  medirAuxiliar('studentsResponseMs',inicio);pintarBaseAuxiliar(base);
+  const total=IEAuxPermissions.niveles().reduce((n,nivel)=>n+BD[nivel].estudiantes.length,0);
+  estado.textContent='Padrón '+bim+' · '+total+' estudiantes vigentes.'+(base.offline?' Lista temporal sin conexión.':'');
+  retry.hidden=!base.offline;
+  if(typeof actualizarEstadisticaDia==='function')actualizarEstadisticaDia();return true;
+  } catch(e){
+  if(serial!==ensureBD.serial)return false;
+  const cacheSeguro=e.retryable&&token===IEStudents.validToken()&&IEStudents.peekRoster(bim);
+  pintarBaseAuxiliar(cacheSeguro&&cacheSeguro.padronInicializado&&cacheSeguro.bimestre===bim?cacheSeguro:IEStudents.empty());
+  if(e.code==='SESSION'||e.authorizationRejected){
+   retirarSesionAuxiliar(token||(IEStudents.session()||{}).token);
+   estado.textContent='Sesión inválida o revocada. Vuelve a ingresar.';relogin.hidden=false;
+  } else {estado.textContent=e.message||'No se pudo cargar el padrón bimestral.';retry.hidden=false;}
+  return false;
+  }
 }
 
 function alumnosAula() {
@@ -452,7 +574,7 @@ function getRec(al) {
   return { marca: rec.marca || '', hora: rec.hora || '', motivo: rec.motivo || '', via: rec.via || '', ts: rec.ts, versionServidor:rec.versionServidor, firmaConfirmada:rec.firmaConfirmada };
 }
 function setRec(al, marca, via, motivo) {
-  if (!IEAuxPermissions.permite(al.nivel)) return false;
+  if (!IEAuxPermissions.permite(al.nivel)||!asistenciaEscribible()) {toast('Bimestre cerrado o no verificado: solo lectura.');return false;}
   const all = loadAsis();
   const k = asisKey(al);
   const prev = all[k] || {};
@@ -463,7 +585,7 @@ function setRec(al, marca, via, motivo) {
     via: via || prev.via || 'manual',
     ts: Date.now(),
     motivo: marca === 'J' ? String(motivo != null ? motivo : (prev.motivo || '')) : '',
-    versionServidor:prev.versionServidor || '', firmaConfirmada:prev.firmaConfirmada, remoto:prev.remoto
+    nombre:al.nombre,versionServidor:prev.versionServidor || '', firmaConfirmada:prev.firmaConfirmada, remoto:prev.remoto
   };
   if (marca && !prev.hora) all[k].hora = horaAhora();
   saveAsis(all);
@@ -474,8 +596,8 @@ function recToItem(clave, rec) {
   const p = String(clave).split('||');
   return {
     clave: clave,
-    fecha: p[0], nivel: p[1], grado: p[2], seccion: p[3], nombre: p.slice(4).join('||'),
-    marca: rec.marca || '', hora: rec.hora || '', via: rec.via || '', ts: rec.ts, motivo: rec.motivo || '', versionBase:rec.versionServidor || ''
+    anio:Number(p[0]),bimestre:p[1],fecha:p[2],nivel:p[3],grado:p[4],seccion:p[5],
+    idEstudiante:p.slice(6).join('||'),nombre:rec.nombre||'',marca: rec.marca || '', hora: rec.hora || '', via: rec.via || '', ts: rec.ts, motivo: rec.motivo || '', versionBase:rec.versionServidor || ''
   };
 }
 function tokenSesionAuxiliar() {
@@ -508,7 +630,7 @@ async function prepararSubidaAsistencia() {
       toast('La sesión cambió. Marcas locales conservadas.');
       return false;
     }
-    if (!data.ok || data.protocoloAsistencia!==1) {
+    if (!data.ok || data.protocoloAsistencia!==2) {
       rechazarSesionAsistencia(data,token);
       toast(data.ok ? 'Backend anterior: subida bloqueada hasta actualizar asistencia. Marcas locales conservadas.' : (data.error||'Sesión no verificada. Marcas locales conservadas.'));
       return false;
@@ -533,7 +655,7 @@ function rechazarSesionAsistencia(data,token) {
 }
 function confirmarSubidaAsistencia(data, enviados, token) {
   if (token !== tokenSesionAuxiliar()) {toast('La sesión cambió. Subida no confirmada localmente.');return false;}
-  if (data.protocoloAsistencia !== 1 || !Array.isArray(data.resultados)) {
+  if (data.protocoloAsistencia !== 2 || !Array.isArray(data.resultados)) {
     rechazarSesionAsistencia(data,token);
     toast(data.error||'Sin confirmación versionada. Las marcas locales siguen pendientes.');return false;
   }
@@ -553,6 +675,7 @@ function confirmarSubidaAsistencia(data, enviados, token) {
     if (!pendienteMarcaAsistencia(actual)) delete actual.remoto;
   });
   saveAsis(all);
+  if((aceptadas||repetidas)&&typeof actualizarEstadisticaDia==='function')actualizarEstadisticaDia();
   const sinConfirmar=enviados.length-aceptadas-repetidas-conflictos;
   toast('Asistencia: '+aceptadas+' aceptadas · '+repetidas+' repetidas · '+conflictos+' conflictos'+(sinConfirmar?' · '+sinConfirmar+' sin confirmar':'')+
     (conflictos?' — Baja asistencia y revisa; se conservan tus marcas locales.':''));
@@ -564,8 +687,8 @@ function combinarBajadaAsistencia(data, snapshot) {
     if (!IEAuxPermissions.permite(it.nivel)) return;
     const k=it.clave || [it.fecha,it.nivel,it.grado,it.seccion,it.nombre].join('||'),prev=all[k];
     if (snapshot && JSON.stringify(snapshot[k]) !== JSON.stringify(prev)) {pendientes++;return;}
-    const nueva={marca:it.marca,hora:it.hora||'',via:it.via||'',ts:it.ts,motivo:it.motivo||''};
-    const versionada=data.protocoloAsistencia===1 && typeof it.version==='string' && it.version.startsWith('asis1:');
+    const nueva={marca:it.marca,hora:it.hora||'',via:it.via||'',ts:it.ts,motivo:it.motivo||'',nombre:it.nombre||''};
+    const versionada=data.protocoloAsistencia===2 && typeof it.version==='string' && it.version.startsWith('asis1:');
     if (prev && (pendienteMarcaAsistencia(prev) || !versionada)) {
       // Nunca resolver un conflicto perdiendo una edición sin confirmar.
       if (typeof prev === 'object' && versionada) prev.remoto={...nueva,version:it.version};
@@ -584,13 +707,13 @@ function resolverSubidaAsistencia(items) {
     const rec=all[it.clave];
     if (!rec || !rec.remoto || !pendienteMarcaAsistencia(rec)) {autorizados.push(it);return;}
     const campos=String(it.clave).split('||');
-    const nombre=campos.slice(4).join('||')||it.nombre||'Sin identificación';
+    const nombre=it.nombre||'Sin identificación';
     const remoto=rec.remoto;
     if (typeof remoto.version!=='string' || !remoto.version.startsWith('asis1:')) {cancelados++;return;}
     const mensaje='Conflicto de asistencia de ingreso\n\n'
       +'Estudiante: '+nombre+'\n'
-      +'Fecha: '+(campos[0]||it.fecha||'Sin fecha')+'\n'
-      +'Aula: '+(campos[1]||it.nivel)+' · '+(campos[2]||it.grado)+'° '+(campos[3]||it.seccion)+'\n'
+      +'Fecha: '+(it.fecha||'Sin fecha')+'\n'
+      +'Aula: '+it.nivel+' · '+it.grado+'° '+it.seccion+'\n'
       +'Marca en este dispositivo: '+(rec.marca||'Sin marca')+'\n'
       +'Marca en la nube: '+(remoto.marca||'Sin marca')+'\n\n'
       +'¿Conservar la marca LOCAL como una nueva decisión manual? Se actualizará su timestamp, sin cambiar hora ni motivo. Si la nube cambió, se rechazará por versión.';
@@ -607,7 +730,7 @@ function resolverSubidaAsistencia(items) {
   return autorizados;
 }
 async function subirUnoNube(al) {
-  if (!IEAuxPermissions.permite(al.nivel)) return false;
+  if (!IEAuxPermissions.permite(al.nivel)||!asistenciaEscribible()) return false;
   try {
     const k = asisKey(al);
     const rec = loadAsis()[k];
@@ -620,28 +743,18 @@ async function subirUnoNube(al) {
     confirmarSubidaAsistencia(JSON.parse(await res.text()),items,token);
   } catch(e) {toast('No se confirmó la subida. Las marcas locales se conservan.');}
 }
-function completarFaltasAlSubir() {
-  const fecha = document.getElementById('inpFecha').value || hoyISO();
-  if (fecha !== hoyISO()) return 0;
-  const all = loadAsis();
-  let n = 0;
-  todosAlumnos().forEach(al => {
-    if (!jornadaCerrada(al)) return;
-    const k = asisKey(al);
-    if (all[k] && all[k].marca) return;
-    all[k] = { marca: 'F', hora: horaAhora(), via: 'auto-falta', ts: Date.now() };
-    n++;
-  });
-  if (n) saveAsis(all);
-  return n;
-}
 async function subirTodoNube() {
+  if (!await verificarCierreAsistencia() || !asistenciaEscribible()) {
+    toast('Asistencia cerrada o sin confirmar. No se subieron marcas.');return false;
+  }
   if (!IEAuxPermissions.permite(document.getElementById('selNivel').value)) { toast('Nivel no autorizado.'); return false; }
-  const faltas = completarFaltasAlSubir();
-  if (faltas) renderLista();
+  // La subida confirma exclusivamente marcas existentes en la fecha visible.
+  // «Sin registrar» no implica falta: generar F de forma silenciosa sería incorrecto.
+  const fecha=document.getElementById('inpFecha').value||hoyISO();
   const all = loadAsis();
-  const pendientes=Object.keys(all).filter(k=>all[k] && pendienteMarcaAsistencia(all[k]));
-  const items=pendientes.map(k=>recToItem(k,all[k])).filter(it=>it.marca && IEAuxPermissions.permite(it.nivel));
+  const prefijo=anioAsistencia()+'||'+bimestreAsistencia()+'||'+fecha+'||';
+  const pendientes=Object.keys(all).filter(k=>k.startsWith(prefijo)&&all[k]&&pendienteMarcaAsistencia(all[k]));
+  const items=pendientes.map(k=>recToItem(k,all[k])).filter(it=>it.marca && it.nombre && IEAuxPermissions.permite(it.nivel));
   if (!items.length) {toast('Asistencia al día: no hay marcas pendientes para subir.');return;}
   try {
     const token=tokenSesionAuxiliar();
@@ -656,22 +769,204 @@ async function bajarNube() {
   const nivel=document.getElementById('selNivel').value;
   if (!IEAuxPermissions.permite(nivel)) { toast('Nivel no autorizado.'); return false; }
   const fecha = document.getElementById('inpFecha').value || hoyISO();
+  const anio=anioAsistencia(),bimestre=bimestreAsistencia();
   const snapshot=loadAsis(),token=tokenSesionAuxiliar(),serial=(bajarNube.serial||0)+1;
   bajarNube.serial=serial;
   try {
-    const res = await fetchLecturaNube(CLOUD_API_URL + '?action=loadasis&nivel=' + encodeURIComponent(nivel) + '&fecha=' + encodeURIComponent(fecha));
+    const res = await fetchLecturaNube(CLOUD_API_URL + '?action=loadasis&nivel=' + encodeURIComponent(nivel) + '&fecha=' + encodeURIComponent(fecha) +
+      '&anio='+encodeURIComponent(anio)+'&bimestre='+encodeURIComponent(bimestre));
     const data = JSON.parse(await res.text());
     if (token !== tokenSesionAuxiliar() || serial !== bajarNube.serial) return;
     rechazarSesionAsistencia(data,token);
     if (!data.ok) throw new Error(data.error || 'Error');
     combinarBajadaAsistencia(data,snapshot);
     renderLista();
+    if(typeof actualizarEstadisticaDia==='function')actualizarEstadisticaDia();
   } catch(e) { toast('No se pudo bajar. Actualiza el Apps Script.'); }
 }
 
-function escapeAuxiliar(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// Estadísticas oficiales: lectura agregada, nunca transforma ausencia de marca en falta.
+let estadisticaDiaSerial=0,estadisticaMesSerial=0;
+function invalidarEstadisticasAsistencia() {
+ estadisticaDiaSerial++;estadisticaMesSerial++;
+ const estado=document.getElementById('asisDiaEstado'),kpis=document.getElementById('asisDiaKPIs');
+ if(estado)estado.textContent='Selecciona fecha, nivel y bimestre para consultar la nube.';
+ if(kpis)kpis.innerHTML='';
+ const detalle=document.getElementById('asisDiaDetalle');if(detalle)detalle.textContent='';
+ const panel=document.getElementById('asisStatsPanel');if(panel)panel.hidden=true;
+ const boton=document.getElementById('asisStatsBoton');if(boton)boton.setAttribute('aria-expanded','false');
+}
+function estadisticaParams(tipo) {
+ const nivel=document.getElementById('selNivel').value,bimestre=bimestreAsistencia(),anio=anioAsistencia();
+ if(!IEAuxPermissions.permite(nivel)||!anio||!['I','II','III','IV'].includes(bimestre))return null;
+ const fecha=document.getElementById('inpFecha').value||hoyISO();
+ const mes=document.getElementById('asisStatsMes').value;
+ const periodo=tipo==='mes'?'mes='+encodeURIComponent(mes):'fecha='+encodeURIComponent(fecha);
+ return '?action=loadasisstats&nivel='+encodeURIComponent(nivel)+'&anio='+encodeURIComponent(anio)+
+  '&bimestre='+encodeURIComponent(bimestre)+'&'+periodo;
+}
+function kpiAsistencia(nombre,valor,clase) {
+ const n=Math.max(0,Number(valor)||0);
+ return '<div class="asis-kpi"><strong class="'+clase+'">'+n+'</strong><span>'+nombre+'</span></div>';
+}
+async function actualizarEstadisticaDia() {
+ const estado=document.getElementById('asisDiaEstado'),kpis=document.getElementById('asisDiaKPIs');
+ const detalle=document.getElementById('asisDiaDetalle');
+ const serial=++estadisticaDiaSerial,query=estadisticaParams('fecha'),token=tokenSesionAuxiliar();
+ if(!query){estado.textContent='Padrón o sesión aún sin verificar.';kpis.innerHTML='';detalle.textContent='';return false;}
+ estado.textContent='Consultando asistencia confirmada del día…';
+ try {
+  const r=await fetchLecturaNube(CLOUD_API_URL+query),data=JSON.parse(await r.text());
+  if(serial!==estadisticaDiaSerial||token!==tokenSesionAuxiliar())return false;
+  if(!data.ok||data.protocoloAsistencia!==2||data.origen!=='nube')throw Error(data.error||'Servidor de estadísticas aún no disponible.');
+  const d=data.dias&&data.dias[0],total=Math.max(0,Number(data.totalEstudiantes)||0);
+  if(!d)throw Error('No se recibió el resumen del día.');
+  const sum=['P','F','T','J','sinMarca'].reduce((n,k)=>n+(Number(d[k])||0),0);
+  if(sum!==total)throw Error('Los conteos no coinciden con el padrón. No se mostrarán cifras incorrectas.');
+  detalle.textContent=(data.nivel==='primaria'?'Primaria':'Secundaria')+' · '+data.bimestre+' bimestre · '+data.fecha+
+   ' · Padrón: '+total+' estudiantes';
+  kpis.innerHTML=kpiAsistencia('Presentes',d.P,'text-green-700')+
+   kpiAsistencia('Faltas',d.F,'text-red-700')+
+   kpiAsistencia('Tardanzas',d.T,'text-amber-700')+
+   kpiAsistencia('Justificadas',d.J,'text-indigo-700')+
+   kpiAsistencia('Sin registrar',d.sinMarca,'text-slate-600');
+  estado.textContent=d.registrados+' marcas confirmadas en la nube'+
+   (d.duplicados?' · '+d.duplicados+' duplicados en revisión (sin contabilizar)':'')+'.';
+  return true;
+ } catch(e) {
+  if(serial!==estadisticaDiaSerial)return false;
+  estado.textContent='Estadística no disponible: '+e.message;
+  kpis.innerHTML='';detalle.textContent='';return false;
+ }
+}
+function verEstadisticasAsistencia() {
+ const panel=document.getElementById('asisStatsPanel'),boton=document.getElementById('asisStatsBoton');
+ panel.hidden=!panel.hidden;
+ boton.setAttribute('aria-expanded',String(!panel.hidden));
+ if(panel.hidden){estadisticaMesSerial++;return;}
+ // El control vive en la cabecera: llevar la vista al panel sin ocultar el formulario.
+ if(typeof panel.scrollIntoView==='function')panel.scrollIntoView({behavior:'smooth',block:'start'});
+ const mes=document.getElementById('asisStatsMes');
+ if(!mes.value)mes.value=(document.getElementById('inpFecha').value||hoyISO()).slice(0,7);
+ cargarEstadisticasMensuales();
+}
+function pintarMesAsistencia(data) {
+ const meses=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+ const total=Math.max(0,Number(data.totalEstudiantes)||0);
+ const titulo=(data.nivel==='primaria'?'Primaria':'Secundaria')+' · '+data.bimestre+' BIMESTRE · '+
+  meses[Number(data.mes.slice(5,7))-1]+' '+data.anio+' · '+total+' estudiantes';
+ const dias=Array.isArray(data.dias)?data.dias:[];
+ document.getElementById('asisStatsInfo').textContent=titulo;
+ const campos=[['P','Presentes'],['F','Faltas'],['T','Tardanzas'],['J','Justificadas'],['S','Sin registrar']];
+ document.getElementById('asisStatsLeyenda').innerHTML=campos.map(([clave,nombre])=>
+  '<span class="asis-legend"><i class="asis-'+clave+'"></i>'+nombre+'</span>').join('');
+ if(!dias.length) {
+  document.getElementById('asisStatsGrafico').innerHTML=
+   '<p class="text-sm text-slate-500 p-4">No hay días con marcas confirmadas en este mes.</p>';
+  document.getElementById('asisStatsTabla').innerHTML='';
+  return;
+ }
+ const num=(d,k)=>Math.max(0,Number(d[k])||0);
+ const componentes=(d)=>[['P',num(d,'P')],['T',num(d,'T')],['F',num(d,'F')],
+  ['J',num(d,'J')],['S',num(d,'sinMarca')]];
+ const html=dias.map(d=>{
+  const sum=componentes(d).reduce((n,x)=>n+x[1],0);
+  if(sum!==total)throw Error('Los conteos del día '+String(d.fecha)+' no corresponden al padrón.');
+  const texto=String(d.fecha).slice(-2);
+  const titulo='Día '+texto+': '+componentes(d).map(x=>x[0]+' '+x[1]).join(', ');
+  return '<div class="asis-chart-col" title="'+escapeAuxiliar(titulo)+'">'+
+   '<div class="asis-chart-bar" aria-hidden="true">'+componentes(d).map(([k,v])=>
+    '<span class="asis-'+k+'" style="height:'+(total?(100*v/total).toFixed(3):0)+'%"></span>').join('')+
+   '</div><span>'+escapeAuxiliar(texto)+'</span></div>';
+ }).join('');
+ document.getElementById('asisStatsGrafico').innerHTML='<div class="asis-chart" aria-label="Gráfico de barras apiladas de asistencia">'+html+'</div>';
+ const filas=dias.map(d=>'<tr class="border-b"><td class="px-2 py-2 font-bold">'+escapeAuxiliar(String(d.fecha).slice(-2))+
+  '</td>'+['P','F','T','J','sinMarca'].map(k=>'<td class="px-2 py-2 text-right">'+num(d,k)+'</td>').join('')+'</tr>').join('');
+ document.getElementById('asisStatsTabla').innerHTML=
+  '<table class="w-full min-w-[440px] text-xs text-left"><thead><tr class="bg-slate-100">'+
+  ['Día','Presentes','Faltas','Tardanzas','Justificadas','Sin registrar'].map(s=>
+   '<th scope="col" class="px-2 py-2">'+s+'</th>').join('')+'</tr></thead><tbody>'+filas+'</tbody></table>';
+}
+async function cargarEstadisticasMensuales() {
+ const serial=++estadisticaMesSerial,estado=document.getElementById('asisStatsEstado');
+ const query=estadisticaParams('mes'),token=tokenSesionAuxiliar();
+ if(!query||!document.getElementById('asisStatsMes').value) {
+  estado.textContent='Selecciona un mes válido y comprueba la sesión.';return false;
+ }
+ estado.textContent='Consultando estadísticas por fechas…';
+ document.getElementById('asisStatsTabla').innerHTML='';
+ document.getElementById('asisStatsGrafico').innerHTML='';
+ try {
+  const r=await fetchLecturaNube(CLOUD_API_URL+query),data=JSON.parse(await r.text());
+  if(serial!==estadisticaMesSerial||token!==tokenSesionAuxiliar()||
+     document.getElementById('asisStatsPanel').hidden)return false;
+  if(!data.ok||data.protocoloAsistencia!==2||data.origen!=='nube')throw Error(data.error||'Sin respuesta confirmada del servidor.');
+  pintarMesAsistencia(data);
+  const repetidos=(data.dias||[]).reduce((n,d)=>n+(Number(d.duplicados)||0),0);
+  estado.textContent=(data.dias||[]).length+' días con marcas confirmadas'+
+   (repetidos?' · '+repetidos+' registros duplicados en revisión':'')+'.';
+  return true;
+ } catch(e) {
+  if(serial!==estadisticaMesSerial)return false;
+  estado.textContent='No se pudieron cargar las estadísticas: '+e.message;return false;
+ }
+}
+
+function invalidarArchivoAsistencia() {
+ consultarHistorialAnterior.serial=(consultarHistorialAnterior.serial||0)+1;
+ const estado=document.getElementById('asisLegadoEstado'),lista=document.getElementById('asisLegadoLista');
+ if(estado)estado.textContent='';
+ if(lista)lista.innerHTML='';
+}
+function marcasLocalesArchivoAnterior(fecha,nivel) {
+ const todas=loadAsis();
+ return Object.keys(todas).flatMap(clave=>{
+  const p=clave.split('||');
+  // Las claves antiguas no contienen año/bimestre; las v2 comienzan con «año||bimestre».
+  if(p.length<5||p[0]!==fecha||p[1]!==nivel)return [];
+  const rec=todas[clave],marca=typeof rec==='string'?rec:rec&&rec.marca;
+  if(!['P','F','T','J'].includes(marca))return [];
+  return [{clave,nombre:p.slice(4).join('||'),grado:p[2],seccion:p[3],marca,
+           hora:typeof rec==='object'&&rec?rec.hora||'':''}];
+ });
+}
+function pintarArchivoAnterior(items,locales) {
+ const lista=document.getElementById('asisLegadoLista');
+ const fila=it=>'<div class="border rounded-lg p-2"><b>'+escapeAuxiliar(it.nombre)+'</b> · '+
+   escapeAuxiliar(it.grado)+'° '+escapeAuxiliar(it.seccion)+' · '+escapeAuxiliar(it.marca)+
+   (it.hora?' · '+escapeAuxiliar(it.hora):'')+'</div>';
+ lista.innerHTML=(items.length?'<p class="font-bold">Registros en la nube ('+items.length+')</p>'+items.map(fila).join(''):'')+
+   (locales.length?'<p class="font-bold mt-2">Solo en este dispositivo ('+locales.length+'); sin confirmar en la nube</p>'+
+     locales.map(fila).join(''):'');
+}
+async function consultarHistorialAnterior() {
+ const nivel=document.getElementById('selNivel').value,fecha=document.getElementById('inpFecha').value||hoyISO();
+ const estado=document.getElementById('asisLegadoEstado'),lista=document.getElementById('asisLegadoLista');
+ const serial=(consultarHistorialAnterior.serial||0)+1;consultarHistorialAnterior.serial=serial;
+ if(!IEAuxPermissions.permite(nivel)) {estado.textContent='Nivel no autorizado.';return false;}
+ const locales=marcasLocalesArchivoAnterior(fecha,nivel);
+ estado.textContent='Consultando archivo anterior…';pintarArchivoAnterior([],locales);
+ const token=tokenSesionAuxiliar();
+ try {
+  const query='?action=loadasis&historico=1&nivel='+encodeURIComponent(nivel)+'&fecha='+encodeURIComponent(fecha);
+  const res=await fetchLecturaNube(CLOUD_API_URL+query),data=JSON.parse(await res.text());
+  if(serial!==consultarHistorialAnterior.serial||token!==tokenSesionAuxiliar()||
+     nivel!==document.getElementById('selNivel').value||fecha!==(document.getElementById('inpFecha').value||hoyISO()))return false;
+  rechazarSesionAsistencia(data,token);
+  if(!data.ok||data.protocoloAsistencia!==2||data.historicoAnterior!==true)throw Error(data.error||'No se verificó el archivo.');
+  const items=Array.isArray(data.items)?data.items:[];
+  estado.textContent='Archivo anterior del '+fecha+': '+items.length+' marcas en la nube y '+locales.length+' locales (sin bimestre asignado).';
+  pintarArchivoAnterior(items,locales);
+  return true;
+ } catch(e) {
+  if(serial!==consultarHistorialAnterior.serial)return false;
+  estado.textContent='No se pudo consultar el archivo en la nube: '+e.message+(locales.length?' Las marcas locales visibles no están confirmadas.':'');return false;
+ }
+}
+function escapeAuxiliar(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
 
 function renderLista() {
+  mostrarEstadoAsistencia();
   const c = ctx();
   const q = (document.getElementById('inpBuscar').value || '').trim().toLowerCase();
   let list = alumnosAula();
@@ -691,14 +986,14 @@ function renderLista() {
       const hora = rec.hora ? '<span class="text-[10px] text-slate-500 font-bold">'+escapeAuxiliar(rec.hora)+'</span>' : '';
       const enc = escapeAuxiliar(encodeURIComponent(al.nombre));
       const motivoBox = m==='J'
-        ? '<input class="mt-1 text-xs w-full" data-motivo="'+enc+'" placeholder="Motivo de la justificación" value="'+escapeAuxiliar(rec.motivo||'')+'">'
+        ? '<input class="mt-1 text-xs w-full" '+(asistenciaEscribible()?'':'disabled')+' data-motivo="'+enc+'" placeholder="Motivo de la justificación" value="'+escapeAuxiliar(rec.motivo||'')+'">'
         : '';
       return '<div class="row">' +
         '<div class="flex gap-2 items-center">' +
         '<div class="text-xs font-bold text-slate-400 w-6">'+escapeAuxiliar(al.numeroVisual)+'</div>' +
         '<div class="flex-1 min-w-0 font-bold text-sm truncate">'+escapeAuxiliar(al.nombre)+' '+hora+'</div>' +
         '<div class="flex gap-1">' +
-        ['P','F','T','J'].map(v => '<button type="button" class="chip '+(m===v?v:'')+'" data-n="'+enc+'" data-v="'+v+'">'+v+'</button>').join('') +
+        ['P','F','T','J'].map(v => '<button type="button" '+(asistenciaEscribible()?'':'disabled aria-disabled="true"')+' class="chip '+(m===v?v:'')+'" data-n="'+enc+'" data-v="'+v+'">'+v+'</button>').join('') +
         '</div></div>'+motivoBox+'</div>';
     }).join('');
   }
@@ -741,6 +1036,7 @@ function renderLista() {
 }
 
 function cerrarAsistenciaAula() {
+  if (!asistenciaEscribible()) {toast('Bimestre cerrado: solo lectura.');return;}
   const c = ctx();
   const list = alumnosAula();
   const sin = list.filter(al => !getRec(al).marca);
@@ -755,6 +1051,7 @@ function cerrarAsistenciaAula() {
   toast('Aula cerrada · ' + sin.length + ' faltas');
 }
 function marcarTodos(marca) {
+  if (!asistenciaEscribible()) {toast('Bimestre cerrado: solo lectura.');return;}
   if (!confirm('¿Marcar a todo el aula como ' + marca + '?')) return;
   alumnosAula().forEach(al => setRec(al, marca, 'manual'));
   renderLista();
@@ -852,6 +1149,9 @@ function verMenu(cual) {
   const esGrupos = cual === 'grupos';
   if (asis) asis.classList.toggle('hidden', esGrupos);
   if (grupos) grupos.classList.toggle('hidden', !esGrupos);
+  const resumen=document.getElementById('asisResumenDiario'),statsBoton=document.getElementById('asisStatsBoton');
+  if(resumen)resumen.hidden=esGrupos;
+  if(statsBoton)statsBoton.hidden=esGrupos;
   const tit = document.getElementById('tituloModulo');
   if (tit) tit.textContent = esGrupos ? 'Envío masivo' : 'Asistencia de ingreso';
   if (bAsis) bAsis.className = 'btn text-sm ' + (esGrupos ? 'btn-ghost' : 'btn-primary');
@@ -920,6 +1220,8 @@ function enviarGruposHoy() {
 let html5Qr = null;
 let lastScanAt = 0;
 let lastScanText = '';
+let scanModoPrueba = false;
+let scanIntento = 0;
 
 function todosAlumnos() {
   const out = [];
@@ -984,6 +1286,7 @@ function hallarAlumno(p) {
   return { error: 'no-encontrado', nombre: p.nombre };
 }
 function marcarPorQR(text) {
+  if (!asistenciaEscribible()) {toast('Asistencia cerrada: QR sin registrar.');return;}
   const nAl = todosAlumnos().length;
   const p = parseQR(text);
   document.getElementById('scanMsg').textContent = 'Leído: ' + String(text).slice(0, 90);
@@ -1009,67 +1312,116 @@ function marcarPorQR(text) {
     return;
   }
   const marca = marcaPorHora(al);
-  setRec(al, marca, 'qr');
+  if(setRec(al, marca, 'qr')===false)return;
   renderLista();
   pitido();
   try { if (navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch(e) {}
   const etq = marca === 'T' ? 'TARDANZA' : 'PRESENTE';
-  toast(etq + ' · ' + (al.nivel==='secundaria'?'SEC':'PRI') + ' ' + al.grado + '° ' + al.seccion + ' · ' + al.nombre.split(',')[0] + ' · ' + horaAhora());
-  subirUnoNube(al);
+  toast(etq + ' · ' + (al.nivel==='secundaria'?'SEC':'PRI') + ' ' + al.grado + '° ' + al.seccion + ' · ' + al.nombre.split(',')[0] + ' · ' + horaAhora()+' · Pendiente de Subir asistencia');
 }
 
-function onDecoded(text) {
-  const now = Date.now();
-  if (text === lastScanText && now - lastScanAt < 1800) return;
-  lastScanText = text;
-  lastScanAt = now;
-  marcarPorQR(text);
+// Un solo botón: en bimestre abierto, QR marca únicamente en almacenamiento local.
+// Si el periodo está cerrado o sin verificar, permite reconocer códigos sin grabar datos.
+function resultadoPruebaQR(text) {
+ const msg=document.getElementById('scanMsg');
+ const p=parseQR(text);
+ if(!/^IE22375\|/i.test(String(text||'').trim())||!p.nombre||!p.grado||!p.nivel) {
+  msg.textContent='QR detectado, pero no pertenece a los photochecks IE 22375. No se guardó ni se subió asistencia.';
+  return false;
+ }
+ const hit=hallarAlumno(p);
+ msg.textContent=hit.al?
+  'QR leído: estudiante localizado en el padrón '+bimestreAsistencia()+'. Solo lectura: no se guardó ni se subió asistencia.':
+  'QR leído de IE 22375, pero ese estudiante no figura en el padrón actual. Solo lectura: no se guardó ni se subió asistencia.';
+ return true;
 }
-
+let scanSoloLectura = false;
+function onDecoded(text, soloLectura=scanSoloLectura) {
+ const now=Date.now();
+ if(text===lastScanText&&now-lastScanAt<1800)return;
+ lastScanText=text;lastScanAt=now;
+ if(soloLectura||!asistenciaEscribible()){resultadoPruebaQR(text);return;}
+ marcarPorQR(text);
+}
 async function toggleScan() {
-  const box = document.getElementById('scanBox');
-  if (box.classList.contains('on')) { stopScan(); return; }
-  box.classList.add('on');
-  try { box.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(e) {}
-  const msg = document.getElementById('scanMsg');
-  prepararAudio();
-  if (typeof Html5Qrcode === 'undefined') {
-    msg.textContent = 'No se cargó el lector. Revisa internet y recarga.';
-    return;
+ const box=document.getElementById('scanBox');
+ if(box.classList.contains('on')){stopScan();return false;}
+ // Fijar el modo para toda esta sesión evita que un lector abierto en solo lectura
+ // registre marcas si el servidor confirma el bimestre mientras la cámara funciona.
+ scanSoloLectura=!asistenciaEscribible();
+ const soloLectura=scanSoloLectura;
+ const intento=++scanIntento;
+ lastScanText='';lastScanAt=0;
+ box.classList.add('on');
+ try{box.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}
+ const msg=document.getElementById('scanMsg');
+ if(!window.isSecureContext) {
+  msg.textContent='La cámara necesita HTTPS. Abre el módulo desde un sitio seguro.';
+  box.classList.remove('on');scanSoloLectura=false;
+  return false;
+ }
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) {
+  msg.textContent='Sin acceso a cámara. En iPhone abre Safari en HTTPS y permite Cámara.';
+  box.classList.remove('on');scanSoloLectura=false;
+  return false;
+ }
+ if(typeof Html5Qrcode==='undefined'){
+  msg.textContent='No se cargó el lector QR. Revisa internet y recarga.';
+  box.classList.remove('on');scanSoloLectura=false;
+  return false;
+ }
+ if(!soloLectura)prepararAudio();
+ msg.textContent=soloLectura?
+  'Abriendo cámara en solo lectura: reconocerá QR, sin marcar ni guardar asistencia…':
+  'Abriendo cámara: las marcas quedarán en este dispositivo hasta pulsar «Subir asistencia»…';
+ let lector=null;
+ const opciones={fps:10,qrbox:function(vw,vh){
+  const s=Math.max(80,Math.min(280,Math.floor(Math.min(vw,vh)*.78)));
+  const ajustado=Math.min(s,Math.floor(vw)-8,Math.floor(vh)-8);
+  return {width:Math.max(1,ajustado),height:Math.max(1,ajustado)};
+ }};
+ try{
+  lector=new Html5Qrcode('reader');
+  html5Qr=lector;
+  const onLectura=function(texto){
+   if(intento===scanIntento)onDecoded(texto,soloLectura);
+  };
+  try{
+   await lector.start({facingMode:'environment'},opciones,onLectura,function(){});
+  }catch(primerError){
+   if(intento!==scanIntento)return false;
+   const cameras=await Html5Qrcode.getCameras();
+   if(!cameras||!cameras.length)throw primerError;
+   const back=cameras.find(c=>/back|rear|environment|trasera|posterior/i.test(c.label||''));
+   await lector.start((back||cameras[cameras.length-1]).id,opciones,onLectura,function(){});
   }
-  try {
-    html5Qr = new Html5Qrcode('reader');
-    let camId = { facingMode: 'environment' };
-    try {
-      const cameras = await Html5Qrcode.getCameras();
-      if (cameras && cameras.length) {
-        const back = cameras.find(c => /back|rear|environment|trasera/i.test(c.label || ''));
-        camId = back ? back.id : cameras[cameras.length - 1].id;
-      }
-    } catch (e) {}
-    await html5Qr.start(
-      camId,
-      {
-        fps: 10,
-        qrbox: function(vw, vh) {
-          const s = Math.max(160, Math.min(vw, vh) * 0.7);
-          return { width: s, height: s };
-        }
-      },
-      onDecoded,
-      function onFail() {}
-    );
-    msg.textContent = 'Cámara lista. Centra el QR en el recuadro.';
-  } catch (e) {
-    msg.textContent = 'Permite la cámara en Ajustes → Safari. ' + (e && e.message ? e.message : '');
+  if(intento!==scanIntento){
+   try{await lector.stop();}catch(e){}
+   try{lector.clear();}catch(e){}
+   return false;
   }
+  msg.textContent=soloLectura?
+   'Cámara activa · Solo lectura por cierre o falta de verificación. Puedes comprobar los QR sin guardar datos.':
+   'Cámara activa · Escanea para marcar localmente. Usa «Subir asistencia» cuando decidas sincronizar.';
+  return true;
+ }catch(e){
+  if(intento!==scanIntento)return false;
+  msg.textContent='No se pudo iniciar la cámara. En iPhone comprueba permisos de Safari. '+(e&&e.message?e.message:'');
+  if(html5Qr===lector){html5Qr=null;try{if(lector)lector.clear();}catch(err){}}
+  box.classList.remove('on');scanSoloLectura=false;
+  return false;
+ }
 }
-
-function stopScan() {
-  document.getElementById('scanBox').classList.remove('on');
-  if (html5Qr) {
-    html5Qr.stop().then(() => { try { html5Qr.clear(); } catch(e) {} html5Qr = null; }).catch(() => { html5Qr = null; });
-  }
+function stopScan(){
+ scanIntento++;
+ scanSoloLectura=false;
+ document.getElementById('scanBox').classList.remove('on');
+ const lector=html5Qr;html5Qr=null;
+ if(lector){
+  Promise.resolve().then(()=>lector.stop()).catch(()=>{}).then(()=>{
+   try{lector.clear();}catch(e){}
+  });
+ }
 }
 
 async function leerFotoQR(input) {
@@ -1088,7 +1440,7 @@ async function leerFotoQR(input) {
     if (typeof jsQR === 'function') {
       const data = ctx.getImageData(0, 0, c.width, c.height);
       const code = jsQR(data.data, c.width, c.height, { inversionAttempts: 'attemptBoth' });
-      if (code && code.data) { marcarPorQR(code.data); return; }
+      if (code && code.data) { onDecoded(code.data); return; }
     }
     toast('No se leyó el QR de la foto. Toma otra más de cerca y de frente.');
   } catch (e) {
@@ -1101,7 +1453,7 @@ function esEnvioMasivo() {
 }
 IEAuxPermissions.configurar();
 (function pintarYa() {
-  BD = fijarNiveles(IEStudents.peek() || loadBD()) || { primaria: { estudiantes: [] }, secundaria: { estudiantes: [] } };
+  BD = IEStudents.empty();
   const f = document.getElementById('inpFecha');
   if (f) f.value = hoyISO();
   if (esEnvioMasivo()) verMenu('grupos');
@@ -1109,7 +1461,7 @@ IEAuxPermissions.configurar();
   actualizarGradosGrupos();
 })();
 // La lista depende solo de estudiantes; las lecturas secundarias tienen su propio límite.
-ensureBD().catch(function() {});
+verificarCierreAsistencia().then(function(){return ensureBD();}).catch(function() {});
 ensureHorario().catch(function() {});
 bajarGruposWa().catch(function() {});
 </script>

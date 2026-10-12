@@ -4,10 +4,24 @@ const {setup}=new Function('require','__dirname',read('tests/backend-remaining-w
 const {extract}=new Function('require','__dirname',read('tests/students-client.test.cjs').split('function fixture')[0]+'\nreturn {extract};')(require,__dirname);
 function backend(){
  const s=setup(),stamp=Date.now()-10000;
- const item=extra=>({fecha:'2026-10-11',nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Student',marca:'P',hora:'08:00',via:'manual',motivo:'',ts:stamp,...extra});
+ // Synthetic bimonthly enrollment and an independently open attendance period:
+ // CAS tests exercise concurrency, not the roster/configuration persistence tested elsewhere.
+ s.c.obtenerAsistenciaPeriodos_=()=>({anio:2026,configurada:true,ts:1,bimestres:{I:'cerrado',II:'cerrado',III:'abierto',IV:'bloqueado'}});
+ s.c.hojaEstudiantes_=()=>({});
+ s.c.leerPadronEstudiantes_=()=>({estudiantes:[
+  {nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Student',idSiagie:'PRIMARY'},
+  {nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Other',idSiagie:'OTHER'}
+ ]});
+ const item=extra=>{
+  const nombre=extra?.nombre||'Synthetic Student';
+  const idEstudiante=nombre==='Synthetic Other'?'siagie:OTHER':'siagie:PRIMARY';
+  return {anio:2026,bimestre:'III',idEstudiante,fecha:'2026-10-11',nivel:'primaria',
+   grado:1,seccion:'Única',nombre,marca:'P',hora:'08:00',via:'manual',motivo:'',ts:stamp,...extra};
+ };
  const save=items=>s.post({action:'saveasis',token:s.admin,items});
- const load=()=>JSON.parse(s.c.doGet({parameter:{action:'loadasis',token:s.admin}}).text);
- return {...s,item,save,load,stamp};
+ const load=()=>JSON.parse(s.c.doGet({parameter:{action:'loadasis',token:s.admin,anio:2026,bimestre:'III'}}).text);
+ const loadLegacy=()=>JSON.parse(s.c.doGet({parameter:{action:'loadasis',token:s.admin}}).text);
+ return {...s,item,save,load,loadLegacy,stamp};
 }
 for(const [fresh,stale] of [['P','F'],['F','P']])test('Server CAS keeps newer '+fresh+' over older '+stale+' even with a forged newer clock',()=>{
  const s=backend(),first=s.save([s.item({marca:stale})]);assert.equal(first.ok,true);
@@ -50,7 +64,7 @@ test('Untimestamped legacy creation keeps zero, not a manufactured current times
 test('Historical row gets a stable read-only version and requires it before modification',()=>{
  const s=backend(),it=s.item(),key=s.c.itemAsistenciaAutorizado_(it).clave;
  s.c.asegurarAsis_().appendRow([key,it.fecha,it.nivel,it.grado,it.seccion,it.nombre,'P',it.hora,it.via,it.ts,it.motivo]);
- const before=clone(s.tables.get('AsistenciaIngreso').rows),version=s.load().items[0].version;assert.equal(s.load().items[0].version,version);assert.deepEqual(s.tables.get('AsistenciaIngreso').rows,before);
+ const before=clone(s.tables.get('AsistenciaIngreso').rows),version=s.loadLegacy().items[0].version;assert.equal(s.loadLegacy().items[0].version,version);assert.deepEqual(s.tables.get('AsistenciaIngreso').rows,before);
  assert.equal(s.save([s.item({marca:'F',ts:it.ts+100})]).code,'CONFLICT');
  assert.equal(s.save([s.item({marca:'F',ts:it.ts+100,versionBase:version})]).ok,true);assert.equal(s.tables.get('AsistenciaIngreso').rows.length,2);
 });
@@ -80,15 +94,15 @@ test('Automatic absence with no known version cannot replace a confirmed present
 });
 
 function client(){
- const memory=new Map(),messages=[],writes=[],reads=[],els=new Map(),key='2026-10-11||primaria||1||Única||Synthetic Student';let token='synthetic-token';
- const el=id=>{if(!els.has(id))els.set(id,{value:'',textContent:'',hidden:false});return els.get(id);};el('selNivel').value='primaria';el('inpFecha').value='2026-10-11';
+ const memory=new Map(),messages=[],writes=[],reads=[],els=new Map(),key='2026||III||2026-10-11||primaria||1||Única||siagie:PRIMARY';let token='synthetic-token';
+ const el=id=>{if(!els.has(id))els.set(id,{value:'',textContent:'',hidden:false});return els.get(id);};el('selNivel').value='primaria';el('inpFecha').value='2026-10-11';el('selBimestre').value='III';
  const c=vm.createContext({Date,Map,URLSearchParams,document:{getElementById:el},IEAuxPermissions:{permite:n=>n==='primaria'},tokenSesionAuxiliar:()=>token,
  localStorage:{getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,v)},toast:m=>messages.push(m),confirm:()=>false,renderLista(){},completarFaltasAlSubir:()=>0,
- asisKey:()=>key,horaAhora:()=> '08:00',hoyISO:()=> '2026-10-11',fetchLecturaNube:async url=>{reads.push(url);return {text:async()=>JSON.stringify({ok:true,protocoloAsistencia:1,items:[]})};},
- fetch:async(url,opts)=>{const b=JSON.parse(opts.body);writes.push(b);return {text:async()=>JSON.stringify({ok:true,protocoloAsistencia:1,resultados:b.items.map(it=>({clave:it.clave,estado:'aceptada',version:'asis1:synthetic-1'}))})};}});
- const run=s=>vm.runInContext(s,c);run("const ASIS_KEY='synthetic-asis',CLOUD_API_URL='https://synthetic.invalid';");
+ asisKey:()=>key,horaAhora:()=> '08:00',hoyISO:()=> '2026-10-11',fetchLecturaNube:async url=>{reads.push(url);return {text:async()=>JSON.stringify({ok:true,protocoloAsistencia:2,items:[]})};},
+ fetch:async(url,opts)=>{const b=JSON.parse(opts.body);writes.push(b);return {text:async()=>JSON.stringify({ok:true,protocoloAsistencia:2,resultados:b.items.map(it=>({clave:it.clave,estado:'aceptada',version:'asis1:synthetic-1'}))})};}});
+ const run=s=>vm.runInContext(s,c);run("const ASIS_KEY='synthetic-asis',CLOUD_API_URL='https://synthetic.invalid';function anioAsistencia(){return 2026};function bimestreAsistencia(){return 'III'};function asistenciaEscribible(){return true};async function verificarCierreAsistencia(){return true}");
  for(const n of ['loadAsis','saveAsis','getRec','setRec','recToItem','firmaMarcaAsistencia','pendienteMarcaAsistencia','prepararSubidaAsistencia','rechazarSesionAsistencia','confirmarSubidaAsistencia','combinarBajadaAsistencia','resolverSubidaAsistencia','subirUnoNube','subirTodoNube','bajarNube'])run(extract('auxiliar.html',n));
- const rec={marca:'P',hora:'08:00',via:'manual',ts:Date.now()-10000,motivo:''},al={nivel:'primaria'};
+ const rec={marca:'P',hora:'08:00',via:'manual',ts:Date.now()-10000,motivo:'',nombre:'Synthetic Student'},al={nivel:'primaria',nombre:'Synthetic Student'};
  c.saveAsis({[key]:rec});return {c,run,memory,messages,writes,reads,key,rec,al,el,changeToken:t=>token=t};
 }
 test('Legacy backend preflight blocks writes rather than claiming new guarantees',async()=>{
@@ -101,30 +115,30 @@ for(const method of ['subirTodoNube','subirUnoNube'])test(method+': network fail
 });
 test('Verified receipt preserves a local edit made while upload is in flight',async()=>{
  const f=client();let resolve;f.c.fetch=()=>new Promise(r=>resolve=r);const task=f.c.subirTodoNube();await new Promise(r=>setImmediate(r));
- f.c.setRec(f.al,'J','manual','Synthetic justification');resolve({text:async()=>JSON.stringify({ok:true,protocoloAsistencia:1,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:one'}]})});await task;
+ f.c.setRec(f.al,'J','manual','Synthetic justification');resolve({text:async()=>JSON.stringify({ok:true,protocoloAsistencia:2,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:one'}]})});await task;
  const rec=f.c.loadAsis()[f.key];assert.equal(rec.marca,'J');assert.equal(rec.motivo,'Synthetic justification');assert.equal(rec.versionServidor,'asis1:one');assert.equal(f.c.pendienteMarcaAsistencia(rec),true);
 });
 test('Partial results confirm only matched receipts; conflicts and missing receipts remain pending',()=>{
  const f=client(),all=f.c.loadAsis(),other=f.key+' Other';all[other]={...f.rec,marca:'F'};f.c.saveAsis(all);const items=Object.entries(all).map(([k,r])=>f.c.recToItem(k,r));
- f.c.confirmarSubidaAsistencia({protocoloAsistencia:1,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:one'},{clave:other,estado:'conflicto'}]},items,'synthetic-token');
+ f.c.confirmarSubidaAsistencia({protocoloAsistencia:2,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:one'},{clave:other,estado:'conflicto'}]},items,'synthetic-token');
  assert.equal(f.c.pendienteMarcaAsistencia(f.c.loadAsis()[f.key]),false);assert.equal(f.c.pendienteMarcaAsistencia(f.c.loadAsis()[other]),true);assert.match(f.messages.at(-1),/1 conflictos/);
 });
 test('Download after conflict retains raw local edits and captures remote version for explicit review',()=>{
  const f=client();const remote={...f.c.recToItem(f.key,{...f.rec,marca:'F'}),version:'asis1:remote'};
- f.c.combinarBajadaAsistencia({protocoloAsistencia:1,items:[remote]});const rec=f.c.loadAsis()[f.key];assert.equal(rec.marca,'P');assert.equal(rec.ts,f.rec.ts);assert.equal(rec.remoto.marca,'F');assert.equal(rec.versionServidor,undefined);
+ f.c.combinarBajadaAsistencia({protocoloAsistencia:2,items:[remote]});const rec=f.c.loadAsis()[f.key];assert.equal(rec.marca,'P');assert.equal(rec.ts,f.rec.ts);assert.equal(rec.remoto.marca,'F');assert.equal(rec.versionServidor,undefined);
  const items=[f.c.recToItem(f.key,rec)];f.c.resolverSubidaAsistencia(items);assert.equal(items[0].versionBase,'');
  f.c.confirm=()=>true;f.c.resolverSubidaAsistencia(items);assert.equal(items[0].versionBase,'asis1:remote');assert.equal(f.c.pendienteMarcaAsistencia(f.c.loadAsis()[f.key]),true);
 });
 test('Late download cannot undo a receipt/version established after the request started',()=>{
  const f=client(),snapshot=clone(f.c.loadAsis()),it=f.c.recToItem(f.key,f.rec);
- f.c.confirmarSubidaAsistencia({protocoloAsistencia:1,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:new'}]},[it],'synthetic-token');
- f.c.combinarBajadaAsistencia({protocoloAsistencia:1,items:[{...it,marca:'F',version:'asis1:old'}]},snapshot);
+ f.c.confirmarSubidaAsistencia({protocoloAsistencia:2,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:new'}]},[it],'synthetic-token');
+ f.c.combinarBajadaAsistencia({protocoloAsistencia:2,items:[{...it,marca:'F',version:'asis1:old'}]},snapshot);
  assert.equal(f.c.loadAsis()[f.key].marca,'P');assert.equal(f.c.loadAsis()[f.key].versionServidor,'asis1:new');
 });
 test('Old backend reply and changed session cannot confirm or remove local assistance',()=>{
  const f=client(),it=f.c.recToItem(f.key,f.rec),before=f.memory.get('synthetic-asis');
  f.c.confirmarSubidaAsistencia({ok:true,guardados:1},[it],'synthetic-token');assert.equal(f.memory.get('synthetic-asis'),before);
- f.changeToken('new-token');f.c.confirmarSubidaAsistencia({protocoloAsistencia:1,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:one'}]},[it],'synthetic-token');assert.equal(f.memory.get('synthetic-asis'),before);
+ f.changeToken('new-token');f.c.confirmarSubidaAsistencia({protocoloAsistencia:2,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:one'}]},[it],'synthetic-token');assert.equal(f.memory.get('synthetic-asis'),before);
 });
 test('Legacy string marks and missing timestamps remain representable without invented clocks',()=>{
  const f=client(),it=f.c.recToItem(f.key,'P');assert.equal(it.marca,'P');assert.equal(it.ts,undefined);assert.equal(it.versionBase,'');
@@ -134,27 +148,33 @@ test('Revoked preflight session retires authorization but leaves assistance unch
  f.c.fetchLecturaNube=async()=>({text:async()=>JSON.stringify({ok:false,code:'SESSION',error:'Synthetic revoked session'})});await f.c.subirTodoNube();
  assert.equal(retired,1);assert.equal(f.writes.length,0);assert.equal(f.memory.get('synthetic-asis'),before);assert.equal(f.el('studentsRelogin').hidden,false);
 });
-test('Academic attendance and Auxiliar styles remain byte-identical to main after PR73',()=>{
+test('Academic attendance is unchanged; Auxiliar preserves approved base styles beyond compact form and statistics',()=>{
  const original=file=>execFileSync('git',['show','d3fee52033c2c0b7244d00d52e9a5ae0799ed30f:'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
  assert.equal(read('registro.html').replace(/\r\n/g,'\n'),original('registro.html'));
- const old=original('auxiliar.html'),now=read('auxiliar.html').replace(/\r\n/g,'\n');assert.deepEqual([...now.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]),[...old.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]));
+ const old=original('auxiliar.html'),now=read('auxiliar.html').replace(/\r\n/g,'\n');
+ const estilos=html=>[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]);
+ const limpiado=estilos(now).map(css=>css
+  .replace('select, input[type=date], input[type=month], input[type=search]', 'select, input[type=date], input[type=search]')
+  .replace(/    \/\* Formulario compacto[\s\S]*?(?=    #scanBox \{)/,'')
+  .replace(/    \.asis-kpi[\s\S]*?(?=    #reader \{)/,''));
+ assert.deepEqual(limpiado,estilos(old),'Los estilos originales fuera del módulo estadístico no deben cambiar');
 });
 
 
 test('Explicit conflict resolution can be confirmed without changing mark, hour or justification',()=>{
  const f=client(),remote={...f.c.recToItem(f.key,f.rec),marca:'F',version:'asis1:remote'};
- f.c.combinarBajadaAsistencia({protocoloAsistencia:1,items:[remote]});f.c.confirm=()=>true;
+ f.c.combinarBajadaAsistencia({protocoloAsistencia:2,items:[remote]});f.c.confirm=()=>true;
  const items=[f.c.recToItem(f.key,f.c.loadAsis()[f.key])];f.c.resolverSubidaAsistencia(items);
  const rec=f.c.loadAsis()[f.key];assert.equal(rec.marca,f.rec.marca);assert.equal(rec.hora,f.rec.hora);assert.equal(rec.motivo,f.rec.motivo);assert.ok(rec.ts>=f.rec.ts);
- f.c.confirmarSubidaAsistencia({protocoloAsistencia:1,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:resolved'}]},items,'synthetic-token');
+ f.c.confirmarSubidaAsistencia({protocoloAsistencia:2,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:resolved'}]},items,'synthetic-token');
  assert.equal(f.c.pendienteMarcaAsistencia(f.c.loadAsis()[f.key]),false);assert.equal(f.c.loadAsis()[f.key].remoto,undefined);
 });
 
 test('A late upload receipt cannot roll back a newer confirmed version',()=>{
  const f=client(),it=f.c.recToItem(f.key,f.rec);
- f.c.confirmarSubidaAsistencia({protocoloAsistencia:1,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:new'}]},[it],'synthetic-token');
+ f.c.confirmarSubidaAsistencia({protocoloAsistencia:2,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:new'}]},[it],'synthetic-token');
  const before=f.memory.get('synthetic-asis');
- f.c.confirmarSubidaAsistencia({protocoloAsistencia:1,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:old'}]},[it],'synthetic-token');assert.equal(f.memory.get('synthetic-asis'),before);
+ f.c.confirmarSubidaAsistencia({protocoloAsistencia:2,resultados:[{clave:f.key,estado:'aceptada',version:'asis1:old'}]},[it],'synthetic-token');assert.equal(f.memory.get('synthetic-asis'),before);
 });
 
 test('Protected upload and download integrate with server CAS using only synthetic records',async()=>{
@@ -176,7 +196,7 @@ test('Authenticated assistance protocol probe is lightweight and never opens att
  assert.equal(s.tables.has('AsistenciaIngreso'),false);
  const response=s.post({action:'asisprotocol',token:s.admin});
  assert.equal(response.ok,true);
- assert.equal(response.protocoloAsistencia,1);
+ assert.equal(response.protocoloAsistencia,2);
  assert.equal(s.tables.has('AsistenciaIngreso'),false);
  const unauth=s.post({action:'asisprotocol',token:'synthetic-invalid'});
  assert.equal(unauth.ok,false);assert.equal(unauth.code,'SESSION');
@@ -201,7 +221,7 @@ test('Concurrent protocol checks share a single in-flight request',async()=>{
  f.c.fetchLecturaNube=()=>{consultas++;return new Promise(r=>resolve=r);};
  const a=f.c.prepararSubidaAsistencia(),b=f.c.prepararSubidaAsistencia();
  assert.equal(consultas,1);
- resolve({text:async()=>JSON.stringify({ok:true,protocoloAsistencia:1})});
+ resolve({text:async()=>JSON.stringify({ok:true,protocoloAsistencia:2})});
  assert.equal(await a,true);assert.equal(await b,true);
  assert.equal(f.c.prepararSubidaAsistencia.estado.token,'synthetic-token');
  assert.equal(await f.c.prepararSubidaAsistencia(),true);
@@ -231,17 +251,16 @@ test('Mass upload sends only unconfirmed marks and never resends a confirmed mar
  assert.equal(f.writes[1].items[0].marca,'F');
 });
 
-test('Mass upload continues to include legacy string marks as pending',async()=>{
+test('Legacy local string marks are retained but not uploaded without a verified student identity',async()=>{
  const f=client();f.c.saveAsis({[f.key]:'P'});
  await f.c.subirTodoNube();
- assert.equal(f.writes.length,1);
- assert.equal(f.writes[0].items[0].marca,'P');
- assert.equal(f.writes[0].items[0].versionBase,'');
+ assert.equal(f.writes.length,0);
+ assert.equal(f.c.loadAsis()[f.key],'P');
 });
 
 test('Per-student conflict confirmation shows exact student/date/class and both marks',()=>{
  const f=client(),remote={...f.c.recToItem(f.key,f.rec),marca:'F',version:'asis1:remote'};
- f.c.combinarBajadaAsistencia({protocoloAsistencia:1,items:[remote]});
+ f.c.combinarBajadaAsistencia({protocoloAsistencia:2,items:[remote]});
  let prompt;
  f.c.confirm=m=>{prompt=m;return true;};
  const items=[f.c.recToItem(f.key,f.c.loadAsis()[f.key])];
@@ -258,7 +277,7 @@ test('Per-student conflict confirmation shows exact student/date/class and both 
 
 test('Cancellation retains a conflicting local edit and never sends it to the cloud',async()=>{
  const f=client(),remote={...f.c.recToItem(f.key,f.rec),marca:'F',version:'asis1:remote'};
- f.c.combinarBajadaAsistencia({protocoloAsistencia:1,items:[remote]});
+ f.c.combinarBajadaAsistencia({protocoloAsistencia:2,items:[remote]});
  const before=f.memory.get('synthetic-asis');
  let dialogs=0;f.c.confirm=()=>{dialogs++;return false;};
  await f.c.subirTodoNube();
@@ -274,7 +293,7 @@ test('Sheets automatic Date coercion is prevented by text-formatting the exact r
  sh.getRange=function(r,c,nr,nc){
   const range=getRange(r,c,nr,nc),format=range.setNumberFormat;
   range.setNumberFormat=function(pattern){if(pattern==='@')formatted.add(r+':'+c);return format.call(this,pattern);};
-  if(r>=2 && c===1 && nc===12){
+  if(r>=2 && c===1 && nc===15){
    const original=range.setValues;
    range.setValues=function(values){
     const typed=values.map(raw=>{
@@ -331,4 +350,46 @@ test('loadasis filters historic Sheets Date cells using the spreadsheet timezone
  assert.equal(load().items.length,3,'unfiltered reading includes old and new rows');
  assert.equal(s.state.writes,writes,'all date queries must remain read-only');
  assert.equal(sh.rows[1][1],legacyDate,'historical Date cells must not be migrated or rewritten');
+});
+
+test('Legacy archive is read-only, scoped to date and level, and never mixes with bimonthly records',()=>{
+ const s=backend(),sh=s.c.asegurarAsis_();
+ sh.appendRow(['2026-10-11||primaria||1||Única||Old Student','2026-10-11','primaria','1','Única','Old Student','F','08:30','manual',1,'']);
+ const fresh=s.save([s.item({marca:'P'})]);
+ assert.equal(fresh.ok,true,JSON.stringify(fresh));
+ const rows=clone(sh.rows),writes=s.state.writes;
+ const read=p=>JSON.parse(s.c.doGet({parameter:{action:'loadasis',token:s.admin,...p}}).text);
+ const old=read({historico:'1',nivel:'primaria',fecha:'2026-10-11'});
+ assert.equal(old.ok,true);assert.equal(old.historicoAnterior,true);
+ assert.deepEqual(old.items.map(x=>x.nombre),['Old Student']);
+ assert.equal(old.items[0].bimestre,'');assert.equal(old.items[0].idEstudiante,'');
+ assert.deepEqual(read({anio:'2026',bimestre:'III',fecha:'2026-10-11',nivel:'primaria'}).items.map(x=>x.nombre),['Synthetic Student']);
+ assert.equal(read({historico:'1',fecha:'2026-10-11'}).code,'INVALID_PERIOD');
+ assert.equal(read({historico:'1',nivel:'primaria'}).code,'INVALID_PERIOD');
+ assert.equal(read({historico:'1',nivel:'primaria',fecha:'2026-10-11',anio:'2026',bimestre:'III'}).code,'INVALID_PERIOD');
+ assert.equal(read({historico:'1',nivel:'secundaria',fecha:'2026-10-11'}).items.length,0);
+ assert.deepEqual(sh.rows,rows,'historical archive reads must not alter rows');
+ assert.equal(s.state.writes,writes,'archive reads must not write data');
+});
+
+test('Bulk upload sends only the selected date and keeps other dates pending',async()=>{
+ const f=client(),day2=f.key.replace('2026-10-11','2026-10-12');
+ const all=f.c.loadAsis();all[day2]={...f.rec,marca:'T',nombre:'Synthetic Student',ts:f.rec.ts+1};
+ f.c.saveAsis(all);
+ await f.c.subirTodoNube();
+ assert.equal(f.writes.length,1);
+ assert.deepEqual(f.writes[0].items.map(it=>it.fecha),['2026-10-11']);
+ assert.equal(f.c.pendienteMarcaAsistencia(f.c.loadAsis()[day2]),true,'Other day must remain pending');
+ f.el('inpFecha').value='2026-10-12';
+ await f.c.subirTodoNube();
+ assert.equal(f.writes.length,2);
+ assert.deepEqual(f.writes[1].items.map(it=>it.fecha),['2026-10-12']);
+});
+test('Bulk upload never creates absent marks without a deliberate manual mark',async()=>{
+ const f=client();let generated=0;
+ f.c.completarFaltasAlSubir=()=>{generated++;throw Error('Automatic absences must never occur on upload')};
+ await f.c.subirTodoNube();
+ assert.equal(generated,0);
+ assert.equal(f.writes.length,1);
+ assert.deepEqual(f.writes[0].items.map(x=>x.marca),['P']);
 });

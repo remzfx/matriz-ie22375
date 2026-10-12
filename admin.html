@@ -308,6 +308,15 @@
         <p class="text-xs text-slate-500 mt-3">Al <b>cerrar</b> un bimestre, los docentes no deberían editar notas de ese periodo (se aplicará en el registro auxiliar).</p>
         <button class="btn btn-primary text-sm mt-3" onclick="savePeriodos()">Guardar periodos</button>
       </div>
+            <div class="card p-4 mt-4" id="panelPeriodosAsistencia">
+        <h2 class="font-black text-lg mb-2">Cierre independiente de asistencia de ingreso</h2>
+        <p class="text-sm text-slate-600 mb-3">No modifica el cierre de notas. Un bimestre cerrado o bloqueado permite consultar el historial, pero impide guardar asistencia incluso desde otro dispositivo.</p>
+        <label class="text-xs font-bold text-slate-600" for="asisAnioAdmin">Año lectivo</label>
+        <input id="asisAnioAdmin" type="number" min="2020" max="2100" class="max-w-[120px]" disabled>
+        <div id="asisPeriodosEstado" class="text-sm text-slate-600 mt-2" role="status">Consultando cierre de asistencia…</div>
+        <div class="space-y-2 my-3" id="asisPeriodosLista"></div>
+        <button type="button" class="btn btn-primary" id="asisPeriodosGuardar" onclick="guardarCierreAsistencia()" disabled>Guardar cierre de asistencia</button>
+      </div>
     </section>
 
     <section id="tab-siagie" class="tab hidden">
@@ -725,7 +734,7 @@ function showTab(id) {
   if (id === 'auxiliares') cargarAuxiliares();
   if (id === 'docentes') { initDocentesUI(); }
   if (id === 'bd') { iniciarConsultaEstudiantes(); }
-  if (id === 'periodos') { initPeriodosUI(); bajarPeriodosNube().then(function(p){ if(p) initPeriodosUI(); }); }
+  if (id === 'periodos') { initPeriodosUI(); bajarPeriodosNube().then(function(p){ if(p) initPeriodosUI(); }); cargarCierreAsistencia(); }
   if (id === 'horario') initHorarioUI();
   if (id === 'menu') {actualizarResumen();cargarResumenMenuAdmin();}
   if (id === 'siagie') renderAulasSiagie();
@@ -1127,6 +1136,55 @@ function mergeNivel(nivel, rows) {
     if (!have.has(k)) { cur.push(r); have.add(k); }
   });
   estado[nivel].estudiantes = cur;
+}
+
+// Control separado de la asistencia: ninguna acción de esta pantalla modifica periodos académicos.
+let configAsistenciaAdmin=null;
+async function cargarCierreAsistencia() {
+  const estado=document.getElementById('asisPeriodosEstado'),lista=document.getElementById('asisPeriodosLista');
+  const guardar=document.getElementById('asisPeriodosGuardar');
+  guardar.disabled=true;lista.innerHTML='';estado.textContent='Consultando cierre de asistencia…';
+  try {
+    const token=tokenSesionAdmin();
+    const r=await fetch(CLOUD_API_URL,{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'loadasisperiodos',token:token})});
+    const data=await r.json();
+    if(!data.ok||!data.periodos)throw Error(data.error||'No se pudo consultar el estado.');
+    configAsistenciaAdmin=data.periodos;
+    document.getElementById('asisAnioAdmin').value=configAsistenciaAdmin.anio;
+    document.getElementById('asisAnioAdmin').disabled=false;
+    const nombres={abierto:'Abierto',cerrado:'Cerrado',bloqueado:'Bloqueado'};
+    lista.innerHTML=['I','II','III','IV'].map(b=>{
+      const est=configAsistenciaAdmin.bimestres[b]||'bloqueado';
+      return '<label class="flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-50"><span class="font-bold">Asistencia bimestre '+b+'</span>'+
+      '<select class="asis-bim-sel max-w-[160px]" data-bim="'+b+'">'+
+      ['abierto','cerrado','bloqueado'].map(op=>'<option value="'+op+'" '+(op===est?'selected':'')+'>'+nombres[op]+'</option>').join('')+'</select></label>';
+    }).join('');
+    guardar.disabled=false;
+    estado.textContent=data.periodos.configurada?'Configuración oficial cargada.':'Aún no hay cierre configurado: toda asistencia está bloqueada hasta guardarlo aquí.';
+  } catch(e){configAsistenciaAdmin=null;estado.textContent='No se pudo verificar el cierre: '+e.message;}
+}
+async function guardarCierreAsistencia() {
+  if(!configAsistenciaAdmin)return;
+  const bimestres={};
+  document.querySelectorAll('.asis-bim-sel').forEach(sel=>{bimestres[sel.dataset.bim]=sel.value;});
+  const anio=Number(document.getElementById('asisAnioAdmin').value);
+  const antes=['I','II','III','IV'].filter(b=>configAsistenciaAdmin.bimestres[b]==='abierto' && bimestres[b]!=='abierto');
+  const reapertura=['I','II','III','IV'].filter(b=>configAsistenciaAdmin.bimestres[b]!=='abierto' && bimestres[b]==='abierto');
+  if(!confirm('Guardar los estados de asistencia del año '+anio+'?'+
+    (antes.length?'\\nSe cerrará la escritura de asistencia: '+antes.join(', ')+'.':'')+
+    (reapertura.length?'\\nSe habilitará escritura de asistencia: '+reapertura.join(', ')+'.':'')))return;
+  const btn=document.getElementById('asisPeriodosGuardar');btn.disabled=true;
+  try {
+    const r=await fetch(CLOUD_API_URL,{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'saveasisperiodos',token:tokenSesionAdmin(),
+        version:configAsistenciaAdmin.ts,periodos:{anio:anio,bimestres:bimestres}})});
+    const data=await r.json();
+    if(!data.ok)throw Error(data.error||'El servidor no confirmó el cierre.');
+    await cargarCierreAsistencia();
+    alert('Cierre de asistencia confirmado en la nube. No se modificaron los bimestres de notas.');
+  } catch(e){alert('No se actualizó el cierre de asistencia: '+e.message+' Recarga el estado oficial antes de reintentar.');await cargarCierreAsistencia();}
+  finally{btn.disabled=!configAsistenciaAdmin;}
 }
 
 function defaultPeriodos() {

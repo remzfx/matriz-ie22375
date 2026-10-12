@@ -73,6 +73,13 @@ function setup() {
     ContentService: {MimeType: {JSON: 'json'}, createTextOutput: text => ({setMimeType: () => ({text})})}
   });
   new vm.Script(source).runInContext(c);
+  // The v2 attendance writer requires its own open period and a verified cohort.
+  c.obtenerAsistenciaPeriodos_=()=>({anio:2026,configurada:true,ts:1,bimestres:{I:'cerrado',II:'cerrado',III:'abierto',IV:'bloqueado'}});
+  c.hojaEstudiantes_=()=>({});
+  c.leerPadronEstudiantes_=()=>({estudiantes:[
+    {nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Student',idSiagie:'PRIMARY-1'},
+    {nivel:'secundaria',grado:2,seccion:'B',nombre:'Another Synthetic Student',idSiagie:'SECONDARY-1'}
+  ]});
   tables.get('ConfigSistema').rows.push(['AUXILIAR_ACCESOS',1000,JSON.stringify([{user:'auxiliar',nombre:'Synthetic Auxiliary',niveles:['primaria','secundaria'],activo:true,passHash:c.hashAuxiliarPass_('auxiliar','synthetic-aux-password')}])]);
   const post = body => JSON.parse(c.doPost({postData: {contents: JSON.stringify(body)}}).text);
   const token = (user, role = 'docente', extra = {}) => c.firmarToken_({user, role, permisosVersion: 1000, exp: Date.now() + 60000, ...extra});
@@ -88,7 +95,7 @@ function request(s, action, token, extra = {}) {
     action, token, nivel: 'primaria', bimestre: 'I', grado: 1, seccion: 'Única',
     b64: Buffer.from('synthetic-file').toString('base64'), filename: 'Test.xlsx',
     payload: {plan: 'synthetic-plan'}, grupos: [],
-    items: [{fecha: '2026-10-03', nivel: 'primaria', grado: 1, seccion: 'Única', nombre: 'Synthetic Student', marca: 'P'}],
+    items: [{anio:2026,bimestre:'III',fecha:'2026-10-03',nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Student',idEstudiante:'siagie:PRIMARY-1',marca:'P'}],
     ...extra
   };
 }
@@ -125,7 +132,7 @@ test('saveasis: forged key cannot replace a different attendance record', () => 
   const token = s.token('auxiliar', 'auxiliar');
   assert.equal(s.post(request(s, 'saveasis', token)).ok, true);
   const key = s.tables.get('AsistenciaIngreso').rows[1][0];
-  const result = s.post(request(s, 'saveasis', token, {items: [{fecha: '2026-10-03', nivel: 'secundaria', grado: 2, seccion: 'B', nombre: 'Another Synthetic Student', marca: 'F', clave: key}]}));
+  const result = s.post(request(s, 'saveasis', token, {items: [{anio:2026,bimestre:'III',fecha:'2026-10-03',nivel:'secundaria',grado:2,seccion:'B',nombre:'Another Synthetic Student',idEstudiante:'siagie:SECONDARY-1',marca:'F',clave:key}]}));
   assert.equal(result.ok, true);
   assert.equal(s.tables.get('AsistenciaIngreso').rows[1][6], 'P');
   assert.notEqual(s.tables.get('AsistenciaIngreso').rows[2][0], key);
@@ -211,11 +218,12 @@ for (const [file, name, helper, role, action] of [
         const body = JSON.parse(options.body); requests.push(body); const response = s.post(body); responses.push(response);
         return {text: async () => JSON.stringify(response), json: async () => response};
       },
-      document: {getElementById: id => ({value: /Nivel/.test(id) ? 'primaria' : /Bim/.test(id) ? 'I' : /Sec/.test(id) ? 'Única' : '1', files: [fileFixture]})},
+      document: {getElementById: id => ({value: id==='inpFecha' ? '2026-10-03' : /Nivel/.test(id) ? 'primaria' : /Bim/.test(id) ? 'I' : /Sec/.test(id) ? 'Única' : '1', files: [fileFixture]})},
       btoa: value => Buffer.from(value, 'binary').toString('base64'),
       listarPlantillasSiagie() {}, renderAulasSiagie() {}, aulasDelNivel: () => [], loadGruposWa: () => [], saveGruposWaLocal() {},
       guardarCfg() {}, saveHS() {}, paqueteAip: () => ({plan: 'synthetic'}), alert() {}, toast() {}, renderLista() {},
-      completarFaltasAlSubir: () => 0, loadAsis: () => ({key: {marca: 'P'}}), asisKey: () => 'key',
+      completarFaltasAlSubir: () => 0, loadAsis: () => ({'2026||III||2026-10-03||primaria||1||Única||siagie:PRIMARY-1': {marca:'P',nombre:'Synthetic Student'}}), asisKey: () => '2026||III||2026-10-03||primaria||1||Única||siagie:PRIMARY-1',
+      anioAsistencia:()=>2026,bimestreAsistencia:()=> 'III',asistenciaEscribible:()=>true,verificarCierreAsistencia:async()=>true,
       prepararSubidaAsistencia:async()=>true,pendienteMarcaAsistencia:()=>true,resolverSubidaAsistencia:items=>items,confirmarSubidaAsistencia(){},recToItem: () => request(s, 'saveasis', token).items[0]
     });
     new vm.Script(clientFunction(file, helper)).runInContext(context);

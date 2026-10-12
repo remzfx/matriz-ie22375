@@ -87,7 +87,7 @@ for(const failure of ['404','500','timeout'])test('Actual protected background '
  const s=await remembered();await s.context.ensureBD();const token=s.context.getSession().token;const tick=clock(s);
  s.context.fetch=async(url,o)=>failure==='timeout'?pending(o.signal):{...missing(),status:Number(failure)};
  const task=s.context.precargarAuxiliar(true);await tick(failure==='timeout'?25200:1200);await task;
- assert.equal(s.context.getSession().token,token);assert.ok(s.context.IEStudents.peek());
+ assert.equal(s.context.getSession().token,token);assert.ok(s.context.IEStudents.peekRoster('III'));
 });
 test('Explicit SESSION response without explanatory text requires relogin',async()=>{
  const s=await remembered();s.context.fetch=async()=>({...ok(),json:async()=>({ok:false,code:'SESSION'})});

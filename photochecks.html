@@ -5,32 +5,64 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Photochecks QR · IE 22375</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Generador empaquetado y licenciado localmente: no depende de una CDN para los QR. -->
+  <script src="vendor/qrcodejs.min.js"></script>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#f1f5f9; color:#0f172a; }
+    body { font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin:0; background:#f1f5f9; color:#0f172a; }
     .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); }
     .btn { border:0; border-radius:12px; font-weight:800; padding:.65rem 1rem; cursor:pointer; font-size:14px; }
     .btn-primary { background:#0284c7; color:#fff; }
     .btn-ghost { background:#e2e8f0; color:#0f172a; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
     select { border:1.5px solid #cbd5e1; border-radius:12px; padding:.55rem .7rem; font-size:16px; min-height:44px; background:#fff; }
-    .sheet { display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
-    .badge {
-      border:2px solid #0f172a; border-radius:12px; padding:10px 10px 8px;
-      background:#fff; break-inside:avoid; page-break-inside:avoid;
-      display:flex; gap:10px; align-items:center;
+    .sheet { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .badge { border:1.5px solid #0f172a; border-radius:10px; background:#fff; overflow:hidden;
+      break-inside:avoid; page-break-inside:avoid; min-width:0; }
+    .badge-head { background:#0f172a; color:#fff; padding:7px 11px 6px; border-bottom:3px solid #b91c1c;
+      display:flex; align-items:center; gap:9px; }
+    /* Insignia oficial existente en el repositorio; no es un monograma simulado. */
+    .badge-emblem { width:48px; height:48px; object-fit:contain; flex-shrink:0; display:block;
+      border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:3px; }
+    .badge-school { font-size:10px; font-weight:900; line-height:1.25; letter-spacing:.03em; }
+    .badge-place { font-size:8px; color:#dbeafe; font-weight:650; margin-top:2px; }
+    .badge-body { padding:9px 11px; display:flex; gap:10px; align-items:center; justify-content:space-between; min-height:100px; }
+    .badge-info { min-width:0; flex:1 1 auto; }
+    .badge-kind { font-size:8px; font-weight:900; color:#b91c1c; letter-spacing:.11em; }
+    .badge-name { font-size:12px; font-weight:900; line-height:1.3; margin-top:5px;
+      overflow-wrap:anywhere; text-transform:uppercase; }
+    .badge-level { color:#334155; font-size:10px; font-weight:850; margin-top:6px; }
+    .badge-period { color:#64748b; font-size:9px; margin-top:5px; }
+    .badge .qr { width:99px; height:99px; flex:0 0 99px; display:grid; place-items:center;
+      background:#fff; border:1px solid #e2e8f0; padding:2px; }
+    .badge .qr img, .badge .qr canvas { width:94px!important; height:94px!important;
+      image-rendering:pixelated; max-width:100%; }
+    .badge .qr table { max-width:100%; }
+    .message { color:#9a3412; font-size:12px; font-weight:700; }
+    @media(max-width:690px) {
+      .sheet { grid-template-columns:1fr; }
     }
-    .badge .qr { width:96px; height:96px; flex-shrink:0; background:#fff; border:1px solid #e2e8f0; }
-    .badge .qr img, .badge .qr canvas { width:96px !important; height:96px !important; }
     @media print {
-      .no-print { display:none !important; }
+      .no-print { display:none!important; }
       body { background:#fff; }
-      .sheet { gap:8px; }
-      .badge { box-shadow:none; }
+      main { margin:0!important; padding:0!important; width:100%!important; max-width:100%!important; }
+      .sheet { display:grid!important; grid-template-columns:repeat(2,minmax(0,1fr))!important; gap:4mm; }
+      .badge { border:1.2px solid #0f172a; box-shadow:none!important; border-radius:2mm; }
+      .badge-head { background:#0f172a!important; color:#fff!important; padding:2mm 2.5mm; border-bottom:1mm solid #b91c1c; }
+      .badge-school { font-size:7.5pt; }
+      .badge-place { font-size:6.4pt; }
+      .badge-emblem { width:14mm; height:14mm; padding:.5mm; border-radius:1mm; }
+      .badge-body { padding:2.2mm 2.5mm; gap:2mm; min-height:27mm; }
+      .badge-name { font-size:9.5pt; }
+      .badge-level { font-size:8pt; }
+      .badge-kind, .badge-period { font-size:6.5pt; }
+      .badge .qr { width:26mm; height:26mm; flex:0 0 26mm; padding:.5mm; }
+      .badge .qr img, .badge .qr canvas { width:24.5mm!important; height:24.5mm!important; }
+      .badge-head, .badge-emblem, .badge-kind { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     }
-    @page { size: A4; margin: 10mm; }
+    @page { size:A4; margin:9mm; }
   </style>
   <script src="login-bridge.js"></script>
-<script src="students.js"></script>
+  <script src="students.js"></script>
   <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body>
@@ -47,9 +79,8 @@
   } catch(e) { location.replace('index.html'); }
 })();
 </script>
-
 <header class="no-print bg-slate-900 text-white">
-  <div class="shell shell-wide max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+  <div class="shell shell-wide max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
     <div>
       <div class="text-[10px] font-bold tracking-widest text-sky-300">ADMIN · IE 22375</div>
       <div class="font-black">Photochecks QR</div>
@@ -60,120 +91,182 @@
     </div>
   </div>
 </header>
-
-<main class="shell shell-wide max-w-4xl mx-auto px-4 py-4">
-  <p id="studentsStatus" role="status" class="no-print text-sm text-sky-800">Cargando estudiantes…</p>
-  <div class="no-print card p-3 mb-4 space-y-2">
-    <p class="text-sm text-slate-600">Genera credenciales con QR para la tablet de la puerta. Imprime en A4 (2 por fila) y recorta.</p>
+<main class="shell shell-wide max-w-5xl mx-auto px-4 py-4">
+  <p id="studentsStatus" role="status" class="no-print text-sm text-sky-800">Esperando padrón oficial…</p>
+  <div class="no-print card p-4 mb-4 space-y-3">
+    <p class="text-sm text-slate-600">Genera carnets QR para la asistencia de ingreso con el padrón oficial del bimestre. Imprime en A4 (2 por fila) o guarda como PDF.</p>
     <div class="flex flex-wrap gap-2 items-end">
       <div>
-        <label class="text-[10px] font-bold text-slate-500">Nivel</label><br>
-        <select id="selNivel" onchange="onNivel()">
-          <option value="primaria">Primaria</option>
-          <option value="secundaria">Secundaria</option>
+        <label class="text-[10px] font-bold text-slate-500" for="selBimestre">Padrón del bimestre</label><br>
+        <select id="selBimestre" onchange="cambiarBimestrePhotochecks()">
+          <option>I</option><option>II</option><option selected>III</option><option>IV</option>
         </select>
       </div>
       <div>
-        <label class="text-[10px] font-bold text-slate-500">Grado</label><br>
+        <label class="text-[10px] font-bold text-slate-500" for="selNivel">Nivel</label><br>
+        <select id="selNivel" onchange="onNivel()">
+          <option value="primaria">Primaria</option><option value="secundaria">Secundaria</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold text-slate-500" for="selGrado">Grado</label><br>
         <select id="selGrado" onchange="onGrado()"></select>
       </div>
       <div>
-        <label class="text-[10px] font-bold text-slate-500">Sección</label><br>
+        <label class="text-[10px] font-bold text-slate-500" for="selSeccion">Sección</label><br>
         <select id="selSeccion"></select>
       </div>
-      <button type="button" class="btn btn-primary" onclick="generar()">Generar aula</button>
-      <button type="button" class="btn btn-ghost" onclick="generarNivel()">Generar todo el nivel</button>
-      <button type="button" class="btn btn-primary" onclick="window.print()">🖨 Imprimir</button>
+      <button type="button" id="btnGenerar" class="btn btn-primary" onclick="generar()" disabled>Generar aula</button>
+      <button type="button" id="btnGenerarNivel" class="btn btn-ghost" onclick="generarNivel()" disabled>Generar todo el nivel</button>
+      <button type="button" id="btnImprimir" class="btn btn-primary" onclick="imprimirPhotochecks()" disabled>Imprimir / Guardar PDF</button>
+      <button type="button" id="btnReintentar" class="btn btn-ghost" onclick="ensureBD()">Actualizar padrón</button>
     </div>
-    <p class="text-[11px] text-slate-400" id="lblN">—</p>
-    <p class="text-[11px] text-slate-500" id="lblBD">Cargando lista oficial…</p>
+    <p class="text-xs text-slate-500">El botón Imprimir abre las opciones del navegador: selecciona <b>Guardar como PDF</b> si deseas descargarlo.</p>
+    <p class="text-xs text-sky-900 font-bold" id="lblBD" role="status">Comprobando padrón bimestral…</p>
+    <p class="text-xs text-slate-600" id="lblN" role="status">—</p>
   </div>
   <div id="sheet" class="sheet"></div>
 </main>
-
 <script>
-let BD = IEStudents.empty();
-async function ensureBD() {
-  try {
-    BD = await IEStudents.load();
-    if (BD.offline) document.getElementById('lblBD').textContent = 'Sin conexión: lista temporal de esta sesión (10 minutos máximo).';
-  } catch(e) {
-    BD = IEStudents.empty();
-    document.getElementById('lblBD').textContent = e.message;
-    throw e;
-  }
+let BD=IEStudents.empty(),padronVerificado=false,photocheckSerial=0,carnetsListos=false;
+function bimestrePhotochecks(){return document.getElementById('selBimestre').value;}
+function habilitarPhotochecks(){
+ const disponible=padronVerificado&&BD.bimestre===bimestrePhotochecks()&&
+  BD.padronInicializado===true&&BD.fuentePadron==='bimestre'&&!BD.offline;
+ document.getElementById('btnGenerar').disabled=!disponible;
+ document.getElementById('btnGenerarNivel').disabled=!disponible;
+ document.getElementById('btnImprimir').disabled=!disponible||!carnetsListos;
+ return disponible;
 }
-function payload(al) {
-  const nivel = al.nivel === 'secundaria' ? 'secundaria' : 'primaria';
-  return 'IE22375|' + nivel + '|' + al.grado + '|' + al.seccion + '|' + al.nombre;
+function limpiarCarnets(){
+ carnetsListos=false;
+ document.getElementById('sheet').innerHTML='';
+ document.getElementById('lblN').textContent='—';
+ habilitarPhotochecks();
 }
-function onNivel() {
-  const nivel = document.getElementById('selNivel').value;
-  const list = ((BD[nivel]||{}).estudiantes)||[];
-  let grados = [...new Set(list.map(a => Number(a.grado)))].filter(Boolean).sort((a,b)=>a-b);
-  if (!grados.length) grados = nivel === 'secundaria' ? [1,2,3,4,5] : [1,2,3,4,5,6];
-  document.getElementById('selGrado').innerHTML = grados.map(g => '<option value="'+g+'">'+g+'°</option>').join('');
-  onGrado();
+async function cambiarBimestrePhotochecks(){
+ photocheckSerial++;
+ padronVerificado=false;BD=IEStudents.empty();
+ document.getElementById('lblBD').textContent='Cargando padrón '+bimestrePhotochecks()+'…';
+ limpiarCarnets();onNivel();
+ return ensureBD();
 }
-function onGrado() {
-  const nivel = document.getElementById('selNivel').value;
-  const g = parseInt(document.getElementById('selGrado').value,10);
-  const list = ((BD[nivel]||{}).estudiantes)||[];
-  let secs;
-  if (nivel === 'secundaria') {
-    secs = (g === 5) ? ['Única'] : ['A', 'B'];
-  } else {
-    secs = [...new Set(list.filter(a => Number(a.grado)===g).map(a => a.seccion))];
-    if (!secs.length) secs = ['Única'];
-  }
-  document.getElementById('selSeccion').innerHTML = secs.map(s => '<option value="'+s+'">'+s+'</option>').join('');
+async function ensureBD(){
+ const bim=bimestrePhotochecks(),serial=++photocheckSerial,token=IEStudents.validToken();
+ padronVerificado=false;BD=IEStudents.empty();limpiarCarnets();
+ document.getElementById('lblBD').textContent='Verificando padrón oficial '+bim+'…';
+ document.getElementById('studentsStatus').textContent='Cargando padrón '+bim+'…';
+ try {
+  const base=await IEStudents.loadRoster(bim);
+  if(serial!==photocheckSerial||bim!==bimestrePhotochecks()||token!==IEStudents.validToken())return false;
+  if(!base||!base.padronInicializado||base.fuentePadron!=='bimestre'||
+     base.bimestre!==bim||base.offline)throw Error('El padrón '+bim+' no se confirmó en el servidor. No se usará la base general ni una lista temporal.');
+  BD=base;padronVerificado=true;
+  const np=BD.primaria.estudiantes.length,ns=BD.secundaria.estudiantes.length;
+  document.getElementById('lblBD').textContent='Padrón oficial '+bim+' confirmado · Primaria '+np+' · Secundaria '+ns+'.';
+  document.getElementById('studentsStatus').textContent='Padrón '+bim+' verificado. Solo matrícula de ese bimestre.';
+  onNivel();habilitarPhotochecks();
+  return true;
+ } catch(e) {
+  if(serial!==photocheckSerial)return false;
+  BD=IEStudents.empty();padronVerificado=false;
+  document.getElementById('lblBD').textContent='No se pudo confirmar el padrón '+bim+': '+(e.message||'Error del servidor')+'. No se generarán carnets.';
+  document.getElementById('studentsStatus').textContent='Padrón sin verificar · generación bloqueada.';
+  onNivel();habilitarPhotochecks();return false;
+ }
 }
-function textoHtml(value) { return String(value).replace(/[&<>"']/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"})[c]); }
-function cardHtml(al, i) {
-  const id = 'qr-' + i;
-  const niv = al.nivel === 'secundaria' ? 'SECUNDARIA' : 'PRIMARIA';
-  return '<div class="badge">' +
-    '<div class="qr" id="'+id+'"></div>' +
-    '<div class="min-w-0">' +
-      '<div style="font-size:9px;font-weight:800;letter-spacing:.08em;color:#0369a1">IE 22375 SANTA ROSA DE LOS MOLINOS</div>' +
-      '<div style="font-size:12px;font-weight:900;line-height:1.2;margin-top:2px">'+textoHtml(al.nombre)+'</div>' +
-      '<div style="font-size:11px;font-weight:800;margin-top:4px">'+niv+' · '+al.grado+'° '+al.seccion+'</div>' +
-      '<div style="font-size:9px;color:#64748b;margin-top:2px">2026 · Photocheck de ingreso</div>' +
-    '</div></div>';
+function payload(al){
+ const nivel=al.nivel==='secundaria'?'secundaria':'primaria';
+ // Formato original compatible con parseQR() y hallarAlumno() del lector Auxiliar.
+ return 'IE22375|'+nivel+'|'+al.grado+'|'+al.seccion+'|'+al.nombre;
 }
-function pintar(list) {
-  if (typeof QRCode === 'undefined') { alert('No se cargó el generador QR. Revisa la conexión y recarga.'); return; }
-  const sheet = document.getElementById('sheet');
-  sheet.innerHTML = list.map((al,i) => cardHtml(al,i)).join('');
-  list.forEach((al,i) => new QRCode(document.getElementById('qr-' + i), {text: payload(al), width: 96, height: 96, correctLevel: QRCode.CorrectLevel.M}));
-  document.getElementById('lblN').textContent = list.length + ' photochecks · debe verse el cuadrado QR a la izquierda';
+function onNivel(){
+ const nivel=document.getElementById('selNivel').value;
+ const list=((BD[nivel]||{}).estudiantes)||[];
+ const grados=[...new Set(list.map(a=>Number(a.grado)))].filter(Boolean).sort((a,b)=>a-b);
+ document.getElementById('selGrado').innerHTML=grados.map(g=>'<option value="'+g+'">'+g+'°</option>').join('');
+ onGrado();
 }
-function generar() {
-  const nivel = document.getElementById('selNivel').value;
-  const g = parseInt(document.getElementById('selGrado').value,10);
-  const sec = document.getElementById('selSeccion').value;
-  const list = (((BD[nivel]||{}).estudiantes)||[])
-    .filter(a => Number(a.grado)===g && String(a.seccion)===String(sec))
-    .map(a => Object.assign({}, a, { nivel: nivel }))
-    .sort((a,b)=>(a.orden||0)-(b.orden||0) || a.nombre.localeCompare(b.nombre,'es'));
-  if (!list.length) { alert('No hay alumnos en esa aula. Revisa la base oficial en Admin.'); return; }
-  pintar(list);
+function onGrado(){
+ const nivel=document.getElementById('selNivel').value,g=parseInt(document.getElementById('selGrado').value,10);
+ const list=((BD[nivel]||{}).estudiantes)||[];
+ const secs=[...new Set(list.filter(a=>Number(a.grado)===g).map(a=>String(a.seccion)))];
+ document.getElementById('selSeccion').innerHTML=secs.map(s=>'<option value="'+textoHtml(s)+'">'+textoHtml(s)+'</option>').join('');
 }
-function generarNivel() {
-  const nivel = document.getElementById('selNivel').value;
-  const list = (((BD[nivel]||{}).estudiantes)||[]).slice()
-    .map(a => Object.assign({}, a, { nivel: nivel }))
-    .sort((a,b)=>a.grado-b.grado || String(a.seccion).localeCompare(String(b.seccion),'es') || a.nombre.localeCompare(b.nombre,'es'));
-  if (!list.length) { alert('No hay alumnos.'); return; }
-  pintar(list);
+function textoHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function cardHtml(al,i){
+ const niv=al.nivel==='secundaria'?'SECUNDARIA':'PRIMARIA';
+ return '<article class="badge">'+
+   '<div class="badge-head">'+
+     '<img class="badge-emblem" src="icon-192.png" alt="Insignia oficial de la I.E. 22375" width="48" height="48">'+
+     '<div><div class="badge-school">I.E. N.° 22375 · SANTA ROSA</div>'+
+     '<div class="badge-place">San José de los Molinos · Ica</div></div>'+
+   '</div>'+
+   '<div class="badge-body">'+
+     '<div class="badge-info">'+
+       '<div class="badge-kind">CREDENCIAL DE INGRESO</div>'+
+       '<div class="badge-name">'+textoHtml(al.nombre)+'</div>'+
+       '<div class="badge-level">'+niv+' · '+textoHtml(al.grado)+'° '+textoHtml(al.seccion)+'</div>'+
+       '<div class="badge-period">Año '+new Date().getFullYear()+'</div>'+
+     '</div>'+
+     '<div class="qr" id="qr-'+i+'" aria-label="QR de acceso"></div>'+
+   '</div></article>';
 }
-ensureBD().then(function(){
-  const np = ((BD.primaria||{}).estudiantes||[]).length;
-  const ns = ((BD.secundaria||{}).estudiantes||[]).length;
-  const el = document.getElementById('lblBD');
-  if (el && !BD.offline) el.textContent = 'Lista oficial: Primaria ' + np + ' · Secundaria ' + ns + ' (sec. 1°–4° = A/B · 5° = Única)';
-  onNivel();
-}).catch(function() {});
+function pintar(list){
+ if(!habilitarPhotochecks())return false;
+ if(typeof QRCode==='undefined'){
+  document.getElementById('lblN').textContent='Generador QR no disponible. Recarga la página; no se permite imprimir códigos vacíos.';
+  return false;
+ }
+ limpiarCarnets();
+ const sheet=document.getElementById('sheet');
+ sheet.innerHTML=list.map((al,i)=>cardHtml(al,i)).join('');
+ let listos=0,fallos=0;
+ list.forEach((al,i)=>{
+  const qr=document.getElementById('qr-'+i);
+  if(!qr)return void fallos++;
+  try{
+   new QRCode(qr,{text:payload(al),width:192,height:192,correctLevel:QRCode.CorrectLevel.M});
+   if(qr.querySelector('canvas,img,table,svg'))listos++;
+   else{fallos++;qr.textContent='QR NO DISPONIBLE';}
+  }catch(e){fallos++;qr.textContent='QR NO DISPONIBLE';}
+ });
+ carnetsListos=listos===list.length&&fallos===0&&listos>0;
+ habilitarPhotochecks();
+ document.getElementById('lblN').textContent=carnetsListos?
+  listos+' photochecks QR listos para imprimir · padrón '+bimestrePhotochecks() :
+  'Solo '+listos+' de '+list.length+' QR generados. No imprimas; actualiza el navegador y vuelve a generar.';
+ return carnetsListos;
+}
+function generar(){
+ if(!habilitarPhotochecks())return false;
+ const nivel=document.getElementById('selNivel').value,g=parseInt(document.getElementById('selGrado').value,10);
+ const sec=document.getElementById('selSeccion').value;
+ const list=(((BD[nivel]||{}).estudiantes)||[])
+  .filter(a=>Number(a.grado)===g&&String(a.seccion)===String(sec))
+  .map(a=>Object.assign({},a,{nivel}))
+  .sort((a,b)=>(a.orden||0)-(b.orden||0)||a.nombre.localeCompare(b.nombre,'es'));
+ if(!list.length){document.getElementById('lblN').textContent='Sin estudiantes en esta aula del padrón seleccionado.';return false;}
+ return pintar(list);
+}
+function generarNivel(){
+ if(!habilitarPhotochecks())return false;
+ const nivel=document.getElementById('selNivel').value;
+ const list=(((BD[nivel]||{}).estudiantes)||[]).slice()
+  .map(a=>Object.assign({},a,{nivel}))
+  .sort((a,b)=>a.grado-b.grado||String(a.seccion).localeCompare(String(b.seccion),'es')||a.nombre.localeCompare(b.nombre,'es'));
+ if(!list.length){document.getElementById('lblN').textContent='Sin estudiantes en este nivel del padrón seleccionado.';return false;}
+ return pintar(list);
+}
+function imprimirPhotochecks(){
+ if(!habilitarPhotochecks()||!carnetsListos){
+  document.getElementById('lblN').textContent='Confirma el padrón y genera todos los códigos QR antes de imprimir.';
+  return false;
+ }
+ window.print();return true;
+}
+onNivel();
+ensureBD().catch(function(){});
 </script>
 </body>
 </html>

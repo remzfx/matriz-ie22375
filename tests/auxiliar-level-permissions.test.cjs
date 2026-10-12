@@ -36,7 +36,10 @@ for(const [user,niveles] of [['pri',['primaria']],['sec',['secundaria']],['both'
  });
  test('Auxiliar '+user+': saveasis accepts authorized items and rejects an unauthorized mixed batch atomically',()=>{
   const s=backend();s.accounts();const token=s.login(user).token;
-  const item=n=>({fecha:'2026-10-06',nivel:n,grado:1,seccion:n==='primaria'?'Única':'A',nombre:'Synthetic Student',marca:'P'});
+  s.c.obtenerAsistenciaPeriodos_=()=>({anio:2026,configurada:true,ts:1,bimestres:{III:'abierto'}});
+  s.c.hojaEstudiantes_=()=>({});
+  s.c.leerPadronEstudiantes_=()=>({estudiantes:['primaria','secundaria'].map(n=>({nivel:n,grado:1,seccion:n==='primaria'?'Única':'A',nombre:'Synthetic Student',idSiagie:n==='primaria'?'PRIMARY-1':'SECONDARY-1'}))});
+  const item=n=>({anio:2026,bimestre:'III',fecha:'2026-10-06',nivel:n,grado:1,seccion:n==='primaria'?'Única':'A',nombre:'Synthetic Student',idEstudiante:n==='primaria'?'siagie:PRIMARY-1':'siagie:SECONDARY-1',marca:'P'});
   assert.equal(s.post({action:'saveasis',token,items:[item(niveles[0])]}).ok,true);
   const before=s.state.writes;
   if(niveles.length===1){assert.equal(s.post({action:'saveasis',token,role:'admin',items:[item(niveles[0]),item(niveles[0]==='primaria'?'secundaria':'primaria')]}).ok,false);assert.equal(s.state.writes,before);}
@@ -90,7 +93,9 @@ function client(niveles=['primaria'],role='auxiliar'){
  c.prepararSubidaAsistencia=async()=>true;c.resolverSubidaAsistencia=items=>items;c.confirmarSubidaAsistencia=()=>{};
  const run=s=>new vm.Script(s).runInContext(c);run(read('students.js'));c.IEStudents=c.window.IEStudents;run(read('auxiliar-permissions.js'));c.IEAuxPermissions=c.window.IEAuxPermissions;
  run("let BD={primaria:{estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Primary'}]},secundaria:{estudiantes:[{nivel:'secundaria',grado:1,seccion:'A',nombre:'Synthetic Secondary'}]}},ASIS_KEY='synthetic-attendance';let horarioVerificado=true;");
- for(const name of ['todosAlumnos','jornadaCerrada','loadAsis','saveAsis','asisKey','setRec','pendienteMarcaAsistencia','completarFaltasAlSubir','onNivel','onGrado','ctx','loadGruposWa','textoListaAula','recToItem','subirTodoNube','bajarNube','tokenSesionAuxiliar'])run(extract('auxiliar.html',name));
+ // These scope regressions simulate an independently open, verified III bimestre.
+ run("function anioAsistencia(){return 2026};function bimestreAsistencia(){return 'III'};function identidadAsistencia(a){return 'nombre:'+a.nombre.toUpperCase()};function asistenciaEscribible(){return true};async function verificarCierreAsistencia(){return true};");
+ for(const name of ['todosAlumnos','jornadaCerrada','loadAsis','saveAsis','asisKey','setRec','pendienteMarcaAsistencia','cerrarAsistenciaAula','onNivel','onGrado','ctx','loadGruposWa','textoListaAula','recToItem','subirTodoNube','bajarNube','tokenSesionAuxiliar'])run(extract('auxiliar.html',name));
  run("const WA_KEY='synthetic-wa',CLOUD_API_URL='synthetic';");
  return {c,run,el,data,storage,token};
 }
@@ -109,17 +114,29 @@ test('Manipulating DOM or session profile cannot select, write or upload an unas
  assert.equal(s.c.setRec({nivel:'secundaria',grado:1,seccion:'A',nombre:'Synthetic Secondary'},'P'),false);
  let calls=0;s.c.fetch=async()=>{calls++};assert.equal(await s.c.subirTodoNube(),false);assert.equal(await s.c.bajarNube(),false);assert.equal(calls,0);
 });
-for(const level of ['primaria','secundaria'])test('Automatic absences never affect the other level: '+level,()=>{
- const s=client([level]);assert.equal(s.c.completarFaltasAlSubir(),1);
- const all=clone(s.c.loadAsis());assert.equal(Object.keys(all).length,1);assert.ok(Object.keys(all)[0].includes('||'+level+'||'));
- assert.equal(s.c.jornadaCerrada({nivel:level==='primaria'?'secundaria':'primaria'}),false);
+for(const level of ['primaria','secundaria'])test('Explicitly closing one classroom cannot record absences from the other level: '+level,()=>{
+  const s=client([level]);let allowed=true,confirmCount=0;
+  s.c.alumnosAula=()=>s.c.todosAlumnos();
+  s.c.getRec=()=>({marca:''});
+  s.c.confirm=()=>{confirmCount++;return allowed};
+  s.c.alert=()=>{};
+  allowed=false;s.c.cerrarAsistenciaAula();
+  assert.equal(Object.keys(s.c.loadAsis()).length,0,'Cancelling does not register absences');
+  allowed=true;s.c.cerrarAsistenciaAula();
+  const all=clone(s.c.loadAsis());
+  assert.equal(confirmCount,2,'The user must confirm the classroom closure');
+  assert.equal(Object.keys(all).length,1);
+  assert.ok(Object.keys(all)[0].includes('||'+level+'||'));
+  assert.equal(Object.values(all)[0].marca,'F');
+  assert.equal(Object.values(all)[0].via,'cierre');
+  assert.equal(s.c.jornadaCerrada({nivel:level==='primaria'?'secundaria':'primaria'}),false);
 });
 test('Auxiliary WhatsApp cache and text creation cannot expose groups/students of another level',()=>{
  const s=client();s.storage.setItem('synthetic-wa',JSON.stringify([{nivel:'primaria',link:'synthetic-primary'},{nivel:'secundaria',link:'synthetic-secondary'}]));
  assert.deepEqual(clone(s.c.loadGruposWa()).map(g=>g.nivel),['primaria']);assert.throws(()=>s.c.textoListaAula('secundaria',1,'A','2026-10-05'),/no autorizado/);
 });
 test('Auxiliary whole upload omits historical local records from forbidden levels',async()=>{
- const s=client();s.storage.setItem('synthetic-attendance',JSON.stringify({'2026-10-05||primaria||1||Única||Synthetic Primary':{marca:'P'},'2026-10-05||secundaria||1||A||Synthetic Secondary':{marca:'P'}}));
+ const s=client();s.storage.setItem('synthetic-attendance',JSON.stringify({'2026||III||2026-10-05||primaria||1||Única||nombre:SYNTHETIC PRIMARY':{marca:'P',nombre:'Synthetic Primary'},'2026||III||2026-10-05||secundaria||1||A||nombre:SYNTHETIC SECONDARY':{marca:'P',nombre:'Synthetic Secondary'}}));
  let body;s.c.fetch=async(url,opts)=>{body=JSON.parse(opts.body);return {text:async()=>JSON.stringify({ok:true,guardados:1})}};
  await s.c.subirTodoNube();assert.equal(body.items.length,1);assert.equal(body.items[0].nivel,'primaria');
 });

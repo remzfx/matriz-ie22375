@@ -17,7 +17,7 @@ test('login stays compact inside shell-auth and Registro entry selector uses the
  assert.match(read('index.html'),/id="viewLogin" class="shell shell-auth /);assert.match(read('index.html'),/<div class="w-full max-w-sm">/);assert.match(read('registro.html'),/id="viewHome" class="hidden shell shell-auth /);
 });
 test('Unrelated module HTML remains identical to the approved responsive shells base',()=>{
- const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['aula_innovacion.html','primaria.html','secundaria.html','photochecks.html']){
+ const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['aula_innovacion.html','primaria.html','secundaria.html']){
  let current=withoutPr73Escaping(read(file));
  assert.equal(current,execFileSync('git',['show',baseNow+':'+file],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n'));
  }
@@ -38,8 +38,15 @@ test('critical tables retain horizontal scroll, minimum column sizes and sticky 
  for(const file of ['registro.html','transversales.html','primaria.html','secundaria.html','admin.html'])assert.match(read(file),/overflow-x(?::\s*auto|-auto)/,file);
  assert.match(read('registro.html'),/\.fin-wrap \{ overflow-x:auto/);assert.match(read('registro.html'),/\.fin-grid th\.fin-nom[^\n]*position:sticky; left:0/);assert.match(read('transversales.html'),/\.trans-grid-wrap\{overflow-x:auto/);assert.match(read('transversales.html'),/\.trans-grid\{[^}]*min-width:900px/);
 });
-test('Photochecks keeps exact print rules, QR dimensions and legacy print wrapper widths',()=>{
- const old=original('photochecks.html'),now=read('photochecks.html').replace(/\r\n/g,'\n');assert.equal(now.match(/<style>([\s\S]*?)<\/style>/)[1],old.match(/<style>([\s\S]*?)<\/style>/)[1]);assert.match(now,/<main class="shell shell-wide max-w-4xl mx-auto px-4 py-4">/);
+test('Photochecks retains shell-wide while upgrading A4 print and high-resolution QR design',()=>{
+ const now=read('photochecks.html').replace(/\r\n/g,'\n');
+ assert.match(now,/<main class="shell shell-wide max-w-5xl mx-auto px-4 py-4">/);
+ assert.match(now,/@page\s*\{\s*size:A4/);
+ assert.match(now,/@media print/);
+ assert.match(now,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)!important/);
+ assert.match(now,/width:192,height:192/);
+ assert.match(now,/CREDENCIAL DE INGRESO/);
+ assert.match(now,/vendor\/qrcodejs\.min\.js/);
 });
 test('SW changes only static version and shared stylesheet entry, preserving API transport and cache policy',()=>{
  const sw=read('sw.js').replace(/\r\n/g,'\n');assert.match(sw,/CACHE_PREFIX \+ 'v19'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace("CACHE_PREFIX + 'v19'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
