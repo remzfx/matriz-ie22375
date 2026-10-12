@@ -11,7 +11,7 @@ test('Auxiliary paints the exact authorized cache before a slow read and later r
   const task=s.context.ensureBD();
   assert.ok(s.run('BD.secundaria.estudiantes.length')>0);
   assert.match(s.el('studentsStatus').textContent,/Padrón III local.*comprobando servidor/);
-  await flush();release({ok:true,json:async()=>({ok:true,inicializada:true,version:'new',estudiantes:[{nivel:'secundaria',grado:2,seccion:'B',nombre:'Synthetic new'}]})});
+  await flush();release({ok:true,json:async()=>({ok:true,inicializada:true,version:'new',bimestre:'III',padronInicializado:true,fuentePadron:'bimestre',estudiantes:[{nivel:'secundaria',grado:2,seccion:'B',nombre:'Synthetic new'}]})});
   await task;
   assert.equal(s.run('BD.secundaria.estudiantes[0].grado'),2);
   assert.equal(s.context.IEStudents.peek().version,'new');assert.match(s.el('studentsStatus').textContent,/estudiantes vigentes/);
