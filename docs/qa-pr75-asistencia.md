@@ -41,6 +41,18 @@
 | 23. QR e impresión | Abrir `preview-photochecks-pr75.html` local y después probar el módulo con alumnos ficticios en copia | QR visible, compatible con lector Auxiliar, diseño institucional y A4 dos por fila, opción Guardar como PDF |
 | 24. Cambiar bimestre | Generar carnet de muestra en III, cambiar a IV y esperar respuesta de copia | Se limpia la vista y no se imprime un carnet de III atribuido a IV |
 
+## Revisión de premerge: sincronización controlada (bloqueante)
+
+- El botón **Subir asistencia** envía únicamente las marcas locales ya creadas para la **fecha seleccionada**. Las otras fechas permanecen pendientes hasta que se consulten y suban por separado.
+- Nunca convierte automáticamente **Sin registrar** en **Falta** al pulsar subir; las ausencias requieren marca manual/acción explícita revisada.
+- Verificar que las marcas de varios niveles autorizados del mismo día se mantienen en la subida; el servidor valida año, bimestre, identidad y permisos.
+- Comprobar ante cierre/traslado/error que las marcas locales permanezcan sin confirmación y que el backend no acepte escrituras.
+
+### Bloqueo de publicación y orden seguro
+
+- El frontend del PR #75 requiere `asisprotocol` **v2**, `loadasisperiodos`, `loadasisstats`, `saveasisperiodos` y padrón bimestral. El Apps Script publicado anteriormente no ofrece todas estas capacidades: **no fusionar mientras la implementación vigente no esté compatible**, porque GitHub Pages puede publicar el frontend al fusionar.
+- Ejecutar antes los escenarios de integración en una **copia independiente de Apps Script + Sheets**, incluidos permisos, QR real Safari/iOS, cierre, historial y concurrencia.
+- Solo tras aprobar en copia: el propietario despliega primero un backend v2 compatible (respaldo previo y comprobación autenticada, sin cambiar frontend aún), autoriza merge; ChatGPT ejecuta merge y el propietario maneja los despliegues posteriores. Si GitHub Pages se publica por merge, confirmar funcionamiento del frontend contra el backend preparado.
 ## Comprobación visual del formulario compacto (Android, iPhone y escritorio)
 
 1. Confirmar que **Fecha | Año lectivo | Bimestre** estén en la misma fila y **Nivel | Grado | Sección** en la siguiente, sin desplazamiento horizontal ni recortes.
