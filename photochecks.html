@@ -20,10 +20,9 @@
       break-inside:avoid; page-break-inside:avoid; min-width:0; }
     .badge-head { background:#0f172a; color:#fff; padding:7px 11px 6px; border-bottom:3px solid #b91c1c;
       display:flex; align-items:center; gap:9px; }
-    .badge-emblem { border:1.5px solid #f8fafc; border-radius:50%; width:35px; height:35px;
-      display:flex; flex-direction:column; justify-content:center; align-items:center; flex-shrink:0;
-      font-size:11px; font-weight:900; line-height:1.1; letter-spacing:-.04em; }
-    .badge-emblem small { font-size:6px; letter-spacing:.03em; }
+    /* Insignia oficial existente en el repositorio; no es un monograma simulado. */
+    .badge-emblem { width:48px; height:48px; object-fit:contain; flex-shrink:0; display:block;
+      border:1px solid #e2e8f0; border-radius:8px; background:#fff; padding:3px; }
     .badge-school { font-size:10px; font-weight:900; line-height:1.25; letter-spacing:.03em; }
     .badge-place { font-size:8px; color:#dbeafe; font-weight:650; margin-top:2px; }
     .badge-body { padding:9px 11px; display:flex; gap:10px; align-items:center; justify-content:space-between; min-height:100px; }
@@ -51,8 +50,7 @@
       .badge-head { background:#0f172a!important; color:#fff!important; padding:2mm 2.5mm; border-bottom:1mm solid #b91c1c; }
       .badge-school { font-size:7.5pt; }
       .badge-place { font-size:6.4pt; }
-      .badge-emblem { width:9mm; height:9mm; font-size:8pt; }
-      .badge-emblem small { font-size:5pt; }
+      .badge-emblem { width:14mm; height:14mm; padding:.5mm; border-radius:1mm; }
       .badge-body { padding:2.2mm 2.5mm; gap:2mm; min-height:27mm; }
       .badge-name { font-size:9.5pt; }
       .badge-level { font-size:8pt; }
@@ -200,7 +198,7 @@ function cardHtml(al,i){
  const niv=al.nivel==='secundaria'?'SECUNDARIA':'PRIMARIA';
  return '<article class="badge">'+
    '<div class="badge-head">'+
-     '<div class="badge-emblem" aria-hidden="true">22375<small>IE</small></div>'+
+     '<img class="badge-emblem" src="icon-192.png" alt="Insignia oficial de la I.E. 22375" width="48" height="48">'+
      '<div><div class="badge-school">I.E. N.° 22375 · SANTA ROSA</div>'+
      '<div class="badge-place">San José de los Molinos · Ica</div></div>'+
    '</div>'+
