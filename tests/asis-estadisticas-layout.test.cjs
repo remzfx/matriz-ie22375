@@ -86,31 +86,22 @@ test('Offline-only preview mirrors header and footer without touching production
  assert.match(preview,/sin conexión|sin conexión/i);
  assert.doesNotMatch(preview,/script\.google\.com|\/macros\/s\/|CLOUD_API_URL|fetch\s*\(/);
 });
-test('Attendance form displays Fecha Año Bimestre on same row and Nivel Grado Sección on second row',()=>{
- const form=source.slice(source.indexOf('<main id="vistaAsis"'),source.indexOf('    <input type="search" id="inpBuscar"'));
- const first=form.match(/<div class="asis-fila-fecha">([\s\S]*?)<p id="asisEstado"/);
- assert.ok(first,'First compact row');
- const firstIds=['inpFecha','asisAnio','selBimestre'];
- firstIds.forEach(id=>assert.match(first[1],new RegExp('id="'+id+'"')));
- assert.ok(firstIds.every((id,i)=>i===0||first[1].indexOf(firstIds[i-1])<first[1].indexOf(id)));
- const second=form.match(/<div class="asis-fila-aula">([\s\S]*?)$/);
- assert.ok(second,'Second compact row');
- const secondIds=['selNivel','selGrado','selSeccion'];
- secondIds.forEach(id=>assert.match(second[1],new RegExp('id="'+id+'"')));
- assert.ok(secondIds.every((id,i)=>i===0||second[1].indexOf(secondIds[i-1])<second[1].indexOf(id)));
- assert.match(source,/\.asis-fila-fecha\s*\{\s*display:grid;\s*grid-template-columns:minmax\(0,1\.8fr\)/);
- assert.match(source,/\.asis-fila-aula\s*\{\s*display:grid;\s*grid-template-columns:minmax\(0,1\.5fr\)/);
- assert.match(source,/@media \(max-width:440px\)/);
- assert.match(source,/\.asis-field select, \.asis-field input\[type=date\]\s*\{/);
- for(const id of [...firstIds,...secondIds])assert.equal((source.match(new RegExp('id="'+id+'"','g'))||[]).length,1);
+test('Attendance selection keeps six fields in one desktop grid and wraps on mobile',()=>{
+ const form=source.slice(source.indexOf('<div id="asisSeccionPanel"'),source.indexOf('<p id="asisEstado"'));
+ const ids=['inpFecha','asisAnio','selBimestre','selNivel','selGrado','selSeccion'];
+ ids.forEach((id,i)=>{assert.equal((form.match(new RegExp('id="'+id+'"','g'))||[]).length,1);if(i)assert.ok(form.indexOf(ids[i-1])<form.indexOf(id));});
+ assert.match(source,/\.asis-context-grid \{ display:grid; grid-template-columns:minmax\(0,1.6fr\)/);
+ assert.match(source,/@media \(max-width:640px\).*asis-context-grid.*repeat\(2,minmax\(0,1fr\)\)/);
+ assert.match(source,/\.asis-context-grid\[hidden\] \{ display:none/);
 });
+
 test('Single QR button stays above roster; upload remains a separate deliberate action',()=>{
  const form=source.slice(source.indexOf('<main id="vistaAsis"'),source.indexOf('<div id="lista"'));
  assert.equal((form.match(/onclick="toggleScan\(\)"/g)||[]).length,1);
  assert.match(form,/Escanear QR/);
  assert.doesNotMatch(form,/Probar lector QR|onclick="toggleScan\(true\)"/);
- assert.match(form,/onclick="subirTodoNube\(\)"/);
- assert.ok(form.indexOf('onclick="toggleScan()"')<form.indexOf('onclick="subirTodoNube()"'));
+ assert.match(source.slice(source.indexOf('<footer id="asisResumenDiario"')),/onclick="subirTodoNube\(\)"/);
+ assert.ok(source.indexOf('onclick="toggleScan()"')<source.indexOf('onclick="subirTodoNube()"'));
  assert.match(preview,/>Escanear QR<\/button>/);
  assert.doesNotMatch(preview,/Probar lector QR/);
  assert.doesNotMatch(preview,/getUserMedia|Html5Qrcode/,'Offline preview must remain visual-only');
