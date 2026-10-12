@@ -82,27 +82,40 @@ test('Reading attendance remains possible after closure and restricts its year a
 });
 
 
-test('Auto-completed absences preserve the name required by attendance protocol v2',()=>{
- const {runInNewContext}=require('node:vm');
- const src=read('auxiliar.html');
- const start=src.indexOf('function completarFaltasAlSubir() {');
- const end=src.indexOf('\n}',start)+2;
- assert.ok(start>=0&&end>start,'Automatic absence function must exist');
- const key='2026||III||2026-10-11||secundaria||1||A||siagie:AUTOMATIC-1';
- const stored={};
- const state={
-  document:{getElementById:()=>({value:'2026-10-11'})},
-  hoyISO:()=> '2026-10-11',asistenciaEscribible:()=>true,
-  loadAsis:()=>stored,saveAsis:()=>{},
-  todosAlumnos:()=>[{nombre:'Synthetic Automatic Student',nivel:'secundaria'}],
-  jornadaCerrada:()=>true,asisKey:()=>key,horaAhora:()=> '13:00'
+test('Unmarked students remain unmarked until an explicit, confirmed classroom closure',()=>{
+ const {runInNewContext}=require('node:vm'),src=read('auxiliar.html');
+ assert.equal(src.includes('function completarFaltasAlSubir('),false,
+  'The legacy automatic-absence generator must not be reachable');
+ const upload=src.slice(src.indexOf('async function subirTodoNube() {'),src.indexOf('\n}',src.indexOf('async function subirTodoNube() {'))+2);
+ assert.ok(upload.includes('pendienteMarcaAsistencia(all[k])'));
+ assert.ok(upload.includes('it.marca && it.nombre'));
+ assert.doesNotMatch(upload,/auto-falta|completarFaltasAlSubir|setRec\(/);
+ const begin=src.indexOf('function cerrarAsistenciaAula() {'),finish=src.indexOf('\n}',begin);
+ assert.ok(begin>=0&&finish>begin,'Explicit classroom closure must exist');
+ const students=[{nombre:'Synthetic Present'},{nombre:'Synthetic No Mark A'},{nombre:'Synthetic Justified'},{nombre:'Synthetic No Mark B'}];
+ const records=new Map([[students[0],{marca:'P'}],[students[2],{marca:'J'}]]);
+ const writes=[],dialogs=[],alerts=[],toasts=[];
+ let confirmed=false;
+ const context={
+  asistenciaEscribible:()=>true,ctx:()=>({grado:6,seccion:'A'}),
+  alumnosAula:()=>students,getRec:al=>records.get(al)||{marca:''},
+  setRec:(al,marca,via)=>{writes.push({al,marca,via});records.set(al,{marca});},
+  confirm:message=>{dialogs.push(message);return confirmed;},
+  alert:message=>alerts.push(message),renderLista:()=>{},toast:message=>toasts.push(message)
  };
- const result=runInNewContext(src.slice(start,end)+'\ncompletarFaltasAlSubir()',state);
- assert.equal(result,1);
- assert.equal(stored[key].marca,'F');
- assert.equal(stored[key].nombre,'Synthetic Automatic Student');
+ const fn=src.slice(begin,finish+2);
+ runInNewContext(fn+'\ncerrarAsistenciaAula()',context);
+ assert.equal(writes.length,0,'Cancel must leave ALL marks unchanged');
+ assert.match(dialogs[0],/2 sin marca pasarán a Falta/);
+ confirmed=true;
+ runInNewContext(fn+'\ncerrarAsistenciaAula()',context);
+ assert.equal(writes.length,2,'Only the two unmarked students receive a confirmed F');
+ assert.deepEqual(writes.map(x=>x.al.nombre),['Synthetic No Mark A','Synthetic No Mark B']);
+ assert.ok(writes.every(x=>x.marca==='F'&&x.via==='cierre'));
+ assert.equal(records.get(students[0]).marca,'P');
+ assert.equal(records.get(students[2]).marca,'J');
 });
-
+ 
 test('Legacy archive shows escaped cloud and local-only v1 marks without mixing v2 keys',async()=>{
  const {runInNewContext}=require('node:vm'),src=read('auxiliar.html');
  const getFunction=name=>{
