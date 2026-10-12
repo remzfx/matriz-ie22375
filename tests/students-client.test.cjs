@@ -46,7 +46,7 @@ for(const file of ['primaria.html','secundaria.html'])test(file+': real matrix l
   if(file==='primaria.html'){s.run(extract(file,'getTotalEstudiantes'));assert.equal(s.c.getTotalEstudiantes(),1);s.run('estado.grado="SEGUNDO"');assert.equal(s.c.getTotalEstudiantes(),0);}
   else{s.run(extract(file,'normalizarSeccionBD'));s.run(extract(file,'totalEstudiantesDesdeBD'));assert.equal(s.c.totalEstudiantesDesdeBD('1°','A'),1);assert.equal(s.c.totalEstudiantesDesdeBD('2°','B'),0);}
 });
-for(const file of ['auxiliar.html','photochecks.html'])test(file+': real loader uses protected students instead of the old global roster',async()=>{
+for(const file of ['auxiliar.html'])test(file+': real loader uses protected students instead of the old global roster',async()=>{
   const s=fixture(file==='auxiliar.html'?'auxiliar':'admin'),aux=file==='auxiliar.html';
   s.run("let BD=null,cargandoEstudiantesAux=false;const auxiliarInicio=performance.now();function medirAuxiliar(){};function pintarBaseAuxiliar(base){BD=base;}function toast(){};function onNivel(){};function bimestreAsistencia(){return 'III'}");
   if(aux){
@@ -58,6 +58,21 @@ for(const file of ['auxiliar.html','photochecks.html'])test(file+': real loader 
   }
   s.run(extract(file,'ensureBD'));await s.c.ensureBD();checkRequest(s,aux?'III':undefined);
   assert.equal(s.run('BD.primaria.estudiantes[0].nombre'),'Synthetic Primary');
+});
+test('Photochecks loads only the signed protected bimestre roster, not BASE_ACTUAL',async()=>{
+ const s=fixture();
+ s.run("let BD=IEStudents.empty(),padronVerificado=false,photocheckSerial=0,carnetsListos=false;");
+ s.run("function bimestrePhotochecks(){return 'III'};function limpiarCarnets(){};function onNivel(){};function habilitarPhotochecks(){return true}");
+ const orig=s.c.fetch;
+ s.c.fetch=async(...args)=>{
+  const r=await orig(...args),v=await r.json();
+  return {ok:true,json:async()=>({...v,bimestre:'III',padronInicializado:true,fuentePadron:'bimestre'})};
+ };
+ s.run(extract('photochecks.html','ensureBD'));
+ assert.equal(await s.c.ensureBD(),true);
+ checkRequest(s,'III');
+ assert.equal(s.run('BD.secundaria.estudiantes[0].nombre'),'Synthetic Secondary');
+ assert.match(s.elements.get('lblBD').textContent,/Padrón oficial III confirmado/);
 });
 test('Registro startup uses cached period configuration without waiting for the first cloud refresh',async()=>{
   const s=fixture('docente');
@@ -134,18 +149,21 @@ test('Session switched during an in-flight request cannot receive/cache the old 
   const s=fixture(),fetch=s.c.fetch;s.c.fetch=async(...args)=>{const result=await fetch(...args);s.storage.removeItem('ie22375_session_v1');return result;};
   await assert.rejects(s.c.IEStudents.load(),/sesión cambió/i);assert.equal(s.c.IEStudents.peek(),null);
 });
-test('Photochecks keep the current QR payload and render QR locally without exposing names in remote image URLs',()=>{
-  const s=fixture();s.run('let qrCalls=[];function QRCode(el,opts){qrCalls.push(opts);}QRCode.CorrectLevel={M:1};');
-  for(const name of ['payload','textoHtml','cardHtml','pintar'])s.run(extract('photochecks.html',name));
-  s.c.pintar([{nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic <Student>'}]);
-  assert.equal(s.run('qrCalls[0].text'),'IE22375|primaria|1|Única|Synthetic <Student>');
-  assert.match(s.elements.get('sheet').innerHTML,/Synthetic &lt;Student&gt;/);
-  assert.doesNotMatch(s.elements.get('sheet').innerHTML,/<img|https:/);
+test('Photochecks preserve Auxiliar QR payload, escape printed names and use locally hosted QR library',()=>{
+ const s=fixture();s.run("function bimestrePhotochecks(){return 'III'}");
+ for(const name of ['payload','textoHtml','cardHtml'])s.run(extract('photochecks.html',name));
+ const student={nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic <Student>'};
+ assert.equal(s.c.payload(student),'IE22375|primaria|1|Única|Synthetic <Student>');
+ const card=s.c.cardHtml(student,0);
+ assert.match(card,/Synthetic &lt;Student&gt;/);
+ assert.doesNotMatch(card,/<img|https:/);
+ assert.match(read('photochecks.html'),/src="vendor\/qrcodejs\.min\.js"/);
+ assert.match(read('photochecks.html'),/new QRCode\(/);
 });
 test('Production consumers include the shared protected loader; no public base/old fallback survives',()=>{
   assert.equal(fs.existsSync(path.join(root,'bd_oficial_2026.json')),false);
   for(const file of ['admin.html','registro.html','primaria.html','secundaria.html','auxiliar.html','photochecks.html']){
-    const src=read(file);assert.match(src,/<script src="students.js"><\/script>/);assert.match(src,['registro.html','auxiliar.html'].includes(file)?/IEStudents\.loadRoster\(/:/IEStudents\.load\(/);
+    const src=read(file);assert.match(src,/<script src="students.js"><\/script>/);assert.match(src,['registro.html','auxiliar.html','photochecks.html'].includes(file)?/IEStudents\.loadRoster\(/:/IEStudents\.load\(/);
     assert.doesNotMatch(src,/BD_EMP|bd_oficial_2026\.json|ie22375_admin_bd_v1|ie22375_bd_sec_cache_v1/);
   }
   assert.doesNotMatch(read('photochecks.html'),/api\.qrserver\.com|corregirNiveles/);
