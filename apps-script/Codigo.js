@@ -1651,7 +1651,7 @@ function doGet(e) {
     if (action === 'loadasis') {
       const fecha = String(p.fecha || '');
       const anio=p.anio==null?'':String(p.anio),bimestre=String(p.bimestre || '').toUpperCase();
-      if ((anio || bimestre) && (!/^(20\\d{2}|2100)$/.test(anio) || !/^(I|II|III|IV)$/.test(bimestre)))
+      if ((anio || bimestre) && (!/^(20\d{2}|2100)$/.test(anio) || !/^(I|II|III|IV)$/.test(bimestre)))
         return responder_({ok:false,code:'INVALID_PERIOD',error:'Indica año y bimestre para consultar asistencia.'});
       const sh = asegurarAsis_();
       const last = sh.getLastRow();
