@@ -56,6 +56,39 @@
     .asis-J { background:#4f46e5; }.asis-S { background:#cbd5e1; }
     .asis-legend { display:inline-flex; align-items:center; gap:4px; font-size:11px; }
     .asis-legend i { width:9px; height:9px; border-radius:2px; display:inline-block; }
+    /* Resumen diario compacto y fijo: no compite con la lista ni con las acciones. */
+    .asis-day-footer { position:fixed; bottom:0; left:0; right:0; z-index:29; background:#fff;
+      border-top:1px solid #cbd5e1; box-shadow:0 -6px 24px rgba(15,23,42,.08);
+      padding:7px 12px calc(7px + env(safe-area-inset-bottom, 0px)); }
+    .asis-day-inner { max-width:1000px; margin:0 auto; }
+    .asis-day-top { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:4px 10px;
+      margin-bottom:6px; line-height:1.25; }
+    .asis-day-heading { font-size:12px; font-weight:900; color:#0f172a; }
+    .asis-day-detail { font-size:11px; color:#475569; font-weight:600; }
+    .asis-day-counter-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:5px 12px; }
+    #asisDiaKPIs { display:flex; align-items:center; flex-wrap:wrap; gap:5px; }
+    #asisDiaKPIs .asis-kpi { display:inline-flex; align-items:center; gap:5px;
+      padding:5px 8px; border-radius:9px; background:#f8fafc; border:1px solid #e2e8f0; }
+    #asisDiaKPIs .asis-kpi strong { display:inline; font-size:14px; line-height:1; font-weight:900; }
+    #asisDiaKPIs .asis-kpi span { display:inline; font-size:10px; line-height:1.1; }
+    .asis-day-state { display:flex; gap:6px; align-items:center; font-size:10px; color:#64748b; }
+    .asis-day-state .btn { padding:5px 8px; font-size:11px; min-height:28px; }
+    .btn-estadisticas-header { color:#e0f2fe; background:rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.4); padding:.7rem .6rem; font-size:12px; white-space:nowrap; }
+    #asisStatsPanel { scroll-margin-top:110px; }
+    #vistaAsis { padding-bottom:calc(150px + env(safe-area-inset-bottom, 0px)); }
+    @media (max-width:540px) {
+      .asis-day-footer { padding-left:8px; padding-right:8px; }
+      .asis-day-heading { font-size:11px; }
+      .asis-day-detail { font-size:10px; }
+      #asisDiaKPIs { flex:1 1 100%; justify-content:space-between; gap:3px; }
+      #asisDiaKPIs .asis-kpi { flex:1 1 auto; justify-content:center; gap:3px; padding:5px 4px; }
+      #asisDiaKPIs .asis-kpi strong { font-size:12px; }
+      #asisDiaKPIs .asis-kpi span { font-size:9px; }
+      .asis-day-state { width:100%; justify-content:flex-end; }
+      #vistaAsis { padding-bottom:calc(172px + env(safe-area-inset-bottom, 0px)); }
+      .btn-estadisticas-header { padding:.65rem .45rem; font-size:11px; }
+    }
     #reader { width:100%; min-height:240px; background:#000; border-radius:12px; overflow:hidden; }
     #reader video, #reader canvas, #reader img {
       width:100% !important; max-height:280px !important; object-fit:cover !important;
@@ -96,7 +129,11 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <div class="font-black leading-tight" id="tituloModulo">Asistencia de ingreso</div>
       <div class="text-[11px] text-teal-100/80 leading-tight">Lector QR · iPhone y Android</div>
     </div>
-    <a href="index.html" class="btn btn-ghost btn-inicio text-sm shrink-0">Inicio</a>
+    <div class="flex items-center gap-2 shrink-0">
+      <button type="button" id="asisStatsBoton" class="btn btn-estadisticas-header"
+        aria-expanded="false" aria-controls="asisStatsPanel" onclick="verEstadisticasAsistencia()">Estadísticas</button>
+      <a href="index.html" class="btn btn-ghost btn-inicio text-sm shrink-0">Inicio</a>
+    </div>
   </div>
 </header>
 
@@ -141,18 +178,6 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       </div>
     </div>
     <input type="search" id="inpBuscar" placeholder="Buscar alumno…" oninput="renderLista()">
-    <div class="card border border-sky-100 p-3 space-y-2" id="asisResumenDiario">
-      <div class="flex justify-between items-center gap-2">
-        <h2 class="font-black text-sm">Estadística del día</h2>
-        <button type="button" class="btn btn-down text-xs" onclick="actualizarEstadisticaDia()">Actualizar</button>
-      </div>
-      <p id="asisDiaEstado" role="status" class="text-xs text-slate-600">Esperando padrón y servidor…</p>
-      <div id="asisDiaDetalle" class="text-xs font-bold text-slate-600"></div>
-      <div id="asisDiaKPIs" class="grid grid-cols-3 gap-1"></div>
-      <p class="text-[11px] text-slate-500">Solo marcas confirmadas en la nube. Sin registrar no significa falta.</p>
-      <button type="button" id="asisStatsBoton" class="btn btn-primary w-full"
-        aria-expanded="false" aria-controls="asisStatsPanel" onclick="verEstadisticasAsistencia()">Ver estadísticas por fechas</button>
-    </div>
     <section id="asisStatsPanel" class="card p-3 space-y-3" hidden aria-label="Estadísticas mensuales de asistencia">
       <h2 class="font-black text-base">Estadísticas de asistencia por bimestre</h2>
       <label class="block text-xs font-bold text-slate-600" for="asisStatsMes">Mes de consulta</label>
@@ -198,6 +223,22 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     Primaria presente 07:30–08:15 · tardanza después. Secundaria presente 12:30–13:15 · tardanza después. J justificación manual. Al subir a la nube, sin marca = falta si ya cerró la jornada.
   </p>
 </main>
+
+<footer id="asisResumenDiario" class="asis-day-footer" aria-label="Resumen diario de asistencia">
+  <div class="asis-day-inner">
+    <div class="asis-day-top">
+      <span class="asis-day-heading">Estadística del día · nube</span>
+      <span id="asisDiaDetalle" class="asis-day-detail">Esperando padrón oficial…</span>
+    </div>
+    <div class="asis-day-counter-row">
+      <div id="asisDiaKPIs" aria-label="Conteos diarios confirmados"></div>
+      <div class="asis-day-state">
+        <span id="asisDiaEstado" role="status">Consultando registros confirmados…</span>
+        <button type="button" class="btn btn-down" onclick="actualizarEstadisticaDia()" aria-label="Actualizar estadísticas del día">Actualizar</button>
+      </div>
+    </div>
+  </div>
+</footer>
 
 <main id="vistaGrupos" class="hidden shell shell-ops max-w-lg mx-auto px-4 py-4 space-y-3">
   <div class="card p-3 space-y-3">
@@ -789,6 +830,8 @@ function verEstadisticasAsistencia() {
  panel.hidden=!panel.hidden;
  boton.setAttribute('aria-expanded',String(!panel.hidden));
  if(panel.hidden){estadisticaMesSerial++;return;}
+ // El control vive en la cabecera: llevar la vista al panel sin ocultar el formulario.
+ if(typeof panel.scrollIntoView==='function')panel.scrollIntoView({behavior:'smooth',block:'start'});
  const mes=document.getElementById('asisStatsMes');
  if(!mes.value)mes.value=(document.getElementById('inpFecha').value||hoyISO()).slice(0,7);
  cargarEstadisticasMensuales();
@@ -1092,6 +1135,9 @@ function verMenu(cual) {
   const esGrupos = cual === 'grupos';
   if (asis) asis.classList.toggle('hidden', esGrupos);
   if (grupos) grupos.classList.toggle('hidden', !esGrupos);
+  const resumen=document.getElementById('asisResumenDiario'),statsBoton=document.getElementById('asisStatsBoton');
+  if(resumen)resumen.hidden=esGrupos;
+  if(statsBoton)statsBoton.hidden=esGrupos;
   const tit = document.getElementById('tituloModulo');
   if (tit) tit.textContent = esGrupos ? 'Envío masivo' : 'Asistencia de ingreso';
   if (bAsis) bAsis.className = 'btn text-sm ' + (esGrupos ? 'btn-ghost' : 'btn-primary');
