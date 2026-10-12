@@ -1651,6 +1651,10 @@ function doGet(e) {
     if (action === 'loadasis') {
       const fecha = String(p.fecha || '');
       const anio=p.anio==null?'':String(p.anio),bimestre=String(p.bimestre || '').toUpperCase();
+      // Archivo previo al protocolo v2: no se asigna un bimestre que no fue registrado.
+      const historicoAnterior=String(p.historico || '')==='1';
+      if (historicoAnterior && (anio || bimestre || !fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !['primaria','secundaria'].includes(nivel)))
+        return responder_({ok:false,code:'INVALID_PERIOD',error:'La consulta del archivo anterior requiere fecha y nivel, sin bimestre.'});
       if ((anio || bimestre) && (!/^(20\d{2}|2100)$/.test(anio) || !/^(I|II|III|IV)$/.test(bimestre)))
         return responder_({ok:false,code:'INVALID_PERIOD',error:'Indica año y bimestre para consultar asistencia.'});
       const sh = asegurarAsis_();
@@ -1662,6 +1666,7 @@ function doGet(e) {
           // Sheets puede devolver Date para filas históricas; comparar en la zona horaria del archivo.
           if (fecha && valorAsistenciaIngreso_(data[i][1], 1) !== fecha) continue;
           if (anio && (String(data[i][12]) !== anio || String(data[i][13]) !== bimestre)) continue;
+          if (historicoAnterior && (String(data[i][12] || '') || String(data[i][13] || ''))) continue;
           const nivelItem = String(data[i][2]).toLowerCase();
           if (!autorizaNivelAuxiliar_(acceso.sesion,nivelItem) || (p.nivel && p.nivel !== nivelItem)) continue;
           items.push({
@@ -1681,7 +1686,7 @@ function doGet(e) {
           });
         }
       }
-      return responder_({ ok: true, protocoloAsistencia: 2, fecha: fecha, anio:anio,bimestre:bimestre,items: items, total: items.length });
+      return responder_({ ok: true, protocoloAsistencia: 2, fecha: fecha, anio:anio,bimestre:bimestre,historicoAnterior:historicoAnterior,items: items, total: items.length });
     }
 
     if (action === 'loadreg') {
