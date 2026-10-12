@@ -461,7 +461,7 @@ function getRec(al) {
   return { marca: rec.marca || '', hora: rec.hora || '', motivo: rec.motivo || '', via: rec.via || '', ts: rec.ts, versionServidor:rec.versionServidor, firmaConfirmada:rec.firmaConfirmada };
 }
 function setRec(al, marca, via, motivo) {
-  if (!IEAuxPermissions.permite(al.nivel)) return false;
+  if (!IEAuxPermissions.permite(al.nivel)||!asistenciaEscribible()) {toast('Bimestre cerrado o no verificado: solo lectura.');return false;}
   const all = loadAsis();
   const k = asisKey(al);
   const prev = all[k] || {};
@@ -472,7 +472,7 @@ function setRec(al, marca, via, motivo) {
     via: via || prev.via || 'manual',
     ts: Date.now(),
     motivo: marca === 'J' ? String(motivo != null ? motivo : (prev.motivo || '')) : '',
-    versionServidor:prev.versionServidor || '', firmaConfirmada:prev.firmaConfirmada, remoto:prev.remoto
+    nombre:al.nombre,versionServidor:prev.versionServidor || '', firmaConfirmada:prev.firmaConfirmada, remoto:prev.remoto
   };
   if (marca && !prev.hora) all[k].hora = horaAhora();
   saveAsis(all);
@@ -483,8 +483,8 @@ function recToItem(clave, rec) {
   const p = String(clave).split('||');
   return {
     clave: clave,
-    fecha: p[0], nivel: p[1], grado: p[2], seccion: p[3], nombre: p.slice(4).join('||'),
-    marca: rec.marca || '', hora: rec.hora || '', via: rec.via || '', ts: rec.ts, motivo: rec.motivo || '', versionBase:rec.versionServidor || ''
+    anio:Number(p[0]),bimestre:p[1],fecha:p[2],nivel:p[3],grado:p[4],seccion:p[5],
+    idEstudiante:p.slice(6).join('||'),nombre:rec.nombre||'',marca: rec.marca || '', hora: rec.hora || '', via: rec.via || '', ts: rec.ts, motivo: rec.motivo || '', versionBase:rec.versionServidor || ''
   };
 }
 function tokenSesionAuxiliar() {
@@ -517,7 +517,7 @@ async function prepararSubidaAsistencia() {
       toast('La sesión cambió. Marcas locales conservadas.');
       return false;
     }
-    if (!data.ok || data.protocoloAsistencia!==1) {
+    if (!data.ok || data.protocoloAsistencia!==2) {
       rechazarSesionAsistencia(data,token);
       toast(data.ok ? 'Backend anterior: subida bloqueada hasta actualizar asistencia. Marcas locales conservadas.' : (data.error||'Sesión no verificada. Marcas locales conservadas.'));
       return false;
@@ -542,7 +542,7 @@ function rechazarSesionAsistencia(data,token) {
 }
 function confirmarSubidaAsistencia(data, enviados, token) {
   if (token !== tokenSesionAuxiliar()) {toast('La sesión cambió. Subida no confirmada localmente.');return false;}
-  if (data.protocoloAsistencia !== 1 || !Array.isArray(data.resultados)) {
+  if (data.protocoloAsistencia !== 2 || !Array.isArray(data.resultados)) {
     rechazarSesionAsistencia(data,token);
     toast(data.error||'Sin confirmación versionada. Las marcas locales siguen pendientes.');return false;
   }
@@ -573,8 +573,8 @@ function combinarBajadaAsistencia(data, snapshot) {
     if (!IEAuxPermissions.permite(it.nivel)) return;
     const k=it.clave || [it.fecha,it.nivel,it.grado,it.seccion,it.nombre].join('||'),prev=all[k];
     if (snapshot && JSON.stringify(snapshot[k]) !== JSON.stringify(prev)) {pendientes++;return;}
-    const nueva={marca:it.marca,hora:it.hora||'',via:it.via||'',ts:it.ts,motivo:it.motivo||''};
-    const versionada=data.protocoloAsistencia===1 && typeof it.version==='string' && it.version.startsWith('asis1:');
+    const nueva={marca:it.marca,hora:it.hora||'',via:it.via||'',ts:it.ts,motivo:it.motivo||'',nombre:it.nombre||''};
+    const versionada=data.protocoloAsistencia===2 && typeof it.version==='string' && it.version.startsWith('asis1:');
     if (prev && (pendienteMarcaAsistencia(prev) || !versionada)) {
       // Nunca resolver un conflicto perdiendo una edición sin confirmar.
       if (typeof prev === 'object' && versionada) prev.remoto={...nueva,version:it.version};
@@ -593,13 +593,13 @@ function resolverSubidaAsistencia(items) {
     const rec=all[it.clave];
     if (!rec || !rec.remoto || !pendienteMarcaAsistencia(rec)) {autorizados.push(it);return;}
     const campos=String(it.clave).split('||');
-    const nombre=campos.slice(4).join('||')||it.nombre||'Sin identificación';
+    const nombre=it.nombre||'Sin identificación';
     const remoto=rec.remoto;
     if (typeof remoto.version!=='string' || !remoto.version.startsWith('asis1:')) {cancelados++;return;}
     const mensaje='Conflicto de asistencia de ingreso\n\n'
       +'Estudiante: '+nombre+'\n'
-      +'Fecha: '+(campos[0]||it.fecha||'Sin fecha')+'\n'
-      +'Aula: '+(campos[1]||it.nivel)+' · '+(campos[2]||it.grado)+'° '+(campos[3]||it.seccion)+'\n'
+      +'Fecha: '+(it.fecha||'Sin fecha')+'\n'
+      +'Aula: '+it.nivel+' · '+it.grado+'° '+it.seccion+'\n'
       +'Marca en este dispositivo: '+(rec.marca||'Sin marca')+'\n'
       +'Marca en la nube: '+(remoto.marca||'Sin marca')+'\n\n'
       +'¿Conservar la marca LOCAL como una nueva decisión manual? Se actualizará su timestamp, sin cambiar hora ni motivo. Si la nube cambió, se rechazará por versión.';
@@ -616,7 +616,7 @@ function resolverSubidaAsistencia(items) {
   return autorizados;
 }
 async function subirUnoNube(al) {
-  if (!IEAuxPermissions.permite(al.nivel)) return false;
+  if (!IEAuxPermissions.permite(al.nivel)||!asistenciaEscribible()) return false;
   try {
     const k = asisKey(al);
     const rec = loadAsis()[k];
@@ -631,7 +631,7 @@ async function subirUnoNube(al) {
 }
 function completarFaltasAlSubir() {
   const fecha = document.getElementById('inpFecha').value || hoyISO();
-  if (fecha !== hoyISO()) return 0;
+  if (fecha !== hoyISO()||!asistenciaEscribible()) return 0;
   const all = loadAsis();
   let n = 0;
   todosAlumnos().forEach(al => {
@@ -645,12 +645,16 @@ function completarFaltasAlSubir() {
   return n;
 }
 async function subirTodoNube() {
+  if (!await verificarCierreAsistencia() || !asistenciaEscribible()) {
+    toast('Asistencia cerrada o sin confirmar. No se subieron marcas.');return false;
+  }
   if (!IEAuxPermissions.permite(document.getElementById('selNivel').value)) { toast('Nivel no autorizado.'); return false; }
   const faltas = completarFaltasAlSubir();
   if (faltas) renderLista();
   const all = loadAsis();
-  const pendientes=Object.keys(all).filter(k=>all[k] && pendienteMarcaAsistencia(all[k]));
-  const items=pendientes.map(k=>recToItem(k,all[k])).filter(it=>it.marca && IEAuxPermissions.permite(it.nivel));
+  const prefijo=anioAsistencia()+'||'+bimestreAsistencia()+'||';
+  const pendientes=Object.keys(all).filter(k=>k.startsWith(prefijo)&&all[k]&&pendienteMarcaAsistencia(all[k]));
+  const items=pendientes.map(k=>recToItem(k,all[k])).filter(it=>it.marca && it.nombre && IEAuxPermissions.permite(it.nivel));
   if (!items.length) {toast('Asistencia al día: no hay marcas pendientes para subir.');return;}
   try {
     const token=tokenSesionAuxiliar();
@@ -665,10 +669,12 @@ async function bajarNube() {
   const nivel=document.getElementById('selNivel').value;
   if (!IEAuxPermissions.permite(nivel)) { toast('Nivel no autorizado.'); return false; }
   const fecha = document.getElementById('inpFecha').value || hoyISO();
+  const anio=anioAsistencia(),bimestre=bimestreAsistencia();
   const snapshot=loadAsis(),token=tokenSesionAuxiliar(),serial=(bajarNube.serial||0)+1;
   bajarNube.serial=serial;
   try {
-    const res = await fetchLecturaNube(CLOUD_API_URL + '?action=loadasis&nivel=' + encodeURIComponent(nivel) + '&fecha=' + encodeURIComponent(fecha));
+    const res = await fetchLecturaNube(CLOUD_API_URL + '?action=loadasis&nivel=' + encodeURIComponent(nivel) + '&fecha=' + encodeURIComponent(fecha) +
+      '&anio='+encodeURIComponent(anio)+'&bimestre='+encodeURIComponent(bimestre));
     const data = JSON.parse(await res.text());
     if (token !== tokenSesionAuxiliar() || serial !== bajarNube.serial) return;
     rechazarSesionAsistencia(data,token);
@@ -681,6 +687,7 @@ async function bajarNube() {
 function escapeAuxiliar(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function renderLista() {
+  mostrarEstadoAsistencia();
   const c = ctx();
   const q = (document.getElementById('inpBuscar').value || '').trim().toLowerCase();
   let list = alumnosAula();
@@ -700,14 +707,14 @@ function renderLista() {
       const hora = rec.hora ? '<span class="text-[10px] text-slate-500 font-bold">'+escapeAuxiliar(rec.hora)+'</span>' : '';
       const enc = escapeAuxiliar(encodeURIComponent(al.nombre));
       const motivoBox = m==='J'
-        ? '<input class="mt-1 text-xs w-full" data-motivo="'+enc+'" placeholder="Motivo de la justificación" value="'+escapeAuxiliar(rec.motivo||'')+'">'
+        ? '<input class="mt-1 text-xs w-full" '+(asistenciaEscribible()?'':'disabled')+' data-motivo="'+enc+'" placeholder="Motivo de la justificación" value="'+escapeAuxiliar(rec.motivo||'')+'">'
         : '';
       return '<div class="row">' +
         '<div class="flex gap-2 items-center">' +
         '<div class="text-xs font-bold text-slate-400 w-6">'+escapeAuxiliar(al.numeroVisual)+'</div>' +
         '<div class="flex-1 min-w-0 font-bold text-sm truncate">'+escapeAuxiliar(al.nombre)+' '+hora+'</div>' +
         '<div class="flex gap-1">' +
-        ['P','F','T','J'].map(v => '<button type="button" class="chip '+(m===v?v:'')+'" data-n="'+enc+'" data-v="'+v+'">'+v+'</button>').join('') +
+        ['P','F','T','J'].map(v => '<button type="button" '+(asistenciaEscribible()?'':'disabled aria-disabled="true"')+' class="chip '+(m===v?v:'')+'" data-n="'+enc+'" data-v="'+v+'">'+v+'</button>').join('') +
         '</div></div>'+motivoBox+'</div>';
     }).join('');
   }
@@ -750,6 +757,7 @@ function renderLista() {
 }
 
 function cerrarAsistenciaAula() {
+  if (!asistenciaEscribible()) {toast('Bimestre cerrado: solo lectura.');return;}
   const c = ctx();
   const list = alumnosAula();
   const sin = list.filter(al => !getRec(al).marca);
@@ -764,6 +772,7 @@ function cerrarAsistenciaAula() {
   toast('Aula cerrada · ' + sin.length + ' faltas');
 }
 function marcarTodos(marca) {
+  if (!asistenciaEscribible()) {toast('Bimestre cerrado: solo lectura.');return;}
   if (!confirm('¿Marcar a todo el aula como ' + marca + '?')) return;
   alumnosAula().forEach(al => setRec(al, marca, 'manual'));
   renderLista();
@@ -993,6 +1002,7 @@ function hallarAlumno(p) {
   return { error: 'no-encontrado', nombre: p.nombre };
 }
 function marcarPorQR(text) {
+  if (!asistenciaEscribible()) {toast('Asistencia cerrada: QR sin registrar.');return;}
   const nAl = todosAlumnos().length;
   const p = parseQR(text);
   document.getElementById('scanMsg').textContent = 'Leído: ' + String(text).slice(0, 90);
@@ -1036,6 +1046,7 @@ function onDecoded(text) {
 }
 
 async function toggleScan() {
+  if (!asistenciaEscribible()) {toast('Asistencia cerrada: solo lectura.');return;}
   const box = document.getElementById('scanBox');
   if (box.classList.contains('on')) { stopScan(); return; }
   box.classList.add('on');
