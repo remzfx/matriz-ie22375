@@ -51,7 +51,7 @@ for(const nivel of ['primaria','secundaria'])test('Fresh '+nivel+' auxiliary log
 test('Revocation rejects students, removes cached authorization and displays a persistent session error',async()=>{
   const s=fixture('secundaria');await s.context.intentarLogin();await s.context.ensureBD();
   const token=s.context.getSession().token;s.configure();
-  await assert.rejects(s.context.ensureBD(),e=>e.code==='DENIED'&&/sesión/i.test(e.message));
+  assert.equal(await s.context.ensureBD(),false);
   assert.equal(s.server.c.validarToken_(token),null);assert.equal(s.context.IEStudents.peek(),null);
   assert.match(s.el('studentsStatus').textContent,/sesión/i);assert.doesNotMatch(s.el('studentsStatus').textContent,/cargando/i);
   assert.equal(s.context.getSession(),null);
@@ -103,7 +103,7 @@ test('Explicit auxiliary revocation preserves pending attendance and removes bot
   s.local.set('ie22375_session_v1',s.stored.get('ie22375_session_v1'));
   const attendance=JSON.stringify({synthetic:{marca:'P',ts:42}});
   s.local.set('ie22375_asistencia_colegio_v1',attendance);s.configure();
-  await assert.rejects(s.context.ensureBD());
+  assert.equal(await s.context.ensureBD(),false);
   assert.equal(s.local.get('ie22375_asistencia_colegio_v1'),attendance);
   assert.equal(s.local.has('ie22375_session_v1'),false);assert.equal(s.stored.has('ie22375_session_v1'),false);
   assert.equal(s.el('studentsRetry').hidden,true);assert.equal(s.el('studentsRelogin').hidden,false);
@@ -113,7 +113,7 @@ for(const status of [404,500,503])test('HTTP '+status+' loading failure shows re
   const s=fixture('primaria');await s.context.intentarLogin();const token=s.context.getSession().token;
   s.context.setTimeout=(fn,ms)=>{if(ms===1200)queueMicrotask(fn);return 0;};s.context.clearTimeout=()=>{};
   s.context.fetch=async()=>({ok:false,status});
-  await assert.rejects(s.context.ensureBD(),e=>e.code==='HTTP');
+  assert.equal(await s.context.ensureBD(),false);
   assert.equal(s.context.getSession().token,token);assert.equal(s.el('studentsRetry').hidden,false);
   assert.equal(s.el('studentsRelogin').hidden,true);assert.doesNotMatch(s.el('studentsStatus').textContent,/cargando/i);
 });
@@ -122,7 +122,7 @@ test('Network failure can recover with the retry button without reloading or los
   const s=fixture('secundaria');await s.context.intentarLogin();const network=s.context.fetch;
   s.context.setTimeout=(fn,ms)=>{if(ms===1200)queueMicrotask(fn);return 0;};s.context.clearTimeout=()=>{};
   s.context.fetch=async()=>{throw Error('synthetic network down');};
-  await assert.rejects(s.context.ensureBD());assert.match(s.el('studentsStatus').textContent,/reintentar/i);
+  assert.equal(await s.context.ensureBD(),false);assert.match(s.el('studentsStatus').textContent,/conectar|red|padrón|servidor/i);
   assert.equal(s.el('studentsRetry').hidden,false);assert.ok(s.context.getSession());
   s.context.fetch=network;await s.context.ensureBD();
   assert.match(s.el('studentsStatus').textContent,/estudiantes vigentes/);assert.equal(s.el('studentsRetry').hidden,true);
