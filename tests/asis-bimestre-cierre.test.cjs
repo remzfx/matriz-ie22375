@@ -6,10 +6,10 @@ const {studentsFixture}=new Function('require','__dirname',read('tests/backend-s
 const sample=(nombre,estado='DEFINITIVA',nivel='secundaria',codigo='SIAGIE-1')=>({
  nivel,grado:1,seccion:nivel==='primaria'?'Única':'A',orden:1,nombre,estadoMatricula:estado,idSiagie:codigo
 });
-function fixture(){
+function fixture(extraAlumnos=[]){
  const s=studentsFixture();
  s.c.bimestreAbierto_=()=>true;
- const alumnos=[sample('Synthetic Active'),sample('Synthetic Transferred','TRASLADADO','secundaria','SIAGIE-2'),sample('Synthetic Primary','DEFINITIVA','primaria','SIAGIE-3')];
+ const alumnos=[sample('Synthetic Active'),sample('Synthetic Transferred','TRASLADADO','secundaria','SIAGIE-2'),sample('Synthetic Primary','DEFINITIVA','primaria','SIAGIE-3'),...extraAlumnos];
  const base={primaria:{estudiantes:alumnos.filter(x=>x.nivel==='primaria')},secundaria:{estudiantes:alumnos.filter(x=>x.nivel==='secundaria')}};
  const init=s.post({action:'savestudents',token:s.admin,version:s.init.version,base});
  assert.equal(init.ok,true);
@@ -146,4 +146,70 @@ test('Legacy archive shows escaped cloud and local-only v1 marks without mixing 
  assert.match(els.asisLegadoLista.innerHTML,/Local Old Student/);
  assert.doesNotMatch(els.asisLegadoLista.innerHTML,/siagie:NEW/);
  assert.match(els.asisLegadoLista.innerHTML,/Solo en este dispositivo/);
+});
+
+test('Daily attendance statistics distinguish P F T J and unregistered without writing',()=>{
+ const f=fixture();assert.equal(f.set({}).ok,true);
+ const empty=f.s.post({action:'loadasisstats',token:f.s.admin,anio:2026,bimestre:'III',nivel:'secundaria',fecha:'2026-10-11'});
+ assert.equal(empty.ok,true,JSON.stringify(empty));assert.equal(empty.totalEstudiantes,1);
+ assert.equal(empty.dias[0].sinMarca,1);assert.equal(empty.dias[0].F,0);
+ assert.equal(f.save([f.item()]).ok,true);
+ const before=f.s.state.writes;
+ const day=f.s.post({action:'loadasisstats',token:f.s.admin,anio:2026,bimestre:'III',nivel:'secundaria',fecha:'2026-10-11'});
+ assert.equal(day.ok,true,JSON.stringify(day));assert.equal(day.origen,'nube');
+ assert.equal(day.dias[0].P,1);assert.equal(day.dias[0].sinMarca,0);
+ assert.equal(f.s.state.writes,before,'aggregate statistics must not write');
+ assert.equal(f.set({III:'cerrado'}).ok,true);
+ assert.equal(f.s.post({action:'loadasisstats',token:f.s.admin,anio:2026,bimestre:'III',nivel:'secundaria',fecha:'2026-10-11'}).dias[0].P,1,'closed bimestre still readable');
+});
+test('Monthly attendance matches a synthetic 257-student reference and excludes transfers',()=>{
+ const nuevos=Array.from({length:256},(_,i)=>sample('Synthetic Stats '+i,'DEFINITIVA','secundaria','STATS-'+i));
+ const f=fixture(nuevos);assert.equal(f.set({}).ok,true);
+ const estudiantes=[f.alumnos[0],...nuevos];
+ assert.equal(estudiantes.length,257);
+ const marcas=[[11,250,3,4],[12,230,20,7],[13,230,14,13]];
+ marcas.forEach(([dd,P,F,T])=>{
+  const items=estudiantes.map((al,i)=>f.item(al.nombre,{
+   idEstudiante:'siagie:'+al.idSiagie,
+   fecha:'2026-10-'+String(dd).padStart(2,'0'),
+   marca:i<P?'P':i<P+F?'F':'T'
+  }));
+  const saved=f.save(items);
+  assert.equal(saved.ok,true,JSON.stringify(saved).slice(0,300));
+ });
+ const before=f.s.state.writes,month=f.s.post({
+  action:'loadasisstats',token:f.s.admin,anio:2026,bimestre:'III',nivel:'secundaria',mes:'2026-10'
+ });
+ assert.equal(month.ok,true,JSON.stringify(month).slice(0,300));
+ assert.equal(month.totalEstudiantes,257);
+ assert.equal(month.dias.length,3);
+ assert.deepEqual(month.dias.map(d=>[d.fecha.slice(-2),d.P,d.F,d.T,d.J,d.sinMarca]),[
+  ['11',250,3,4,0,0],['12',230,20,7,0,0],['13',230,14,13,0,0]
+ ]);
+ assert.equal(f.s.state.writes,before,'statistical history must not write');
+ assert.equal(month.diasDelMes,31);
+ const other=f.s.post({action:'loadasisstats',token:f.s.admin,anio:2026,bimestre:'III',nivel:'primaria',mes:'2026-10'});
+ assert.equal(other.totalEstudiantes,1);assert.equal(other.dias.length,0);
+});
+test('Monthly counts report missing records and reject invalid/unscoped reads',()=>{
+ const f=fixture([sample('Synthetic Second','DEFINITIVA','secundaria','SIAGIE-SECOND')]);
+ assert.equal(f.set({}).ok,true);
+ assert.equal(f.save([f.item()]).ok,true);
+ const request=p=>f.s.post({action:'loadasisstats',token:f.s.admin,anio:2026,bimestre:'III',nivel:'secundaria',...p});
+ const month=request({mes:'2026-10'});assert.equal(month.totalEstudiantes,2);
+ assert.equal(month.dias[0].P,1);assert.equal(month.dias[0].sinMarca,1);
+ assert.equal(month.dias[0].F,0);
+ assert.equal(request({mes:'2026-13'}).code,'INVALID_PERIOD');
+ assert.equal(request({fecha:'2026-02-30'}).code,'INVALID_PERIOD');
+ assert.equal(request({mes:'2026-10',fecha:'2026-10-11'}).code,'INVALID_PERIOD');
+ assert.equal(request({mes:'2025-10'}).code,'INVALID_PERIOD');
+ assert.equal(request({fecha:'2026-10-11',nivel:'otro'}).code,'SCOPE');
+ assert.equal(f.s.post({action:'loadasisstats',token:f.s.primary,anio:2026,bimestre:'III',nivel:'secundaria',mes:'2026-10'}).ok,false);
+ const before=f.s.state.writes,sh=f.s.tables.get('AsistenciaIngreso');
+ const duplicated=[...sh.rows[1]];sh.rows.push(duplicated);
+ const duplicatedResult=request({fecha:'2026-10-11'});
+ assert.equal(duplicatedResult.dias[0].duplicados,1);
+ assert.equal(duplicatedResult.dias[0].P,0);
+ assert.equal(duplicatedResult.dias[0].sinMarca,2,'ambiguous duplicate cannot be counted');
+ assert.equal(f.s.state.writes,before,'duplicate detection must not mutate the sheet');
 });
