@@ -591,7 +591,7 @@ function itemAsistenciaAutorizado_(item) {
   const idEstudiante=String(item.idEstudiante || '').trim();
   if (!Number.isInteger(anio) || anio < 2020 || anio > 2100 ||
     !/^(I|II|III|IV)$/.test(bimestre) || String(anio) !== fecha.slice(0,4) ||
-    !idEstudiante || idEstudiante.length > 250 || /[|\\u0000-\\u001f]/.test(idEstudiante)) return null;
+    !idEstudiante || idEstudiante.length > 250 || /[|\u0000-\u001f]/.test(idEstudiante)) return null;
   if ((nivel !== 'primaria' && nivel !== 'secundaria') || !grado ||
       (nivel === 'secundaria' && grado > 5) || !seccion ||
       !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !nombre ||
