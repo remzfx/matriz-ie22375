@@ -1,463 +1,76 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0f172a" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="IE 22375" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
-  <title>IE 22375 · Acceso</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="login-bridge.js" defer></script>
-  <script src="students.js" defer></script>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; min-height: 100vh; margin: 0;
-      background: radial-gradient(ellipse at top, #e0f2fe 0%, transparent 55%), radial-gradient(ellipse at bottom right, #d1fae5 0%, transparent 45%), #f1f5f9; }
-    .card { background:#fff; border-radius:20px; box-shadow:0 12px 40px rgba(15,23,42,.1); }
-    .btn { border-radius:14px; font-weight:800; padding:.75rem 1.1rem; border:0; cursor:pointer; width:100%; font-size:15px; }
-    .btn-primary { background:#0284c7; color:#fff; }
-    .btn-ghost { background:#e2e8f0; color:#0f172a; }
-    input, select { width:100%; border:1.5px solid #cbd5e1; border-radius:12px; padding:.75rem .9rem; font-size:16px; min-height:48px; background:#fff; }
-    .hidden { display: none !important; }
-    #viewHub { position: relative; z-index: 2; }
-    #viewLogin { position: relative; z-index: 1; }
-    .mod-card {
-      display: block; text-decoration: none; color: inherit;
-      border-radius: 16px; padding: 1.1rem 1.15rem; background: #fff;
-      border: 1.5px solid #e2e8f0; min-height: 72px;
-      -webkit-tap-highlight-color: rgba(2,132,199,.18);
-      touch-action: manipulation; cursor: pointer;
-    }
-    .mod-card:active { background: #e0f2fe; }
-    .hub-header { padding-top: calc(12px + env(safe-area-inset-top, 28px)); }
-    .hub-header .btn { width: auto; min-height: 44px; min-width: 72px; touch-action: manipulation; }
-  </style>
-  <link rel="stylesheet" href="layout-shells.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0f172a">
+<title>PR 75 · Acceso de pruebas · IE 22375</title>
+<style>
+body{font:16px system-ui,-apple-system,sans-serif;margin:0;background:#f1f5f9;color:#0f172a;}
+header{background:linear-gradient(105deg,#0f172a,#115e59);color:white;padding:18px 14px}
+header div{max-width:650px;margin:auto;display:flex;align-items:center;gap:14px}
+header img{width:54px;height:54px;object-fit:contain;background:white;border-radius:12px;padding:4px}
+h1{font-size:19px;line-height:1.25;margin:0}
+header p{margin:4px 0;font-size:12px}
+main{max-width:480px;margin:20px auto;padding:0 12px}
+.card{background:#fff;border:1px solid #dbe2ea;border-radius:16px;padding:22px;box-shadow:0 4px 18px #15223d0c}
+label{display:block;font-size:13px;font-weight:800;color:#475569;margin:13px 0 6px}
+input,select{width:100%;box-sizing:border-box;min-height:48px;border:1.5px solid #cbd5e1;background:#fff;border-radius:11px;font-size:16px;padding:10px}
+button{display:block;width:100%;border:0;border-radius:11px;background:#0369a1;color:white;font-size:16px;font-weight:900;min-height:49px;margin-top:18px;cursor:pointer}
+button:disabled{opacity:.55}
+.notice{background:#fef3c7;border:1px solid #fbbf24;border-radius:10px;padding:12px;font-size:13px;color:#92400e}
+.status{min-height:32px;font-size:13px;margin-top:14px;overflow-wrap:anywhere;font-weight:700}
+small{color:#64748b;line-height:1.6;display:block;font-size:12px;margin-top:12px}
+a{color:#0369a1}
+</style>
 </head>
-<body class="text-slate-800">
-  <div id="viewLogin" class="shell shell-auth min-h-screen flex flex-col items-center justify-center px-4 py-10">
-    <div class="w-full max-w-sm">
-      <div class="text-center mb-6">
-        <img src="icon-192.png" alt="Insignia IE 22375" class="w-28 h-28 mx-auto object-contain drop-shadow-sm" onerror="this.onerror=null;this.src='apple-touch-icon.png'" />
-        <div class="text-[11px] font-bold tracking-widest text-sky-700 mt-3">INSTITUCIÓN EDUCATIVA 22375</div>
-        <h1 class="text-xl font-black mt-1">Santa Rosa de los Molinos</h1>
-        <p class="text-sm text-slate-500 mt-1">Ingreso al sistema · 2026</p>
-      </div>
-      <form class="card p-5 space-y-3" id="formLogin" autocomplete="on" onsubmit="intentarLogin(); return false;">
-        <div>
-          <label class="text-[10px] font-bold text-slate-500">Tipo de acceso</label>
-          <select id="inpTipo" name="rol" onchange="onTipoChange()" autocomplete="off">
-            <option value="docente">Docente</option>
-            <option value="admin">Administrador</option>
-            <option value="auxiliar">Auxiliar</option>
-            <option value="pip">Innovación</option>
-          </select>
-        </div>
-        <div>
-          <label class="text-[10px] font-bold text-slate-500">Usuario</label>
-          <input type="text" id="inpDocUser" name="username" placeholder="usuario" autocomplete="username" />
-        </div>
-        <div>
-          <label class="text-[10px] font-bold text-slate-500">Contraseña</label>
-          <input type="password" id="inpPass" name="password" placeholder="••••••••" autocomplete="current-password" />
-        </div>
-        <label class="flex items-center gap-2 text-sm text-slate-600 font-semibold cursor-pointer">
-          <input type="checkbox" id="inpRecordar" class="w-4 h-4" checked />
-          Recordar sesión en este equipo
-        </label>
-        <p id="loginErr" class="hidden text-sm text-red-600 font-semibold bg-red-50 rounded-lg px-3 py-2"></p>
-        <button type="submit" id="btnLogin" class="btn btn-primary">Ingresar</button>
-        <p class="text-[11px] text-slate-400 text-center">El navegador puede ofrecer guardar la contraseña al ingresar.</p>
-      </form>
-      <p class="text-[10px] text-center text-slate-400 mt-8">Desarrollo · Diseño e integración Mag. Efrain Ceopa Paredes</p>
-    </div>
-  </div>
-  <div id="viewHub" class="hidden min-h-screen">
-    <header class="hub-header bg-gradient-to-r from-slate-900 to-sky-900 text-white">
-      <div class="shell shell-ops max-w-lg mx-auto px-4 pb-4 flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <div class="text-[10px] font-bold tracking-widest text-sky-200">IE 22375</div>
-          <div class="font-black truncate" id="hubTitulo">Panel</div>
-          <div class="text-xs text-sky-100/80 truncate" id="hubSub">—</div>
-        </div>
-        <button type="button" class="btn btn-ghost text-xs" style="width:auto;padding:0.5rem 0.75rem" onclick="cerrarSesion()">Salir</button>
-      </div>
-    </header>
-    <main class="shell shell-ops max-w-lg mx-auto px-4 py-5 space-y-3">
-      <p class="text-sm text-slate-500">Seleccione el módulo:</p>
-      <div id="modulos" class="grid gap-3"></div>
-    </main>
-  </div>
+<body>
+<header><div><img src="icon-192.png" alt="Escudo IE 22375"><div><p>INSTITUCIÓN EDUCATIVA 22375 · ENTORNO DE PRUEBAS</p><h1>Ingreso a Asistencia · PR #75</h1><p>Solo estudiantes ficticios, sin cambios en producción</p></div></div></header>
+<main>
+<div class="card">
+<div class="notice"><b>QA AISLADA — SOLO LECTURA.</b> Aquí se comprobarán el formulario, el padrón y el cierre del bimestre. Usa únicamente las credenciales <b>ficticias del PR #74</b>. No introduzcas la contraseña real de la I.E.</div>
+<form id="form" autocomplete="off">
+<label for="user">Auxiliar ficticio</label>
+<select id="user" required>
+ <option value="pr74primv4jgsk1">Prueba · Auxiliar primaria</option>
+ <option value="pr74secmv4jgsk1">Prueba · Auxiliar secundaria</option>
+</select>
+<label for="pass">Contraseña de prueba</label>
+<input id="pass" type="password" required autocomplete="off" placeholder="Contraseña creada en PR #74">
+<button id="btn" type="submit">Abrir Asistencia de pruebas</button>
+</form>
+<div id="msg" class="status" role="status" aria-live="polite"></div>
+<small>La sesión permanece únicamente en esta pestaña. La única petición de acceso se dirige al Apps Script ficticio y no se almacenará la contraseña. Si la conexión HTTP está bloqueada por el navegador, se mostrará un error y no se enviará nada a producción.</small>
+</div>
+</main>
 <script>
-const SESSION_KEY = 'ie22375_session_v1';
-const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
-function normalizarUsuarioDocente(v) {
-  return String(v || '').trim().toLowerCase().replace(/^@+/, '');
-}
-function errorLogin(code, message, extra) {
-  const e = new Error(message || 'Error de acceso');
-  e.code = code || 'UNKNOWN';
-  if (extra) Object.assign(e, extra);
-  return e;
-}
-function esperar(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-function registrarIntentoLogin(info) {
-  try {
-    const key = 'ie22375_login_attempts_v1';
-    const prev = info.intento === 1 ? [] : JSON.parse(sessionStorage.getItem(key) || '[]');
-    sessionStorage.setItem(key, JSON.stringify(prev.concat([info]).slice(-2)));
-  } catch (_) {}
-}
-async function loginBackendUnaVez(tipo, usuario, password, intento = 1) {
-  detenerPrecalentamientoLogin();
-  const ctrl = new AbortController(), t0 = performance.now();
-  let fase = 'fetch', r = null, t1 = t0, vencido = false, timer;
-  const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      vencido = true;
-      ctrl.abort();
-      reject(errorLogin('TIMEOUT', 'El servidor tardó demasiado en responder.'));
-    }, 18000);
-  });
-  function diagnostico(code) {
-    let origin = '';
-    try { origin = new URL(r.url).origin; } catch (_) {}
-    return {intento:intento, totalMs:Math.round(performance.now()-t0), fase:fase,
-      status:r ? r.status : 0, origin:origin, redirected:!!(r && r.redirected),
-      contentType:r && r.headers ? (r.headers.get('Content-Type') || '').split(';')[0] : '', code:code};
-  }
-  try {
-    const data = await Promise.race([deadline, (async () => {
-      r = await fetch(CLOUD_API_URL, {method:'POST', cache:'no-store', signal:ctrl.signal,
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:JSON.stringify({action:'login',tipo:tipo,usuario:usuario,password:password})});
-      t1 = performance.now();
-      fase = 'respuesta';
-      if (!r || !r.ok) throw errorLogin('HTTP', 'El servidor respondió con un error.');
-      fase = 'cuerpo';
-      const raw = await r.text();
-      fase = 'respuesta';
-      let value;
-      try { value = JSON.parse(raw); }
-      catch (_) { throw errorLogin('INVALID_RESPONSE', 'El servidor devolvió una respuesta no válida.'); }
-      if (!value || typeof value !== 'object' || typeof value.ok !== 'boolean')
-        throw errorLogin('INVALID_RESPONSE', 'El servidor devolvió una respuesta no válida.');
-      value.__timing = {totalMs:Math.round(performance.now()-t0), fetchMs:Math.round(t1-t0),
-        parseMs:Math.round(performance.now()-t1)};
-      return value;
-    })()]);
-    registrarIntentoLogin(diagnostico('OK'));
-    return data;
-  } catch (e) {
-    const code = vencido ? 'TIMEOUT' : e.code || 'NETWORK';
-    const info = diagnostico(code);
-    registrarIntentoLogin(info);
-    throw errorLogin(code, 'No se pudo completar el acceso.', info);
-  } finally { clearTimeout(timer); ctrl.abort(); }
-}
-let loginPendiente = null;
-let puenteLogin = null, versionSesionLogin = 0, solicitudLogin = 0;
-function iniciarPuenteLogin() {
-  if (!puenteLogin && typeof IELoginBridge !== 'undefined') {
-    try { puenteLogin = IELoginBridge.create(CLOUD_API_URL); } catch(e) { /* Fetch sigue disponible. */ }
-  }
-}
-async function loginBackend(tipo, usuario, password, onRetry) {
-  if (loginPendiente) return loginPendiente;
-  loginPendiente = (async () => {
-    if (puenteLogin && puenteLogin.ready()) {
-      detenerPrecalentamientoLogin();
-      // Una solicitud RPC, sin retry ni fallback después de enviar credenciales.
-      return puenteLogin.login(tipo,usuario,password);
-    }
-    let ultimoError;
-    for (let intento = 1; intento <= 2; intento++) {
-      try {
-        const data = await loginBackendUnaVez(tipo, usuario, password, intento);
-        data.__retryCount = intento - 1;
-        return data;
-      } catch (e) {
-        ultimoError = e;
-        if (intento === 1) {
-          if (typeof onRetry === 'function') onRetry(e);
-          await esperar(1200);
-        }
-      }
-    }
-    throw ultimoError;
-  })();
-  try { return await loginPendiente; }
-  finally { loginPendiente = null; }
-}
-function mensajeErrorLogin(e) {
-  const code = e && e.code ? e.code : 'UNKNOWN';
-  if (code.startsWith('BRIDGE_')) return 'No se pudo completar el acceso mediante el puente seguro. Inténtalo nuevamente.';
-  if (code === 'TIMEOUT') return 'El servidor está demorando más de lo normal. Se hicieron 2 intentos y no respondió a tiempo.';
-  if (code === 'HTTP') return 'El servidor respondió con un error' + (e.status ? ' (HTTP ' + e.status + ')' : '') + '. Inténtalo nuevamente en unos segundos.';
-  if (code === 'INVALID_RESPONSE') return 'El servidor respondió de forma inesperada. Inténtalo nuevamente en unos segundos.';
-  if (code === 'NETWORK') return 'No se pudo establecer conexión con el servidor. Revisa tu conexión e inténtalo nuevamente.';
-  return 'No se pudo completar el acceso. Inténtalo nuevamente.';
-}
-function registrarFalloLogin(e) {
-  try {
-    sessionStorage.setItem('ie22375_login_error_v1', JSON.stringify({
-      ts: Date.now(),
-      code: (e && e.code) || 'UNKNOWN',
-      status: (e && e.status) || 0,
-      origin: (e && e.origin) || '',
-      contentType: (e && e.contentType) || '',
-      redirected: !!(e && e.redirected)
-    }));
-  } catch (_) {}
-}
-let loginPrecalentado = false, loginWarmup = null;
-function detenerPrecalentamientoLogin() {
-  if (loginWarmup) {
-    loginWarmup.ctrl.abort();
-    clearTimeout(loginWarmup.timer);
-    loginWarmup = null;
-  }
-}
-function precalentarLoginBackend() {
-  if (loginPrecalentado || loginPendiente || getSession()) return;
-  loginPrecalentado = true;
-  const warmup = {ctrl:new AbortController()};
-  loginWarmup = warmup;
-  warmup.timer = setTimeout(() => warmup.ctrl.abort(), 4000);
-  warmup.task = fetch(CLOUD_API_URL + '?action=ping&t=' + Date.now(), {
-    method:'GET', cache:'no-store', signal:warmup.ctrl.signal
-  }).then(r => r.text()).catch(function () {
-    // Optimización opcional: nunca bloquea el login ni muestra un error.
-  }).finally(function () {
-    clearTimeout(warmup.timer);
-    if (loginWarmup === warmup) loginWarmup = null;
-  });
-}
-const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
-function leerSesionCruda() {
-  try {
-    const a = sessionStorage.getItem(SESSION_KEY);
-    if (a) return JSON.parse(a);
-  } catch (e) {}
-  try {
-    const b = localStorage.getItem(SESSION_KEY);
-    if (b) return JSON.parse(b);
-  } catch (e) {}
-  return null;
-}
-function getSession() {
-  const s = leerSesionCruda();
-  if (!s || !s.ts) return null;
-  if ((['admin', 'docente', 'auxiliar', 'pip'].includes(s.role)) && (!s.token || Number(s.tokenExp) <= Date.now())) {
-    clearSession();
-    return null;
-  }
-  if (Date.now() - s.ts > SESSION_MS) { clearSession(); return null; }
-  return s;
-}
-function setSession(obj) {
-  versionSesionLogin++;
-  const data = JSON.stringify(obj);
-  sessionStorage.setItem(SESSION_KEY, data);
-  if (obj.recordar) localStorage.setItem(SESSION_KEY, data);
-  else localStorage.removeItem(SESSION_KEY);
-}
-function clearSession() {
-  versionSesionLogin++;
-  sessionStorage.removeItem(SESSION_KEY);
-  localStorage.removeItem(SESSION_KEY);
-}
-function onTipoChange() {
-  const t = document.getElementById('inpTipo').value;
-  const u = document.getElementById('inpDocUser');
-  if (!u) return;
-  u.readOnly = t === 'admin';
-  if (t === 'admin') u.value = 'admin';
-  if (t === 'auxiliar' && (u.value === 'admin' || u.value === 'pip')) u.value = '';
-  if (t === 'pip') u.value = 'pip';
-  if (t === 'docente' && (u.value === 'admin' || u.value === 'auxiliar' || u.value === 'pip')) u.value = '';
-}
-async function intentarLogin() {
-  const err = document.getElementById('loginErr');
-  err.classList.add('hidden');
-  const tipo = document.getElementById('inpTipo').value;
-  const pass = (document.getElementById('inpPass').value || '').trim();
-  if (!pass) {
-    err.textContent = 'Escriba su contraseña.';
-    err.classList.remove('hidden');
-    return;
-  }
-  const usuario = tipo === 'pip' ? tipo : normalizarUsuarioDocente(document.getElementById('inpDocUser').value);
-  if (!usuario) {
-    err.textContent = tipo === 'admin' ? 'Ingrese el usuario administrador.' : tipo === 'auxiliar' ? 'Ingrese su usuario.' : 'Ingrese su usuario o DNI de docente.';
-    err.classList.remove('hidden');
-    return;
-  }
-
-  const btnLogin = document.getElementById('btnLogin');
-  const version = versionSesionLogin, solicitud = ++solicitudLogin;
-  const tokenInicial = (leerSesionCruda() || {}).token;
-  if (btnLogin) { btnLogin.disabled = true; btnLogin.textContent = 'Verificando…'; }
-
-  err.textContent = 'Verificando credenciales…';
-  err.classList.remove('hidden');
-  let perfil;
-  try {
-    perfil = await loginBackend(tipo, usuario, pass, function(e) {
-      err.textContent = 'El servidor no respondió al primer intento. Reintentando automáticamente…';
-      err.classList.remove('hidden');
-    });
-  } catch (e) {
-    if (version !== versionSesionLogin || solicitud !== solicitudLogin || (leerSesionCruda() || {}).token !== tokenInicial) return;
-    registrarFalloLogin(e);
-    err.textContent = mensajeErrorLogin(e);
-    if (btnLogin) { btnLogin.disabled = false; btnLogin.textContent = 'Ingresar'; }
-    return;
-  }
-  if (version !== versionSesionLogin || solicitud !== solicitudLogin || (leerSesionCruda() || {}).token !== tokenInicial) return;
-  if (btnLogin) { btnLogin.disabled = false; btnLogin.textContent = 'Ingresar'; }
-  if (!perfil || !perfil.ok) {
-    err.textContent = (perfil && perfil.error) || 'Usuario o contraseña incorrectos.';
-    return;
-  }
-  if (perfil.__timing) {
-    console.info('[Login timing]', perfil.__timing);
-    try {
-      sessionStorage.setItem('ie22375_login_timing_v1', JSON.stringify({
-        ts: Date.now(),
-        role: perfil.role,
-        totalMs: perfil.__timing.totalMs,
-        fetchMs: perfil.__timing.fetchMs,
-        parseMs: perfil.__timing.parseMs,
-        retryCount: perfil.__retryCount || 0
-      }));
-    } catch (e) {}
-  }
-  err.classList.add('hidden');
-  setSession({
-    user: perfil.user, label: perfil.label || perfil.user, nivel: perfil.nivel, role: perfil.role,
-    niveles: perfil.niveles || null,
-    grados: perfil.grados || null,
-    areas: perfil.areas || null,
-    aulas: perfil.aulas || null,
-    asignaciones: perfil.asignaciones || null,
-    tutorAulas: perfil.tutorAulas || [],
-    aportesTransversales: perfil.aportesTransversales || {},
-    mods: perfil.mods || [],
-    token: perfil.token,
-    tokenExp: perfil.tokenExp,
-    permisosVersion: perfil.permisosVersion,
-    ts: Date.now(),
-    recordar: !!(document.getElementById('inpRecordar')||{}).checked
-  });
-  mostrarHub();
-  precargarAuxiliar();
-}
-let comprobacionAuxiliar = null;
-function precargarAuxiliar(verificar = false) {
-  const s = getSession();
-  if (!s || s.role !== 'auxiliar' || typeof IEStudents === 'undefined') return;
-  if (comprobacionAuxiliar && comprobacionAuxiliar.token === s.token) {
-    comprobacionAuxiliar.verificar = comprobacionAuxiliar.verificar || verificar;
-    return comprobacionAuxiliar.task;
-  }
-  const check = {token:s.token, verificar:verificar};
-  comprobacionAuxiliar = check;
-  check.task = (async function () {
-    try {
-      const base = await IEStudents.preload();
-      // Al restaurar sesión se verifica también si no hay un SW capaz de precargar.
-      if (check.verificar && !base && getSession() && getSession().token === s.token) await IEStudents.load();
-    } catch (e) {
-      const actual = getSession();
-      if ((e.code === 'SESSION' || e.authorizationRejected) && actual && actual.token === s.token) {
-        clearSession(); IEStudents.clear(); mostrarHub();
-        const err = document.getElementById('loginErr');
-        err.textContent = 'La sesión ya no está autorizada. Vuelve a iniciar sesión.';
-        err.classList.remove('hidden');
-      }
-    } finally { if (comprobacionAuxiliar === check) comprobacionAuxiliar = null; }
-  })();
-  return check.task;
-}
-function restaurarSesionRecordada() {
-  if (!getSession()) return false;
-  mostrarHub();
-  // students.js es defer: esperar al DOM permite usarlo sin retrasar el Hub.
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { precargarAuxiliar(true); }, {once:true});
-  } else precargarAuxiliar(true);
-  return true;
-}
-function cerrarSesion() {
-  clearSession();
-  document.getElementById('viewHub').classList.add('hidden');
-  document.getElementById('viewLogin').classList.remove('hidden');
-  document.getElementById('inpPass').value = '';
-  iniciarPuenteLogin();
-}
-function modsDe(s) {
-  if (s.role === 'admin' || s.user === 'admin') return ['admin_bd','registro','auxiliar','wa_grupos','matriz_pri','matriz_sec','aip'];
-  if (s.role === 'auxiliar' || s.user === 'auxiliar') return ['auxiliar','wa_grupos'];
-  if (s.role === 'pip' || s.user === 'pip') return ['aip'];
-  if (s.nivel === 'primaria') return ['registro','matriz_pri'];
-  if (s.nivel === 'secundaria') return ['registro','matriz_sec'];
-  return ['registro'];
-}
-function irModulo(href) {
-  window.location.href = href;
-}
-function mostrarHub() {
-  const s = getSession();
-  if (!s) { document.getElementById('viewLogin').classList.remove('hidden'); document.getElementById('viewHub').classList.add('hidden'); return; }
-  document.getElementById('viewLogin').classList.add('hidden');
-  document.getElementById('viewHub').classList.remove('hidden');
-  document.getElementById('hubTitulo').textContent = s.label;
-  let sub = s.role === 'admin' ? 'Acceso total' : (s.nivel || '');
-  if (s.role === 'docente') {
-    // Encabezado limpio: mostramos nivel + área(s), sin enumerar aulas/secciones.
-    if (s.grados && s.grados.length && s.nivel === 'primaria') sub += ' · Grado ' + s.grados.map(g => g + '°').join(', ');
-    if (s.areas && s.areas.length) sub += ' · ' + s.areas.join(', ');
-  }
-  document.getElementById('hubSub').textContent = sub;
-  const catalog = {
-    matriz_pri: { href:'primaria.html', title:'Matriz consolidado · Primaria', desc:'Áreas y gráficos de avance', badge:'PRIMARIA' },
-    matriz_sec: { href:'secundaria.html', title:'Matriz consolidado · Secundaria', desc:'Áreas y gráficos de avance', badge:'SECUNDARIA' },
-    registro: { href:'registro.html', title:'Registro auxiliar', desc:'Notas, asistencia e impresión', badge:'REGISTRO' },
-    admin_bd: { href:'admin.html', title:'Administración', desc:'BD, docentes y bimestres', badge:'ADMIN' },
-    auxiliar: { href:'auxiliar.html', title:'Asistencia de ingreso', desc:'Puerta · QR · lista del aula', badge:'AUXILIAR' },
-    wa_grupos: { href:'auxiliar.html?vista=masivo', title:'Envío masivo', desc:'Listas de asistencia a los grupos de WhatsApp', badge:'WHATSAPP' },
-    aip: { href:'aula_innovacion.html', title:'Aula de innovación (AIP)', desc:'Horario mensual · competencia 28', badge:'Innovación' }
-
-  };
-  const keys = modsDe(s).filter(m => catalog[m]);
-  document.getElementById('modulos').innerHTML = keys.map(key => {
-    const m = catalog[key];
-    return '<a class="mod-card" href="'+m.href+'" onclick="irModulo(\''+m.href+'\');return false;">' +
-      '<div class="text-[10px] font-bold tracking-widest text-slate-400">'+m.badge+'</div>' +
-      '<div class="font-black text-base mt-0.5">'+m.title+'</div>' +
-      '<div class="text-sm text-slate-500 mt-0.5">'+m.desc+'</div></a>';
-  }).join('') || '<p class="text-sm text-slate-500">No hay módulos para este usuario.</p>';
-}
-onTipoChange();
-if (!restaurarSesionRecordada()) {
-  iniciarPuenteLogin();
-  if (typeof document.addEventListener === 'function') document.addEventListener('DOMContentLoaded',function() {
-    if (!getSession()) iniciarPuenteLogin();
-  },{once:true});
-  // Arrancar Apps Script en segundo plano mientras el usuario completa el login.
-  precalentarLoginBackend();
-}
-if (typeof navigator!=='undefined' && navigator.serviceWorker) {
-  navigator.serviceWorker.register('./sw.js').catch(function(){});
-  navigator.serviceWorker.addEventListener('controllerchange',function () { precargarAuxiliar(); });
-}
+'use strict';
+const API="https://script.google.com/macros/s/AKfycbxvWf_eODGES6nCJiIw9sKW8tLux8z2nY0vlyshzZR8vDLi5UmGTJHTLBV1wQJHV1Ng/exec";
+const SESSION='ie22375_pr75qa_session_v1';
+const form=document.getElementById('form'),btn=document.getElementById('btn'),msg=document.getElementById('msg');
+form.addEventListener('submit',async ev=>{
+ ev.preventDefault();
+ btn.disabled=true;msg.textContent='Verificando credenciales ficticias…';
+ const password=document.getElementById('pass').value;
+ try{
+  const res=await fetch(API,{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},
+   body:JSON.stringify({action:'login',tipo:'auxiliar',usuario:document.getElementById('user').value,password})});
+  if(!res.ok)throw Error('HTTP '+res.status+' (posible bloqueo CORS o de acceso al Web App)');
+  const data=await res.json();
+  if(!data.ok||data.role!=='auxiliar'||!data.token||!Array.isArray(data.niveles))
+   throw Error(data.error||'No se confirmó una cuenta auxiliar de pruebas.');
+  sessionStorage.setItem(SESSION,JSON.stringify({
+   user:data.user,role:'auxiliar',nivel:data.nivel,niveles:data.niveles,
+   label:data.label||data.user,token:data.token,tokenExp:data.tokenExp,
+   permisosVersion:data.permisosVersion,ts:Date.now(),recordar:false
+  }));
+  document.getElementById('pass').value='';
+  location.assign('auxiliar.html');
+ }catch(e){
+  msg.textContent='No se pudo iniciar la sesión de pruebas: '+e.message+'. No intentes iniciar sesión con credenciales de producción.';
+ }finally{btn.disabled=false;}
+});
 </script>
 </body>
 </html>
