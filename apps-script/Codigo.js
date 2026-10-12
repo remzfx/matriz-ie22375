@@ -73,6 +73,22 @@ function guardarAsistenciaIngreso_(body, items) {
     if (!sesion || items.some(function(it) { return !autorizaNivelAuxiliar_(sesion,it.nivel); })) {
       return {ok:false,code:'SESSION',error:'Sesión inválida o revocada. Vuelve a iniciar sesión.'};
     }
+    const configAsis=obtenerAsistenciaPeriodos_();
+    if (!items.length || items.some(function(it){return !asistenciaAbierta_(configAsis,it.anio,it.bimestre);}))
+      return {ok:false,code:'PERIOD_CLOSED',error:'Asistencia del bimestre cerrada, bloqueada o sin configurar. Solo lectura.'};
+    // La nómina es la fotografía oficial del bimestre, no BASE_ACTUAL.
+    const bimestre=items[0].bimestre,anio=items[0].anio;
+    if (items.some(function(it){return it.bimestre!==bimestre || it.anio!==anio;}))
+      return {ok:false,code:'INVALID_BATCH',error:'No se mezclan años ni bimestres en la misma subida.'};
+    const padron=leerPadronEstudiantes_(hojaEstudiantes_(),bimestre);
+    if (!padron) return {ok:false,code:'ROSTER_MISSING',error:'No existe un padrón confirmado para el bimestre seleccionado.'};
+    const admitidos=new Set(padron.estudiantes.map(function(al){
+      return [String(al.nivel),String(gradoEscritura_(al.grado)),seccionEscritura_(al.seccion),
+        identidadParaAsistencia_(al),String(al.nombre)].join('||');
+    }));
+    if (items.some(function(it){
+      return !admitidos.has([it.nivel,it.grado,seccionEscritura_(it.seccion),it.idEstudiante,it.nombre].join('||'));
+    })) return {ok:false,code:'ROSTER_CONFLICT',error:'La nómina del bimestre cambió. Recarga el padrón antes de registrar asistencia.'};
     const vistos = Object.create(null);
     if (items.some(function(it) { if (vistos[it.clave]) return true; vistos[it.clave]=true; return false; })) {
       return {ok:false,code:'INVALID_BATCH',error:'El lote repite una clave; no se escribió ninguna marca.'};
@@ -102,19 +118,19 @@ function guardarAsistenciaIngreso_(body, items) {
       // El reloj no da autoridad: se requiere CAS aun cuando el timestamp parezca más nuevo.
       const rev=row && Number(row[11]);
       const revision=(Number.isSafeInteger(rev) && rev >= 0 ? rev : 0)+1;
-      const nueva=[it.clave,it.fecha,it.nivel,it.grado,it.seccion,it.nombre,contenido[0],contenido[1],contenido[2],ts,contenido[3],revision];
+      const nueva=[it.clave,it.fecha,it.nivel,it.grado,it.seccion,it.nombre,contenido[0],contenido[1],contenido[2],ts,contenido[3],revision,it.anio,it.bimestre,it.idEstudiante];
       const fila=actual ? actual.fila : sh.getLastRow()+1;
-      if (sh.getLastColumn() < 12) sh.getRange(1,12).setValue('revisionServidor');
+      if (sh.getLastColumn() < 15) sh.getRange(1,12,1,4).setValues([['revisionServidor','anio','bimestre','idEstudiante']]);
       // Evita que Sheets convierta ISO y HH:mm en Date (y cambie la versión).
       // Solo se formatean las dos celdas del registro autorizado, nunca el historial.
       sh.getRange(fila,2).setNumberFormat('@');
       sh.getRange(fila,8).setNumberFormat('@');
-      sh.getRange(fila,1,1,12).setValues([nueva]);
+      sh.getRange(fila,1,1,15).setValues([nueva]);
       mapa[it.clave]={fila:fila,row:nueva};guardados++;
       resultados.push({clave:it.clave,estado:'aceptada',version:versionAsistenciaIngreso_(nueva)});
     });
     SpreadsheetApp.flush();
-    return {ok:conflictos===0,protocoloAsistencia:1,code:conflictos ? 'CONFLICT' : 'OK',guardados:guardados,repetidos:repetidos,conflictos:conflictos,resultados:resultados,
+    return {ok:conflictos===0,protocoloAsistencia:2,code:conflictos ? 'CONFLICT' : 'OK',guardados:guardados,repetidos:repetidos,conflictos:conflictos,resultados:resultados,
       error:conflictos ? 'Hay marcas en conflicto. Se conservaron las demás aceptadas; baja y revisa antes de resolver.' : ''};
   } finally { lock.releaseLock(); }
 }
@@ -560,6 +576,10 @@ function sesionRutaEscritura_(token, roles) {
   return sesion && roles.indexOf(sesion.role) >= 0 ? sesion : null;
 }
 
+function identidadParaAsistencia_(al) {
+  const id=String(al.idSiagie || '').trim(),codigo=String(al.codigoEstudiante || '').trim();
+  return id ? 'siagie:' + id : codigo ? 'codigo:' + codigo : 'nombre:' + String(al.nombre || '').trim().toUpperCase();
+}
 function itemAsistenciaAutorizado_(item) {
   // La estructura se valida aquí; el permiso por nivel se valida antes de escribir el lote.
   const nivel = String(item.nivel || '').trim().toLowerCase();
@@ -567,6 +587,11 @@ function itemAsistenciaAutorizado_(item) {
   const seccion = seccionEscritura_(item.seccion);
   const fecha = typeof item.fecha === 'string' ? item.fecha.trim() : '';
   const nombre = typeof item.nombre === 'string' ? item.nombre.trim() : '';
+  const anio=Number(item.anio),bimestre=String(item.bimestre || '').trim().toUpperCase();
+  const idEstudiante=String(item.idEstudiante || '').trim();
+  if (!Number.isInteger(anio) || anio < 2020 || anio > 2100 ||
+    !/^(I|II|III|IV)$/.test(bimestre) || String(anio) !== fecha.slice(0,4) ||
+    !idEstudiante || idEstudiante.length > 250 || /[|\\u0000-\\u001f]/.test(idEstudiante)) return null;
   if ((nivel !== 'primaria' && nivel !== 'secundaria') || !grado ||
       (nivel === 'secundaria' && grado > 5) || !seccion ||
       !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || !nombre ||
@@ -574,7 +599,8 @@ function itemAsistenciaAutorizado_(item) {
   return Object.assign({}, item, {
     fecha: fecha, nivel: nivel, grado: String(grado),
     seccion: seccion === 'ÚNICA' ? 'Única' : seccion, nombre: nombre,
-    clave: [fecha, nivel, grado, seccion === 'ÚNICA' ? 'Única' : seccion, nombre].join('||')
+    anio:anio,bimestre:bimestre,idEstudiante:idEstudiante,
+    clave: [anio,bimestre,fecha,nivel,grado,seccion === 'ÚNICA' ? 'Única' : seccion,idEstudiante].join('||')
   });
 }
 
@@ -1624,14 +1650,18 @@ function doGet(e) {
 
     if (action === 'loadasis') {
       const fecha = String(p.fecha || '');
+      const anio=p.anio==null?'':String(p.anio),bimestre=String(p.bimestre || '').toUpperCase();
+      if ((anio || bimestre) && (!/^(20\\d{2}|2100)$/.test(anio) || !/^(I|II|III|IV)$/.test(bimestre)))
+        return responder_({ok:false,code:'INVALID_PERIOD',error:'Indica año y bimestre para consultar asistencia.'});
       const sh = asegurarAsis_();
       const last = sh.getLastRow();
       const items = [];
       if (last >= 2) {
-        const data = sh.getRange(2, 1, last - 1, 12).getValues();
+        const data = sh.getRange(2, 1, last - 1, 15).getValues();
         for (let i = 0; i < data.length; i++) {
           // Sheets puede devolver Date para filas históricas; comparar en la zona horaria del archivo.
           if (fecha && valorAsistenciaIngreso_(data[i][1], 1) !== fecha) continue;
+          if (anio && (String(data[i][12]) !== anio || String(data[i][13]) !== bimestre)) continue;
           const nivelItem = String(data[i][2]).toLowerCase();
           if (!autorizaNivelAuxiliar_(acceso.sesion,nivelItem) || (p.nivel && p.nivel !== nivelItem)) continue;
           items.push({
@@ -1646,11 +1676,12 @@ function doGet(e) {
             via: data[i][8],
             ts: data[i][9],
             motivo: data[i][10],
+            anio: data[i][12] || '',bimestre: data[i][13] || '',idEstudiante: data[i][14] || '',
             version: versionAsistenciaIngreso_(data[i])
           });
         }
       }
-      return responder_({ ok: true, protocoloAsistencia: 1, fecha: fecha, items: items, total: items.length });
+      return responder_({ ok: true, protocoloAsistencia: 2, fecha: fecha, anio:anio,bimestre:bimestre,items: items, total: items.length });
     }
 
     if (action === 'loadreg') {
