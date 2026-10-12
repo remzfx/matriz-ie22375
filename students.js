@@ -1,9 +1,9 @@
 /* Estudiantes: solo respuestas autorizadas del backend; caché temporal ligada al token exacto. */
 (function (global) {
   'use strict';
-  const KEY = 'ie22375_students_session_v1';
+  const KEY = 'ie22375_pr75qa_students_session_v1';
   const TTL = 24 * 60 * 60 * 1000;
-  const API = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
+  const API = 'https://script.google.com/macros/s/AKfycbxvWf_eODGES6nCJiIw9sKW8tLux8V8z2nY0vlyshzZR8vDLi5UmGTJHTLBV1wQJHV1Ng/exec';
   let memory = null, authorizationEpoch = 0;
   const pending = new Map();
   const latestRequest = new Map();
@@ -21,7 +21,7 @@
     if (el) el.textContent = message;
   }
   function session() {
-    try { return JSON.parse(sessionStorage.getItem('ie22375_session_v1') || localStorage.getItem('ie22375_session_v1') || 'null'); }
+    try { return JSON.parse(sessionStorage.getItem('ie22375_pr75qa_session_v1') || localStorage.getItem('ie22375_pr75qa_session_v1') || 'null'); }
     catch (e) { return null; }
   }
   function tokenExpiryMs(token) {
@@ -44,7 +44,7 @@
   }
   // Propagar retirada de autorización entre pestañas sin borrar notas locales.
   if (typeof global.addEventListener === 'function') global.addEventListener('storage', function(e) {
-    if ((e.key === KEY && !e.newValue) || e.key === 'ie22375_session_v1') clear();
+    if ((e.key === KEY && !e.newValue) || e.key === 'ie22375_pr75qa_session_v1') clear();
   });
   function empty() { return {primaria: {estudiantes: [], docentes: []}, secundaria: {estudiantes: [], docentes: []}}; }
   function toBase(response) {
@@ -122,11 +122,7 @@
       catch(e){clearTimeout(timer);channel.port1.close();reject(error('NETWORK','No se pudo conectar con el servidor.',true));}
     });
   }
-  async function preloadAvailable() {
-    const worker=typeof navigator!=='undefined'&&navigator.serviceWorker&&navigator.serviceWorker.controller;
-    if (!worker || typeof MessageChannel==='undefined') return null;
-    try {return (await workerMessage(worker,{type:'IE_STUDENTS_PROBE_V1'},200)).supported ? worker : null;}catch(e){return null;}
-  }
+  async function preloadAvailable() { return null; } // Entorno QA: no utilizar Service Worker externo.
   async function studentsResponse(data,token,transport) {
     if (transport) return transport.loadStudents({token,bimestre:data.bimestre || ''});
     const worker=session()&&session().role==='auxiliar' ? await preloadAvailable() : null;
