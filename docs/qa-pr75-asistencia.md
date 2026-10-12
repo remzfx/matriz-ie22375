@@ -2,6 +2,18 @@
 
 **Estado:** no autorizado para producción. Este documento describe qué comprobar en una COPIA; no constituye una orden de desplegar o fusionar.
 
+## Entorno reutilizado del PR #74 — no crear otro
+
+- **Google Sheets de pruebas existente:** `IE22375_PR74_PRUEBAS`. La comprobación de solo lectura confirmó las pestañas `Hoja 1`, `AsistenciaIngreso` y `ConfigSistema`. No utilizar la hoja oficial `Matriz IE 22375 - Datos` ni su copia de respaldo como entorno de pruebas.
+- **Estado observado:** `AsistenciaIngreso` conserva registros **ficticios** del PR #74 con esquema de **12 columnas** (hasta `revisionServidor`); `ConfigSistema` contiene configuraciones de auxiliares de prueba. No se observó todavía un registro `ASISTENCIA_PERIODOS` en las filas consultadas.
+- El proyecto Apps Script **vinculado a esta hoja** y el archivo de pruebas `PruebasPR74.gs` ya se utilizaron para pruebas de concurrencia. Reutilizar ese proyecto; **no modificar el Apps Script oficial**.
+- **Diferencia pendiente con PR #75:** instalar/ejecutar el backend v2 en el **mismo proyecto de pruebas**, comprobar el esquema de 15 columnas y preparar un `PADRON_III` sintético confirmado. No copiar estudiantes reales ni crear datos de ejemplo en producción.
+- Antes de cualquier prueba desde una página HTML, verificar que su URL de API corresponde al Web App de **pruebas**, nunca al de producción. En particular, abrir archivos del PR directamente puede seguir apuntando al backend oficial; no utilizar esas páginas para escrituras.
+- **Despliegue del proyecto de pruebas:** lo realiza exclusivamente el propietario y solo después de identificar explícitamente el Script ID de prueba; el workflow general `Deploy Apps Script` de `main` apunta normalmente a la implementación oficial y **no sirve para este ensayo**.
+- La suite automatizada de GitHub Actions es una comprobación separada. No marca estas pruebas de integración como aprobadas hasta disponer de resultados reales del Apps Script de pruebas.
+
+**Orden corto:** (1) backend v2 en Apps Script aislado; (2) comprobar `asisprotocol`, `loadasisperiodos` y `PADRON_III` de prueba; (3) ensayar guardado/cierre/historial, estadísticas y QR móvil desde un frontend de pruebas HTTPS; (4) revisar resultados y autorizar merge. Ninguno de estos pasos implica despliegue oficial.
+
 ## Reglas innegociables
 
 - El propietario autoriza expresamente el merge (lo ejecuta ChatGPT) y efectúa personalmente cualquier despliegue desde GitHub/Apps Script.
