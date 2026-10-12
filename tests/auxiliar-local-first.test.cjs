@@ -15,7 +15,7 @@ test('Auxiliary paints the exact authorized cache before a slow read and later r
   await task;
   assert.equal(s.run('BD.secundaria.estudiantes[0].grado'),2);
   assert.equal(s.context.IEStudents.peekRoster('III').version,'new');assert.match(s.el('studentsStatus').textContent,/estudiantes vigentes/);
-  assert.ok(JSON.parse(s.stored.get('ie22375_aux_timing_v1')).cachePaintMs>=0);
+  assert.ok(JSON.parse(s.stored.get('ie22375_aux_timing_v1')).studentsResponseMs>=0);
   assert.doesNotMatch(s.stored.get('ie22375_aux_timing_v1'),/token|Synthetic|password/);
 });
 
