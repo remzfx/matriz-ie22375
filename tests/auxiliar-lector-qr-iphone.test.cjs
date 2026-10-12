@@ -48,7 +48,7 @@ test('Diagnostic scans an accented photocheck without saving attendance or touch
  assert.equal(f.state.on,true);
  assert.equal(f.state.scannerStart.length,1);
  assert.equal(f.state.scannerStart[0].facingMode,'environment');
- assert.match(f.state.msg,/NO se guardará asistencia/);
+ assert.match(f.state.msg,/Ninguna asistencia será guardada/);
  const qr='IE22375|primaria|1|Única|ALEJOS GALLIQUE, GAEL ALEXANDER';
  f.getScanner().read(qr);
  assert.match(f.state.msg,/Prueba correcta: QR leído y estudiante localizado/);
