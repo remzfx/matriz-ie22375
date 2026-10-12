@@ -2723,8 +2723,9 @@ function quitarFinalManual(comp, nombre, posponerRender) {
 }
 function quitarAreaMasiva() {
   if (registroSoloLectura() || bimCerradoDocente()) return false;
-  const comps=competencias().filter(competenciaTrabajada),alumnos=estudiantes();
-  if (!comps.length || !alumnos.length) return false;
+  const comps=competencias().filter(competenciaTrabajada);
+  const alumnos=estudiantes().filter(al=>comps.some(cp=>{const original=leerNota(store.finales,finalKey(cp,studentKey(al)));return original && Object.keys(original).length && !original.borrado;}));
+  if (!comps.length || !alumnos.length) {toast('No hay calificaciones directas que quitar en esta área.');return false;}
   const c=ctxBase();
   if (!confirm('Quitar las calificaciones directas existentes de todas las competencias trabajadas del área '+c.area+' · '+c.grado+'° '+c.seccion+' · Bim '+c.bim+' ('+alumnos.length+' estudiantes). Se conservarán evidencias y conclusiones descriptivas. ¿Continuar?')) return false;
   let cambios=0;
