@@ -29,11 +29,17 @@
 | 12. Seguridad histórica | Intentar combinar `historico=1` con un bimestre, o leer otro nivel | Solicitud rechazada o alcance restringido, sin escrituras |
 | 13. Teléfono sin conexión | Fallar red de forma controlada y volver a entrar | No se confirma falsamente una sincronización; marcas locales permanecen |
 | 14. Retrocompatibilidad | Comparar registros reales representativos antes/después en copia | Ninguna fila histórica se borra, reescribe ni asigna artificialmente a un bimestre |
+| 15. Estadística del día | Seleccionar fecha, nivel y bimestre en Auxiliar; actualizar resumen | Presentes, faltas, tardanzas, justificadas y sin registrar suman exactamente el padrón oficial |
+| 16. Ejemplo de 257 alumnos | Registrar sintéticamente 250/3/4 para el día 11; 230/20/7 para el 12; 230/14/13 para el 13 | Tabla y gráfico mensual muestran las tres fechas sin confundir tardanzas con faltas |
+| 17. Registros parciales | Marcar una parte del padrón y consultar antes de subir otras marcas | La diferencia se muestra «Sin registrar», no como falta ni justificación |
+| 18. Estadística en bimestre cerrado | Cerrar asistencia del bimestre en la copia y volver a consultar estadísticas | Conserva consulta histórica; sin autorizaciones de escritura |
+| 19. Permisos estadísticos | Auxiliar de Primaria intenta consultar estadísticas de Secundaria | Se rechaza la consulta; API devuelve solo agregados, nunca nombres o códigos de estudiantes |
+| 20. Integridad y anomalías | Duplicar deliberadamente una fila de prueba y consultar | No cuenta dos veces a un estudiante; presenta aviso de duplicados para revisión |
 
 ## Criterios para solicitar aprobación final
 
 1. La CI del último commit del PR pasa sin errores.
-2. Los 14 escenarios de integración anteriores se verifican en copia con evidencia mínima sin datos personales.
+2. Los 20 escenarios de integración anteriores se verifican en copia con evidencia mínima sin datos personales.
 3. Los padrones por bimestre consultados se verifican contra su fuente oficial.
 4. Se dispone de respaldo independiente de Sheets y del Apps Script actual.
 5. El propietario autoriza explícitamente la secuencia y ejecuta los despliegues. Hasta entonces, PR en borrador, sin fusión y sin despliegue.
