@@ -95,7 +95,7 @@ function client(niveles=['primaria'],role='auxiliar'){
  run("let BD={primaria:{estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Primary'}]},secundaria:{estudiantes:[{nivel:'secundaria',grado:1,seccion:'A',nombre:'Synthetic Secondary'}]}},ASIS_KEY='synthetic-attendance';let horarioVerificado=true;");
  // These scope regressions simulate an independently open, verified III bimestre.
  run("function anioAsistencia(){return 2026};function bimestreAsistencia(){return 'III'};function identidadAsistencia(a){return 'nombre:'+a.nombre.toUpperCase()};function asistenciaEscribible(){return true};async function verificarCierreAsistencia(){return true};");
- for(const name of ['todosAlumnos','jornadaCerrada','loadAsis','saveAsis','asisKey','setRec','pendienteMarcaAsistencia','completarFaltasAlSubir','onNivel','onGrado','ctx','loadGruposWa','textoListaAula','recToItem','subirTodoNube','bajarNube','tokenSesionAuxiliar'])run(extract('auxiliar.html',name));
+ for(const name of ['todosAlumnos','jornadaCerrada','loadAsis','saveAsis','asisKey','setRec','pendienteMarcaAsistencia','cerrarAsistenciaAula','onNivel','onGrado','ctx','loadGruposWa','textoListaAula','recToItem','subirTodoNube','bajarNube','tokenSesionAuxiliar'])run(extract('auxiliar.html',name));
  run("const WA_KEY='synthetic-wa',CLOUD_API_URL='synthetic';");
  return {c,run,el,data,storage,token};
 }
@@ -114,10 +114,22 @@ test('Manipulating DOM or session profile cannot select, write or upload an unas
  assert.equal(s.c.setRec({nivel:'secundaria',grado:1,seccion:'A',nombre:'Synthetic Secondary'},'P'),false);
  let calls=0;s.c.fetch=async()=>{calls++};assert.equal(await s.c.subirTodoNube(),false);assert.equal(await s.c.bajarNube(),false);assert.equal(calls,0);
 });
-for(const level of ['primaria','secundaria'])test('Automatic absences never affect the other level: '+level,()=>{
- const s=client([level]);assert.equal(s.c.completarFaltasAlSubir(),1);
- const all=clone(s.c.loadAsis());assert.equal(Object.keys(all).length,1);assert.ok(Object.keys(all)[0].includes('||'+level+'||'));
- assert.equal(s.c.jornadaCerrada({nivel:level==='primaria'?'secundaria':'primaria'}),false);
+for(const level of ['primaria','secundaria'])test('Explicitly closing one classroom cannot record absences from the other level: '+level,()=>{
+  const s=client([level]);let allowed=true,confirmCount=0;
+  s.c.alumnosAula=()=>s.c.todosAlumnos();
+  s.c.getRec=()=>({marca:''});
+  s.c.confirm=()=>{confirmCount++;return allowed};
+  s.c.alert=()=>{};
+  allowed=false;s.c.cerrarAsistenciaAula();
+  assert.equal(Object.keys(s.c.loadAsis()).length,0,'Cancelling does not register absences');
+  allowed=true;s.c.cerrarAsistenciaAula();
+  const all=clone(s.c.loadAsis());
+  assert.equal(confirmCount,2,'The user must confirm the classroom closure');
+  assert.equal(Object.keys(all).length,1);
+  assert.ok(Object.keys(all)[0].includes('||'+level+'||'));
+  assert.equal(Object.values(all)[0].marca,'F');
+  assert.equal(Object.values(all)[0].via,'cierre');
+  assert.equal(s.c.jornadaCerrada({nivel:level==='primaria'?'secundaria':'primaria'}),false);
 });
 test('Auxiliary WhatsApp cache and text creation cannot expose groups/students of another level',()=>{
  const s=client();s.storage.setItem('synthetic-wa',JSON.stringify([{nivel:'primaria',link:'synthetic-primary'},{nivel:'secundaria',link:'synthetic-secondary'}]));
