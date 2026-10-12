@@ -156,7 +156,8 @@ test('Photochecks preserve Auxiliar QR payload, escape printed names and use loc
  assert.equal(s.c.payload(student),'IE22375|primaria|1|Única|Synthetic <Student>');
  const card=s.c.cardHtml(student,0);
  assert.match(card,/Synthetic &lt;Student&gt;/);
- assert.doesNotMatch(card,/<img|https:/);
+ assert.match(card,/<img class="badge-emblem" src="icon-192\.png" alt="Insignia oficial de la I\.E\. 22375"/);
+ assert.doesNotMatch(card,/https:/,'La insignia debe obtenerse localmente');
  assert.match(read('photochecks.html'),/src="vendor\/qrcodejs\.min\.js"/);
  assert.match(read('photochecks.html'),/new QRCode\(/);
 });
