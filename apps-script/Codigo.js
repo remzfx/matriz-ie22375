@@ -670,6 +670,77 @@ function asistenciaAbierta_(cfg, anio, bimestre) {
     /^(I|II|III|IV)$/.test(String(bimestre)) &&
     String(cfg.bimestres[bimestre] || 'bloqueado') === 'abierto';
 }
+// Conteos oficiales de solo lectura: un estudiante del PADRON_bimestre se cuenta una sola vez
+// por fecha. Las ausencias sin marca se indican como «sin registrar», nunca como F.
+function estadisticasAsistenciaIngreso_(p, sesion) {
+  const nivel=String(p.nivel || '').trim().toLowerCase();
+  const anio=Number(p.anio),bimestre=String(p.bimestre || '').toUpperCase();
+  const fecha=String(p.fecha || ''),mes=String(p.mes || '');
+  const calendario=mes ? mes : fecha.slice(0,7);
+  if (!['primaria','secundaria'].includes(nivel) || !autorizaNivelAuxiliar_(sesion,nivel))
+    return {ok:false,code:'SCOPE',error:'Nivel no autorizado para estadísticas.'};
+  if (!Number.isInteger(anio) || anio<2020 || anio>2100 ||
+      !/^(I|II|III|IV)$/.test(bimestre) ||
+      !/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/.test(calendario) ||
+      Number(calendario.slice(0,4))!==anio ||
+      (!!fecha===!!mes) ||
+      (fecha && !/^(20\d{2}|2100)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(fecha)))
+    return {ok:false,code:'INVALID_PERIOD',error:'Indica año, bimestre, nivel y una fecha o mes válido.'};
+  if (fecha) {
+    const d=new Date(fecha+'T00:00:00Z');
+    if (!Number.isFinite(d.getTime()) || d.toISOString().slice(0,10)!==fecha)
+      return {ok:false,code:'INVALID_PERIOD',error:'Fecha inválida.'};
+  }
+  const padron=leerPadronEstudiantes_(hojaEstudiantes_(),bimestre);
+  if (!padron) return {ok:false,code:'ROSTER_MISSING',error:'Falta el padrón oficial confirmado del bimestre.'};
+  const autorizados=new Set();
+  padron.estudiantes.forEach(function(al) {
+    if (String(al.nivel).toLowerCase()!==nivel) return;
+    autorizados.add([nivel,String(gradoEscritura_(al.grado)),
+      seccionEscritura_(al.seccion),identidadParaAsistencia_(al)].join('||'));
+  });
+  const total=autorizados.size,dias=new Map(),diasMes=mes ? new Date(anio,Number(calendario.slice(5,7)),0).getDate() : 0;
+  function dia(iso) {
+    if (!dias.has(iso)) dias.set(iso,{fecha:iso,P:0,F:0,T:0,J:0,sinMarca:total,
+      registrados:0,duplicados:0,totalEstudiantes:total});
+    return dias.get(iso);
+  }
+  if (fecha) dia(fecha);
+  const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('AsistenciaIngreso');
+  if (sh && sh.getLastRow()>1) {
+    const filas=sh.getRange(2,1,sh.getLastRow()-1,15).getValues(),marcas=new Map();
+    filas.forEach(function(row) {
+      if (Number(row[12])!==anio || String(row[13])!==bimestre ||
+          String(row[2]).toLowerCase()!==nivel) return;
+      const iso=valorAsistenciaIngreso_(row[1],1);
+      if (iso.slice(0,7)!==calendario || (fecha && iso!==fecha) ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
+      const estudiante=[nivel,String(gradoEscritura_(row[3])),seccionEscritura_(row[4]),String(row[14])].join('||');
+      if (!autorizados.has(estudiante)) return;
+      const marca=String(row[6]).toUpperCase();
+      if (!['P','F','T','J'].includes(marca)) return;
+      const key=iso+'||'+estudiante;
+      if (marcas.has(key)) {
+        // Ante duplicados físicos, no inventar una preferencia: mantener el conteo
+        // sin incrementar y comunicar la anomalía para su revisión.
+        marcas.get(key).duplicado=true;
+      } else marcas.set(key,{fecha:iso,marca:marca,duplicado:false});
+    });
+    marcas.forEach(function(reg) {
+      const d=dia(reg.fecha);
+      if (reg.duplicado) {d.duplicados++;return;}
+      d[reg.marca]++;d.registrados++;
+    });
+  }
+  // La vista mensual solo muestra los días con alguna marca o anomalía en el archivo;
+  // el resto del mes no se presenta engañosamente como días de ausencias.
+  const resultado=Array.from(dias.values()).sort(function(a,b){return a.fecha.localeCompare(b.fecha);});
+  resultado.forEach(function(d){d.sinMarca=Math.max(0,total-d.registrados);});
+  return {ok:true,protocoloAsistencia:2,origen:'nube',anio:anio,bimestre:bimestre,nivel:nivel,
+    fecha:fecha,mes:mes,totalEstudiantes:total,dias:resultado,diasDelMes:diasMes,
+    advertencia:'Datos confirmados en la nube; sin marca no equivale a falta.'};
+}
+
 function guardarAsistenciaPeriodos_(body) {
   const lock=LockService.getScriptLock();lock.waitLock(30000);
   try {
@@ -1629,7 +1700,7 @@ function doGet(e) {
     const rolesLectura = {
       loadreg: ['admin', 'docente'], loadnivel: ['admin', 'docente'], load: ['admin', 'docente'],
       loadtpl: ['admin'], loadtplstatus: ['admin', 'docente'],
-      loadasis: ['admin', 'auxiliar'], loadasisperiodos: ['admin', 'auxiliar'], asisprotocol: ['admin', 'auxiliar'], loadaip: ['admin', 'pip'],
+      loadasis: ['admin', 'auxiliar'], loadasisstats: ['admin', 'auxiliar'], loadasisperiodos: ['admin', 'auxiliar'], asisprotocol: ['admin', 'auxiliar'], loadaip: ['admin', 'pip'],
       loadwa: ['admin', 'auxiliar'], classroom: ['admin']
     };
     const roles = Object.prototype.hasOwnProperty.call(rolesLectura, action) ? rolesLectura[action] : null;
@@ -1645,6 +1716,7 @@ function doGet(e) {
     // Verificación de compatibilidad autenticada y sin lectura de AsistenciaIngreso.
     if (action === 'asisprotocol') return responder_({ok:true,protocoloAsistencia:2});
     if (action === 'loadasisperiodos') return responder_({ok:true,periodos:obtenerAsistenciaPeriodos_()});
+    if (action === 'loadasisstats') return responder_(estadisticasAsistenciaIngreso_(p,acceso.sesion));
 
     if ((action === 'loadasis' || action === 'loadwa') && p.nivel && !autorizaNivelAuxiliar_(acceso.sesion,String(p.nivel))) return responder_({ok:false,error:'Nivel no autorizado.'});
 
@@ -1904,7 +1976,7 @@ function doPost(e) {
     const action = String(body.action || 'saveArea').toLowerCase();
     if (['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','confirmtransversaltutor','confirmtransversalaip','revisartransversal','procesartransversales','loadtransversalexport'].includes(action)) return responder_(transversalesRuta_(body));
 
-    if (['loadreg', 'loadnivel', 'load', 'loadasis', 'loadasisperiodos', 'asisprotocol', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
+    if (['loadreg', 'loadnivel', 'load', 'loadasis', 'loadasisstats', 'loadasisperiodos', 'asisprotocol', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
       return doGet({ parameter: body });
     }
 
