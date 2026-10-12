@@ -12,7 +12,7 @@
 .eyebrow{color:#99f6e4;font-size:11px;letter-spacing:.14em;font-weight:900}
 .top h1{font-size:20px;margin:3px 0}.top small{color:#ccfbf1}
 .flag{padding:7px 10px;background:#dcfce7;color:#14532d;border-radius:999px;font-size:11px;font-weight:850;white-space:nowrap}
-main{max-width:900px;padding:22px 15px 55px;margin:auto}.notice{border:1px solid #fcd34d;background:#fffbeb;color:#92400e;padding:12px 14px;border-radius:12px;font-size:13px;margin-bottom:14px}
+main{max-width:900px;padding:22px 15px 145px;margin:auto}.notice{border:1px solid #fcd34d;background:#fffbeb;color:#92400e;padding:12px 14px;border-radius:12px;font-size:13px;margin-bottom:14px}
 .card{background:#fff;border-radius:16px;box-shadow:0 4px 18px #0f172a09;padding:17px;margin-bottom:14px}
 .headline{font-weight:900;font-size:17px;margin:0 0 14px}
 .cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.field label{display:block;font-size:11px;color:#475569;font-weight:800;margin-bottom:5px}
@@ -22,13 +22,13 @@ input,select{width:100%;height:42px;border:1px solid #cbd5e1;border-radius:10px;
 button{border:0;background:#0369a1;color:#fff;border-radius:11px;cursor:pointer;padding:11px 14px;font-size:13px;font-weight:850}
 button.secondary{background:#e0f2fe;color:#075985}button:hover{filter:brightness(.97)}
 .context{color:#475569;font-size:12px;font-weight:650;margin:8px 0 12px}
-.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
-.kpi{border:1px solid #e2e8f0;background:#f8fafc;border-radius:12px;padding:11px 5px;text-align:center}
-.kpi strong{display:block;font-size:27px;font-weight:900;line-height:1.3;font-variant-numeric:tabular-nums}
-.kpi span{font-size:11px;font-weight:750;color:#475569}
+.kpis{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.kpi{border:1px solid #e2e8f0;background:#f8fafc;border-radius:9px;padding:5px 9px;display:inline-flex;align-items:center;gap:5px}
+.kpi strong{font-size:14px;font-weight:900;line-height:1.3;font-variant-numeric:tabular-nums}
+.kpi span{font-size:10px;font-weight:750;color:#475569}
 .g{color:#15803d}.r{color:#b91c1c}.o{color:#c2410c}.p{color:#4f46e5}.s{color:#475569}
 .note{font-size:11px;color:#64748b;line-height:1.5;margin:12px 0}
-.full{width:100%;margin-top:6px}.stats-panel{margin-top:15px;padding-top:17px;border-top:1px solid #e2e8f0}
+.full{width:100%;margin-top:6px}.stats-panel{scroll-margin-top:95px;padding-top:17px}
 .panel-title{font-size:17px;font-weight:900;margin:0 0 12px}
 .graph{display:flex;gap:20px;padding:14px 12px 6px;border-bottom:1px solid #cbd5e1;align-items:flex-end;overflow:auto;min-height:238px}
 .barrow{flex:1 0 65px;max-width:130px;text-align:center}
@@ -40,14 +40,26 @@ button.secondary{background:#e0f2fe;color:#075985}button:hover{filter:brightness
 th{background:#f1f5f9;text-align:right;font-size:11px;color:#334155}th:first-child,td:first-child{text-align:left}
 td,th{padding:10px 9px;border-bottom:1px solid #e2e8f0}td:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
 .foot{color:#64748b;font-size:11px;text-align:center;line-height:1.6;padding:7px}
+.preview-actions{display:flex;align-items:center;gap:8px}
+.preview-actions .secondary{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.4)}
+.preview-actions .inicio{background:#e2e8f0;color:#0f172a}
+.preview-actions button{padding:9px 12px}
+.day-footer{position:fixed;bottom:0;left:0;right:0;z-index:10;background:#fff;border-top:1px solid #cbd5e1;box-shadow:0 -6px 24px #0f172a12;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+.day-footer-inner{max-width:950px;margin:auto}
+.day-footer-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px 10px;margin-bottom:6px}
+.day-footer-top strong{font-size:12px}.day-footer-top .context{font-size:11px;margin:0}
+.day-footer-bottom{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+.day-footer-bottom .context{font-size:11px;margin:0}
+.day-footer-bottom button{font-size:11px;padding:6px 9px;background:#e0f2fe;color:#075985}
+
 [hidden]{display:none!important}
-@media(max-width:650px){.cols{grid-template-columns:1fr 1fr}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.top h1{font-size:16px}.card{padding:13px}.flag{font-size:9px;padding:6px 8px}.barrow{flex-basis:55px}}
+@media(max-width:650px){.cols{grid-template-columns:1fr 1fr}.top h1{font-size:16px}.card{padding:13px}.preview-actions{gap:5px}.preview-actions button{padding:8px 7px;font-size:11px}.barrow{flex-basis:55px}.day-footer{padding:7px 8px calc(7px + env(safe-area-inset-bottom,0px))}.kpi{flex:1 1 auto;justify-content:center;padding:4px 5px;gap:3px}.kpi strong{font-size:12px}.kpi span{font-size:9px}.day-footer-bottom .context{font-size:10px}main{padding-bottom:170px}}
 </style>
 </head>
 <body>
 <header class="top"><div class="top-inner">
   <div><div class="eyebrow">I.E. N.° 22375 · SANTA ROSA</div><h1>Asistencia de ingreso</h1><small>Módulo Auxiliar · PR #75</small></div>
-  <span class="flag">VISTA PREVIA</span>
+  <div class="preview-actions"><button id="verStats" type="button" class="secondary" aria-expanded="false" aria-controls="statsPanel">Estadísticas</button><button class="inicio" type="button" disabled title="Inicio desactivado en la demostración">Inicio</button></div>
 </div></header>
 <main>
   <div class="notice"><strong>Demostración local, sin conexión:</strong> los números son exclusivamente los que aparecen en tu imagen de ejemplo. Esta página no accede a Apps Script, Google Sheets ni a estudiantes reales y no permite guardar asistencia.</div>
@@ -61,25 +73,32 @@ td,th{padding:10px 9px;border-bottom:1px solid #e2e8f0}td:not(:first-child){text
     </div>
     <p class="status">III bimestre · Referencia de 257 estudiantes de Secundaria</p>
   </section>
-  <section class="card">
-    <div class="stathead"><h2>Estadística del día</h2><button type="button" class="secondary" id="actualizar">Actualizar</button></div>
-    <div id="detalle" class="context">Secundaria · III bimestre · 11/10/2026 · Padrón: 257 estudiantes</div>
-    <div class="kpis" id="kpis"></div>
-    <p class="note" id="nota">Solo marcas confirmadas en la nube en el sistema real. En esta vista se usan los datos de ejemplo.</p>
-    <button class="full" id="verStats" aria-expanded="false" aria-controls="statsPanel">Ver estadísticas por fechas ▾</button>
-    <div class="stats-panel" id="statsPanel" hidden>
-      <h3 class="panel-title">Estadísticas de asistencia por bimestre</h3>
-      <div class="field" style="max-width:250px"><label for="mes">Mes de consulta</label><input type="month" id="mes" value="2026-10"></div>
-      <p id="infoMes" class="context">III BIMESTRE · OCTUBRE 2026 · 257 estudiantes</p>
-      <div class="legend" id="leyenda"></div>
-      <div id="grafico" class="graph" role="img" aria-label="Gráfico diario de asistencia de ejemplo"></div>
-      <h4 style="margin:22px 0 9px">Detalle por día</h4>
-      <div class="table-wrap" id="tabla"></div>
-      <p class="note">Las columnas apiladas suman el total de estudiantes. Sin registrar no equivale a falta.</p>
-    </div>
+  <section class="card stats-panel" id="statsPanel" hidden aria-label="Estadísticas mensuales de asistencia">
+    <h3 class="panel-title">Estadísticas de asistencia por bimestre</h3>
+    <div class="field" style="max-width:250px"><label for="mes">Mes de consulta</label><input type="month" id="mes" value="2026-10"></div>
+    <p id="infoMes" class="context">III BIMESTRE · OCTUBRE 2026 · 257 estudiantes</p>
+    <div class="legend" id="leyenda"></div>
+    <div id="grafico" class="graph" role="img" aria-label="Gráfico diario de asistencia de ejemplo"></div>
+    <h4 style="margin:22px 0 9px">Detalle por día</h4>
+    <div class="table-wrap" id="tabla"></div>
+    <p class="note">Las columnas apiladas suman el total de estudiantes. Sin registrar no equivale a falta.</p>
   </section>
   <p class="foot">Vista previa visual del PR #75. No es una implementación ni una prueba integrada del sistema real.</p>
 </main>
+<footer id="previewDayFooter" class="day-footer" aria-label="Resumen diario en el pie de la pantalla">
+  <div class="day-footer-inner">
+    <div class="day-footer-top">
+      <strong>Estadística del día · nube</strong>
+      <span id="detalle" class="context">Secundaria · III bimestre · 11/10/2026 · Padrón: 257 estudiantes</span>
+    </div>
+    <div class="day-footer-bottom">
+      <div class="kpis" id="kpis"></div>
+      <div style="display:flex;align-items:center;gap:8px"><span class="context" id="nota">Datos de muestra</span>
+        <button type="button" id="actualizar">Actualizar</button>
+      </div>
+    </div>
+  </div>
+</footer>
 <script>
 (function(){
   'use strict';
@@ -133,7 +152,7 @@ td,th{padding:10px 9px;border-bottom:1px solid #e2e8f0}td:not(:first-child){text
   $('verStats').addEventListener('click',function(){
     $('statsPanel').hidden=!$('statsPanel').hidden;
     $('verStats').setAttribute('aria-expanded',String(!$('statsPanel').hidden));
-    if(!$('statsPanel').hidden)dibujarMes();
+    if(!$('statsPanel').hidden){dibujarMes();$('statsPanel').scrollIntoView({behavior:'smooth',block:'start'});}
   });
   dibujarDia();
 })();
