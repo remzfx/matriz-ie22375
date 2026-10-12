@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f172a">
+<title>Vista previa PR #75 · Estadísticas de asistencia · IE 22375</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a;background:#eef2f7;font-size:14px}
+*{box-sizing:border-box}body{margin:0}.top{background:linear-gradient(105deg,#0f172a,#115e59);color:#fff;padding:18px 22px}
+.top-inner{max-width:900px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.eyebrow{color:#99f6e4;font-size:11px;letter-spacing:.14em;font-weight:900}
+.top h1{font-size:20px;margin:3px 0}.top small{color:#ccfbf1}
+.flag{padding:7px 10px;background:#dcfce7;color:#14532d;border-radius:999px;font-size:11px;font-weight:850;white-space:nowrap}
+main{max-width:900px;padding:22px 15px 55px;margin:auto}.notice{border:1px solid #fcd34d;background:#fffbeb;color:#92400e;padding:12px 14px;border-radius:12px;font-size:13px;margin-bottom:14px}
+.card{background:#fff;border-radius:16px;box-shadow:0 4px 18px #0f172a09;padding:17px;margin-bottom:14px}
+.headline{font-weight:900;font-size:17px;margin:0 0 14px}
+.cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.field label{display:block;font-size:11px;color:#475569;font-weight:800;margin-bottom:5px}
+input,select{width:100%;height:42px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:8px 10px;font-size:15px;color:#0f172a}
+.status{margin:12px 0 0;color:#166534;font-weight:700;font-size:12px}
+.stathead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.stathead h2{font-size:17px;font-weight:900;margin:0}
+button{border:0;background:#0369a1;color:#fff;border-radius:11px;cursor:pointer;padding:11px 14px;font-size:13px;font-weight:850}
+button.secondary{background:#e0f2fe;color:#075985}button:hover{filter:brightness(.97)}
+.context{color:#475569;font-size:12px;font-weight:650;margin:8px 0 12px}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.kpi{border:1px solid #e2e8f0;background:#f8fafc;border-radius:12px;padding:11px 5px;text-align:center}
+.kpi strong{display:block;font-size:27px;font-weight:900;line-height:1.3;font-variant-numeric:tabular-nums}
+.kpi span{font-size:11px;font-weight:750;color:#475569}
+.g{color:#15803d}.r{color:#b91c1c}.o{color:#c2410c}.p{color:#4f46e5}.s{color:#475569}
+.note{font-size:11px;color:#64748b;line-height:1.5;margin:12px 0}
+.full{width:100%;margin-top:6px}.stats-panel{margin-top:15px;padding-top:17px;border-top:1px solid #e2e8f0}
+.panel-title{font-size:17px;font-weight:900;margin:0 0 12px}
+.graph{display:flex;gap:20px;padding:14px 12px 6px;border-bottom:1px solid #cbd5e1;align-items:flex-end;overflow:auto;min-height:238px}
+.barrow{flex:1 0 65px;max-width:130px;text-align:center}
+.barbox{height:190px;border-radius:6px 6px 0 0;display:flex;flex-direction:column-reverse;overflow:hidden;margin:auto;max-width:75px;background:#e2e8f0}
+.seg{flex-shrink:0;display:block}.seg.P{background:#15803d}.seg.F{background:#dc2626}.seg.T{background:#d97706}.seg.J{background:#4f46e5}.seg.S{background:#cbd5e1}
+.barrow b{display:block;margin-top:8px}.legend{display:flex;gap:16px;flex-wrap:wrap;margin:17px 0 8px}
+.legend span{display:flex;align-items:center;gap:6px;font-size:12px;color:#475569}.dot{width:11px;height:11px;border-radius:2px}
+.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:510px;font-size:13px}
+th{background:#f1f5f9;text-align:right;font-size:11px;color:#334155}th:first-child,td:first-child{text-align:left}
+td,th{padding:10px 9px;border-bottom:1px solid #e2e8f0}td:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
+.foot{color:#64748b;font-size:11px;text-align:center;line-height:1.6;padding:7px}
+[hidden]{display:none!important}
+@media(max-width:650px){.cols{grid-template-columns:1fr 1fr}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.top h1{font-size:16px}.card{padding:13px}.flag{font-size:9px;padding:6px 8px}.barrow{flex-basis:55px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-inner">
+  <div><div class="eyebrow">I.E. N.° 22375 · SANTA ROSA</div><h1>Asistencia de ingreso</h1><small>Módulo Auxiliar · PR #75</small></div>
+  <span class="flag">VISTA PREVIA</span>
+</div></header>
+<main>
+  <div class="notice"><strong>Demostración local, sin conexión:</strong> los números son exclusivamente los que aparecen en tu imagen de ejemplo. Esta página no accede a Apps Script, Google Sheets ni a estudiantes reales y no permite guardar asistencia.</div>
+  <section class="card">
+    <h2 class="headline">Registro de asistencia</h2>
+    <div class="cols">
+      <div class="field"><label for="fecha">Fecha</label><input id="fecha" type="date" value="2026-10-11"></div>
+      <div class="field"><label for="bimestre">Bimestre</label><select id="bimestre"><option selected>III</option></select></div>
+      <div class="field"><label for="nivel">Nivel</label><select id="nivel"><option value="secundaria" selected>Secundaria</option><option value="primaria">Primaria</option></select></div>
+      <div class="field"><label for="seccion">Aula</label><select id="seccion"><option>Todos los grados y secciones</option></select></div>
+    </div>
+    <p class="status">III bimestre · Referencia de 257 estudiantes de Secundaria</p>
+  </section>
+  <section class="card">
+    <div class="stathead"><h2>Estadística del día</h2><button type="button" class="secondary" id="actualizar">Actualizar</button></div>
+    <div id="detalle" class="context">Secundaria · III bimestre · 11/10/2026 · Padrón: 257 estudiantes</div>
+    <div class="kpis" id="kpis"></div>
+    <p class="note" id="nota">Solo marcas confirmadas en la nube en el sistema real. En esta vista se usan los datos de ejemplo.</p>
+    <button class="full" id="verStats" aria-expanded="false" aria-controls="statsPanel">Ver estadísticas por fechas ▾</button>
+    <div class="stats-panel" id="statsPanel" hidden>
+      <h3 class="panel-title">Estadísticas de asistencia por bimestre</h3>
+      <div class="field" style="max-width:250px"><label for="mes">Mes de consulta</label><input type="month" id="mes" value="2026-10"></div>
+      <p id="infoMes" class="context">III BIMESTRE · OCTUBRE 2026 · 257 estudiantes</p>
+      <div class="legend" id="leyenda"></div>
+      <div id="grafico" class="graph" role="img" aria-label="Gráfico diario de asistencia de ejemplo"></div>
+      <h4 style="margin:22px 0 9px">Detalle por día</h4>
+      <div class="table-wrap" id="tabla"></div>
+      <p class="note">Las columnas apiladas suman el total de estudiantes. Sin registrar no equivale a falta.</p>
+    </div>
+  </section>
+  <p class="foot">Vista previa visual del PR #75. No es una implementación ni una prueba integrada del sistema real.</p>
+</main>
+<script>
+(function(){
+  'use strict';
+  // Únicos datos de ejemplo, tomados de la imagen compartida: no hay conectividad ni autenticación.
+  const datos={
+    '2026-10-11':{P:250,F:3,T:4,J:0,S:0},
+    '2026-10-12':{P:230,F:20,T:7,J:0,S:0},
+    '2026-10-13':{P:230,F:14,T:13,J:0,S:0}
+  };
+  const etiquetas=[['P','Presentes','g'],['F','Faltas','r'],['T','Tardanzas','o'],['J','Justificadas','p'],['S','Sin registrar','s']];
+  const $=id=>document.getElementById(id);
+  const total=257;
+  function dibujarDia(){
+    const fecha=$('fecha').value, nivel=$('nivel').value;
+    if(nivel!=='secundaria'||!Object.prototype.hasOwnProperty.call(datos,fecha)){
+      $('detalle').textContent='Sin datos de demostración para esta fecha o nivel';
+      $('kpis').innerHTML='';
+      $('nota').textContent='El sistema real calculará los valores desde el padrón y las marcas confirmadas. Este archivo no inventa cifras para fechas distintas.';
+      return;
+    }
+    const d=datos[fecha];
+    $('detalle').textContent='Secundaria · III bimestre · '+fecha.slice(8)+'/'+fecha.slice(5,7)+'/'+fecha.slice(0,4)+' · Padrón: 257 estudiantes';
+    $('kpis').innerHTML=etiquetas.map(([k,n,c])=>'<div class="kpi"><strong class="'+c+'">'+d[k]+'</strong><span>'+n+'</span></div>').join('');
+    $('nota').textContent='257 marcas del ejemplo · datos ficticios para revisar únicamente la apariencia.';
+  }
+  function dibujarMes(){
+    const f=$('mes').value, nivel=$('nivel').value;
+    $('leyenda').innerHTML=etiquetas.map(([k,n])=>'<span><i class="dot seg '+k+'"></i>'+n+'</span>').join('');
+    if(f!=='2026-10'||nivel!=='secundaria'){
+      $('infoMes').textContent='Sin datos de ejemplo para este mes o nivel.';
+      $('grafico').innerHTML='<p class="context">Selecciona octubre de 2026 y Secundaria para ver el gráfico de referencia.</p>';
+      $('tabla').innerHTML='';return;
+    }
+    $('infoMes').textContent='III BIMESTRE · OCTUBRE 2026 · 257 ESTUDIANTES';
+    const rows=Object.entries(datos);
+    $('grafico').innerHTML=rows.map(([iso,d])=>{
+      const sum=etiquetas.reduce((s,[k])=>s+d[k],0);
+      if(sum!==total)throw Error('El ejemplo no coincide con el total');
+      return '<div class="barrow"><div class="barbox">'+etiquetas.map(([k])=>
+        '<span class="seg '+k+'" title="'+k+': '+d[k]+'" style="height:'+(100*d[k]/total)+'%"></span>').join('')+'</div><b>'+iso.slice(8)+'</b></div>';
+    }).join('');
+    $('tabla').innerHTML='<table><thead><tr>'+
+      ['Día','Presentes','Faltas','Tardanzas','Justificadas','Sin registrar'].map(n=>'<th>'+n+'</th>').join('')+
+      '</tr></thead><tbody>'+rows.map(([iso,d])=>'<tr><td>'+iso.slice(8)+'</td>'+
+        etiquetas.map(([k])=>'<td>'+d[k]+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+  }
+  $('fecha').addEventListener('change',dibujarDia);
+  $('nivel').addEventListener('change',function(){dibujarDia();dibujarMes()});
+  $('mes').addEventListener('change',dibujarMes);
+  $('actualizar').addEventListener('click',dibujarDia);
+  $('verStats').addEventListener('click',function(){
+    $('statsPanel').hidden=!$('statsPanel').hidden;
+    $('verStats').setAttribute('aria-expanded',String(!$('statsPanel').hidden));
+    if(!$('statsPanel').hidden)dibujarMes();
+  });
+  dibujarDia();
+})();
+</script>
+</body>
+</html>
