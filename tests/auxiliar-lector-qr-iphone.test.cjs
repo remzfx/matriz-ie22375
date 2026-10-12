@@ -100,3 +100,41 @@ test('Reader UI explicitly distinguishes real scanner from safe diagnostic test'
  assert.match(html,/if \(code && code\.data\) \{ onDecoded\(code\.data\); return; \}/);
  assert.match(html,/facingMode:'environment'/);
 });
+
+test('Late QR callback after closing a diagnostic session cannot write locally or remotely',async()=>{
+ const f=fixture();
+ await vm.runInContext('toggleScan(true)',f.c);
+ const oldCallback=f.getScanner().read;
+ vm.runInContext('stopScan()',f.c);
+ // A delayed decoder callback must be ignored even if another writable session starts.
+ f.state.closed=false;
+ oldCallback('IE22375|primaria|1|Única|ALEJOS GALLIQUE, GAEL ALEXANDER');
+ assert.equal(f.state.writes,0);
+ assert.equal(f.state.onlineWrites,0);
+ assert.equal(f.state.on,false);
+});
+test('Late callback from old diagnostic session cannot record after a normal session opens',async()=>{
+ const f=fixture();
+ await vm.runInContext('toggleScan(true)',f.c);
+ const oldCallback=f.getScanner().read;
+ vm.runInContext('stopScan()',f.c);
+ f.state.closed=false;
+ await vm.runInContext('toggleScan()',f.c);
+ oldCallback('IE22375|primaria|1|Única|ALEJOS GALLIQUE, GAEL ALEXANDER');
+ assert.equal(f.state.writes,0);
+ f.getScanner().read('IE22375|primaria|1|Única|ALEJOS GALLIQUE, GAEL ALEXANDER');
+ assert.equal(f.state.writes,1,'Only the new explicit normal scanner may register');
+});
+test('Camera start failure resets visible reader so the user can retry',async()=>{
+ const f=fixture();
+ f.c.Html5Qrcode=class{
+  constructor(){}
+  async start(){throw Error('synthetic camera failure')}
+  static async getCameras(){return []}
+  clear(){}
+ };
+ assert.equal(await vm.runInContext('toggleScan(true)',f.c),false);
+ assert.equal(f.state.on,false);
+ assert.match(f.state.msg,/No se pudo iniciar la cámara/);
+ assert.equal(f.state.writes,0);
+});
