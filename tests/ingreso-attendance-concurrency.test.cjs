@@ -307,7 +307,7 @@ test('Sheets automatic Date coercion is prevented by text-formatting the exact r
 test('loadasis filters historic Sheets Date cells using the spreadsheet timezone without modifying rows',()=>{
  const s=backend(),sh=s.c.asegurarAsis_();
  const append=(name,fecha,cellenFecha)=>{
-  const it=s.item({fecha,nombre}),key=s.c.itemAsistenciaAutorizado_(it).clave;
+  const it=s.item({fecha,nombre:name}),key=s.c.itemAsistenciaAutorizado_(it).clave;
   sh.appendRow([key,cellenFecha,it.nivel,it.grado,it.seccion,it.nombre,'P',it.hora,it.via,it.ts,it.motivo]);
  };
  // 01:30 UTC of October 12 is still October 11 in the sheet timezone America/Lima.
