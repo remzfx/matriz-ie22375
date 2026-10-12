@@ -103,8 +103,13 @@ test('Auto-completed absences preserve the name required by attendance protocol 
  assert.equal(stored[key].nombre,'Synthetic Automatic Student');
 });
 
-test('Legacy archive viewer escapes names and never writes or assigns a bimestre',async()=>{
+test('Legacy archive shows escaped cloud and local-only v1 marks without mixing v2 keys',async()=>{
  const {runInNewContext}=require('node:vm'),src=read('auxiliar.html');
+ const getFunction=name=>{
+  const start=src.indexOf('function '+name+'(');
+  assert.ok(start>=0,name+' missing');
+  return src.slice(start,src.indexOf('\n}',start)+2);
+ };
  const start=src.indexOf('async function consultarHistorialAnterior() {'),end=src.indexOf('\n}',start)+2;
  assert.ok(start>=0&&end>start);
  const escapeFn=src.match(/^function escapeAuxiliar\(value\).*$/m)?.[0];
@@ -117,6 +122,10 @@ test('Legacy archive viewer escapes names and never writes or assigns a bimestre
   document:{getElementById:id=>els[id]},IEAuxPermissions:{permite:n=>n==='primaria'},
   CLOUD_API_URL:'https://synthetic.invalid',hoyISO:()=> '2026-10-11',
   tokenSesionAuxiliar:()=> 'synthetic-token',rechazarSesionAsistencia:()=>{},
+  loadAsis:()=>({
+   '2026-10-11||primaria||1||Única||Local Old Student':{marca:'T',hora:'08:11'},
+   '2026||III||2026-10-11||primaria||1||Única||siagie:NEW':{marca:'P'}
+  }),
   fetchLecturaNube:async url=>{
    requests.push(url);
    return {text:async()=>JSON.stringify({ok:true,protocoloAsistencia:2,historicoAnterior:true,items:[
@@ -124,7 +133,9 @@ test('Legacy archive viewer escapes names and never writes or assigns a bimestre
    ]})};
   }
  };
- const success=await runInNewContext(escapeFn+'\n'+src.slice(start,end)+'\nconsultarHistorialAnterior()',ctx);
+ const code=escapeFn+'\n'+getFunction('marcasLocalesArchivoAnterior')+'\n'+
+  getFunction('pintarArchivoAnterior')+'\n'+src.slice(start,end)+'\nconsultarHistorialAnterior()';
+ const success=await runInNewContext(code,ctx);
  assert.equal(success,true);
  assert.equal(requests.length,1);
  assert.match(requests[0],/historico=1/);
@@ -132,4 +143,7 @@ test('Legacy archive viewer escapes names and never writes or assigns a bimestre
  assert.match(els.asisLegadoLista.innerHTML,/&lt;img src=x onerror=alert\(1\)&gt;/);
  assert.doesNotMatch(els.asisLegadoLista.innerHTML,/<img/);
  assert.match(els.asisLegadoEstado.textContent,/sin bimestre asignado/);
+ assert.match(els.asisLegadoLista.innerHTML,/Local Old Student/);
+ assert.doesNotMatch(els.asisLegadoLista.innerHTML,/siagie:NEW/);
+ assert.match(els.asisLegadoLista.innerHTML,/Solo en este dispositivo/);
 });
