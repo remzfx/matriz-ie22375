@@ -371,3 +371,25 @@ test('Legacy archive is read-only, scoped to date and level, and never mixes wit
  assert.deepEqual(sh.rows,rows,'historical archive reads must not alter rows');
  assert.equal(s.state.writes,writes,'archive reads must not write data');
 });
+
+test('Bulk upload sends only the selected date and keeps other dates pending',async()=>{
+ const f=client(),day2=f.key.replace('2026-10-11','2026-10-12');
+ const all=f.c.loadAsis();all[day2]={...f.rec,marca:'T',nombre:'Synthetic Student',ts:f.rec.ts+1};
+ f.c.saveAsis(all);
+ await f.c.subirTodoNube();
+ assert.equal(f.writes.length,1);
+ assert.deepEqual(f.writes[0].items.map(it=>it.fecha),['2026-10-11']);
+ assert.equal(f.c.pendienteMarcaAsistencia(f.c.loadAsis()[day2]),true,'Other day must remain pending');
+ f.el('inpFecha').value='2026-10-12';
+ await f.c.subirTodoNube();
+ assert.equal(f.writes.length,2);
+ assert.deepEqual(f.writes[1].items.map(it=>it.fecha),['2026-10-12']);
+});
+test('Bulk upload never creates absent marks without a deliberate manual mark',async()=>{
+ const f=client();let generated=0;
+ f.c.completarFaltasAlSubir=()=>{generated++;throw Error('Automatic absences must never occur on upload')};
+ await f.c.subirTodoNube();
+ assert.equal(generated,0);
+ assert.equal(f.writes.length,1);
+ assert.deepEqual(f.writes[0].items.map(x=>x.marca),['P']);
+});
