@@ -47,8 +47,16 @@ for(const file of ['primaria.html','secundaria.html'])test(file+': real matrix l
   else{s.run(extract(file,'normalizarSeccionBD'));s.run(extract(file,'totalEstudiantesDesdeBD'));assert.equal(s.c.totalEstudiantesDesdeBD('1°','A'),1);assert.equal(s.c.totalEstudiantesDesdeBD('2°','B'),0);}
 });
 for(const file of ['auxiliar.html','photochecks.html'])test(file+': real loader uses protected students instead of the old global roster',async()=>{
-  const s=fixture(file==='auxiliar.html'?'auxiliar':'admin');s.run('let BD=null,cargandoEstudiantesAux=false;const auxiliarInicio=performance.now();function medirAuxiliar(){};function pintarBaseAuxiliar(base){BD=base;}function toast(){};function onNivel(){}');
-  s.run(extract(file,'ensureBD'));await s.c.ensureBD();checkRequest(s);
+  const s=fixture(file==='auxiliar.html'?'auxiliar':'admin'),aux=file==='auxiliar.html';
+  s.run("let BD=null,cargandoEstudiantesAux=false;const auxiliarInicio=performance.now();function medirAuxiliar(){};function pintarBaseAuxiliar(base){BD=base;}function toast(){};function onNivel(){};function bimestreAsistencia(){return 'III'}");
+  if(aux){
+    const original=s.c.fetch;
+    s.c.fetch=async(...args)=>{
+      const r=await original(...args),value=await r.json();
+      return {ok:true,json:async()=>({...value,bimestre:'III',padronInicializado:true,fuentePadron:'bimestre'})};
+    };
+  }
+  s.run(extract(file,'ensureBD'));await s.c.ensureBD();checkRequest(s,aux?'III':undefined);
   assert.equal(s.run('BD.primaria.estudiantes[0].nombre'),'Synthetic Primary');
 });
 test('Registro startup uses cached period configuration without waiting for the first cloud refresh',async()=>{
@@ -137,7 +145,7 @@ test('Photochecks keep the current QR payload and render QR locally without expo
 test('Production consumers include the shared protected loader; no public base/old fallback survives',()=>{
   assert.equal(fs.existsSync(path.join(root,'bd_oficial_2026.json')),false);
   for(const file of ['admin.html','registro.html','primaria.html','secundaria.html','auxiliar.html','photochecks.html']){
-    const src=read(file);assert.match(src,/<script src="students.js"><\/script>/);assert.match(src,file==='registro.html'?/IEStudents\.loadRoster\(/:/IEStudents\.load\(/);
+    const src=read(file);assert.match(src,/<script src="students.js"><\/script>/);assert.match(src,['registro.html','auxiliar.html'].includes(file)?/IEStudents\.loadRoster\(/:/IEStudents\.load\(/);
     assert.doesNotMatch(src,/BD_EMP|bd_oficial_2026\.json|ie22375_admin_bd_v1|ie22375_bd_sec_cache_v1/);
   }
   assert.doesNotMatch(read('photochecks.html'),/api\.qrserver\.com|corregirNiveles/);
