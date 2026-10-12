@@ -80,3 +80,25 @@ test('Reading attendance remains possible after closure and restricts its year a
  assert.equal(f.load('III',2027).items.length,0);
  assert.equal(f.s.post({action:'loadasisperiodos',token:f.s.admin}).periodos.bimestres.III,'cerrado');
 });
+
+
+test('Auto-completed absences preserve the name required by attendance protocol v2',()=>{
+ const {runInNewContext}=require('node:vm');
+ const src=read('auxiliar.html');
+ const start=src.indexOf('function completarFaltasAlSubir() {');
+ const end=src.indexOf('\n}',start)+2;
+ assert.ok(start>=0&&end>start,'Automatic absence function must exist');
+ const key='2026||III||2026-10-11||secundaria||1||A||siagie:AUTOMATIC-1';
+ const stored={};
+ const state={
+  document:{getElementById:()=>({value:'2026-10-11'})},
+  hoyISO:()=> '2026-10-11',asistenciaEscribible:()=>true,
+  loadAsis:()=>stored,saveAsis:()=>{},
+  todosAlumnos:()=>[{nombre:'Synthetic Automatic Student',nivel:'secundaria'}],
+  jornadaCerrada:()=>true,asisKey:()=>key,horaAhora:()=> '13:00'
+ };
+ const result=runInNewContext(src.slice(start,end)+'\ncompletarFaltasAlSubir()',state);
+ assert.equal(result,1);
+ assert.equal(stored[key].marca,'F');
+ assert.equal(stored[key].nombre,'Synthetic Automatic Student');
+});
