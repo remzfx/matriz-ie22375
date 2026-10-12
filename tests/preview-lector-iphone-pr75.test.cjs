@@ -31,7 +31,7 @@ test('iPhone preview is standalone HTTPS and never points to production',()=>{
  assert.match(html,/icon-192\.png/);
  assert.match(html,/facingMode:'environment'/);
  assert.match(html,/>Escanear QR<\/button>/);
- assert.match(html,/>Detener cámara'/);
+ assert.match(html,/btn\.textContent='Detener cámara'/);
  assert.ok(html.includes(api+'?action=ping'),'Only explicit read-only ping to test endpoint');
  assert.ok(!html.includes(prod),'Production Apps Script ID must never be in preview');
  assert.doesNotMatch(html,/\b(?:fetch|XMLHttpRequest|sendBeacon|localStorage|sessionStorage)\s*(?:\(|\.)/,'No network mutations or stored tokens');
