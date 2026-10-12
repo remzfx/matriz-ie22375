@@ -54,7 +54,7 @@ test('Readonly compact selector and field cannot replace a stored conclusion',()
 });
 test('Lateral wrapper stays within the same competence cell with no extra column or sliced closing tag',()=>{
  const f=view(),html=f.html();assert.match(html,/<td><div class="final-cell-layout has-conclusion"><div class="final-grade">[\s\S]*?<div class="final-conclusion"/);assert.equal((html.match(/<td[ >]/g)||[]).length,2);
- const src=read('registro.html');assert.doesNotMatch(src,/tds\.slice\(0,-5\)/);assert.match(src,/grid-template-columns:100px minmax\(0,1fr\)/);assert.match(src,/@media\(max-width:640px\)\{\.final-conclusion\{grid-column:1 \/ -1;grid-row:2/);assert.match(src,/worked-label\{[^}]*flex-direction:column/);
+ const src=read('registro.html');assert.doesNotMatch(src,/tds\.slice\(0,-5\)/);assert.match(src,/grid-template-columns:144px minmax\(0,1fr\)/);assert.match(src,/@media\(max-width:640px\)\{\.final-conclusion\{grid-column:1 \/ -1;grid-row:2/);assert.match(src,/worked-label\{[^}]*flex-direction:column/);
 });
 test('Calculated C also requires compact conclusion without creating a direct override',()=>{
  const f=view('secundaria','');f.c.notaDesdeSesiones=()=>({nota:8,letra:'C'});assert.match(f.html(),/final-conclusion/);assert.deepEqual(JSON.parse(JSON.stringify(f.c.store.finales)),{});
@@ -69,7 +69,7 @@ for(const mode of ['letra','num'])test('Mixed C/A/B/AD rows keep identical fixed
  const html=f.html(),rows=[...html.matchAll(/<tbody>([\s\S]*?)<\/tbody>/g)][0][1].match(/<tr>[\s\S]*?<\/tr>/g);
  assert.equal(rows.length,4);rows.forEach(row=>{assert.equal((row.match(/class="final-grade"/g)||[]).length,1);assert.match(row,/<td><div class="final-cell-layout(?: has-conclusion)?"><div class="final-grade">/);});
  assert.equal((html.match(/class="final-conclusion"/g)||[]).length,1);
- const css=read('registro.html');assert.match(css,/\.final-cell-layout\{display:grid;grid-template-columns:100px minmax\(0,1fr\)/);assert.match(css,/\.final-grade\{grid-column:1;width:100px;min-width:100px;/);
+ const css=read('registro.html');assert.match(css,/\.final-cell-layout\{display:grid;grid-template-columns:144px minmax\(0,1fr\)/);assert.match(css,/\.final-grade\{grid-column:1;width:144px;min-width:144px;/);
  assert.doesNotMatch(css,/\.final-cell-layout\.has-conclusion\{/);
 });
 test('Conclusion removal leaves identical grade controls and no conditional centering',()=>{
@@ -81,12 +81,12 @@ test('Conclusion removal leaves identical grade controls and no conditional cent
 });
 test('Flexible conclusion cannot impose its long text intrinsic width on the grade column',()=>{
  const f=view('secundaria','C','Synthetic text '.repeat(100));assert.match(f.html(),/final-conclusion/);
- const css=read('registro.html');assert.match(css,/\.final-conclusion\{[^}]*min-width:0;width:100%;max-width:180px/);
+ const css=read('registro.html');assert.match(css,/\.final-conclusion\{[^}]*min-width:0;width:100%;max-width:100%/);
  assert.match(css,/\.final-conclusion select,\.final-conclusion textarea\{[^}]*width:100%;min-width:0;box-sizing:border-box/);
  assert.match(css,/\.final-conclusion select\{[^}]*overflow:hidden;text-overflow:ellipsis;white-space:nowrap/);
- assert.match(css,/grid-template-columns:100px minmax\(0,1fr\)/);
+ assert.match(css,/grid-template-columns:144px minmax\(0,1fr\)/);
 });
-test('Mobile moves only conclusion to second row and preserves the 100px grade track',()=>{
+test('Mobile moves only conclusion to second row and preserves the 144px grade track',()=>{
  const css=read('registro.html');assert.match(css,/@media\(max-width:640px\)\{\.final-conclusion\{grid-column:1 \/ -1;grid-row:2;\}\}/);
  assert.doesNotMatch(css,/@media\(max-width:640px\)\{\.final-cell-layout/);
  assert.match(css,/\.final-grade > \.fin-cell\{width:100%;min-width:0;\}/);
