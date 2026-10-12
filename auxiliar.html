@@ -43,6 +43,27 @@
     .chip.T { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
     .chip.J { background:#e0e7ff; border-color:#a5b4fc; color:#3730a3; }
     .row { padding:.55rem 0; border-bottom:1px solid #f1f5f9; }
+    /* Formulario compacto en 2 filas de 3 campos, adaptable a móviles. */
+    .asis-fila-fecha { display:grid; grid-template-columns:minmax(0,1.8fr) minmax(0,.8fr) minmax(0,.85fr); gap:8px; align-items:end; }
+    .asis-fila-aula { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,.65fr) minmax(0,1fr); gap:8px; align-items:end; }
+    .asis-field { min-width:0; }
+    .asis-field label { display:block; font-size:10px; font-weight:800; color:#64748b; margin-bottom:5px; }
+    .asis-field select, .asis-field input[type=date] {
+      display:block; min-width:0; width:100%; min-height:44px; padding:.5rem .55rem; border-radius:10px;
+    }
+    #asisAnio { min-height:44px; padding:.55rem .4rem; border:1.5px solid #e2e8f0; border-radius:10px;
+      display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; color:#0f172a; }
+    .asis-scan-actions { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; }
+    .asis-scan-actions .btn { min-width:0; width:100%; line-height:1.2; }
+    @media (max-width:440px) {
+      .asis-fila-fecha, .asis-fila-aula { gap:5px; }
+      .asis-fila-fecha { grid-template-columns:minmax(0,1.8fr) minmax(0,.7fr) minmax(0,.78fr); }
+      .asis-fila-aula { grid-template-columns:minmax(0,1.4fr) minmax(0,.67fr) minmax(0,1fr); }
+      .asis-field select, .asis-field input[type=date] { padding:.45rem .28rem; font-size:16px; }
+      .asis-field label { font-size:10px; }
+      #asisAnio { padding:.5rem .2rem; font-size:14px; }
+      .asis-scan-actions .btn { padding:.55rem .28rem; font-size:12px; }
+    }
     #scanBox { display:none; }
     #scanBox.on { display:block; }
     .asis-kpi { padding:.6rem .4rem; border:1px solid #e2e8f0; border-radius:12px; text-align:center; background:#f8fafc; }
@@ -154,27 +175,36 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       </label>
       <button type="button" class="btn btn-danger w-full" onclick="stopScan()">Cerrar cámara</button>
     </div>
-    <div>
-      <label class="text-[10px] font-bold text-slate-500">Fecha</label>
-      <input type="date" id="inpFecha" onchange="invalidarArchivoAsistencia();invalidarEstadisticasAsistencia();renderLista();actualizarEstadisticaDia()">
+    <div class="asis-fila-fecha">
+      <div class="asis-field">
+        <label for="inpFecha">Fecha</label>
+        <input type="date" id="inpFecha" onchange="invalidarArchivoAsistencia();invalidarEstadisticasAsistencia();renderLista();actualizarEstadisticaDia()">
+      </div>
+      <div class="asis-field">
+        <label for="asisAnio">Año lectivo</label>
+        <div id="asisAnio" aria-label="Año lectivo verificado">—</div>
+      </div>
+      <div class="asis-field">
+        <label for="selBimestre">Bimestre</label>
+        <select id="selBimestre" onchange="cambiarBimestreAsistencia()"><option>I</option><option>II</option><option selected>III</option><option>IV</option></select>
+      </div>
     </div>
-    <div class="grid grid-cols-2 gap-2"><div><label class="text-[10px] font-bold text-slate-500">Año lectivo</label><div id="asisAnio" class="p-3 border rounded-xl font-bold">—</div></div><div><label class="text-[10px] font-bold text-slate-500">Bimestre</label><select id="selBimestre" onchange="cambiarBimestreAsistencia()"><option>I</option><option>II</option><option selected>III</option><option>IV</option></select></div></div>
-    <p id="asisEstado" class="text-sm font-bold text-amber-700" role="status">Verificando cierre de asistencia…</p>
-    <div>
-      <label class="text-[10px] font-bold text-slate-500">Nivel</label>
-      <span id="selNivelScope" hidden></span>
-      <select id="selNivel" onchange="invalidarArchivoAsistencia();invalidarEstadisticasAsistencia();onNivel();actualizarEstadisticaDia()">
-        <option value="primaria">Primaria</option>
-        <option value="secundaria">Secundaria</option>
-      </select>
-    </div>
-    <div class="grid grid-cols-2 gap-2">
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Grado</label>
+    <p id="asisEstado" class="text-xs font-bold text-amber-700" role="status">Verificando cierre de asistencia…</p>
+    <div class="asis-fila-aula">
+      <div class="asis-field">
+        <label for="selNivel">Nivel</label>
+        <span id="selNivelScope" hidden></span>
+        <select id="selNivel" onchange="invalidarArchivoAsistencia();invalidarEstadisticasAsistencia();onNivel();actualizarEstadisticaDia()">
+          <option value="primaria">Primaria</option>
+          <option value="secundaria">Secundaria</option>
+        </select>
+      </div>
+      <div class="asis-field">
+        <label for="selGrado">Grado</label>
         <select id="selGrado" onchange="onGrado()"></select>
       </div>
-      <div>
-        <label class="text-[10px] font-bold text-slate-500">Sección</label>
+      <div class="asis-field">
+        <label for="selSeccion">Sección</label>
         <select id="selSeccion" onchange="renderLista()"></select>
       </div>
     </div>
@@ -191,8 +221,10 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <p class="text-[11px] text-slate-500">P: presente, T: tardanza, F: falta, J: justificada. Los días sin ningún registro confirmado no se grafican. Datos oficiales del padrón seleccionado.</p>
     </section>
     <div class="actions">
-      <button type="button" class="btn btn-primary" onclick="toggleScan()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>Escanear QR</button>
-      <button type="button" class="btn btn-down" onclick="toggleScan(true)">Probar lector QR (sin registrar)</button>
+      <div class="asis-scan-actions">
+        <button type="button" class="btn btn-primary" onclick="toggleScan()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>Escanear QR</button>
+        <button type="button" class="btn btn-down" onclick="toggleScan(true)">Probar lector QR (sin registrar)</button>
+      </div>
       <button type="button" class="btn btn-ok" onclick="marcarTodos('P')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>Todos presente</button>
       <button type="button" class="btn btn-warn" onclick="cerrarAsistenciaAula()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Cerrar asistencia del aula</button>
       <button type="button" class="btn btn-wa" onclick="compartirWhatsApp()"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.7-1.2A9 9 0 1 0 12 3zm5 12.2c-.2.6-1.2 1.1-1.6 1.1-.4 0-.9.2-3.1-.7-2.6-1.1-4.2-3.7-4.3-3.9-.1-.2-1-1.3-1-2.5s.6-1.8.9-2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5.2.6.8 2 .8 2.1.1.1 0 .3-.1.4l-.4.5c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.5-.6c.1-.2.3-.1.5-.1l2 .9c.2.1.4.2.4.3 0 .2 0 .8-.2 1.1z"/></svg>WhatsApp este salón</button>
