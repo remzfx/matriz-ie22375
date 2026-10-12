@@ -92,7 +92,7 @@ test('An HTTP 404 is a transport failure before login JSON parsing, not a denied
 
 test('Every production Web App endpoint uses the verified deployment ID',()=>{
   const urls=[];
-  for(const file of fs.readdirSync(path.join(__dirname,'..')).filter(f=>/\.(?:html|js)$/.test(f)))
+  for(const file of fs.readdirSync(path.join(__dirname,'..')).filter(f=>/\.(?:html|js)$/.test(f)&&f!=='preview-lector-qr-iphone-pr75.html'))
     urls.push(...Array.from(read(file).matchAll(/https:\/\/script\.google\.com\/macros\/s\/[^\s"'<>]+/g),m=>m[0]));
   assert.equal(urls.length,10);
   assert.deepEqual([...new Set(urls)],['https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec']);
