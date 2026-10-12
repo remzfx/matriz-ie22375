@@ -699,12 +699,34 @@ function invalidarArchivoAsistencia() {
  if(estado)estado.textContent='';
  if(lista)lista.innerHTML='';
 }
+function marcasLocalesArchivoAnterior(fecha,nivel) {
+ const todas=loadAsis();
+ return Object.keys(todas).flatMap(clave=>{
+  const p=clave.split('||');
+  // Las claves antiguas no contienen año/bimestre; las v2 comienzan con «año||bimestre».
+  if(p.length<5||p[0]!==fecha||p[1]!==nivel)return [];
+  const rec=todas[clave],marca=typeof rec==='string'?rec:rec&&rec.marca;
+  if(!['P','F','T','J'].includes(marca))return [];
+  return [{clave,nombre:p.slice(4).join('||'),grado:p[2],seccion:p[3],marca,
+           hora:typeof rec==='object'&&rec?rec.hora||'':''}];
+ });
+}
+function pintarArchivoAnterior(items,locales) {
+ const lista=document.getElementById('asisLegadoLista');
+ const fila=it=>'<div class="border rounded-lg p-2"><b>'+escapeAuxiliar(it.nombre)+'</b> · '+
+   escapeAuxiliar(it.grado)+'° '+escapeAuxiliar(it.seccion)+' · '+escapeAuxiliar(it.marca)+
+   (it.hora?' · '+escapeAuxiliar(it.hora):'')+'</div>';
+ lista.innerHTML=(items.length?'<p class="font-bold">Registros en la nube ('+items.length+')</p>'+items.map(fila).join(''):'')+
+   (locales.length?'<p class="font-bold mt-2">Solo en este dispositivo ('+locales.length+'); sin confirmar en la nube</p>'+
+     locales.map(fila).join(''):'');
+}
 async function consultarHistorialAnterior() {
  const nivel=document.getElementById('selNivel').value,fecha=document.getElementById('inpFecha').value||hoyISO();
  const estado=document.getElementById('asisLegadoEstado'),lista=document.getElementById('asisLegadoLista');
  const serial=(consultarHistorialAnterior.serial||0)+1;consultarHistorialAnterior.serial=serial;
  if(!IEAuxPermissions.permite(nivel)) {estado.textContent='Nivel no autorizado.';return false;}
- estado.textContent='Consultando archivo anterior…';lista.innerHTML='';
+ const locales=marcasLocalesArchivoAnterior(fecha,nivel);
+ estado.textContent='Consultando archivo anterior…';pintarArchivoAnterior([],locales);
  const token=tokenSesionAuxiliar();
  try {
   const query='?action=loadasis&historico=1&nivel='+encodeURIComponent(nivel)+'&fecha='+encodeURIComponent(fecha);
@@ -714,16 +736,12 @@ async function consultarHistorialAnterior() {
   rechazarSesionAsistencia(data,token);
   if(!data.ok||data.protocoloAsistencia!==2||data.historicoAnterior!==true)throw Error(data.error||'No se verificó el archivo.');
   const items=Array.isArray(data.items)?data.items:[];
-  estado.textContent=items.length?'Archivo anterior: '+items.length+' marcas del '+fecha+' (sin bimestre asignado).':'Sin marcas del archivo anterior para esta fecha y nivel.';
-  lista.innerHTML=items.map(it=>
-   '<div class="border rounded-lg p-2"><b>'+escapeAuxiliar(it.nombre)+'</b> · '+
-   escapeAuxiliar(it.grado)+'° '+escapeAuxiliar(it.seccion)+' · '+escapeAuxiliar(it.marca)+
-   (it.hora?' · '+escapeAuxiliar(it.hora):'')+'</div>'
-  ).join('');
+  estado.textContent='Archivo anterior del '+fecha+': '+items.length+' marcas en la nube y '+locales.length+' locales (sin bimestre asignado).';
+  pintarArchivoAnterior(items,locales);
   return true;
  } catch(e) {
   if(serial!==consultarHistorialAnterior.serial)return false;
-  estado.textContent='No se pudo consultar el archivo: '+e.message;return false;
+  estado.textContent='No se pudo consultar el archivo en la nube: '+e.message+(locales.length?' Las marcas locales visibles no están confirmadas.':'');return false;
  }
 }
 function escapeAuxiliar(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
