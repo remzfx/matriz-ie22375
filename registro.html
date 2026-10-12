@@ -142,6 +142,9 @@
   #finLista .fin-grid .fin-nom { width:180px; min-width:180px; max-width:180px; text-align:left; }
   #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) { width:310px; min-width:310px; max-width:310px; overflow-wrap:anywhere; }
   #finLista .fin-grid.fin-many th:not(.fin-nom),#finLista .fin-grid.fin-many td:not(.fin-nom) { width:270px; min-width:270px; max-width:270px; }
+  .fin-header-controls { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; max-width:100%; }
+  .fin-remove-bulk { padding:6px 8px; min-height:36px; font-size:11px; }
+  #finLista::before { content:""; display:block; position:sticky; top:0; left:0; width:100%; height:var(--fin-head-height,0px); margin-bottom:calc(-1 * var(--fin-head-height,0px)); background:#0f172a; z-index:3; pointer-events:none; }
   .fin-bulk-actions { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:11px; }
   .fin-bulk-actions .chip { min-height:36px; font-size:12px; }
   .fin-grid { width:100%; border-collapse:separate; border-spacing:0; min-width:640px; }
@@ -372,21 +375,23 @@
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
             </div>
             <div class="fin-mode-info" id="finModeInfo"></div>
-            <div class="mode-toggle">
-              <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
-              <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
+            <div class="fin-header-controls">
+              <div class="fin-bulk-actions" aria-label="Calificar competencias del área">
+                <span>Todo el área:</span>
+                <button type="button" class="chip nivel-ad" data-reg-write onclick="calificarAreaMasiva('AD')">AD</button>
+                <button type="button" class="chip nivel-a" data-reg-write onclick="calificarAreaMasiva('A')">A</button>
+                <button type="button" class="chip nivel-b" data-reg-write onclick="calificarAreaMasiva('B')">B</button>
+                <button type="button" class="chip nivel-c" data-reg-write onclick="calificarAreaMasiva('C')">C</button>
+                <button type="button" class="btn btn-ghost fin-remove-bulk" data-reg-write onclick="quitarAreaMasiva()">Quitar masivo</button>
+              </div>
+              <div class="mode-toggle">
+                <button type="button" data-modo="letra" class="on" onclick="setModoCalif('letra')">Letras</button>
+                <button type="button" data-modo="num" onclick="setModoCalif('num')">0–20</button>
+              </div>
             </div>
           </div>
           <div class="fin-header-aux">
             <div id="finResumen"></div>
-            <div class="fin-bulk-actions" aria-label="Calificar competencias del área">
-              <span>Todo el área:</span>
-              <button type="button" class="chip nivel-ad" data-reg-write onclick="calificarAreaMasiva('AD')">AD</button>
-              <button type="button" class="chip nivel-a" data-reg-write onclick="calificarAreaMasiva('A')">A</button>
-              <button type="button" class="chip nivel-b" data-reg-write onclick="calificarAreaMasiva('B')">B</button>
-              <button type="button" class="chip nivel-c" data-reg-write onclick="calificarAreaMasiva('C')">C</button>
-            </div>
-
           </div>
         </header>
         <div id="finLista" class="fin-wrap fin-scroll-body"></div>
@@ -576,6 +581,7 @@ const CAPS_CNEB = {
 let nivel = null;
 let areaActual = null;
 let modoCalif = 'num';
+let modoCalificarAntesPromedios = 'num';
 let dirty = false; // hay cambios sin guardar
 let sesionActiva = null; // { fecha, unidad, comp, capacidad }
 let notas = {}; // key alumno -> { nivel, nota20, conclusion }
@@ -1955,9 +1961,12 @@ function syncModoBtns() {
 }
 function setModoCalif(m) {
   modoCalif = m;
-  try { localStorage.setItem('ie22375_modo_calif', m); } catch(e) {}
+  const enPromedios=document.getElementById('panelFinales') && document.getElementById('panelFinales').classList.contains('on');
+  if (!enPromedios) {
+    try { localStorage.setItem('ie22375_modo_calif', m); } catch(e) {}
+  }
   syncModoBtns();
-  renderStudents();
+  if (!enPromedios) renderStudents();
   if (document.getElementById('panelFinales') && document.getElementById('panelFinales').classList.contains('on')) renderFinales();
   if (document.getElementById('panelAvance') && document.getElementById('panelAvance').classList.contains('on')) renderAvance();
 }
@@ -2540,6 +2549,9 @@ function showPanel(which) {
   const tAv = document.getElementById('tabAv');
   const tAs = document.getElementById('tabAs');
   const tFin = document.getElementById('tabFin');
+  const estabaEnPromedios=fin && fin.classList.contains('on');
+  if (estabaEnPromedios && which!=='fin') { modoCalif=modoCalificarAntesPromedios; syncModoBtns(); }
+  if (!estabaEnPromedios && which==='fin') { modoCalificarAntesPromedios=modoCalif; modoCalif='letra'; syncModoBtns(); }
   cal.classList.remove('on');
   av.classList.remove('on');
   as.classList.remove('on');
@@ -2698,6 +2710,43 @@ function calificarAreaMasiva(val) {
   toast(cambios+' calificaciones actualizadas localmente');
   return true;
 }
+function quitarFinalManual(comp, nombre, posponerRender) {
+  const k=finalKey(comp,nombre),original=leerNota(store.finales,k);
+  if (registroSoloLectura() || bimCerradoDocente() || !competenciaTrabajada(comp) || !original || !Object.keys(original).length || original.borrado) return false;
+  if (!competencias().includes(comp) || !estudiantes().some(al=>studentKey(al)===nombre)) return false;
+  baselineAcademica();
+  store.finales[k]={borrado:true,ts:Date.now()};
+  saveStore();
+  dirtyAcademico();
+  if (!posponerRender) renderFinales();
+  return true;
+}
+function quitarAreaMasiva() {
+  if (registroSoloLectura() || bimCerradoDocente()) return false;
+  const comps=competencias().filter(competenciaTrabajada),alumnos=estudiantes();
+  if (!comps.length || !alumnos.length) return false;
+  const c=ctxBase();
+  if (!confirm('Quitar las calificaciones directas existentes de todas las competencias trabajadas del área '+c.area+' · '+c.grado+'° '+c.seccion+' · Bim '+c.bim+' ('+alumnos.length+' estudiantes). Se conservarán evidencias y conclusiones descriptivas. ¿Continuar?')) return false;
+  let cambios=0;
+  alumnos.forEach(al=>comps.forEach(cp=>{if(quitarFinalManual(cp,studentKey(al),true))cambios++;}));
+  if (cambios) renderFinales();
+  toast(cambios+' calificaciones directas quitadas localmente');
+  return true;
+}
+function sincronizarFondoPromedios() {
+  const box=document.getElementById('finLista'),table=box && box.querySelector('table'),head=table && table.tHead;
+  if (sincronizarFondoPromedios.observer) sincronizarFondoPromedios.observer.disconnect();
+  if (!head) { if(box && box.style)box.style.removeProperty('--fin-head-height');return; }
+  const actualizar=()=>box.style.setProperty('--fin-head-height',head.getBoundingClientRect().height+'px');
+  actualizar();
+  if (typeof ResizeObserver!=='undefined') {
+    sincronizarFondoPromedios.observer=new ResizeObserver(actualizar);
+    sincronizarFondoPromedios.observer.observe(head);
+  } else if (typeof window!=='undefined' && !sincronizarFondoPromedios.resize) {
+    sincronizarFondoPromedios.resize=true;
+    window.addEventListener('resize',sincronizarFondoPromedios);
+  }
+}
 function renderFinales() {
   loadStore();
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
@@ -2711,7 +2760,7 @@ function renderFinales() {
   const modeInfo = document.getElementById('finModeInfo');
   const bloqueado = bimCerradoDocente();
   const alumnos = estudiantes();
-  if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; modeInfo.innerHTML=''; return; }
+  if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; modeInfo.innerHTML=''; if(typeof sincronizarFondoPromedios==='function')sincronizarFondoPromedios(); return; }
 
   const capsPor = {};
   comps.forEach(cp => { capsPor[cp] = capsDeComp(cp); });
@@ -2808,10 +2857,11 @@ function renderFinales() {
       aplicarFinalManual(comp,nombre,val);
     });
   });
-  box.querySelectorAll('[data-quitar-directo]').forEach(el=>el.onclick=()=>{const cp=decodeURIComponent(el.dataset.quitarDirecto),id=decodeURIComponent(el.dataset.alumno),k=finalKey(cp,id);if(registroSoloLectura()||bimCerradoDocente()||!competenciaTrabajada(cp)||!leerNota(store.finales,k))return;baselineAcademica();store.finales[k]={borrado:true,ts:Date.now()};saveStore();dirtyAcademico();renderFinales();});
+  box.querySelectorAll('[data-quitar-directo]').forEach(el=>el.onclick=()=>quitarFinalManual(decodeURIComponent(el.dataset.quitarDirecto),decodeURIComponent(el.dataset.alumno)));
   box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
   IEConclusionSuggestions.bindCompact(box,(el,text)=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),text));
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);
+  if (typeof sincronizarFondoPromedios==='function') sincronizarFondoPromedios();
   sincronizarEdicionRegistro();
 }
 
