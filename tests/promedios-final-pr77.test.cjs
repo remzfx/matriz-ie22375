@@ -2,6 +2,16 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8'),clone=x=>JSON.parse(JSON.stringify(x)),html=read('registro.html');
 const base='538c12385b2336c36964b6e38f2c4684386f3982',old=execFileSync('git',['show',base+':registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 const {fixture}=new Function('require','__dirname',read('tests/frontend-optimization-pr76.test.cjs').split('\nfor(const level')[0]+'\nreturn {fixture};')(require,__dirname);
+test('Final visual correction changes only CSS: all HTML, inline events and scripts match the reviewed PR77 head',()=>{
+ const reviewed=execFileSync('git',['show','e007286a61f9fb05aaa4041269595128b80463a4:registro.html'],{encoding:'utf8',maxBuffer:4000000});
+ const withoutStyle=s=>s.replace(/\r\n/g,'\n').replace(/<style\b[^>]*>[\s\S]*?<\/style>/g,'');assert.equal(withoutStyle(html),withoutStyle(reviewed));
+});
+test('Promedios C/B/A/AD fit a single compact row inside the existing 100px grade zone on desktop and mobile',()=>{
+ assert.match(html,/#finLista \.final-grade > \.fin-cell:has\(> button\[data-val\]\) \{ display:grid; grid-template-columns:repeat\(4,minmax\(0,1fr\)\); gap:4px 1px/);
+ assert.match(html,/#finLista \.final-grade > \.fin-cell > \.chip\[data-val\] \{[^}]*box-sizing:border-box; width:100%; min-width:0; min-height:44px;[^}]*padding:2px 1px; margin:0; font-size:11px; white-space:nowrap; overflow-wrap:normal/);
+ assert.match(html,/:has\(> button\[data-val\]\) > :not\(\[data-val\]\) \{ grid-column:1 \/ -1; justify-self:center/);
+ assert.match(html,/final-grade\{[^}]*width:100px;min-width:100px/);assert.equal((100-3)/4,24.25);
+});
 function extract(n,s=html){const i=s.indexOf('function '+n+'(');assert.ok(i>=0,n);return s.slice(i,s.indexOf('\n}',i)+2);}
 function f(level){const x=fixture(level);for(const n of ['quitarFinalManual','quitarAreaMasiva'])vm.runInContext(extract(n),x.c);return x;}
 for(const level of ['primaria','secundaria'])test(level+': bulk removal matches the preexisting individual operation including tombstone, timestamp, dirty and persistence',()=>{
