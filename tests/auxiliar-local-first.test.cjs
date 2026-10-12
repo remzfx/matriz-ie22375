@@ -10,11 +10,11 @@ test('Auxiliary paints the exact authorized cache before a slow read and later r
   let release;s.context.fetch=()=>new Promise(r=>{release=r});
   const task=s.context.ensureBD();
   assert.ok(s.run('BD.secundaria.estudiantes.length')>0);
-  assert.match(s.el('studentsStatus').textContent,/datos locales.*verificando/);
+  assert.match(s.el('studentsStatus').textContent,/Padrón III local.*comprobando servidor/);
   await flush();release({ok:true,json:async()=>({ok:true,inicializada:true,version:'new',estudiantes:[{nivel:'secundaria',grado:2,seccion:'B',nombre:'Synthetic new'}]})});
   await task;
   assert.equal(s.run('BD.secundaria.estudiantes[0].grado'),2);
-  assert.equal(s.context.IEStudents.peek().version,'new');assert.match(s.el('studentsStatus').textContent,/Datos actualizados/);
+  assert.equal(s.context.IEStudents.peek().version,'new');assert.match(s.el('studentsStatus').textContent,/estudiantes vigentes/);
   assert.ok(JSON.parse(s.stored.get('ie22375_aux_timing_v1')).cachePaintMs>=0);
   assert.doesNotMatch(s.stored.get('ie22375_aux_timing_v1'),/token|Synthetic|password/);
 });
@@ -132,8 +132,8 @@ test('Read bridge rejects expired tokens and cannot send a write action or broad
 test('Read bridge delivers an explicit revocation; preload cannot authorize a revoked token',async()=>{
   const s=fixture('primaria');await s.context.intentarLogin();await s.context.ensureBD();
   const w=bridge(s.server);s.context.navigator={serviceWorker:{controller:w.controller}};s.context.MessageChannel=w.Channel;
-  s.configure();const read=s.context.ensureBD(),reject=assert.rejects(read,e=>e.authorizationRejected);
-  await flush();w.release();await reject;
+  s.configure();const read=s.context.ensureBD();
+  await flush();w.release();assert.equal(await read,false);
   assert.equal(s.context.getSession(),null);assert.equal(s.context.IEStudents.peek(),null);
 });
 
@@ -163,8 +163,8 @@ test('A completed preload cannot mask a later configuration revocation',async()=
   const s=fixture('primaria');await s.context.intentarLogin();const w=bridge(s.server);
   s.context.navigator={serviceWorker:{controller:w.controller}};s.context.MessageChannel=w.Channel;
   const pre=s.context.IEStudents.preload();await flush();w.release();await pre;s.configure();
-  const task=s.context.ensureBD(),rejected=assert.rejects(task,e=>e.authorizationRejected);
-  await flush();assert.equal(w.requests.length,2);w.release();await rejected;
+  const task=s.context.ensureBD();
+  await flush();assert.equal(w.requests.length,2);w.release();assert.equal(await task,false);
   assert.equal(s.context.getSession(),null);assert.equal(s.context.IEStudents.peek(),null);
 });
 
