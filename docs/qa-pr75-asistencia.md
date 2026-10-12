@@ -14,6 +14,22 @@
 
 **Orden corto:** (1) backend v2 en Apps Script aislado; (2) comprobar `asisprotocol`, `loadasisperiodos` y `PADRON_III` de prueba; (3) ensayar guardado/cierre/historial, estadísticas y QR móvil desde un frontend de pruebas HTTPS; (4) revisar resultados y autorizar merge. Ninguno de estos pasos implica despliegue oficial.
 
+## Evidencia de integración real en el entorno PR74 reutilizado (12-10-2026)
+
+Se ejecutaron de forma interactiva, **solo en el Apps Script independiente** `IE22375_PR74_APPS_SCRIPT_PRUEBAS`, las siguientes funciones. El usuario compartió capturas con los registros de ejecución exitosos:
+
+| Verificación | Evidencia y resultado |
+| --- | --- |
+| `verificarEntornoPR74` | Hoja `IE22375_PR74_PRUEBAS` verificada; pestañas AsistenciaIngreso y ConfigSistema. |
+| `verificarPR75SoloLectura` | Funciones v2 presentes, año 2026, III bloqueado, 12 columnas previas; no escribió. |
+| `probarPR75CierreIndependiente` | Abrió y cerró III; conservó historia de asistencia y no cambió configuración de notas. |
+| `probarPR75BloqueoEscritura` | `saveasis` con III cerrado devolvió `PERIOD_CLOSED`; historial sin cambios. |
+| `probarPR75GuardadoYEstadisticas` | Padrón ficticio de 2 estudiantes; guardó P en III (15 columnas), estadísticas primaria P=1/total=1, conservó las filas antiguas y cerró III en `finally`. |
+
+**Confirmación de lectura directa** de la hoja aislada mediante el conector Google Sheets: `AsistenciaIngreso` tiene encabezados de 15 columnas, filas históricas con 12 valores y una nueva fila ficticia de 15 valores (fecha 2026-10-12, primaria, P, año 2026, bimestre III); `ConfigSistema` contiene pares de apertura/cierre y su último cierre deja III=`cerrado`; `EstudiantesBase` presenta el marcador `ESTUDIANTES_COMMIT` con los datos ficticios. No se consultó ni escribió la hoja oficial.
+
+**Aún pendientes para autorizar merge:** validación real del lector en iPhone/Android mediante frontend HTTPS **apuntando al Apps Script aislado**, prueba de interfaz de Admin y Auxiliar con cierre/estadísticas, y preparación verificada del backend v2 que utilizará la página publicada. El uso local del editor Apps Script no equivale a desplegar Web App en el entorno real. No fusionar ni desplegar automáticamente.
+
 ## Reglas innegociables
 
 - El propietario autoriza expresamente el merge (lo ejecuta ChatGPT) y efectúa personalmente cualquier despliegue desde GitHub/Apps Script.
