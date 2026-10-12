@@ -1356,11 +1356,11 @@ function resultadoPruebaQR(text) {
   'Prueba correcta: la cámara leyó el QR de IE 22375, pero ese estudiante no está en el padrón cargado. NO se registró asistencia.';
  return true;
 }
-function onDecoded(text) {
+function onDecoded(text, modoDeLectura=scanModoPrueba) {
  const now=Date.now();
  if(text===lastScanText&&now-lastScanAt<1800)return;
  lastScanText=text;lastScanAt=now;
- if(scanModoPrueba){resultadoPruebaQR(text);return;}
+ if(modoDeLectura===true){resultadoPruebaQR(text);return;}
  marcarPorQR(text);
 }
 async function toggleScan(modoPrueba=false) {
@@ -1378,20 +1378,22 @@ async function toggleScan(modoPrueba=false) {
  const msg=document.getElementById('scanMsg');
  if(!window.isSecureContext) {
   msg.textContent='La cámara necesita una página HTTPS segura. No funciona desde una vista previa local HTTP o archivo. Abre el módulo publicado mediante HTTPS.';
+  box.classList.remove('on');scanModoPrueba=false;
   return false;
  }
  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) {
   msg.textContent='Este navegador no ofrece acceso a la cámara. En iPhone, abre el sitio HTTPS directamente en Safari y autoriza Cámara.';
+  box.classList.remove('on');scanModoPrueba=false;
   return false;
  }
  if(typeof Html5Qrcode==='undefined'){
   msg.textContent='No se cargó el lector QR de la página. Comprueba internet y vuelve a abrir el módulo.';
+  box.classList.remove('on');scanModoPrueba=false;
   return false;
  }
  if(!scanModoPrueba)prepararAudio();
  msg.textContent=scanModoPrueba?'Modo prueba: abriendo cámara, NO se guardará asistencia…':'Abriendo cámara trasera…';
- const lector=new Html5Qrcode('reader');
- html5Qr=lector;
+ let lector=null;
  const opciones={fps:10,qrbox:function(vw,vh){
   const s=Math.max(80,Math.min(280,Math.floor(Math.min(vw,vh)*.78)));
   const ajustado=Math.min(s,Math.floor(vw)-8,Math.floor(vh)-8);
@@ -1399,17 +1401,23 @@ async function toggleScan(modoPrueba=false) {
   return {width:lado,height:lado};
  }};
  try{
+  lector=new Html5Qrcode('reader');
+  html5Qr=lector;
   // iOS: dar preferencia al facingMode trasero; la enumeración previa puede
   // seleccionar una lente inadecuada antes de conceder permisos.
   try{
-   await lector.start({facingMode:'environment'},opciones,onDecoded,function(){});
+   await lector.start({facingMode:'environment'},opciones,function(texto){
+    if(intento===scanIntento)onDecoded(texto,modoPrueba===true);
+   },function(){});
   }catch(primerError){
    if(intento!==scanIntento)return false;
    const cameras=await Html5Qrcode.getCameras();
    if(!cameras||!cameras.length)throw primerError;
    const back=cameras.find(c=>/back|rear|environment|trasera|posterior/i.test(c.label||''));
    const id=(back||cameras[cameras.length-1]).id;
-   await lector.start(id,opciones,onDecoded,function(){});
+   await lector.start(id,opciones,function(texto){
+    if(intento===scanIntento)onDecoded(texto,modoPrueba===true);
+   },function(){});
   }
   if(intento!==scanIntento){
    try{await lector.stop();}catch(e){}
@@ -1424,7 +1432,9 @@ async function toggleScan(modoPrueba=false) {
   if(intento!==scanIntento)return false;
   msg.textContent='No se pudo iniciar la cámara. En iPhone: Safari → aA/Ajustes del sitio web → Cámara → Permitir. '+
    (e&&e.message?e.message:'Prueba desde HTTPS.');
-  if(html5Qr===lector){html5Qr=null;try{lector.clear();}catch(err){}}
+  if(html5Qr===lector){html5Qr=null;try{if(lector)lector.clear();}catch(err){}}
+  box.classList.remove('on');
+  scanModoPrueba=false;
   return false;
  }
 }
