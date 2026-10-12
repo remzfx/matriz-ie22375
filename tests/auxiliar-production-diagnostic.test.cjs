@@ -35,7 +35,7 @@ function fixture(nivel){
   run(read('students.js'));context.IEStudents=context.window.IEStudents;
   run(read('auxiliar-permissions.js'));context.IEAuxPermissions=context.window.IEAuxPermissions;
   run("let BD=null,cargandoEstudiantesAux=false;const auxiliarInicio=performance.now(),WA_KEY='ie22375_wa_grupos_v1';function toast(){};function onNivel(){};function bimestreAsistencia(){return 'III'};function mostrarEstadoAsistencia(){};async function verificarCierreAsistencia(){return true}");
-  for(const name of ['hoyISO','medirAuxiliar','loadGruposWa','enviarGruposHoy','actualizarGradosGrupos','pintarBaseAuxiliar','retirarSesionAuxiliar','ensureBD'])run(extract(name));
+  for(const name of ['hoyISO','medirAuxiliar','loadGruposWa','enviarGruposHoy','actualizarGradosGrupos','fijarNiveles','pintarBaseAuxiliar','retirarSesionAuxiliar','ensureBD'])run(extract(name));
   return {server,configure,context,run,el,stored,local,calls};
 }
 
