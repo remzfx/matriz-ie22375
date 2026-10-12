@@ -218,7 +218,7 @@ for (const [file, name, helper, role, action] of [
         const body = JSON.parse(options.body); requests.push(body); const response = s.post(body); responses.push(response);
         return {text: async () => JSON.stringify(response), json: async () => response};
       },
-      document: {getElementById: id => ({value: /Nivel/.test(id) ? 'primaria' : /Bim/.test(id) ? 'I' : /Sec/.test(id) ? 'Única' : '1', files: [fileFixture]})},
+      document: {getElementById: id => ({value: id==='inpFecha' ? '2026-10-03' : /Nivel/.test(id) ? 'primaria' : /Bim/.test(id) ? 'I' : /Sec/.test(id) ? 'Única' : '1', files: [fileFixture]})},
       btoa: value => Buffer.from(value, 'binary').toString('base64'),
       listarPlantillasSiagie() {}, renderAulasSiagie() {}, aulasDelNivel: () => [], loadGruposWa: () => [], saveGruposWaLocal() {},
       guardarCfg() {}, saveHS() {}, paqueteAip: () => ({plan: 'synthetic'}), alert() {}, toast() {}, renderLista() {},
