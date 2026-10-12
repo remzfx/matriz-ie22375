@@ -303,3 +303,32 @@ test('Sheets automatic Date coercion is prevented by text-formatting the exact r
  assert.equal(late.code,'CONFLICT');assert.equal(late.resultados[0].motivo,'VERSION_CONFLICT');
  assert.equal(s.load().items[0].marca,'T');assert.equal(sh.rows.length,2);
 });
+
+test('loadasis filters historic Sheets Date cells using the spreadsheet timezone without modifying rows',()=>{
+ const s=backend(),sh=s.c.asegurarAsis_();
+ const append=(name,fecha,cellenFecha)=>{
+  const it=s.item({fecha,nombre}),key=s.c.itemAsistenciaAutorizado_(it).clave;
+  sh.appendRow([key,cellenFecha,it.nivel,it.grado,it.seccion,it.nombre,'P',it.hora,it.via,it.ts,it.motivo]);
+ };
+ // 01:30 UTC of October 12 is still October 11 in the sheet timezone America/Lima.
+ const legacyDate=new Date('2026-10-12T01:30:00Z');
+ append('Legacy Date Row','2026-10-11',legacyDate);
+ append('Text Date Row','2026-10-11','2026-10-11');
+ append('Other Day Row','2026-10-12',new Date('2026-10-12T17:00:00Z'));
+ const writes=s.state.writes;
+ const load=(fecha)=>JSON.parse(s.c.doGet({parameter:{
+  action:'loadasis',token:s.admin,...(fecha===undefined?{}:{fecha})
+ }}).text);
+ const oct11=load('2026-10-11');
+ assert.equal(oct11.ok,true);
+ assert.deepEqual(oct11.items.map(x=>x.nombre).sort(),['Legacy Date Row','Text Date Row']);
+ assert.equal(oct11.items[0].fecha,'2026-10-11');
+ assert.match(oct11.items[0].version,/^asis1:/);
+ assert.equal(load('2026-10-11').items.find(x=>x.nombre==='Legacy Date Row').version,
+  oct11.items.find(x=>x.nombre==='Legacy Date Row').version);
+ assert.deepEqual(load('2026-10-12').items.map(x=>x.nombre),['Other Day Row']);
+ assert.equal(load('2026-10-13').items.length,0);
+ assert.equal(load().items.length,3,'unfiltered reading includes old and new rows');
+ assert.equal(s.state.writes,writes,'all date queries must remain read-only');
+ assert.equal(sh.rows[1][1],legacyDate,'historical Date cells must not be migrated or rewritten');
+});
