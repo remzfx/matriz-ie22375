@@ -17,15 +17,15 @@
   .session-evaluation-grid select,.session-evaluation-grid input[type="date"]{width:100%;min-width:0;box-sizing:border-box;height:50px;min-height:50px;margin:0;padding:8px 10px;border:1px solid #cbd5e1;border-radius:10px;}
   @media(max-width:640px){.session-evaluation-grid{grid-template-columns:minmax(0,1fr);}}
   .worked-label{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;}
-  .final-cell-layout{display:grid;grid-template-columns:100px minmax(0,1fr);gap:8px;align-items:start;min-width:0;}
-  .final-grade{grid-column:1;width:100px;min-width:100px;display:flex;flex-direction:column;align-items:center;}
+  .final-cell-layout{display:grid;grid-template-columns:144px minmax(0,1fr);gap:8px;align-items:start;min-width:0;}
+  .final-grade{grid-column:1;width:144px;min-width:144px;display:flex;flex-direction:column;align-items:center;}
   .final-grade > .fin-cell{width:100%;min-width:0;}
   .final-grade button{max-width:100%;overflow-wrap:anywhere;}
   .final-grade .fin-clear-direct{box-sizing:border-box;display:flex;align-items:center;justify-content:center;align-self:center;flex:0 0 auto;width:18px;height:18px;min-width:18px;min-height:18px;margin:2px 0 0;padding:0;border:1px solid #475569;border-radius:4px;background:#475569;color:#fff;font-size:12px;font-weight:600;line-height:1;cursor:pointer;box-shadow:none;}
   .final-grade .fin-clear-direct:hover{background:#334155;border-color:#334155;}
   .final-grade .fin-clear-direct:focus-visible{outline:2px solid #334155;outline-offset:2px;}
   @media(max-width:640px){.final-grade .fin-clear-direct{width:20px;height:20px;min-width:20px;min-height:20px;}}
-  .final-conclusion{text-align:left;min-width:0;width:100%;max-width:180px;font-size:11px;}
+  .final-conclusion{text-align:left;min-width:0;width:100%;max-width:100%;font-size:11px;}
   .final-conclusion label{display:block;font-size:10px;font-weight:600;}
   .final-conclusion select,.final-conclusion textarea{width:100%;min-width:0;box-sizing:border-box;font-size:11px;line-height:1.25;padding:4px;}
   .final-conclusion select{min-height:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -41,6 +41,9 @@
   .btn-danger { background:#fee2e2; color:#b91c1c; }
   .chip { display:inline-flex; align-items:center; justify-content:center; min-width:2.4rem; padding:.4rem .65rem; border-radius:999px; font-size:13px; font-weight:800; border:2px solid transparent; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .fin-cell .chip { min-width:1.7rem; padding:.2rem .32rem; font-size:11px; margin:1px; }
+  #finLista .final-grade > .fin-cell:has(> button[data-val]) { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px 1px; align-items:center; }
+  #finLista .final-grade > .fin-cell > .chip[data-val] { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:2px 1px; margin:0; font-size:11px; white-space:nowrap; overflow-wrap:normal; }
+  #finLista .final-grade > .fin-cell:has(> button[data-val]) > :not([data-val]) { grid-column:1 / -1; justify-self:center; }
   .nivel-c, .nivel-b, .nivel-a, .nivel-ad {
     background:#f1f5f9; color:#64748b; border-color:#cbd5e1;
   }
@@ -137,11 +140,16 @@
     @media (max-width:600px) { .registro-datos-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media (max-width:360px) { .registro-datos-grid { grid-template-columns:minmax(0,1fr); } }
   }
-  /* Solo Promedios: columnas compartidas entre encabezado y nota, sin distribuir huecos. */
-  #finLista .fin-grid { width:auto; min-width:0; table-layout:fixed; }
+  /* Solo Promedios: cada columna se amplía si alguna fila necesita conclusión. */
+  #finLista .fin-grid { width:auto; min-width:0; table-layout:auto; }
   #finLista .fin-grid .fin-nom { width:180px; min-width:180px; max-width:180px; text-align:left; }
-  #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) { width:310px; min-width:310px; max-width:310px; overflow-wrap:anywhere; }
-  #finLista .fin-grid.fin-many th:not(.fin-nom),#finLista .fin-grid.fin-many td:not(.fin-nom) { width:270px; min-width:270px; max-width:270px; }
+  #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) { width:160px; min-width:160px; overflow-wrap:anywhere; }
+  #finLista .fin-grid td:has(.final-conclusion) { width:350px; min-width:350px; }
+  #finLista { min-width:0; max-width:100%; }
+  @media(max-width:640px){#finLista .fin-grid td:has(.final-conclusion){width:220px;min-width:220px;}}
+  .fin-header-controls { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; max-width:100%; }
+  .fin-remove-bulk { padding:6px 8px; min-height:36px; font-size:11px; }
+  #finLista::before { content:""; display:block; position:sticky; top:0; left:0; width:100%; height:var(--fin-head-height,0px); margin-bottom:calc(-1 * var(--fin-head-height,0px)); background:#0f172a; z-index:3; pointer-events:none; }
   .fin-bulk-actions { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:11px; }
   .fin-bulk-actions .chip { min-height:36px; font-size:12px; }
   .fin-grid { width:100%; border-collapse:separate; border-spacing:0; min-width:640px; }
@@ -372,21 +380,23 @@
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
             </div>
             <div class="fin-mode-info" id="finModeInfo"></div>
-            <div class="mode-toggle">
-              <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
-              <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
+            <div class="fin-header-controls">
+              <div class="fin-bulk-actions" aria-label="Calificar competencias del área">
+                <span>Todo el área:</span>
+                <button type="button" class="chip nivel-ad" data-reg-write onclick="calificarAreaMasiva('AD')">AD</button>
+                <button type="button" class="chip nivel-a" data-reg-write onclick="calificarAreaMasiva('A')">A</button>
+                <button type="button" class="chip nivel-b" data-reg-write onclick="calificarAreaMasiva('B')">B</button>
+                <button type="button" class="chip nivel-c" data-reg-write onclick="calificarAreaMasiva('C')">C</button>
+                <button type="button" class="btn btn-ghost fin-remove-bulk" data-reg-write onclick="quitarAreaMasiva()">Quitar masivo</button>
+              </div>
+              <div class="mode-toggle">
+                <button type="button" data-modo="letra" class="on" onclick="setModoCalif('letra')">Letras</button>
+                <button type="button" data-modo="num" onclick="setModoCalif('num')">0–20</button>
+              </div>
             </div>
           </div>
           <div class="fin-header-aux">
             <div id="finResumen"></div>
-            <div class="fin-bulk-actions" aria-label="Calificar competencias del área">
-              <span>Todo el área:</span>
-              <button type="button" class="chip nivel-ad" data-reg-write onclick="calificarAreaMasiva('AD')">AD</button>
-              <button type="button" class="chip nivel-a" data-reg-write onclick="calificarAreaMasiva('A')">A</button>
-              <button type="button" class="chip nivel-b" data-reg-write onclick="calificarAreaMasiva('B')">B</button>
-              <button type="button" class="chip nivel-c" data-reg-write onclick="calificarAreaMasiva('C')">C</button>
-            </div>
-
           </div>
         </header>
         <div id="finLista" class="fin-wrap fin-scroll-body"></div>
@@ -487,11 +497,11 @@
           <div class="text-sm font-bold text-slate-800" id="lblSesionActiva">Define fecha, competencia y capacidad arriba</div>
         </div>
         <div class="mode-toggle" style="min-width:200px">
-          <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
-          <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
+          <button type="button" data-modo="letra" class="on" onclick="setModoCalif('letra')">Letras</button>
+          <button type="button" data-modo="num" onclick="setModoCalif('num')">0–20</button>
         </div>
       </div>
-      <p class="scale-hint" id="lblEscala">0–20 → letra: 18–20 AD · 14–17 A · 11–13 B · 0–10 C</p>
+      <p class="scale-hint" id="lblEscala">Escala: AD destacado · A logrado · B proceso · C inicio</p>
       <p class="text-[10px] text-slate-400 mt-1">Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas.</p>
       <div id="stuList" class="mt-2"></div>
     </div>
@@ -575,7 +585,7 @@ const CAPS_CNEB = {
 
 let nivel = null;
 let areaActual = null;
-let modoCalif = 'num';
+let modoCalif = 'letra';
 let dirty = false; // hay cambios sin guardar
 let sesionActiva = null; // { fecha, unidad, comp, capacidad }
 let notas = {}; // key alumno -> { nivel, nota20, conclusion }
@@ -1433,8 +1443,8 @@ async function entrarNivel(n) {
   sesionActiva = null;
   notas = {};
   dirty = false;
-  modoCalif = 'num';
-  try { localStorage.setItem('ie22375_modo_calif', 'num'); } catch(e) {}
+  modoCalif = 'letra';
+  try { localStorage.setItem('ie22375_modo_calif', 'letra'); } catch(e) {}
   syncModoBtns();
 
   updateHdr();
@@ -2698,6 +2708,44 @@ function calificarAreaMasiva(val) {
   toast(cambios+' calificaciones actualizadas localmente');
   return true;
 }
+function quitarFinalManual(comp, nombre, posponerRender) {
+  const k=finalKey(comp,nombre),original=leerNota(store.finales,k);
+  if (registroSoloLectura() || bimCerradoDocente() || !competenciaTrabajada(comp) || !original || !Object.keys(original).length || original.borrado) return false;
+  if (!competencias().includes(comp) || !estudiantes().some(al=>studentKey(al)===nombre)) return false;
+  baselineAcademica();
+  store.finales[k]={borrado:true,ts:Date.now()};
+  saveStore();
+  dirtyAcademico();
+  if (!posponerRender) renderFinales();
+  return true;
+}
+function quitarAreaMasiva() {
+  if (registroSoloLectura() || bimCerradoDocente()) return false;
+  const comps=competencias().filter(competenciaTrabajada);
+  const alumnos=estudiantes().filter(al=>comps.some(cp=>{const original=leerNota(store.finales,finalKey(cp,studentKey(al)));return original && Object.keys(original).length && !original.borrado;}));
+  if (!comps.length || !alumnos.length) {toast('No hay calificaciones directas que quitar en esta área.');return false;}
+  const c=ctxBase();
+  if (!confirm('Quitar las calificaciones directas existentes de todas las competencias trabajadas del área '+c.area+' · '+c.grado+'° '+c.seccion+' · Bim '+c.bim+' ('+alumnos.length+' estudiantes). Se conservarán evidencias y conclusiones descriptivas. ¿Continuar?')) return false;
+  let cambios=0;
+  alumnos.forEach(al=>comps.forEach(cp=>{if(quitarFinalManual(cp,studentKey(al),true))cambios++;}));
+  if (cambios) renderFinales();
+  toast(cambios+' calificaciones directas quitadas localmente');
+  return true;
+}
+function sincronizarFondoPromedios() {
+  const box=document.getElementById('finLista'),table=box && box.querySelector('table'),head=table && table.tHead;
+  if (sincronizarFondoPromedios.observer) sincronizarFondoPromedios.observer.disconnect();
+  if (!head) { if(box && box.style)box.style.removeProperty('--fin-head-height');return; }
+  const actualizar=()=>box.style.setProperty('--fin-head-height',head.getBoundingClientRect().height+'px');
+  actualizar();
+  if (typeof ResizeObserver!=='undefined') {
+    sincronizarFondoPromedios.observer=new ResizeObserver(actualizar);
+    sincronizarFondoPromedios.observer.observe(head);
+  } else if (typeof window!=='undefined' && !sincronizarFondoPromedios.resize) {
+    sincronizarFondoPromedios.resize=true;
+    window.addEventListener('resize',sincronizarFondoPromedios);
+  }
+}
 function renderFinales() {
   loadStore();
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
@@ -2711,7 +2759,7 @@ function renderFinales() {
   const modeInfo = document.getElementById('finModeInfo');
   const bloqueado = bimCerradoDocente();
   const alumnos = estudiantes();
-  if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; modeInfo.innerHTML=''; return; }
+  if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; modeInfo.innerHTML=''; if(typeof sincronizarFondoPromedios==='function')sincronizarFondoPromedios(); return; }
 
   const capsPor = {};
   comps.forEach(cp => { capsPor[cp] = capsDeComp(cp); });
@@ -2808,10 +2856,11 @@ function renderFinales() {
       aplicarFinalManual(comp,nombre,val);
     });
   });
-  box.querySelectorAll('[data-quitar-directo]').forEach(el=>el.onclick=()=>{const cp=decodeURIComponent(el.dataset.quitarDirecto),id=decodeURIComponent(el.dataset.alumno),k=finalKey(cp,id);if(registroSoloLectura()||bimCerradoDocente()||!competenciaTrabajada(cp)||!leerNota(store.finales,k))return;baselineAcademica();store.finales[k]={borrado:true,ts:Date.now()};saveStore();dirtyAcademico();renderFinales();});
+  box.querySelectorAll('[data-quitar-directo]').forEach(el=>el.onclick=()=>quitarFinalManual(decodeURIComponent(el.dataset.quitarDirecto),decodeURIComponent(el.dataset.alumno)));
   box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
   IEConclusionSuggestions.bindCompact(box,(el,text)=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),text));
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);
+  if (typeof sincronizarFondoPromedios==='function') sincronizarFondoPromedios();
   sincronizarEdicionRegistro();
 }
 
