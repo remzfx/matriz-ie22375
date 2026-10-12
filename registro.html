@@ -492,11 +492,11 @@
           <div class="text-sm font-bold text-slate-800" id="lblSesionActiva">Define fecha, competencia y capacidad arriba</div>
         </div>
         <div class="mode-toggle" style="min-width:200px">
-          <button type="button" data-modo="letra" onclick="setModoCalif('letra')">Letras</button>
-          <button type="button" data-modo="num" class="on" onclick="setModoCalif('num')">0–20</button>
+          <button type="button" data-modo="letra" class="on" onclick="setModoCalif('letra')">Letras</button>
+          <button type="button" data-modo="num" onclick="setModoCalif('num')">0–20</button>
         </div>
       </div>
-      <p class="scale-hint" id="lblEscala">0–20 → letra: 18–20 AD · 14–17 A · 11–13 B · 0–10 C</p>
+      <p class="scale-hint" id="lblEscala">Escala: AD destacado · A logrado · B proceso · C inicio</p>
       <p class="text-[10px] text-slate-400 mt-1">Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas.</p>
       <div id="stuList" class="mt-2"></div>
     </div>
@@ -580,8 +580,7 @@ const CAPS_CNEB = {
 
 let nivel = null;
 let areaActual = null;
-let modoCalif = 'num';
-let modoCalificarAntesPromedios = 'num';
+let modoCalif = 'letra';
 let dirty = false; // hay cambios sin guardar
 let sesionActiva = null; // { fecha, unidad, comp, capacidad }
 let notas = {}; // key alumno -> { nivel, nota20, conclusion }
@@ -1439,8 +1438,8 @@ async function entrarNivel(n) {
   sesionActiva = null;
   notas = {};
   dirty = false;
-  modoCalif = 'num';
-  try { localStorage.setItem('ie22375_modo_calif', 'num'); } catch(e) {}
+  modoCalif = 'letra';
+  try { localStorage.setItem('ie22375_modo_calif', 'letra'); } catch(e) {}
   syncModoBtns();
 
   updateHdr();
@@ -1961,12 +1960,9 @@ function syncModoBtns() {
 }
 function setModoCalif(m) {
   modoCalif = m;
-  const enPromedios=document.getElementById('panelFinales') && document.getElementById('panelFinales').classList.contains('on');
-  if (!enPromedios) {
-    try { localStorage.setItem('ie22375_modo_calif', m); } catch(e) {}
-  }
+  try { localStorage.setItem('ie22375_modo_calif', m); } catch(e) {}
   syncModoBtns();
-  if (!enPromedios) renderStudents();
+  renderStudents();
   if (document.getElementById('panelFinales') && document.getElementById('panelFinales').classList.contains('on')) renderFinales();
   if (document.getElementById('panelAvance') && document.getElementById('panelAvance').classList.contains('on')) renderAvance();
 }
@@ -2549,9 +2545,6 @@ function showPanel(which) {
   const tAv = document.getElementById('tabAv');
   const tAs = document.getElementById('tabAs');
   const tFin = document.getElementById('tabFin');
-  const estabaEnPromedios=fin && fin.classList.contains('on');
-  if (estabaEnPromedios && which!=='fin') { modoCalif=modoCalificarAntesPromedios; syncModoBtns(); }
-  if (!estabaEnPromedios && which==='fin') { modoCalificarAntesPromedios=modoCalif; modoCalif='letra'; syncModoBtns(); }
   cal.classList.remove('on');
   av.classList.remove('on');
   as.classList.remove('on');

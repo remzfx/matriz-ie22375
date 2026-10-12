@@ -90,7 +90,7 @@ test('Expired local-first cache is withdrawn and local writes become blocked',as
 test('Local-first mode allows Calificar, Promedios, Resumen and Asistencia tabs plus local save',async()=>{
  const s=fixture();await s.c.IEStudents.loadRoster('III');s.c.fetch=async()=>{throw Error('down');};
  const task=s.c.cargarPadronRegistro('III');await s.tick(1200);await task;
- s.run("let modoCalif='num',modoCalificarAntesPromedios='num';function syncModoBtns(){}function esVistaAdmin(){return false}");s.run(extract('showPanel'));
+ s.run("function esVistaAdmin(){return false}");s.run(extract('showPanel'));
  for(const [tab,panel] of [['cal','panelCalificar'],['fin','panelFinales'],['av','panelAvance'],['as','panelAsistencia']]){
    s.c.showPanel(tab);assert.equal(s.element(panel).classList.contains('on'),true);assert.equal(s.main.inert,false);assert.notEqual(s.c.guardarTodo(),false);
  }
