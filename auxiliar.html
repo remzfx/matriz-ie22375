@@ -107,14 +107,14 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     </div>
     <div>
       <label class="text-[10px] font-bold text-slate-500">Fecha</label>
-      <input type="date" id="inpFecha" onchange="renderLista()">
+      <input type="date" id="inpFecha" onchange="invalidarArchivoAsistencia();renderLista()">
     </div>
     <div class="grid grid-cols-2 gap-2"><div><label class="text-[10px] font-bold text-slate-500">Año lectivo</label><div id="asisAnio" class="p-3 border rounded-xl font-bold">—</div></div><div><label class="text-[10px] font-bold text-slate-500">Bimestre</label><select id="selBimestre" onchange="cambiarBimestreAsistencia()"><option>I</option><option>II</option><option selected>III</option><option>IV</option></select></div></div>
     <p id="asisEstado" class="text-sm font-bold text-amber-700" role="status">Verificando cierre de asistencia…</p>
     <div>
       <label class="text-[10px] font-bold text-slate-500">Nivel</label>
       <span id="selNivelScope" hidden></span>
-      <select id="selNivel" onchange="onNivel()">
+      <select id="selNivel" onchange="invalidarArchivoAsistencia();onNivel()">
         <option value="primaria">Primaria</option>
         <option value="secundaria">Secundaria</option>
       </select>
@@ -139,10 +139,16 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
         <button type="button" class="btn btn-up" onclick="subirTodoNube()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20V9M7 13l5-5 5 5M5 4h14"/></svg>Subir asistencia</button>
         <button type="button" class="btn btn-down" onclick="bajarNube()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>Bajar asistencia</button>
       </div>
+      <div class="rounded-xl border p-3 mt-2 space-y-2">
+        <button type="button" class="btn btn-down w-full" onclick="consultarHistorialAnterior()">Consultar archivo anterior (solo lectura)</button>
+        <p class="text-xs text-slate-600">Asistencias registradas antes de usar padrones bimestrales. No tienen bimestre certificado y no se mezclan ni modifican.</p>
+        <p id="asisLegadoEstado" class="text-xs text-slate-600" role="status"></p>
+        <div id="asisLegadoLista" class="text-xs space-y-1"></div>
+      </div>
     </div>
   </div>
 
-  <div class="flex flex-wrap gap-2 text-[11px] font-bold">
+  <div class="flex flex-wrap gap-2 text-[11px] font-bold'>
     <span class="px-2 py-1 rounded-lg bg-green-50 text-green-800">P <span id="nP">0</span></span>
     <span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">F <span id="nF">0</span></span>
     <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">T <span id="nT">0</span></span>
@@ -335,7 +341,7 @@ async function verificarCierreAsistencia(){
  }catch(e){configAsistencia=null;asistenciaVerificada=false;mostrarEstadoAsistencia();return false;}
 }
 async function cambiarBimestreAsistencia(){
- BD=IEStudents.empty();document.getElementById('lista').innerHTML='';mostrarEstadoAsistencia();
+ invalidarArchivoAsistencia();BD=IEStudents.empty();document.getElementById('lista').innerHTML='';mostrarEstadoAsistencia();
  return ensureBD();
 }
 function loadBD() { return IEStudents.empty(); }
@@ -687,7 +693,40 @@ async function bajarNube() {
   } catch(e) { toast('No se pudo bajar. Actualiza el Apps Script.'); }
 }
 
-function escapeAuxiliar(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function invalidarArchivoAsistencia() {
+ consultarHistorialAnterior.serial=(consultarHistorialAnterior.serial||0)+1;
+ const estado=document.getElementById('asisLegadoEstado'),lista=document.getElementById('asisLegadoLista');
+ if(estado)estado.textContent='';
+ if(lista)lista.innerHTML='';
+}
+async function consultarHistorialAnterior() {
+ const nivel=document.getElementById('selNivel').value,fecha=document.getElementById('inpFecha').value||hoyISO();
+ const estado=document.getElementById('asisLegadoEstado'),lista=document.getElementById('asisLegadoLista');
+ const serial=(consultarHistorialAnterior.serial||0)+1;consultarHistorialAnterior.serial=serial;
+ if(!IEAuxPermissions.permite(nivel)) {estado.textContent='Nivel no autorizado.';return false;}
+ estado.textContent='Consultando archivo anterior…';lista.innerHTML='';
+ const token=tokenSesionAuxiliar();
+ try {
+  const query='?action=loadasis&historico=1&nivel='+encodeURIComponent(nivel)+'&fecha='+encodeURIComponent(fecha);
+  const res=await fetchLecturaNube(CLOUD_API_URL+query),data=JSON.parse(await res.text());
+  if(serial!==consultarHistorialAnterior.serial||token!==tokenSesionAuxiliar()||
+     nivel!==document.getElementById('selNivel').value||fecha!==(document.getElementById('inpFecha').value||hoyISO()))return false;
+  rechazarSesionAsistencia(data,token);
+  if(!data.ok||data.protocoloAsistencia!==2||data.historicoAnterior!==true)throw Error(data.error||'No se verificó el archivo.');
+  const items=Array.isArray(data.items)?data.items:[];
+  estado.textContent=items.length?'Archivo anterior: '+items.length+' marcas del '+fecha+' (sin bimestre asignado).':'Sin marcas del archivo anterior para esta fecha y nivel.';
+  lista.innerHTML=items.map(it=>
+   '<div class="border rounded-lg p-2"><b>'+escapeAuxiliar(it.nombre)+'</b> · '+
+   escapeAuxiliar(it.grado)+'° '+escapeAuxiliar(it.seccion)+' · '+escapeAuxiliar(it.marca)+
+   (it.hora?' · '+escapeAuxiliar(it.hora):'')+'</div>'
+  ).join('');
+  return true;
+ } catch(e) {
+  if(serial!==consultarHistorialAnterior.serial)return false;
+  estado.textContent='No se pudo consultar el archivo: '+e.message;return false;
+ }
+}
+function escapeAuxiliar(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
 
 function renderLista() {
   mostrarEstadoAsistencia();
