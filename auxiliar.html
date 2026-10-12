@@ -370,10 +370,13 @@ function fijarNiveles(j) {
 }
 const auxiliarInicio=performance.now();
 try{sessionStorage.removeItem('ie22375_aux_timing_v1');}catch(e){}
-function medirAuxiliar(etapa,inicio){try{
- const d=JSON.parse(sessionStorage.getItem('ie22375_aux_timing_v1')||'{}');
- d[etapa]=Math.round(performance.now()-inicio);sessionStorage.setItem('ie22375_aux_timing_v1',JSON.stringify(d));
-}catch(e){}}
+function medirAuxiliar(etapa,inicio) {
+  try {
+    const d=JSON.parse(sessionStorage.getItem('ie22375_aux_timing_v1')||'{}');
+    d[etapa]=Math.round(performance.now()-inicio);
+    sessionStorage.setItem('ie22375_aux_timing_v1',JSON.stringify(d));
+  } catch(e) {}
+}
 function pintarBaseAuxiliar(base){
  BD=fijarNiveles(base);IEAuxPermissions.configurar();onNivel();actualizarGradosGrupos();
  if(!IEAuxPermissions.niveles().some(n=>BD[n].estudiantes.length))document.getElementById('lista').innerHTML='';
@@ -406,16 +409,16 @@ async function ensureBD(){
   const total=IEAuxPermissions.niveles().reduce((n,nivel)=>n+BD[nivel].estudiantes.length,0);
   estado.textContent='Padrón '+bim+' · '+total+' estudiantes vigentes.'+(base.offline?' Lista temporal sin conexión.':'');
   retry.hidden=!base.offline;return true;
- }catch(e){
+  } catch(e){
   if(serial!==ensureBD.serial)return false;
   const cacheSeguro=e.retryable&&token===IEStudents.validToken()&&IEStudents.peekRoster(bim);
   pintarBaseAuxiliar(cacheSeguro&&cacheSeguro.padronInicializado&&cacheSeguro.bimestre===bim?cacheSeguro:IEStudents.empty());
   if(e.code==='SESSION'||e.authorizationRejected){
    retirarSesionAuxiliar(token||(IEStudents.session()||{}).token);
    estado.textContent='Sesión inválida o revocada. Vuelve a ingresar.';relogin.hidden=false;
-  }else{estado.textContent=e.message||'No se pudo cargar el padrón bimestral.';retry.hidden=false;}
+  } else {estado.textContent=e.message||'No se pudo cargar el padrón bimestral.';retry.hidden=false;}
   return false;
- }
+  }
 }
 
 function alumnosAula() {
