@@ -619,6 +619,51 @@ function bimestreAbierto_(bimestre) {
 }
 
 
+// Cierre de asistencia independiente de los periodos de calificaciones.
+function obtenerAsistenciaPeriodos_() {
+  const academico = obtenerPeriodosConfig_();
+  const anioDefecto = Number(academico && academico.anio) || new Date().getFullYear();
+  const bloqueados = {I:'bloqueado',II:'bloqueado',III:'bloqueado',IV:'bloqueado'};
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ConfigSistema');
+  if (!sh || sh.getLastRow() < 2) return {anio:anioDefecto,bimestres:bloqueados,ts:0,configurada:false};
+  const rows = sh.getRange(2,1,sh.getLastRow()-1,3).getValues();
+  let best = null;
+  rows.forEach(function(row) {
+    if (String(row[0]) !== 'ASISTENCIA_PERIODOS') return;
+    const ts = Number(row[1]);
+    try {
+      const cfg = JSON.parse(String(row[2] || ''));
+      if (!Number.isSafeInteger(ts) || !cfg || !cfg.bimestres) return;
+      if (!best || ts > best.ts) best={anio:Number(cfg.anio),bimestres:cfg.bimestres,ts:ts,configurada:true};
+    } catch (err) {}
+  });
+  return best || {anio:anioDefecto,bimestres:bloqueados,ts:0,configurada:false};
+}
+function asistenciaAbierta_(cfg, anio, bimestre) {
+  return !!cfg && cfg.configurada && Number(cfg.anio) === Number(anio) &&
+    /^(I|II|III|IV)$/.test(String(bimestre)) &&
+    String(cfg.bimestres[bimestre] || 'bloqueado') === 'abierto';
+}
+function guardarAsistenciaPeriodos_(body) {
+  const lock=LockService.getScriptLock();lock.waitLock(30000);
+  try {
+    if (!validarToken_(body.token,'admin')) return {ok:false,code:'SESSION',error:'Solo Administración puede cambiar el cierre de asistencia.'};
+    const actual=obtenerAsistenciaPeriodos_(),cfg=body.periodos||{};
+    const anio=Number(cfg.anio),estados=['abierto','cerrado','bloqueado'];
+    if (!Number.isInteger(anio) || anio<2020 || anio>2100 || !cfg.bimestres ||
+      ['I','II','III','IV'].some(function(b){return estados.indexOf(cfg.bimestres[b])<0;}))
+      return {ok:false,code:'INVALID_PERIOD',error:'Año y estados de asistencia inválidos.'};
+    if (Number(body.version) !== actual.ts)
+      return {ok:false,code:'CONFLICT',error:'La configuración de asistencia cambió. Actualiza antes de guardar.',periodos:actual};
+    // Un cierre no borra datos ni afecta al cierre de calificaciones.
+    const ts=Math.max(Date.now(),actual.ts+1);
+    const guardado={anio:anio,bimestres:{I:cfg.bimestres.I,II:cfg.bimestres.II,III:cfg.bimestres.III,IV:cfg.bimestres.IV}};
+    asegurarConfig_().appendRow(['ASISTENCIA_PERIODOS',ts,JSON.stringify(guardado)]);
+    SpreadsheetApp.flush();
+    return {ok:true,periodos:Object.assign({},guardado,{ts:ts,configurada:true})};
+  } finally {lock.releaseLock();}
+}
+
 function asegurarAip_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName('AipPlan');
@@ -1558,7 +1603,7 @@ function doGet(e) {
     const rolesLectura = {
       loadreg: ['admin', 'docente'], loadnivel: ['admin', 'docente'], load: ['admin', 'docente'],
       loadtpl: ['admin'], loadtplstatus: ['admin', 'docente'],
-      loadasis: ['admin', 'auxiliar'], asisprotocol: ['admin', 'auxiliar'], loadaip: ['admin', 'pip'],
+      loadasis: ['admin', 'auxiliar'], loadasisperiodos: ['admin', 'auxiliar'], asisprotocol: ['admin', 'auxiliar'], loadaip: ['admin', 'pip'],
       loadwa: ['admin', 'auxiliar'], classroom: ['admin']
     };
     const roles = Object.prototype.hasOwnProperty.call(rolesLectura, action) ? rolesLectura[action] : null;
@@ -1572,7 +1617,8 @@ function doGet(e) {
     }
 
     // Verificación de compatibilidad autenticada y sin lectura de AsistenciaIngreso.
-    if (action === 'asisprotocol') return responder_({ok:true,protocoloAsistencia:1});
+    if (action === 'asisprotocol') return responder_({ok:true,protocoloAsistencia:2});
+    if (action === 'loadasisperiodos') return responder_({ok:true,periodos:obtenerAsistenciaPeriodos_()});
 
     if ((action === 'loadasis' || action === 'loadwa') && p.nivel && !autorizaNivelAuxiliar_(acceso.sesion,String(p.nivel))) return responder_({ok:false,error:'Nivel no autorizado.'});
 
@@ -1822,7 +1868,7 @@ function doPost(e) {
     const action = String(body.action || 'saveArea').toLowerCase();
     if (['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','confirmtransversaltutor','confirmtransversalaip','revisartransversal','procesartransversales','loadtransversalexport'].includes(action)) return responder_(transversalesRuta_(body));
 
-    if (['loadreg', 'loadnivel', 'load', 'loadasis', 'asisprotocol', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
+    if (['loadreg', 'loadnivel', 'load', 'loadasis', 'loadasisperiodos', 'asisprotocol', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
       return doGet({ parameter: body });
     }
 
@@ -1845,6 +1891,8 @@ function doPost(e) {
       if (!validarToken_(body.token,'admin')) return responder_({ok:false,error:'Sesión administrativa inválida.'});
       return responder_(action === 'loadauxiliares' ? respuestaAuxiliares_(obtenerAuxiliaresConfig_()) : guardarAuxiliar_(body));
     }
+
+    if (action === 'saveasisperiodos') return responder_(guardarAsistenciaPeriodos_(body));
 
     if (action === 'saveasis') {
       const sesion = sesionRutaEscritura_(body.token, ['admin', 'auxiliar']);
