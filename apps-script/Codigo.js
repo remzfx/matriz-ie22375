@@ -1584,7 +1584,8 @@ function doGet(e) {
       if (last >= 2) {
         const data = sh.getRange(2, 1, last - 1, 12).getValues();
         for (let i = 0; i < data.length; i++) {
-          if (fecha && String(data[i][1]) !== fecha) continue;
+          // Sheets puede devolver Date para filas históricas; comparar en la zona horaria del archivo.
+          if (fecha && valorAsistenciaIngreso_(data[i][1], 1) !== fecha) continue;
           const nivelItem = String(data[i][2]).toLowerCase();
           if (!autorizaNivelAuxiliar_(acceso.sesion,nivelItem) || (p.nivel && p.nivel !== nivelItem)) continue;
           items.push({
