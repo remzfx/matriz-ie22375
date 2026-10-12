@@ -641,7 +641,7 @@ function completarFaltasAlSubir() {
     if (!jornadaCerrada(al)) return;
     const k = asisKey(al);
     if (all[k] && all[k].marca) return;
-    all[k] = { marca: 'F', hora: horaAhora(), via: 'auto-falta', ts: Date.now() };
+    all[k] = { marca: 'F', hora: horaAhora(), via: 'auto-falta', ts: Date.now(), nombre: al.nombre };
     n++;
   });
   if (n) saveAsis(all);
