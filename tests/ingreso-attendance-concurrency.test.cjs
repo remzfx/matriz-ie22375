@@ -345,3 +345,23 @@ test('loadasis filters historic Sheets Date cells using the spreadsheet timezone
  assert.equal(s.state.writes,writes,'all date queries must remain read-only');
  assert.equal(sh.rows[1][1],legacyDate,'historical Date cells must not be migrated or rewritten');
 });
+
+test('Legacy archive is read-only, scoped to date and level, and never mixes with bimonthly records',()=>{
+ const s=backend(),sh=s.c.asegurarAsis_();
+ sh.appendRow(['2026-10-11||primaria||1||Única||Old Student','2026-10-11','primaria','1','Única','Old Student','F','08:30','manual',1,'']);
+ const fresh=s.save([s.item({marca:'P'})]);
+ assert.equal(fresh.ok,true,JSON.stringify(fresh));
+ const rows=clone(sh.rows),writes=s.state.writes;
+ const read=p=>JSON.parse(s.c.doGet({parameter:{action:'loadasis',token:s.admin,...p}}).text);
+ const old=read({historico:'1',nivel:'primaria',fecha:'2026-10-11'});
+ assert.equal(old.ok,true);assert.equal(old.historicoAnterior,true);
+ assert.deepEqual(old.items.map(x=>x.nombre),['Old Student']);
+ assert.equal(old.items[0].bimestre,'');assert.equal(old.items[0].idEstudiante,'');
+ assert.deepEqual(read({anio:'2026',bimestre:'III',fecha:'2026-10-11',nivel:'primaria'}).items.map(x=>x.nombre),['Synthetic Student']);
+ assert.equal(read({historico:'1',fecha:'2026-10-11'}).code,'INVALID_PERIOD');
+ assert.equal(read({historico:'1',nivel:'primaria'}).code,'INVALID_PERIOD');
+ assert.equal(read({historico:'1',nivel:'primaria',fecha:'2026-10-11',anio:'2026',bimestre:'III'}).code,'INVALID_PERIOD');
+ assert.equal(read({historico:'1',nivel:'secundaria',fecha:'2026-10-11'}).items.length,0);
+ assert.deepEqual(sh.rows,rows,'historical archive reads must not alter rows');
+ assert.equal(s.state.writes,writes,'archive reads must not write data');
+});
