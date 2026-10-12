@@ -9,6 +9,9 @@ function extract(name){
 }
 function fixture(nivel){
   const server=studentsFixture(),rows=server.tables.get('ConfigSistema').rows;
+  server.c.bimestreAbierto_=()=>true;
+  const roster=server.post({action:'seedstudentsroster',token:server.admin,version:server.init.version,bimestre:'III'});
+  assert.equal(roster.ok,true,'Synthetic III roster must be confirmed before auxiliary loading');
   rows.splice(rows.findIndex(r=>r[0]==='AUXILIAR_ACCESOS'),1);
   let version=0;
   const configure=()=>{
@@ -31,7 +34,7 @@ function fixture(nivel){
   run([...read('index.html').matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1]);context.mostrarHub=()=>{};
   run(read('students.js'));context.IEStudents=context.window.IEStudents;
   run(read('auxiliar-permissions.js'));context.IEAuxPermissions=context.window.IEAuxPermissions;
-  run("let BD=null,cargandoEstudiantesAux=false;const auxiliarInicio=performance.now(),WA_KEY='ie22375_wa_grupos_v1';function toast(){};function onNivel(){}");
+  run("let BD=null,cargandoEstudiantesAux=false;const auxiliarInicio=performance.now(),WA_KEY='ie22375_wa_grupos_v1';function toast(){};function onNivel(){};function bimestreAsistencia(){return 'III'};function mostrarEstadoAsistencia(){};async function verificarCierreAsistencia(){return true}");
   for(const name of ['hoyISO','medirAuxiliar','loadGruposWa','enviarGruposHoy','actualizarGradosGrupos','pintarBaseAuxiliar','retirarSesionAuxiliar','ensureBD'])run(extract(name));
   return {server,configure,context,run,el,stored,local,calls};
 }
@@ -59,7 +62,7 @@ test('Revocation rejects students, removes cached authorization and displays a p
 test('Successful auxiliary student loading finishes with a count and no retry',async()=>{
   const s=fixture('secundaria');await s.context.intentarLogin();await s.context.ensureBD();
   assert.ok(s.run('BD.secundaria.estudiantes.length')>0);
-  assert.match(s.el('studentsStatus').textContent,/estudiantes cargados/);
+  assert.match(s.el('studentsStatus').textContent,/estudiantes vigentes/);
   assert.equal(s.el('studentsRetry').hidden,true);
 });
 
@@ -75,7 +78,7 @@ for(const failure of ['pending WhatsApp','failed schedule'])test('Students rende
   s.run(html.slice(bootstrap,html.indexOf('</script>',bootstrap)));
   for(let i=0;i<40;i++)await Promise.resolve();
   assert.ok(painted>=2);assert.ok(s.run('BD.secundaria.estudiantes.length')>0);
-  assert.match(s.el('studentsStatus').textContent,/estudiantes cargados/);
+  assert.match(s.el('studentsStatus').textContent,/estudiantes vigentes/);
 });
 
 test('An HTTP 404 is a transport failure before login JSON parsing, not a denied account response',async()=>{
@@ -122,7 +125,7 @@ test('Network failure can recover with the retry button without reloading or los
   await assert.rejects(s.context.ensureBD());assert.match(s.el('studentsStatus').textContent,/reintentar/i);
   assert.equal(s.el('studentsRetry').hidden,false);assert.ok(s.context.getSession());
   s.context.fetch=network;await s.context.ensureBD();
-  assert.match(s.el('studentsStatus').textContent,/estudiantes cargados/);assert.equal(s.el('studentsRetry').hidden,true);
+  assert.match(s.el('studentsStatus').textContent,/estudiantes vigentes/);assert.equal(s.el('studentsRetry').hidden,true);
 });
 
 test('A late rejection for an old token cannot remove a newer login',async()=>{
