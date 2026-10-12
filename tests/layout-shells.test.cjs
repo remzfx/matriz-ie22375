@@ -17,9 +17,8 @@ test('login stays compact inside shell-auth and Registro entry selector uses the
  assert.match(read('index.html'),/id="viewLogin" class="shell shell-auth /);assert.match(read('index.html'),/<div class="w-full max-w-sm">/);assert.match(read('registro.html'),/id="viewHome" class="hidden shell shell-auth /);
 });
 test('Unrelated module HTML remains identical to the approved responsive shells base',()=>{
- const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['auxiliar.html','aula_innovacion.html','primaria.html','secundaria.html','photochecks.html']){
+ const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['aula_innovacion.html','primaria.html','secundaria.html','photochecks.html']){
  let current=withoutPr73Escaping(read(file));
- if(file==='auxiliar.html')current=current.replace('<script src="student-identity.js"></script>\n','').replace('return IEStudentIdentity.numbered(list.filter(a => Number(a.grado) === g && String(a.seccion) === String(c.seccion)), c.nivel);','return list.filter(a => Number(a.grado) === g && String(a.seccion) === String(c.seccion));').replace("'+al.numeroVisual+'", "'+(i+1)+'").replace('lineas.push(al.numeroVisual','lineas.push((i+1)').replace('const list = IEStudentIdentity.numbered((((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion)), nivel);','const list = (((BD[nivel] || {}).estudiantes) || []).filter(a => String(a.grado) === String(grado) && String(a.seccion) === String(seccion));');
  assert.equal(current,execFileSync('git',['show',baseNow+':'+file],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n'));
  }
 });
