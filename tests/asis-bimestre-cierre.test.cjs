@@ -115,7 +115,7 @@ test('Unmarked students remain unmarked until an explicit, confirmed classroom c
  assert.equal(records.get(students[0]).marca,'P');
  assert.equal(records.get(students[2]).marca,'J');
 });
- 
+
 test('Legacy archive shows escaped cloud and local-only v1 marks without mixing v2 keys',async()=>{
  const {runInNewContext}=require('node:vm'),src=read('auxiliar.html');
  const getFunction=name=>{
