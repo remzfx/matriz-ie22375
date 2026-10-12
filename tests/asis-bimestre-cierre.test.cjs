@@ -39,7 +39,7 @@ test('Bimonthly attendance validates verified roster; transferred students canno
  const wrong=f.save([f.item('Synthetic Transferred')]);
  assert.equal(wrong.code,'ROSTER_CONFLICT',JSON.stringify(wrong));assert.equal(f.s.tables.has('AsistenciaIngreso'),false);
  const valid=f.save([f.item()]);
- assert.equal(valid.ok,true);
+ assert.equal(valid.ok,true,JSON.stringify(valid));
  const current=f.load();
  assert.equal(current.ok,true);assert.equal(current.protocoloAsistencia,2);
  assert.equal(current.items.length,1);assert.equal(current.items[0].idEstudiante,'siagie:SIAGIE-1');
