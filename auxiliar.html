@@ -53,8 +53,6 @@
     }
     #asisAnio { min-height:44px; padding:.55rem .4rem; border:1.5px solid #e2e8f0; border-radius:10px;
       display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; color:#0f172a; }
-    .asis-scan-actions { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; }
-    .asis-scan-actions .btn { min-width:0; width:100%; line-height:1.2; }
     @media (max-width:440px) {
       .asis-fila-fecha, .asis-fila-aula { gap:5px; }
       .asis-fila-fecha { grid-template-columns:minmax(0,1.8fr) minmax(0,.7fr) minmax(0,.78fr); }
@@ -62,7 +60,6 @@
       .asis-field select, .asis-field input[type=date] { padding:.45rem .28rem; font-size:16px; }
       .asis-field label { font-size:10px; }
       #asisAnio { padding:.5rem .2rem; font-size:14px; }
-      .asis-scan-actions .btn { padding:.55rem .28rem; font-size:12px; }
     }
     #scanBox { display:none; }
     #scanBox.on { display:block; }
@@ -168,7 +165,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
   <div class="card p-3 space-y-3">
     <div id="scanBox" class="space-y-2">
       <div id="reader"></div>
-      <p class="text-[11px] text-slate-600 font-semibold" id="scanMsg" role="status">Apunta al photocheck. Para pruebas, usa «Probar lector QR».</p>
+      <p class="text-[11px] text-slate-600 font-semibold" id="scanMsg" role="status">Enfoca un photocheck. Si la asistencia está cerrada, solo se comprobará su lectura.</p>
       <label class="btn btn-ghost w-full" style="display:block;text-align:center">
         Leer QR desde foto
         <input id="inpFotoQR" type="file" accept="image/*" capture="environment" hidden onchange="leerFotoQR(this)">
@@ -221,10 +218,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       <p class="text-[11px] text-slate-500">P: presente, T: tardanza, F: falta, J: justificada. Los días sin ningún registro confirmado no se grafican. Datos oficiales del padrón seleccionado.</p>
     </section>
     <div class="actions">
-      <div class="asis-scan-actions">
-        <button type="button" class="btn btn-primary" onclick="toggleScan()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>Escanear QR</button>
-        <button type="button" class="btn btn-down" onclick="toggleScan(true)">Probar lector QR (sin registrar)</button>
-      </div>
+      <button type="button" class="btn btn-primary" onclick="toggleScan()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>Escanear QR</button>
       <button type="button" class="btn btn-ok" onclick="marcarTodos('P')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>Todos presente</button>
       <button type="button" class="btn btn-warn" onclick="cerrarAsistenciaAula()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Cerrar asistencia del aula</button>
       <button type="button" class="btn btn-wa" onclick="compartirWhatsApp()"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.7-1.2A9 9 0 1 0 12 3zm5 12.2c-.2.6-1.2 1.1-1.6 1.1-.4 0-.9.2-3.1-.7-2.6-1.1-4.2-3.7-4.3-3.9-.1-.2-1-1.3-1-2.5s.6-1.8.9-2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5.2.6.8 2 .8 2.1.1.1 0 .3-.1.4l-.4.5c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.5-.6c.1-.2.3-.1.5-.1l2 .9c.2.1.4.2.4.3 0 .2 0 .8-.2 1.1z"/></svg>WhatsApp este salón</button>
@@ -1332,115 +1326,109 @@ function marcarPorQR(text) {
     return;
   }
   const marca = marcaPorHora(al);
-  setRec(al, marca, 'qr');
+  if(setRec(al, marca, 'qr')===false)return;
   renderLista();
   pitido();
   try { if (navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch(e) {}
   const etq = marca === 'T' ? 'TARDANZA' : 'PRESENTE';
-  toast(etq + ' · ' + (al.nivel==='secundaria'?'SEC':'PRI') + ' ' + al.grado + '° ' + al.seccion + ' · ' + al.nombre.split(',')[0] + ' · ' + horaAhora());
-  subirUnoNube(al);
+  toast(etq + ' · ' + (al.nivel==='secundaria'?'SEC':'PRI') + ' ' + al.grado + '° ' + al.seccion + ' · ' + al.nombre.split(',')[0] + ' · ' + horaAhora()+' · Pendiente de Subir asistencia');
 }
 
-// Modo diagnóstico: confirma decodificación y coincidencia en el padrón SIN llamar
-// a setRec(), subirUnoNube() ni escribir datos, incluso con asistencia cerrada.
+// Un solo botón: en bimestre abierto, QR marca únicamente en almacenamiento local.
+// Si el periodo está cerrado o sin verificar, permite reconocer códigos sin grabar datos.
 function resultadoPruebaQR(text) {
  const msg=document.getElementById('scanMsg');
  const p=parseQR(text);
  if(!/^IE22375\|/i.test(String(text||'').trim())||!p.nombre||!p.grado||!p.nivel) {
-  msg.textContent='Cámara: QR detectado, pero no es un photocheck IE 22375. Sin registrar.';
+  msg.textContent='QR detectado, pero no pertenece a los photochecks IE 22375. No se guardó ni se subió asistencia.';
   return false;
  }
  const hit=hallarAlumno(p);
  msg.textContent=hit.al?
-  'Prueba correcta: QR leído y estudiante localizado en el padrón '+bimestreAsistencia()+'. NO se registró asistencia.':
-  'Prueba correcta: la cámara leyó el QR de IE 22375, pero ese estudiante no está en el padrón cargado. NO se registró asistencia.';
+  'QR leído: estudiante localizado en el padrón '+bimestreAsistencia()+'. Solo lectura: no se guardó ni se subió asistencia.':
+  'QR leído de IE 22375, pero ese estudiante no figura en el padrón actual. Solo lectura: no se guardó ni se subió asistencia.';
  return true;
 }
-function onDecoded(text, modoDeLectura=scanModoPrueba) {
+let scanSoloLectura = false;
+function onDecoded(text, soloLectura=scanSoloLectura) {
  const now=Date.now();
  if(text===lastScanText&&now-lastScanAt<1800)return;
  lastScanText=text;lastScanAt=now;
- if(modoDeLectura===true){resultadoPruebaQR(text);return;}
+ if(soloLectura||!asistenciaEscribible()){resultadoPruebaQR(text);return;}
  marcarPorQR(text);
 }
-async function toggleScan(modoPrueba=false) {
- if(!modoPrueba&&!asistenciaEscribible()) {
-  toast('Asistencia cerrada o sin verificar. Usa «Probar lector QR» para revisar la cámara sin registrar.');
-  return false;
- }
+async function toggleScan() {
  const box=document.getElementById('scanBox');
  if(box.classList.contains('on')){stopScan();return false;}
- scanModoPrueba=modoPrueba===true;
+ // Fijar el modo para toda esta sesión evita que un lector abierto en solo lectura
+ // registre marcas si el servidor confirma el bimestre mientras la cámara funciona.
+ scanSoloLectura=!asistenciaEscribible();
+ const soloLectura=scanSoloLectura;
  const intento=++scanIntento;
  lastScanText='';lastScanAt=0;
  box.classList.add('on');
  try{box.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}
  const msg=document.getElementById('scanMsg');
  if(!window.isSecureContext) {
-  msg.textContent='La cámara necesita una página HTTPS segura. No funciona desde una vista previa local HTTP o archivo. Abre el módulo publicado mediante HTTPS.';
-  box.classList.remove('on');scanModoPrueba=false;
+  msg.textContent='La cámara necesita HTTPS. Abre el módulo desde un sitio seguro.';
+  box.classList.remove('on');scanSoloLectura=false;
   return false;
  }
  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia) {
-  msg.textContent='Este navegador no ofrece acceso a la cámara. En iPhone, abre el sitio HTTPS directamente en Safari y autoriza Cámara.';
-  box.classList.remove('on');scanModoPrueba=false;
+  msg.textContent='Sin acceso a cámara. En iPhone abre Safari en HTTPS y permite Cámara.';
+  box.classList.remove('on');scanSoloLectura=false;
   return false;
  }
  if(typeof Html5Qrcode==='undefined'){
-  msg.textContent='No se cargó el lector QR de la página. Comprueba internet y vuelve a abrir el módulo.';
-  box.classList.remove('on');scanModoPrueba=false;
+  msg.textContent='No se cargó el lector QR. Revisa internet y recarga.';
+  box.classList.remove('on');scanSoloLectura=false;
   return false;
  }
- if(!scanModoPrueba)prepararAudio();
- msg.textContent=scanModoPrueba?'Modo prueba: abriendo cámara, NO se guardará asistencia…':'Abriendo cámara trasera…';
+ if(!soloLectura)prepararAudio();
+ msg.textContent=soloLectura?
+  'Abriendo cámara en solo lectura: reconocerá QR, sin marcar ni guardar asistencia…':
+  'Abriendo cámara: las marcas quedarán en este dispositivo hasta pulsar «Subir asistencia»…';
  let lector=null;
  const opciones={fps:10,qrbox:function(vw,vh){
   const s=Math.max(80,Math.min(280,Math.floor(Math.min(vw,vh)*.78)));
   const ajustado=Math.min(s,Math.floor(vw)-8,Math.floor(vh)-8);
-  const lado=Math.max(1,ajustado);
-  return {width:lado,height:lado};
+  return {width:Math.max(1,ajustado),height:Math.max(1,ajustado)};
  }};
  try{
   lector=new Html5Qrcode('reader');
   html5Qr=lector;
-  // iOS: dar preferencia al facingMode trasero; la enumeración previa puede
-  // seleccionar una lente inadecuada antes de conceder permisos.
+  const onLectura=function(texto){
+   if(intento===scanIntento)onDecoded(texto,soloLectura);
+  };
   try{
-   await lector.start({facingMode:'environment'},opciones,function(texto){
-    if(intento===scanIntento)onDecoded(texto,modoPrueba===true);
-   },function(){});
+   await lector.start({facingMode:'environment'},opciones,onLectura,function(){});
   }catch(primerError){
    if(intento!==scanIntento)return false;
    const cameras=await Html5Qrcode.getCameras();
    if(!cameras||!cameras.length)throw primerError;
    const back=cameras.find(c=>/back|rear|environment|trasera|posterior/i.test(c.label||''));
-   const id=(back||cameras[cameras.length-1]).id;
-   await lector.start(id,opciones,function(texto){
-    if(intento===scanIntento)onDecoded(texto,modoPrueba===true);
-   },function(){});
+   await lector.start((back||cameras[cameras.length-1]).id,opciones,onLectura,function(){});
   }
   if(intento!==scanIntento){
    try{await lector.stop();}catch(e){}
    try{lector.clear();}catch(e){}
    return false;
   }
-  msg.textContent=scanModoPrueba?
-   'Cámara activa en MODO PRUEBA. Apunta a un QR IE 22375 mostrado en otra pantalla o impreso. Ninguna asistencia será guardada.':
-   'Cámara activa. Centra el QR en el recuadro; se registrará asistencia solo si el bimestre está abierto.';
+  msg.textContent=soloLectura?
+   'Cámara activa · Solo lectura por cierre o falta de verificación. Puedes comprobar los QR sin guardar datos.':
+   'Cámara activa · Escanea para marcar localmente. Usa «Subir asistencia» cuando decidas sincronizar.';
   return true;
  }catch(e){
   if(intento!==scanIntento)return false;
-  msg.textContent='No se pudo iniciar la cámara. En iPhone: Safari → aA/Ajustes del sitio web → Cámara → Permitir. '+
-   (e&&e.message?e.message:'Prueba desde HTTPS.');
+  msg.textContent='No se pudo iniciar la cámara. En iPhone comprueba permisos de Safari. '+(e&&e.message?e.message:'');
   if(html5Qr===lector){html5Qr=null;try{if(lector)lector.clear();}catch(err){}}
-  box.classList.remove('on');
-  scanModoPrueba=false;
+  box.classList.remove('on');scanSoloLectura=false;
   return false;
  }
 }
 function stopScan(){
  scanIntento++;
- scanModoPrueba=false;
+ scanSoloLectura=false;
  document.getElementById('scanBox').classList.remove('on');
  const lector=html5Qr;html5Qr=null;
  if(lector){
