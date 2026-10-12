@@ -763,10 +763,11 @@ async function subirTodoNube() {
     toast('Asistencia cerrada o sin confirmar. No se subieron marcas.');return false;
   }
   if (!IEAuxPermissions.permite(document.getElementById('selNivel').value)) { toast('Nivel no autorizado.'); return false; }
-  const faltas = completarFaltasAlSubir();
-  if (faltas) renderLista();
+  // La subida confirma exclusivamente marcas existentes en la fecha visible.
+  // «Sin registrar» no implica falta: generar F de forma silenciosa sería incorrecto.
+  const fecha=document.getElementById('inpFecha').value||hoyISO();
   const all = loadAsis();
-  const prefijo=anioAsistencia()+'||'+bimestreAsistencia()+'||';
+  const prefijo=anioAsistencia()+'||'+bimestreAsistencia()+'||'+fecha+'||';
   const pendientes=Object.keys(all).filter(k=>k.startsWith(prefijo)&&all[k]&&pendienteMarcaAsistencia(all[k]));
   const items=pendientes.map(k=>recToItem(k,all[k])).filter(it=>it.marca && it.nombre && IEAuxPermissions.permite(it.nivel));
   if (!items.length) {toast('Asistencia al día: no hay marcas pendientes para subir.');return;}
