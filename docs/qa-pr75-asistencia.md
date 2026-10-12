@@ -4,7 +4,7 @@
 
 ## Reglas innegociables
 
-- El propietario del sistema efectúa cualquier despliegue o fusión desde GitHub/Apps Script y da la autorización expresa.
+- El propietario autoriza expresamente el merge (lo ejecuta ChatGPT) y efectúa personalmente cualquier despliegue desde GitHub/Apps Script.
 - No alterar la implementación pública de Apps Script, ni la hoja oficial, ni el sitio publicado para ejecutar estas pruebas.
 - Probar con una copia privada de Google Sheets y un proyecto/implementación Apps Script de prueba vinculado exclusivamente a esa copia.
 - Las páginas de prueba `admin.html` y `auxiliar.html` deben apuntar a la URL de la **implementación de prueba**; el código fuente normalmente apunta a producción. No visitar una página de prueba que aún use `CLOUD_API_URL` de producción para experimentar con escrituras.
@@ -45,22 +45,22 @@
 
 1. Confirmar que **Fecha | Año lectivo | Bimestre** estén en la misma fila y **Nivel | Grado | Sección** en la siguiente, sin desplazamiento horizontal ni recortes.
 2. Probar Safari/iPhone y Chrome/Android a aproximadamente 360–390 px de ancho, además de escritorio. La tipografía de los selectores conserva tamaño 16 px para evitar zoom automático al tocar campos.
-3. Verificar que **Escanear QR** y **Probar lector QR (sin registrar)** se vean uno al lado del otro, por encima de la lista de estudiantes.
-4. Comprobar en modo prueba la cámara con un QR del aula, de otra aula autorizada y uno ficticio. No deben cambiar ni los botones P/F/T/J, ni el historial local, ni la nube.
-5. Cerrar la cámara mientras todavía hay decodificaciones pendientes y volver a abrir en modo normal: las lecturas pendientes de la sesión de prueba se ignoran.
+3. Verificar que solo aparezca **Escanear QR**, encima de la lista de estudiantes, con «Subir asistencia» como acción separada.
+4. Con el bimestre cerrado o sin verificar, usar «Escanear QR» para comprobar un código del aula, de otra aula autorizada y uno ficticio: debe reconocer sin modificar ni historial local ni nube. Con el bimestre abierto, debe marcar localmente pero sin subir a la nube hasta «Subir asistencia».
+5. Cerrar la cámara mientras todavía hay decodificaciones pendientes y volver a abrir en modo de escritura: las lecturas pendientes de la sesión previa se ignoran.
 6. Si **Año lectivo** muestra «—» y **Cierre sin verificar: solo lectura**, verificar la API `loadasisperiodos` del proyecto Apps Script de **prueba**. No desbloquear escrituras manualmente ni modificar producción.
 
-## Prueba segura del lector QR en iPhone (sin registrar)
+## Prueba segura del lector QR en iPhone (un único botón)
 
 **No probar con datos escolares en producción antes de una autorización.** Realizarla en una implementación aislada, o después de una publicación expresamente aprobada.
 
 1. Abre Safari en iPhone, navega al sitio HTTPS de prueba y entra al módulo Asistencia con una cuenta autorizada. La app Cámara nativa no registra asistencia: este QR tiene formato de texto escolar.
 2. Muestra el photocheck QR en otra pantalla o impreso. No puede leerse con la cámara un QR que esté en la misma pantalla del iPhone.
-3. Pulsa «Probar lector QR (sin registrar)», concede permiso de cámara y espera «Cámara activa en MODO PRUEBA».
-4. Enfoca el QR a 15–25 cm. El mensaje «Prueba correcta» confirma que se leyó; un QR de alumno ficticio también se decodifica, pero no coincide con el padrón.
-5. Comprueba que los conteos y registros locales/de nube siguen iguales. En modo prueba no se llama a setRec ni subirUnoNube.
+3. Pulsa «Escanear QR» y permite la cámara. Si la asistencia está cerrada o sin verificar, el lector entra automáticamente en «Solo lectura», sin guardar datos.
+4. Enfoca el QR a 15–25 cm. El mensaje «QR leído» confirma el reconocimiento; un QR ficticio se decodifica pero no coincide con el padrón.
+5. En solo lectura, comprueba que los conteos y los registros locales/de nube no cambian. En bimestre abierto, el escáner marca solamente en el dispositivo; «Subir asistencia» es la única acción que sincroniza.
 6. Si no carga el lector, verifica internet (la librería de lectura aún depende de Html5Qrcode externo). Si hay problemas de permisos, revísalos en Safari/Ajustes. Si la página no es HTTPS, no se puede solicitar la cámara.
-7. Cierra la cámara. El botón «Escanear QR» sin la palabra Probar SÍ registra asistencia si el bimestre está abierto: no usarlo para diagnóstico con datos reales.
+7. Cierra la cámara. Si el periodo está abierto, NO utilices estudiantes reales para una prueba de grabación sin autorización: sus marcas sí quedan guardadas localmente, aunque no se envían automáticamente.
 
 Las pruebas automáticas solo comprueban el código; hace falta validar físicamente Safari/iPhone en un sitio seguro.
 ## Criterios para solicitar aprobación final
@@ -69,4 +69,4 @@ Las pruebas automáticas solo comprueban el código; hace falta validar físicam
 2. Los 24 escenarios de integración anteriores se verifican en copia con evidencia mínima sin datos personales.
 3. Los padrones por bimestre consultados se verifican contra su fuente oficial.
 4. Se dispone de respaldo independiente de Sheets y del Apps Script actual.
-5. El propietario autoriza explícitamente la secuencia y ejecuta los despliegues. Hasta entonces, PR en borrador, sin fusión y sin despliegue.
+5. El propietario autoriza explícitamente el merge, ChatGPT lo ejecuta y el propietario realiza exclusivamente los despliegues. Hasta entonces, PR en borrador, sin fusión y sin despliegue.
