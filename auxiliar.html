@@ -24,7 +24,7 @@
     .btn-down { background:#e0f2fe; color:#075985; border:1px solid #7dd3fc; }
     .btn-up { background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; }
     .btn-danger { background:#fee2e2; color:#991b1b; }
-    select, input[type=date], input[type=search] {
+    select, input[type=date], input[type=month], input[type=search] {
       width:100%; border:1.5px solid #cbd5e1; border-radius:12px; padding:.65rem .75rem; font-size:16px; min-height:48px; background:#fff;
       max-width:100%; box-sizing:border-box;
     }
@@ -45,6 +45,17 @@
     .row { padding:.55rem 0; border-bottom:1px solid #f1f5f9; }
     #scanBox { display:none; }
     #scanBox.on { display:block; }
+    .asis-kpi { padding:.6rem .4rem; border:1px solid #e2e8f0; border-radius:12px; text-align:center; background:#f8fafc; }
+    .asis-kpi strong { display:block; font-size:1.4rem; font-weight:900; font-variant-numeric:tabular-nums; }
+    .asis-kpi span { display:block; font-size:.65rem; font-weight:800; line-height:1.2; }
+    .asis-chart { display:flex; gap:9px; overflow-x:auto; padding:8px 2px 12px; align-items:flex-end; min-height:190px; }
+    .asis-chart-col { flex:0 0 32px; text-align:center; font-size:11px; font-weight:800; }
+    .asis-chart-bar { display:flex; flex-direction:column-reverse; height:145px; width:28px; background:#e2e8f0; border-radius:5px 5px 0 0; overflow:hidden; margin:0 auto 5px; }
+    .asis-chart-bar span { flex-shrink:0; display:block; }
+    .asis-P { background:#15803d; }.asis-F { background:#dc2626; }.asis-T { background:#d97706; }
+    .asis-J { background:#4f46e5; }.asis-S { background:#cbd5e1; }
+    .asis-legend { display:inline-flex; align-items:center; gap:4px; font-size:11px; }
+    .asis-legend i { width:9px; height:9px; border-radius:2px; display:inline-block; }
     #reader { width:100%; min-height:240px; background:#000; border-radius:12px; overflow:hidden; }
     #reader video, #reader canvas, #reader img {
       width:100% !important; max-height:280px !important; object-fit:cover !important;
@@ -107,14 +118,14 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
     </div>
     <div>
       <label class="text-[10px] font-bold text-slate-500">Fecha</label>
-      <input type="date" id="inpFecha" onchange="invalidarArchivoAsistencia();renderLista()">
+      <input type="date" id="inpFecha" onchange="invalidarArchivoAsistencia();invalidarEstadisticasAsistencia();renderLista();actualizarEstadisticaDia()">
     </div>
     <div class="grid grid-cols-2 gap-2"><div><label class="text-[10px] font-bold text-slate-500">Año lectivo</label><div id="asisAnio" class="p-3 border rounded-xl font-bold">—</div></div><div><label class="text-[10px] font-bold text-slate-500">Bimestre</label><select id="selBimestre" onchange="cambiarBimestreAsistencia()"><option>I</option><option>II</option><option selected>III</option><option>IV</option></select></div></div>
     <p id="asisEstado" class="text-sm font-bold text-amber-700" role="status">Verificando cierre de asistencia…</p>
     <div>
       <label class="text-[10px] font-bold text-slate-500">Nivel</label>
       <span id="selNivelScope" hidden></span>
-      <select id="selNivel" onchange="invalidarArchivoAsistencia();onNivel()">
+      <select id="selNivel" onchange="invalidarArchivoAsistencia();invalidarEstadisticasAsistencia();onNivel();actualizarEstadisticaDia()">
         <option value="primaria">Primaria</option>
         <option value="secundaria">Secundaria</option>
       </select>
@@ -130,6 +141,29 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
       </div>
     </div>
     <input type="search" id="inpBuscar" placeholder="Buscar alumno…" oninput="renderLista()">
+    <div class="card border border-sky-100 p-3 space-y-2" id="asisResumenDiario">
+      <div class="flex justify-between items-center gap-2">
+        <h2 class="font-black text-sm">Estadística del día</h2>
+        <button type="button" class="btn btn-down text-xs" onclick="actualizarEstadisticaDia()">Actualizar</button>
+      </div>
+      <p id="asisDiaEstado" role="status" class="text-xs text-slate-600">Esperando padrón y servidor…</p>
+      <div id="asisDiaDetalle" class="text-xs font-bold text-slate-600"></div>
+      <div id="asisDiaKPIs" class="grid grid-cols-3 gap-1"></div>
+      <p class="text-[11px] text-slate-500">Solo marcas confirmadas en la nube. Sin registrar no significa falta.</p>
+      <button type="button" id="asisStatsBoton" class="btn btn-primary w-full"
+        aria-expanded="false" aria-controls="asisStatsPanel" onclick="verEstadisticasAsistencia()">Ver estadísticas por fechas</button>
+    </div>
+    <section id="asisStatsPanel" class="card p-3 space-y-3" hidden aria-label="Estadísticas mensuales de asistencia">
+      <h2 class="font-black text-base">Estadísticas de asistencia por bimestre</h2>
+      <label class="block text-xs font-bold text-slate-600" for="asisStatsMes">Mes de consulta</label>
+      <input id="asisStatsMes" type="month" onchange="cargarEstadisticasMensuales()">
+      <p id="asisStatsEstado" class="text-xs text-slate-600" role="status"></p>
+      <p id="asisStatsInfo" class="text-sm font-bold"></p>
+      <div id="asisStatsLeyenda" class="flex flex-wrap gap-2"></div>
+      <div id="asisStatsGrafico" role="img" aria-label="Gráfico de asistencia por días"></div>
+      <div id="asisStatsTabla" class="overflow-x-auto"></div>
+      <p class="text-[11px] text-slate-500">P: presente, T: tardanza, F: falta, J: justificada. Los días sin ningún registro confirmado no se grafican. Datos oficiales del padrón seleccionado.</p>
+    </section>
     <div class="actions">
       <button type="button" class="btn btn-primary" onclick="toggleScan()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>Escanear QR</button>
       <button type="button" class="btn btn-ok" onclick="marcarTodos('P')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>Todos presente</button>
@@ -341,7 +375,7 @@ async function verificarCierreAsistencia(){
  }catch(e){configAsistencia=null;asistenciaVerificada=false;mostrarEstadoAsistencia();return false;}
 }
 async function cambiarBimestreAsistencia(){
- invalidarArchivoAsistencia();BD=IEStudents.empty();document.getElementById('lista').innerHTML='';mostrarEstadoAsistencia();
+ invalidarEstadisticasAsistencia();invalidarArchivoAsistencia();BD=IEStudents.empty();document.getElementById('lista').innerHTML='';mostrarEstadoAsistencia();
  return ensureBD();
 }
 function loadBD() { return IEStudents.empty(); }
@@ -414,7 +448,8 @@ async function ensureBD(){
   medirAuxiliar('studentsResponseMs',inicio);pintarBaseAuxiliar(base);
   const total=IEAuxPermissions.niveles().reduce((n,nivel)=>n+BD[nivel].estudiantes.length,0);
   estado.textContent='Padrón '+bim+' · '+total+' estudiantes vigentes.'+(base.offline?' Lista temporal sin conexión.':'');
-  retry.hidden=!base.offline;return true;
+  retry.hidden=!base.offline;
+  if(typeof actualizarEstadisticaDia==='function')actualizarEstadisticaDia();return true;
   } catch(e){
   if(serial!==ensureBD.serial)return false;
   const cacheSeguro=e.retryable&&token===IEStudents.validToken()&&IEStudents.peekRoster(bim);
@@ -571,6 +606,7 @@ function confirmarSubidaAsistencia(data, enviados, token) {
     if (!pendienteMarcaAsistencia(actual)) delete actual.remoto;
   });
   saveAsis(all);
+  if((aceptadas||repetidas)&&typeof actualizarEstadisticaDia==='function')actualizarEstadisticaDia();
   const sinConfirmar=enviados.length-aceptadas-repetidas-conflictos;
   toast('Asistencia: '+aceptadas+' aceptadas · '+repetidas+' repetidas · '+conflictos+' conflictos'+(sinConfirmar?' · '+sinConfirmar+' sin confirmar':'')+
     (conflictos?' — Baja asistencia y revisa; se conservan tus marcas locales.':''));
@@ -690,6 +726,7 @@ async function bajarNube() {
     if (!data.ok) throw new Error(data.error || 'Error');
     combinarBajadaAsistencia(data,snapshot);
     renderLista();
+    if(typeof actualizarEstadisticaDia==='function')actualizarEstadisticaDia();
   } catch(e) { toast('No se pudo bajar. Actualiza el Apps Script.'); }
 }
 
