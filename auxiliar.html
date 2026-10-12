@@ -122,7 +122,7 @@
    desde la hoja ficticia IE22375_PR74_PRUEBAS. */
 (function(){
 'use strict';
-const QA_API="https://script.google.com/macros/s/AKfycbxvWf_eODGES6nCJiIw9sKW8tLux8z2nY0vlyshzZR8vDLi5UmGTJHTLBV1wQJHV1Ng/exec";
+const QA_API="https://script.google.com/macros/s/AKfycbxvWf_eODGES6nCJiIw9sKW8tLux8V8z2nY0vlyshzZR8vDLi5UmGTJHTLBV1wQJHV1Ng/exec";
 const permitidas=new Set(['loadstudents','loadasisperiodos','asisprotocol','loadasisstats','loadasis','loadwa','loadhorario','ping']);
 const original=window.fetch.bind(window);
 window.fetch=function(target,opciones){
@@ -322,7 +322,7 @@ window.__IE_NEED_ROLES=['admin','auxiliar'];
 
 <script>
 const ASIS_KEY = 'ie22375_pr75qa_asistencia_colegio_v1';
-const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxvWf_eODGES6nCJiIw9sKW8tLux8z2nY0vlyshzZR8vDLi5UmGTJHTLBV1wQJHV1Ng/exec';
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxvWf_eODGES6nCJiIw9sKW8tLux8V8z2nY0vlyshzZR8vDLi5UmGTJHTLBV1wQJHV1Ng/exec';
 function fetchLecturaNube(url) {
   const params = new URLSearchParams(url.slice(url.indexOf('?') + 1));
   const body = {};
