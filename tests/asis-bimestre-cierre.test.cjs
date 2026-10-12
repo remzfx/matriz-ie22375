@@ -41,7 +41,7 @@ test('Bimonthly attendance validates verified roster; transferred students canno
  const valid=f.save([f.item()]);
  assert.equal(valid.ok,true,JSON.stringify(valid));
  const current=f.load();
- assert.equal(current.ok,true);assert.equal(current.protocoloAsistencia,2);
+ assert.equal(current.ok,true,JSON.stringify(current));assert.equal(current.protocoloAsistencia,2);
  assert.equal(current.items.length,1);assert.equal(current.items[0].idEstudiante,'siagie:SIAGIE-1');
  assert.equal(current.items[0].bimestre,'III');assert.equal(Number(current.items[0].anio),2026);
 });
