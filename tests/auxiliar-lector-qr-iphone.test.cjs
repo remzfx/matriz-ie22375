@@ -154,7 +154,7 @@ test('Scanner UI has one scan button, no diagnostic button, and explicit separat
  const form=html.slice(html.indexOf('<main id="vistaAsis"'),html.indexOf('</main>'));
  assert.equal((form.match(/onclick="toggleScan\(\)"/g)||[]).length,1);
  assert.doesNotMatch(form,/onclick="toggleScan\(true\)"|Probar lector QR/);
- assert.match(form,/onclick="subirTodoNube\(\)"/);
+ assert.match(html.slice(html.indexOf('<footer id="asisResumenDiario"')),/onclick="subirTodoNube\(\)"/);
  assert.match(html,/No se guardó|no se guardó ni se subió asistencia/);
  assert.match(html,/function onDecoded\(text, soloLectura=scanSoloLectura\)/);
  assert.match(html,/facingMode:'environment'/);

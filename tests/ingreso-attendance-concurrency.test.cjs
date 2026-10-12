@@ -150,12 +150,12 @@ test('Revoked preflight session retires authorization but leaves assistance unch
 });
 test('Academic attendance is unchanged; Auxiliar preserves approved base styles beyond compact form and statistics',()=>{
  const original=file=>execFileSync('git',['show','d3fee52033c2c0b7244d00d52e9a5ae0799ed30f:'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
- assert.equal(read('registro.html').replace(/\r\n/g,'\n'),original('registro.html'));
+ for(const name of ['renderAsistencia','asisSet','asisGet','getAsisFechas']) {const code=x=>{const i=x.indexOf('function '+name+'(');assert.ok(i>=0);return x.slice(i,x.indexOf('\n}',i)+2);};assert.equal(code(read('registro.html').replace(/\r\n/g,'\n')),code(original('registro.html')));}
  const old=original('auxiliar.html'),now=read('auxiliar.html').replace(/\r\n/g,'\n');
  const estilos=html=>[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]);
  const limpiado=estilos(now).map(css=>css
   .replace('select, input[type=date], input[type=month], input[type=search]', 'select, input[type=date], input[type=search]')
-  .replace(/    \/\* Formulario compacto[\s\S]*?(?=    #scanBox \{)/,'')
+  .replace(/    \/\* (?:Formulario compacto|Selección compacta)[\s\S]*?(?=    #scanBox \{)/,'')
   .replace(/    \.asis-kpi[\s\S]*?(?=    #reader \{)/,''));
  assert.deepEqual(limpiado,estilos(old),'Los estilos originales fuera del módulo estadístico no deben cambiar');
 });

@@ -95,9 +95,9 @@ test('Compact cross CSS isolates desktop/mobile sizes and retains fixed grade/co
  assert.equal(handler(html),handler(old));
 });
 
-test('Dark compact square changes CSS only; removal markup, inline behavior and layout stay identical',()=>{
+test('Dark compact square retains removal markup, behavior and fixed grade/conclusion layout',()=>{
  const html=read('registro.html'),old=require('node:child_process').execFileSync('git',['show','48f909b5e962d7cc4e5d268fb93a1f13fef0b17d:registro.html'],{encoding:'utf8',maxBuffer:4*1024*1024});
- const withoutCrossStyles=x=>x.replace(/\.final-grade \.fin-clear-direct[^{}]*\{[^}]*\}/g,'').replace(/  \.fin-grid td\.summary-competence\{[^}]*\}\r?\n/g,'').replaceAll('<td class="summary-competence">','<td>').replace(/\r\n/g,'\n');const academicStyles=x=>x.slice(x.indexOf('<style>'),x.indexOf('.asis-chip'));assert.equal(withoutCrossStyles(academicStyles(html)),withoutCrossStyles(academicStyles(old)));const finalMarkup=x=>x.slice(x.indexOf('function renderFinales()'),x.indexOf('\n}',x.indexOf('function renderFinales()'))+2);assert.equal(withoutPr73Escaping(finalMarkup(html)+'\n').trimEnd(),finalMarkup(old));
+ const withoutCrossStyles=x=>x.replace(/\.final-grade \.fin-clear-direct[^{}]*\{[^}]*\}/g,'').replace(/  \.fin-grid td\.summary-competence\{[^}]*\}\r?\n/g,'').replaceAll('<td class="summary-competence">','<td>').replace(/\r\n/g,'\n');const academicStyles=x=>x.slice(x.indexOf('<style>'),x.indexOf('.asis-chip'));assert.equal(withoutCrossStyles(academicStyles(html).replace(/  \/\* Solo Promedios:[\s\S]*?(?=  \.fin-grid \{)/,'')),withoutCrossStyles(academicStyles(old)));const finalMarkup=x=>x.slice(x.indexOf('function renderFinales()'),x.indexOf('\n}',x.indexOf('function renderFinales()'))+2);const removal=x=>x.slice(x.indexOf("box.querySelectorAll('[data-quitar-directo]')"),x.indexOf("box.querySelectorAll('[data-trabajada]')")).trim();assert.equal(removal(html),removal(old));
  const css=html.match(/\.final-grade \.fin-clear-direct\{[^}]*\}/)[0];assert.match(css,/align-items:center;justify-content:center;align-self:center/);assert.match(css,/margin:2px 0 0;padding:0/);assert.doesNotMatch(css,/#fff1f2|#be123c|50%/);
  assert.match(html,/fin-clear-direct:hover\{background:#334155;border-color:#334155/);assert.match(html,/fin-clear-direct:focus-visible\{outline:2px solid #334155;outline-offset:2px/);
 });
