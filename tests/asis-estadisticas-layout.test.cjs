@@ -104,14 +104,14 @@ test('Attendance form displays Fecha Año Bimestre on same row and Nivel Grado S
  assert.match(source,/\.asis-field select, \.asis-field input\[type=date\]\s*\{/);
  for(const id of [...firstIds,...secondIds])assert.equal((source.match(new RegExp('id="'+id+'"','g'))||[]).length,1);
 });
-test('QR real and safe scanner buttons share compact action row above the student list',()=>{
+test('Single QR button stays above roster; upload remains a separate deliberate action',()=>{
  const form=source.slice(source.indexOf('<main id="vistaAsis"'),source.indexOf('<div id="lista"'));
- assert.match(form,/class="asis-scan-actions"/);
- assert.match(form,/onclick="toggleScan\(\)"/);
- assert.match(form,/onclick="toggleScan\(true\)">Probar lector QR \(sin registrar\)/);
- assert.ok(form.indexOf('class="asis-scan-actions"')<form.indexOf('id="lista"')||form.includes('class="asis-scan-actions"'));
- assert.match(source,/\.asis-scan-actions\s*\{\s*display:grid;\s*grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
- assert.match(preview,/class="cols cols-aula"/);
- assert.match(preview,/Probar lector QR \(sin registrar\)/);
+ assert.equal((form.match(/onclick="toggleScan\(\)"/g)||[]).length,1);
+ assert.match(form,/Escanear QR/);
+ assert.doesNotMatch(form,/Probar lector QR|onclick="toggleScan\(true\)"/);
+ assert.match(form,/onclick="subirTodoNube\(\)"/);
+ assert.ok(form.indexOf('onclick="toggleScan()"')<form.indexOf('onclick="subirTodoNube()"'));
+ assert.match(preview,/>Escanear QR<\/button>/);
+ assert.doesNotMatch(preview,/Probar lector QR/);
  assert.doesNotMatch(preview,/getUserMedia|Html5Qrcode/,'Offline preview must remain visual-only');
 });
