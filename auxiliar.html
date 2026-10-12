@@ -743,21 +743,6 @@ async function subirUnoNube(al) {
     confirmarSubidaAsistencia(JSON.parse(await res.text()),items,token);
   } catch(e) {toast('No se confirmó la subida. Las marcas locales se conservan.');}
 }
-function completarFaltasAlSubir() {
-  const fecha = document.getElementById('inpFecha').value || hoyISO();
-  if (fecha !== hoyISO()||!asistenciaEscribible()) return 0;
-  const all = loadAsis();
-  let n = 0;
-  todosAlumnos().forEach(al => {
-    if (!jornadaCerrada(al)) return;
-    const k = asisKey(al);
-    if (all[k] && all[k].marca) return;
-    all[k] = { marca: 'F', hora: horaAhora(), via: 'auto-falta', ts: Date.now(), nombre: al.nombre };
-    n++;
-  });
-  if (n) saveAsis(all);
-  return n;
-}
 async function subirTodoNube() {
   if (!await verificarCierreAsistencia() || !asistenciaEscribible()) {
     toast('Asistencia cerrada o sin confirmar. No se subieron marcas.');return false;
