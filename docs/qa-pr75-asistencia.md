@@ -41,6 +41,15 @@
 | 23. QR e impresión | Abrir `preview-photochecks-pr75.html` local y después probar el módulo con alumnos ficticios en copia | QR visible, compatible con lector Auxiliar, diseño institucional y A4 dos por fila, opción Guardar como PDF |
 | 24. Cambiar bimestre | Generar carnet de muestra en III, cambiar a IV y esperar respuesta de copia | Se limpia la vista y no se imprime un carnet de III atribuido a IV |
 
+## Comprobación visual del formulario compacto (Android, iPhone y escritorio)
+
+1. Confirmar que **Fecha | Año lectivo | Bimestre** estén en la misma fila y **Nivel | Grado | Sección** en la siguiente, sin desplazamiento horizontal ni recortes.
+2. Probar Safari/iPhone y Chrome/Android a aproximadamente 360–390 px de ancho, además de escritorio. La tipografía de los selectores conserva tamaño 16 px para evitar zoom automático al tocar campos.
+3. Verificar que **Escanear QR** y **Probar lector QR (sin registrar)** se vean uno al lado del otro, por encima de la lista de estudiantes.
+4. Comprobar en modo prueba la cámara con un QR del aula, de otra aula autorizada y uno ficticio. No deben cambiar ni los botones P/F/T/J, ni el historial local, ni la nube.
+5. Cerrar la cámara mientras todavía hay decodificaciones pendientes y volver a abrir en modo normal: las lecturas pendientes de la sesión de prueba se ignoran.
+6. Si **Año lectivo** muestra «—» y **Cierre sin verificar: solo lectura**, verificar la API `loadasisperiodos` del proyecto Apps Script de **prueba**. No desbloquear escrituras manualmente ni modificar producción.
+
 ## Prueba segura del lector QR en iPhone (sin registrar)
 
 **No probar con datos escolares en producción antes de una autorización.** Realizarla en una implementación aislada, o después de una publicación expresamente aprobada.
