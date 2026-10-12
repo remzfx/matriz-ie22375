@@ -730,6 +730,131 @@ async function bajarNube() {
   } catch(e) { toast('No se pudo bajar. Actualiza el Apps Script.'); }
 }
 
+// Estadísticas oficiales: lectura agregada, nunca transforma ausencia de marca en falta.
+let estadisticaDiaSerial=0,estadisticaMesSerial=0;
+function invalidarEstadisticasAsistencia() {
+ estadisticaDiaSerial++;estadisticaMesSerial++;
+ const estado=document.getElementById('asisDiaEstado'),kpis=document.getElementById('asisDiaKPIs');
+ if(estado)estado.textContent='Selecciona fecha, nivel y bimestre para consultar la nube.';
+ if(kpis)kpis.innerHTML='';
+ const detalle=document.getElementById('asisDiaDetalle');if(detalle)detalle.textContent='';
+ const panel=document.getElementById('asisStatsPanel');if(panel)panel.hidden=true;
+ const boton=document.getElementById('asisStatsBoton');if(boton)boton.setAttribute('aria-expanded','false');
+}
+function estadisticaParams(tipo) {
+ const nivel=document.getElementById('selNivel').value,bimestre=bimestreAsistencia(),anio=anioAsistencia();
+ if(!IEAuxPermissions.permite(nivel)||!anio||!['I','II','III','IV'].includes(bimestre))return null;
+ const fecha=document.getElementById('inpFecha').value||hoyISO();
+ const mes=document.getElementById('asisStatsMes').value;
+ const periodo=tipo==='mes'?'mes='+encodeURIComponent(mes):'fecha='+encodeURIComponent(fecha);
+ return '?action=loadasisstats&nivel='+encodeURIComponent(nivel)+'&anio='+encodeURIComponent(anio)+
+  '&bimestre='+encodeURIComponent(bimestre)+'&'+periodo;
+}
+function kpiAsistencia(nombre,valor,clase) {
+ const n=Math.max(0,Number(valor)||0);
+ return '<div class="asis-kpi"><strong class="'+clase+'">'+n+'</strong><span>'+nombre+'</span></div>';
+}
+async function actualizarEstadisticaDia() {
+ const estado=document.getElementById('asisDiaEstado'),kpis=document.getElementById('asisDiaKPIs');
+ const detalle=document.getElementById('asisDiaDetalle');
+ const serial=++estadisticaDiaSerial,query=estadisticaParams('fecha'),token=tokenSesionAuxiliar();
+ if(!query){estado.textContent='Padrón o sesión aún sin verificar.';kpis.innerHTML='';detalle.textContent='';return false;}
+ estado.textContent='Consultando asistencia confirmada del día…';
+ try {
+  const r=await fetchLecturaNube(CLOUD_API_URL+query),data=JSON.parse(await r.text());
+  if(serial!==estadisticaDiaSerial||token!==tokenSesionAuxiliar())return false;
+  if(!data.ok||data.protocoloAsistencia!==2||data.origen!=='nube')throw Error(data.error||'Servidor de estadísticas aún no disponible.');
+  const d=data.dias&&data.dias[0],total=Math.max(0,Number(data.totalEstudiantes)||0);
+  if(!d)throw Error('No se recibió el resumen del día.');
+  const sum=['P','F','T','J','sinMarca'].reduce((n,k)=>n+(Number(d[k])||0),0);
+  if(sum!==total)throw Error('Los conteos no coinciden con el padrón. No se mostrarán cifras incorrectas.');
+  detalle.textContent=(data.nivel==='primaria'?'Primaria':'Secundaria')+' · '+data.bimestre+' bimestre · '+data.fecha+
+   ' · Padrón: '+total+' estudiantes';
+  kpis.innerHTML=kpiAsistencia('Presentes',d.P,'text-green-700')+
+   kpiAsistencia('Faltas',d.F,'text-red-700')+
+   kpiAsistencia('Tardanzas',d.T,'text-amber-700')+
+   kpiAsistencia('Justificadas',d.J,'text-indigo-700')+
+   kpiAsistencia('Sin registrar',d.sinMarca,'text-slate-600');
+  estado.textContent=d.registrados+' marcas confirmadas en la nube'+
+   (d.duplicados?' · '+d.duplicados+' duplicados en revisión (sin contabilizar)':'')+'.';
+  return true;
+ } catch(e) {
+  if(serial!==estadisticaDiaSerial)return false;
+  estado.textContent='Estadística no disponible: '+e.message;
+  kpis.innerHTML='';detalle.textContent='';return false;
+ }
+}
+function verEstadisticasAsistencia() {
+ const panel=document.getElementById('asisStatsPanel'),boton=document.getElementById('asisStatsBoton');
+ panel.hidden=!panel.hidden;
+ boton.setAttribute('aria-expanded',String(!panel.hidden));
+ if(panel.hidden){estadisticaMesSerial++;return;}
+ const mes=document.getElementById('asisStatsMes');
+ if(!mes.value)mes.value=(document.getElementById('inpFecha').value||hoyISO()).slice(0,7);
+ cargarEstadisticasMensuales();
+}
+function pintarMesAsistencia(data) {
+ const meses=['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+ const total=Math.max(0,Number(data.totalEstudiantes)||0);
+ const titulo=(data.nivel==='primaria'?'Primaria':'Secundaria')+' · '+data.bimestre+' BIMESTRE · '+
+  meses[Number(data.mes.slice(5,7))-1]+' '+data.anio+' · '+total+' estudiantes';
+ const dias=Array.isArray(data.dias)?data.dias:[];
+ document.getElementById('asisStatsInfo').textContent=titulo;
+ const campos=[['P','Presentes'],['F','Faltas'],['T','Tardanzas'],['J','Justificadas'],['S','Sin registrar']];
+ document.getElementById('asisStatsLeyenda').innerHTML=campos.map(([clave,nombre])=>
+  '<span class="asis-legend"><i class="asis-'+clave+'"></i>'+nombre+'</span>').join('');
+ if(!dias.length) {
+  document.getElementById('asisStatsGrafico').innerHTML=
+   '<p class="text-sm text-slate-500 p-4">No hay días con marcas confirmadas en este mes.</p>';
+  document.getElementById('asisStatsTabla').innerHTML='';
+  return;
+ }
+ const num=(d,k)=>Math.max(0,Number(d[k])||0);
+ const componentes=(d)=>[['P',num(d,'P')],['T',num(d,'T')],['F',num(d,'F')],
+  ['J',num(d,'J')],['S',num(d,'sinMarca')]];
+ const html=dias.map(d=>{
+  const sum=componentes(d).reduce((n,x)=>n+x[1],0);
+  if(sum!==total)throw Error('Los conteos del día '+String(d.fecha)+' no corresponden al padrón.');
+  const texto=String(d.fecha).slice(-2);
+  const titulo='Día '+texto+': '+componentes(d).map(x=>x[0]+' '+x[1]).join(', ');
+  return '<div class="asis-chart-col" title="'+escapeAuxiliar(titulo)+'">'+
+   '<div class="asis-chart-bar" aria-hidden="true">'+componentes(d).map(([k,v])=>
+    '<span class="asis-'+k+'" style="height:'+(total?(100*v/total).toFixed(3):0)+'%"></span>').join('')+
+   '</div><span>'+escapeAuxiliar(texto)+'</span></div>';
+ }).join('');
+ document.getElementById('asisStatsGrafico').innerHTML='<div class="asis-chart" aria-label="Gráfico de barras apiladas de asistencia">'+html+'</div>';
+ const filas=dias.map(d=>'<tr class="border-b"><td class="px-2 py-2 font-bold">'+escapeAuxiliar(String(d.fecha).slice(-2))+
+  '</td>'+['P','F','T','J','sinMarca'].map(k=>'<td class="px-2 py-2 text-right">'+num(d,k)+'</td>').join('')+'</tr>').join('');
+ document.getElementById('asisStatsTabla').innerHTML=
+  '<table class="w-full min-w-[440px] text-xs text-left"><thead><tr class="bg-slate-100">'+
+  ['Día','Presentes','Faltas','Tardanzas','Justificadas','Sin registrar'].map(s=>
+   '<th scope="col" class="px-2 py-2">'+s+'</th>').join('')+'</tr></thead><tbody>'+filas+'</tbody></table>';
+}
+async function cargarEstadisticasMensuales() {
+ const serial=++estadisticaMesSerial,estado=document.getElementById('asisStatsEstado');
+ const query=estadisticaParams('mes'),token=tokenSesionAuxiliar();
+ if(!query||!document.getElementById('asisStatsMes').value) {
+  estado.textContent='Selecciona un mes válido y comprueba la sesión.';return false;
+ }
+ estado.textContent='Consultando estadísticas por fechas…';
+ document.getElementById('asisStatsTabla').innerHTML='';
+ document.getElementById('asisStatsGrafico').innerHTML='';
+ try {
+  const r=await fetchLecturaNube(CLOUD_API_URL+query),data=JSON.parse(await r.text());
+  if(serial!==estadisticaMesSerial||token!==tokenSesionAuxiliar()||
+     document.getElementById('asisStatsPanel').hidden)return false;
+  if(!data.ok||data.protocoloAsistencia!==2||data.origen!=='nube')throw Error(data.error||'Sin respuesta confirmada del servidor.');
+  pintarMesAsistencia(data);
+  const repetidos=(data.dias||[]).reduce((n,d)=>n+(Number(d.duplicados)||0),0);
+  estado.textContent=(data.dias||[]).length+' días con marcas confirmadas'+
+   (repetidos?' · '+repetidos+' registros duplicados en revisión':'')+'.';
+  return true;
+ } catch(e) {
+  if(serial!==estadisticaMesSerial)return false;
+  estado.textContent='No se pudieron cargar las estadísticas: '+e.message;return false;
+ }
+}
+
 function invalidarArchivoAsistencia() {
  consultarHistorialAnterior.serial=(consultarHistorialAnterior.serial||0)+1;
  const estado=document.getElementById('asisLegadoEstado'),lista=document.getElementById('asisLegadoLista');
