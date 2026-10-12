@@ -41,6 +41,19 @@
 | 23. QR e impresión | Abrir `preview-photochecks-pr75.html` local y después probar el módulo con alumnos ficticios en copia | QR visible, compatible con lector Auxiliar, diseño institucional y A4 dos por fila, opción Guardar como PDF |
 | 24. Cambiar bimestre | Generar carnet de muestra en III, cambiar a IV y esperar respuesta de copia | Se limpia la vista y no se imprime un carnet de III atribuido a IV |
 
+## Prueba segura del lector QR en iPhone (sin registrar)
+
+**No probar con datos escolares en producción antes de una autorización.** Realizarla en una implementación aislada, o después de una publicación expresamente aprobada.
+
+1. Abre Safari en iPhone, navega al sitio HTTPS de prueba y entra al módulo Asistencia con una cuenta autorizada. La app Cámara nativa no registra asistencia: este QR tiene formato de texto escolar.
+2. Muestra el photocheck QR en otra pantalla o impreso. No puede leerse con la cámara un QR que esté en la misma pantalla del iPhone.
+3. Pulsa «Probar lector QR (sin registrar)», concede permiso de cámara y espera «Cámara activa en MODO PRUEBA».
+4. Enfoca el QR a 15–25 cm. El mensaje «Prueba correcta» confirma que se leyó; un QR de alumno ficticio también se decodifica, pero no coincide con el padrón.
+5. Comprueba que los conteos y registros locales/de nube siguen iguales. En modo prueba no se llama a setRec ni subirUnoNube.
+6. Si no carga el lector, verifica internet (la librería de lectura aún depende de Html5Qrcode externo). Si hay problemas de permisos, revísalos en Safari/Ajustes. Si la página no es HTTPS, no se puede solicitar la cámara.
+7. Cierra la cámara. El botón «Escanear QR» sin la palabra Probar SÍ registra asistencia si el bimestre está abierto: no usarlo para diagnóstico con datos reales.
+
+Las pruebas automáticas solo comprueban el código; hace falta validar físicamente Safari/iPhone en un sitio seguro.
 ## Criterios para solicitar aprobación final
 
 1. La CI del último commit del PR pasa sin errores.
