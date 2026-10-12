@@ -36,10 +36,15 @@
 | 19. Permisos estadísticos | Auxiliar de Primaria intenta consultar estadísticas de Secundaria | Se rechaza la consulta; API devuelve solo agregados, nunca nombres o códigos de estudiantes |
 | 20. Integridad y anomalías | Duplicar deliberadamente una fila de prueba y consultar | No cuenta dos veces a un estudiante; presenta aviso de duplicados para revisión |
 
+| 21. Photochecks usa padrón III | Seleccionar III en Photochecks en la copia y comparar con la lista de Asistencia | Ambos muestran los mismos estudiantes vigentes de ese bimestre; ningún traslado entra desde BASE_ACTUAL |
+| 22. Padrón no confirmado | Simular fallo del servidor, caché offline y bimestre sin PADRON confirmado | Generar aula, generar nivel e imprimir quedan bloqueados; no se reutilizan carnets anteriores |
+| 23. QR e impresión | Abrir `preview-photochecks-pr75.html` local y después probar el módulo con alumnos ficticios en copia | QR visible, compatible con lector Auxiliar, diseño institucional y A4 dos por fila, opción Guardar como PDF |
+| 24. Cambiar bimestre | Generar carnet de muestra en III, cambiar a IV y esperar respuesta de copia | Se limpia la vista y no se imprime un carnet de III atribuido a IV |
+
 ## Criterios para solicitar aprobación final
 
 1. La CI del último commit del PR pasa sin errores.
-2. Los 20 escenarios de integración anteriores se verifican en copia con evidencia mínima sin datos personales.
+2. Los 24 escenarios de integración anteriores se verifican en copia con evidencia mínima sin datos personales.
 3. Los padrones por bimestre consultados se verifican contra su fuente oficial.
 4. Se dispone de respaldo independiente de Sheets y del Apps Script actual.
 5. El propietario autoriza explícitamente la secuencia y ejecuta los despliegues. Hasta entonces, PR en borrador, sin fusión y sin despliegue.
