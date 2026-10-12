@@ -4,9 +4,22 @@ const {setup}=new Function('require','__dirname',read('tests/backend-remaining-w
 const {extract}=new Function('require','__dirname',read('tests/students-client.test.cjs').split('function fixture')[0]+'\nreturn {extract};')(require,__dirname);
 function backend(){
  const s=setup(),stamp=Date.now()-10000;
- const item=extra=>({fecha:'2026-10-11',nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Student',marca:'P',hora:'08:00',via:'manual',motivo:'',ts:stamp,...extra});
+ // Synthetic bimonthly enrollment and an independently open attendance period:
+ // CAS tests exercise concurrency, not the roster/configuration persistence tested elsewhere.
+ s.c.obtenerAsistenciaPeriodos_=()=>({anio:2026,configurada:true,ts:1,bimestres:{I:'cerrado',II:'cerrado',III:'abierto',IV:'bloqueado'}});
+ s.c.hojaEstudiantes_=()=>({});
+ s.c.leerPadronEstudiantes_=()=>({estudiantes:[
+  {nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Student',idSiagie:'PRIMARY'},
+  {nivel:'primaria',grado:1,seccion:'Única',nombre:'Synthetic Other',idSiagie:'OTHER'}
+ ]});
+ const item=extra=>{
+  const nombre=extra?.nombre||'Synthetic Student';
+  const idEstudiante=nombre==='Synthetic Other'?'siagie:OTHER':'siagie:PRIMARY';
+  return {anio:2026,bimestre:'III',idEstudiante,fecha:'2026-10-11',nivel:'primaria',
+   grado:1,seccion:'Única',nombre,marca:'P',hora:'08:00',via:'manual',motivo:'',ts:stamp,...extra};
+ };
  const save=items=>s.post({action:'saveasis',token:s.admin,items});
- const load=()=>JSON.parse(s.c.doGet({parameter:{action:'loadasis',token:s.admin}}).text);
+ const load=()=>JSON.parse(s.c.doGet({parameter:{action:'loadasis',token:s.admin,anio:2026,bimestre:'III'}}).text);
  return {...s,item,save,load,stamp};
 }
 for(const [fresh,stale] of [['P','F'],['F','P']])test('Server CAS keeps newer '+fresh+' over older '+stale+' even with a forged newer clock',()=>{
