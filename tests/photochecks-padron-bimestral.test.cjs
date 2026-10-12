@@ -140,3 +140,16 @@ test('Local QR library and print stylesheet are included with attribution',()=>{
  assert.match(html,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)!important/);
  assert.match(html,/Imprimir \/ Guardar PDF/);
 });
+
+test('Carnet and independent preview both use the real 192px school crest from the repository',()=>{
+ const img=fs.readFileSync(path.join(__dirname,'..','icon-192.png'));
+ assert.equal(img.subarray(0,8).toString('hex'),'89504e470d0a1a0a','Official logo must be a valid PNG asset');
+ assert.equal(img.readUInt32BE(16),192);
+ assert.equal(img.readUInt32BE(20),192);
+ const preview=fs.readFileSync(path.join(__dirname,'..','preview-photochecks-pr75.html'),'utf8');
+ for(const html of [fs.readFileSync(path.join(__dirname,'..','photochecks.html'),'utf8'),preview]){
+  assert.match(html,/<img class="badge-emblem" src="icon-192\.png" alt="Insignia oficial de la I\.E\. 22375"/);
+  assert.match(html,/\.badge-emblem \{ width:14mm; height:14mm; /);
+  assert.doesNotMatch(html,/<div class="badge-emblem"[^>]*>22375/,'Do not regress to the placeholder badge');
+ }
+});
