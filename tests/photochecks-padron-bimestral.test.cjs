@@ -153,3 +153,14 @@ test('Carnet and independent preview both use the real 192px school crest from t
   assert.doesNotMatch(html,/<div class="badge-emblem"[^>]*>22375/,'Do not regress to the placeholder badge');
  }
 });
+
+test('Photocheck and preview show only year; bimestre stays only in selector and roster validation',async()=>{
+ const s=mockFixture();s.setRoster(s.data(1,2));assert.equal(await s.run('ensureBD()'),true);
+ const card=s.run('cardHtml(BD.primaria.estudiantes[0],0)');
+ assert.match(card,/>Año \d{4}<\/div>/);
+ assert.doesNotMatch(card,/III bimestre|bimestre<\/div>/i);
+ const preview=fs.readFileSync(path.join(__dirname,'..','preview-photochecks-pr75.html'),'utf8');
+ assert.match(preview,/<div class="badge-period">Año 2026<\/div>/);
+ assert.doesNotMatch(preview,/<div class="badge-period">[^<]*bimestre/i);
+ assert.match(html,/IEStudents\.loadRoster\(bim\)/);
+});
