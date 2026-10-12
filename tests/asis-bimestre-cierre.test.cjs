@@ -102,3 +102,34 @@ test('Auto-completed absences preserve the name required by attendance protocol 
  assert.equal(stored[key].marca,'F');
  assert.equal(stored[key].nombre,'Synthetic Automatic Student');
 });
+
+test('Legacy archive viewer escapes names and never writes or assigns a bimestre',async()=>{
+ const {runInNewContext}=require('node:vm'),src=read('auxiliar.html');
+ const start=src.indexOf('async function consultarHistorialAnterior() {'),end=src.indexOf('\n}',start)+2;
+ assert.ok(start>=0&&end>start);
+ const escapeFn=src.match(/^function escapeAuxiliar\(value\).*$/m)?.[0];
+ assert.ok(escapeFn);
+ const els={
+  selNivel:{value:'primaria'},inpFecha:{value:'2026-10-11'},
+  asisLegadoEstado:{textContent:''},asisLegadoLista:{innerHTML:''}
+ };
+ const requests=[],ctx={
+  document:{getElementById:id=>els[id]},IEAuxPermissions:{permite:n=>n==='primaria'},
+  CLOUD_API_URL:'https://synthetic.invalid',hoyISO:()=> '2026-10-11',
+  tokenSesionAuxiliar:()=> 'synthetic-token',rechazarSesionAsistencia:()=>{},
+  fetchLecturaNube:async url=>{
+   requests.push(url);
+   return {text:async()=>JSON.stringify({ok:true,protocoloAsistencia:2,historicoAnterior:true,items:[
+    {nombre:'<img src=x onerror=alert(1)>',grado:1,seccion:'Única',marca:'P',hora:'08:00'}
+   ]})};
+  }
+ };
+ const success=await runInNewContext(escapeFn+'\n'+src.slice(start,end)+'\nconsultarHistorialAnterior()',ctx);
+ assert.equal(success,true);
+ assert.equal(requests.length,1);
+ assert.match(requests[0],/historico=1/);
+ assert.doesNotMatch(requests[0],/bimestre=/);
+ assert.match(els.asisLegadoLista.innerHTML,/&lt;img src=x onerror=alert\(1\)&gt;/);
+ assert.doesNotMatch(els.asisLegadoLista.innerHTML,/<img/);
+ assert.match(els.asisLegadoEstado.textContent,/sin bimestre asignado/);
+});
