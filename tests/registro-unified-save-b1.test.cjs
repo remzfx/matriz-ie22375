@@ -1,6 +1,10 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{execFileSync}=require('node:child_process');
 const root=path.join(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8'),html=read('registro.html'),base='bd86c257bb2c70c1577df38e4eb64deae6bbaa49',old=execFileSync('git',['show',base+':registro.html'],{encoding:'utf8',maxBuffer:4000000}),clone=x=>JSON.parse(JSON.stringify(x));
 function extract(n,s=html){const m=new RegExp('^(?:async )?function '+n+'\\(','m').exec(s);assert.ok(m,n);return s.slice(m.index,s.indexOf('\n}',m.index)+2);}
+test('Historical snapshot normalization restores original functions for both LF and Windows CRLF sources',()=>{
+ const normalize=require('./a1-snapshot.cjs'),reference=execFileSync('git',['show','2806f4d19afdfc7f5e9967c1a4e04b138088eed0:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'),lf=html.replace(/\r\n/g,'\n');
+ for(const source of [lf,lf.replace(/\n/g,'\r\n')]){const restored=normalize(source);for(const name of ['subirRegistroNube','bajarRegistroNube','prepararVersionAcademica'])assert.equal(extract(name,restored),extract(name,reference));assert.doesNotMatch(restored,/function confirmarRegistroConciliado\(/);}
+});
 function fixture(){
  const els=new Map(),el=id=>{if(!els.has(id))els.set(id,{value:id==='selBim'?'III':'',hidden:true,dataset:{},classList:{contains:()=>false}});return els.get(id);};
  let disk,saves=0,sends=0;const messages=[],fields={cal:[],final:[],conclusion:[]};
