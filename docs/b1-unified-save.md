@@ -43,4 +43,4 @@ Prueba manual mínima en copia aislada con estudiantes ficticios: Guardar desde 
 
 Reversión: revertir el commit B1 del PR, sin eliminar store ni academicSync ni aportes históricos. No requiere desplegar backend ni tocar datos. No hacer merge/deploy sin autorización expresa.
 
-Suite final: 1758 aprobadas, 0 fallidas, 0 omitidas. Sintaxis/dependencias: 81 JS/GS, 28 scripts inline y 54 referencias locales. git diff --check correcto.
+Suite final: 1758 aprobadas, 0 fallidas, 0 omitidas. Sintaxis/dependencias: 83 JS/GS, 28 scripts inline y 54 referencias locales. git diff --check correcto.
