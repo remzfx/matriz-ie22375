@@ -47,4 +47,4 @@ Revisión visual realizada en PC 1280×900 y móvil 390×844: EPT (1), Arte y Cu
 
 No merge ni deploy sin autorización expresa.
 
-Validación local final: 1827 pruebas aprobadas, 0 fallidas/omitidas. Sintaxis: 91 JS/GS y 28 scripts inline. Dependencias locales: 67. git diff --check correcto.
+Validación local final: 1825 pruebas aprobadas, 0 fallidas/omitidas. Sintaxis: 91 JS/GS y 28 scripts inline. Dependencias locales: 67. git diff --check correcto.
