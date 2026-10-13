@@ -285,6 +285,11 @@ for(const [file,name,helper,role,action] of [
     context.IEStudents.validToken=()=>token;
     new vm.Script(clientFunction(file,'cargarGruposWaAuxiliar')).runInContext(context);
   }
+  if(name==='bajarRegistroNube'){
+    context.registroSoloLectura=()=>true;context.cloudClaveReg=()=>[level,'I',1,'Única','Comunicación'].join('||');context.prefijoReg=()=>context.cloudClaveReg()+'||';context.asisCtxKey=()=>[level,'I',1,'Única'].join('||');context.sliceRegistroArea=()=>({});context.estudiantes=()=>[];context.aliasesAula=()=>({});context.retirarVerificacionNube=()=>{};
+    context.document.getElementById=()=>({classList:{contains:()=>false}});
+    vm.runInContext(fs.readFileSync(path.join(__dirname,'..','registro-academic-model.js'),'utf8'),context);context.IERegistroAcademico=context.window.IERegistroAcademico;require('./reconcile-fixture.cjs').core(context);
+  }
   if(helper)new vm.Script(clientFunction(file,helper)).runInContext(context);
   new vm.Script(clientFunction(file,'fetchLecturaNube')).runInContext(context);
   new vm.Script(clientFunction(file,name)).runInContext(context);

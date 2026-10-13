@@ -246,6 +246,7 @@ for (const [file, name, action] of [
       context.sliceRegistroArea=()=>({meta:{docente:'Forged Name'},finales});
     }
     if(name==='subirRegistroNube')Object.assign(context,{IERegistroAcademico:{canonical:JSON.stringify},baselineAcademica:()=>({version:0,baseline:'not-synchronized'}),prepararVersionAcademica:async()=>true,informeSiagie:()=>({ok:true}),saveStore:()=>{},dirtyAcademico:()=>{}});
+    if(name==='subirRegistroNube')require('./reconcile-fixture.cjs').mockUpload(context,context.baselineAcademica());
     if (admin) new vm.Script(clientFunction(file, 'tokenSesionAdmin')).runInContext(context);
     new vm.Script(clientFunction(file, name)).runInContext(context);
     await context[name](secondary ? 'Matemática' : 'Comunicación');
