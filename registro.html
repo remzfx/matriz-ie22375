@@ -400,7 +400,6 @@
           </div>
         </header>
         <div id="finLista" class="fin-wrap fin-scroll-body"></div>
-        <button type="button" class="btn btn-primary w-full text-sm" data-reg-write onclick="guardarRegistroIntegrado(true)">Guardar promedios</button>
       </div>
     </div>
 
@@ -418,7 +417,6 @@
             <input type="date" id="inpAsisFecha">
           </div>
           <button type="button" class="btn btn-primary text-sm" data-reg-write onclick="agregarFechaAsis()">Agregar fecha</button>
-          <button type="button" class="btn btn-ghost text-sm" data-reg-write onclick="guardarAsistencia(); toast('Asistencia guardada')">Guardar</button>
           <button type="button" class="btn btn-ghost text-sm" onclick="compartirAsisWhatsApp()">WhatsApp</button>
         </div>
         <div>
@@ -446,7 +444,7 @@
         <button type="button" class="btn btn-ghost no-print" onclick="imprimirResumen()">Imprimir Resumen / PDF</button><div id="avanceBox"></div>
         <div class="mt-3 space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
           <div class="text-sm font-black text-slate-700">Cierre de área</div>
-          <p class="text-[11px] text-slate-500">Usted solo <b>Guarda</b> y usa <b>Nube Subir</b>. El director vacía al SIAGIE desde Admin cuando el aula esté completa.</p>
+          <p class="text-[11px] text-slate-500">Usted solo <b>Guarda</b> y usa <b>Subir Nube</b>. El director vacía al SIAGIE desde Admin cuando el aula esté completa.</p>
           <button type="button" class="btn btn-ghost w-full text-sm" onclick="procesarSiagie()">Revisar si falta algo en mi área</button>
         </div>
       </div>
@@ -519,9 +517,9 @@
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
       <div class="grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex">
-        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="subirRegistroNube()">Nube Subir</button>
-        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#0284c7;color:#fff" onclick="bajarRegistroNube()">Nube Bajar</button>
-        <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" data-reg-write onclick="guardarRegistroIntegrado(false)">Guardar</button>
+        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="subirRegistroNube()">Subir Nube</button>
+        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#0284c7;color:#fff" onclick="bajarRegistroNube()">Bajar Nube</button>
+        <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" data-reg-write onclick="guardarRegistroIntegrado()">Guardar</button>
       </div>
     </div>
   </div>
@@ -1589,12 +1587,22 @@ function esCompetenciaTransversal(comp){return !!claveCompetenciaTransversal(com
 function competenciasParaEvaluar(){
   return competencias().concat(typeof IERegistroTransversales!=='undefined'&&IERegistroTransversales.eligible()?Object.values(IERegistroEvaluacion.COMP):[]);
 }
-async function guardarRegistroIntegrado(finales){
+async function guardarRegistroIntegrado(){
   if(document.getElementById('registroTutorPanel')?.hidden===false){toast('Guarda la decisión desde el módulo del Tutor.');return false;}
-  if(finales){if(guardarFinales()===false)return false;}else if(guardarTodo()===false)return false;
-  const ok=typeof IERegistroTransversales==='undefined'||await IERegistroTransversales.save();
-  if(ok)toast('Guardado local'+(nivel==='secundaria'?' y aportes pendientes sincronizados':''));
-  return ok;
+  if(registroSoloLectura()||bimCerradoDocente())return false;
+  const invalidas=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>{if(inp.dataset?.registroContexto&&inp.dataset.registroContexto!==cloudClaveReg())return false;const root=inp.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return false;return !inp.readOnly&&inp.value!==''&&(!Number.isFinite(Number(inp.value))||Number(inp.value)<0||Number(inp.value)>20);});
+  if(invalidas){toast('Hay notas inválidas. Corrige los valores antes de guardar; el borrador se conserva.');return false;}
+  const key=cloudClaveReg(),token=(getLoginSession()||{}).token;
+  const adapter=typeof IERegistroTransversales==='undefined'?null:IERegistroTransversales;
+  if(adapter)adapter.capture();
+  const aporte=adapter&&adapter.current(),pendiente=!!(aporte&&aporte.dirty);
+  if(guardarTodo()===false)return false;
+  try{
+    const ok=!adapter||await adapter.save();
+    if(key!==cloudClaveReg()||token!==(getLoginSession()||{}).token)return false;
+    toast(ok?'Registro guardado en este dispositivo.'+(pendiente?' Aportes transversales enviados a la nube.':''):'Registro guardado en este dispositivo. Aporte transversal pendiente; conserva esta pestaña y reintenta.');
+    return ok;
+  }catch(e){toast('Registro guardado en este dispositivo. No se confirmó el aporte transversal; conserva esta pestaña y reintenta.');return false;}
 }
 
 function renderAreas() {
@@ -1777,10 +1785,11 @@ function activarSesion() {
 }
 
 function recolectarPantalla() {
-  document.querySelectorAll(".academic-conclusion").forEach(el=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value));
+  document.querySelectorAll(".academic-conclusion").forEach(el=>{const root=el.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return;setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value);});
   if (registroSoloLectura()) return false;
-  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+  try { const active=document.activeElement,root=active?.closest?.('#finLista');if(active&&active.blur&&(!active.dataset?.registroContexto||active.dataset.registroContexto===cloudClaveReg())&&(!root?.dataset?.registroContexto||root.dataset.registroContexto===cloudClaveReg()))active.blur(); } catch (e) {}
   document.querySelectorAll('.cal-nota').forEach(inp => {
+    if (inp.dataset.registroContexto && inp.dataset.registroContexto !== cloudClaveReg()) return;
     if (inp.readOnly) return;
     const nombre = decodeURIComponent(inp.dataset.nom || '');
     const cap = decodeURIComponent(inp.dataset.cap || '');
@@ -1798,6 +1807,7 @@ function recolectarPantalla() {
     else store.grades[k] = { nota20: n, nivel: numToLetter(n), origen:'numero', ts: Date.now() };
   });
   document.querySelectorAll('#finLista [data-fin][data-comp]').forEach(cell => {
+    const root=document.getElementById('finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return;
     const inp = cell.querySelector('.fin-nota');
     if (!inp || inp.readOnly) return;
     const nombre = decodeURIComponent(cell.dataset.fin);
@@ -2038,6 +2048,7 @@ function upsertSesionCap(comp, cap) {
   else store.sessions[idx] = Object.assign({}, store.sessions[idx], s);
 }
 function renderStudents() {
+  const contextoCalificar = cloudClaveReg();
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const list = estudiantes();
   const box = document.getElementById('stuList');
@@ -2106,7 +2117,9 @@ function renderStudents() {
   if (cad) cad.textContent = cAD;
 
   box.querySelectorAll('.cal-nota').forEach(inp => {
+    inp.dataset.registroContexto = contextoCalificar;
     inp.addEventListener('change', function() {
+      if (contextoCalificar !== cloudClaveReg()) return;
       if (registroSoloLectura()) return;
       if (inp.readOnly) return;
       const nombre = decodeURIComponent(inp.dataset.nom);
@@ -2132,6 +2145,7 @@ function renderStudents() {
   });
   box.querySelectorAll('.fin-cell button[data-val]').forEach(btn => {
     btn.addEventListener('click', function() {
+      if (contextoCalificar !== cloudClaveReg()) return;
       if (registroSoloLectura()) return;
       if (btn.disabled) return;
       const cell = btn.closest('[data-nom]');
@@ -2213,7 +2227,7 @@ function procesarSiagie() {
   document.getElementById('siagieCtx').textContent = ctx;
   let html = '';
   if (inf.ok) {
-    html += '<div class="rounded-lg bg-emerald-50 text-emerald-800 p-3 font-bold">Área completa. Use Nube Subir para que el director la vacíe a SIAGIE.</div>';
+    html += '<div class="rounded-lg bg-emerald-50 text-emerald-800 p-3 font-bold">Área completa. Use Subir Nube para que el director la vacíe a SIAGIE.</div>';
   } else {
     html += '<div class="rounded-lg bg-red-50 text-red-800 p-3 font-bold">No se puede procesar todavía.</div>';
     if (inf.faltanNota.length) {
@@ -2802,6 +2816,7 @@ function renderFinales() {
 
   const comps = competencias();
   const box = document.getElementById('finLista');
+  if(!box.dataset)box.dataset={};box.dataset.registroContexto=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||');
   const res = document.getElementById('finResumen');
   const modeInfo = document.getElementById('finModeInfo');
   const bloqueado = bimCerradoDocente();

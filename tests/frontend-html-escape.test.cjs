@@ -95,7 +95,7 @@ test('CNEB competence/capability options encode text and values, keeping the exa
  assert.match(p.el('selCap').innerHTML,/__otra__/);
 });
 test('Calificar renders student names and session competence/capability text safely',()=>{
- const p=page('registro.html',['escapeRegistro','renderStudents'],{estudiantes:()=>[{nombre:sample}],colsCalificar:()=>[{comp:sample,cap:sample}],bimCerradoDocente:()=>false,competenciaTrabajada:()=>true,capKeyHoy:()=> 'synthetic-key',studentKey:()=>sample,
+ const p=page('registro.html',['escapeRegistro','renderStudents'],{cloudClaveReg:()=> 'secundaria||III||1||A||Matemática',estudiantes:()=>[{nombre:sample}],colsCalificar:()=>[{comp:sample,cap:sample}],bimCerradoDocente:()=>false,competenciaTrabajada:()=>true,capKeyHoy:()=> 'synthetic-key',studentKey:()=>sample,
  store:{grades:{}},leerNota:()=>({}),modoCalif:'letra',actualizarContadores(){},sincronizarEdicionRegistro(){}});
  p.el('inpFecha').value='2026-10-11';p.c.renderStudents();safe(p.el('stuList').innerHTML);assert.ok((p.el('stuList').innerHTML.match(/&lt;synthetic/g)||[]).length>=3);
 });
