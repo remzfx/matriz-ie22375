@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>B2 · demostración ficticia del importador real</title>
+<style>
+/* Base equivalente al preflight de las matrices; no modifica el CSS del modal. */
+*,::before,::after{box-sizing:border-box}body{margin:0;font:16px/1.5 Inter,system-ui,sans-serif;color:#1e293b;background:#f0f9ff}h2,p{margin:0 0 12px}h2{font-size:inherit;font-weight:inherit}button,input,select{font:inherit;color:inherit}table{text-indent:0;border-color:inherit}button{cursor:pointer}main{max-width:1180px;margin:24px auto;padding:20px}header{background:#0f172a;color:white;padding:20px;border-radius:14px}button,select{padding:10px;border-radius:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:16px;border:1px solid #cbd5e1;border-radius:12px}#status{background:#dcfce7;padding:12px;border-radius:8px}dialog::backdrop{background:rgba(15,23,42,.5)}.toolbar{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}
+</style>
+<script src="../../student-identity.js" defer></script><script src="../../registro-academic-model.js" defer></script><script src="../../registro-evaluation.js" defer></script><script src="../../matrix-registry-import.js" defer></script><script src="b2-import-demo.js" defer></script>
+</head><body><main>
+<header><h1>B2 · Desde Registro</h1><p>Demostración aislada · datos ficticios · importador real del PR #80</p></header>
+<p>Abra la vista previa, seleccione una fila divergente y pruebe Cancelar o Aplicar. Datos y lecturas simulados; confirmación representada con un diálogo HTML solo en esta demo. El importador de producción conserva su confirmación nativa. Ninguna petición sale a producción.</p>
+<div class="toolbar"><label>Nivel <select id="level"><option value="secundaria">Secundaria</option><option value="primaria">Primaria</option></select></label><button id="open">Abrir vista previa</button><button id="reset">Reiniciar datos ficticios</button></div>
+<p id="status" role="status">Sin aplicaciones. Escrituras remotas: 0.</p>
+<p id="reads">Lecturas simuladas: 0</p><p id="viewport"></p>
+<h2>Conteos locales ficticios · conclusiones intactas en la fuente simulada</h2><pre id="result"></pre>
+<p>En móvil, desplace horizontalmente la tabla dentro del modal. Las filas pendientes y Sin cambios están deshabilitadas; Reemplazo divergente exige selección expresa.</p>
+</main></body></html>
