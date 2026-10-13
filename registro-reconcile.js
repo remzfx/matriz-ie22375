@@ -51,7 +51,7 @@
     }));return out;
   }
   function signature(p){return JSON.stringify([...flatten(p)].sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,clean(v)]));}
-  function plan(base,local,remote,identityGroups=[]){
+  function plan(base,local,remote,identityGroups=[],options={}){
     const b=base===null?null:flatten(base),l=flatten(local),r=flatten(remote),merged=new Map(),conflicts=[];
     const keys=[...new Set([...(b?b.keys():[]),...l.keys(),...r.keys()])].sort();
     keys.forEach(path=>{
@@ -60,6 +60,13 @@
       // en sliceRegistroArea no representa una orden de borrarlas en el servidor.
       if(JSON.parse(path)[0]==='extra'&&lv===undefined){if(rv!==undefined)merged.set(path,rv);}
       else if(equal(lv,rv)){if(lv!==undefined)merged.set(path,lv);}
+      // La versión de un área no demuestra causalidad sobre asistencia compartida.
+      // La ausencia en una copia de área tampoco autoriza borrar marcas del aula.
+      else if(options.sharedAttendance&&['asistencia','asisFechas','asisFechasEstado'].includes(JSON.parse(path)[0])){
+        if(lv===undefined)merged.set(path,rv);
+        else if(rv===undefined)merged.set(path,lv);
+        else conflicts.push({path,local:copy(lv),remote:copy(rv),unknownBase:true,reason:'Asistencia compartida entre áreas: requiere decisión explícita'});
+      }
       else if(b&&equal(lv,bv)){if(rv!==undefined)merged.set(path,rv);}
       else if(b&&equal(rv,bv)){if(lv!==undefined)merged.set(path,lv);}
       else if(!b&&lv===undefined){merged.set(path,rv);}
@@ -78,7 +85,7 @@
     // Quitar una sesión/fecha también afecta la visibilidad de sus marcas.
     // Una eliminación concurrente con notas nuevas se decide como un conjunto,
     // evitando conservar evidencias huérfanas que no aparecen en la grilla.
-    if(b)keys.filter(path=>['sessions','asisFechas'].includes(JSON.parse(path)[0])&&b.has(path)).forEach(path=>{
+    if(b)keys.filter(path=>['sessions','asisFechas'].includes(JSON.parse(path)[0])&&b.has(path)&&!(options.sharedAttendance&&JSON.parse(path)[0]==='asisFechas')).forEach(path=>{
       const localDeleted=!l.has(path),remoteDeleted=!r.has(path);if(localDeleted===remoteDeleted)return;
       const [field,key,date]=JSON.parse(path),prefix=field==='sessions'?key.join('||')+'||':key+'||'+date+'||';
       const dependent=keys.filter(p=>{const [f,k]=JSON.parse(p);return (field==='sessions'?f==='grades':f==='asistencia')&&k.startsWith(prefix);});
@@ -87,6 +94,21 @@
       const records=side=>paths.filter(p=>side.has(p)).map(p=>({path:p,value:copy(side.get(p))}));
       conflicts.push({path:JSON.stringify(['deletion',field,key,date]),paths,local:records(l),remote:records(r),reason:'Sesión o fecha eliminada mientras se editaron sus notas o marcas. Elija el conjunto completo.'});
     });
+    if(options.sharedAttendance){
+      // Una fecha borrada y sus marcas son una única decisión; no dejar marcas
+      // ocultas ni restaurar una fecha eliminada desde una copia antigua.
+      keys.filter(p=>JSON.parse(p)[0]==='asisFechasEstado').forEach(path=>{
+        const [,key]=JSON.parse(path),cut=key.lastIndexOf('||'),aula=key.slice(0,cut),date=key.slice(cut+2);
+        const datePath=JSON.stringify(['asisFechas',aula,date]),prefix=key+'||';
+        const paths=[path,datePath,...keys.filter(p=>{const [f,k]=JSON.parse(p);return f==='asistencia'&&k.startsWith(prefix);})];
+        const deleted=side=>!!(side.get(path)&&side.get(path).borrado);
+        const active=side=>side.has(datePath)||paths.some(p=>JSON.parse(p)[0]==='asistencia'&&side.has(p)&&!side.get(p).borrado);
+        if(!((deleted(l)&&!deleted(r)&&active(r))||(deleted(r)&&!deleted(l)&&active(l))))return;
+        paths.forEach(p=>{merged.delete(p);const i=conflicts.findIndex(c=>c.path===p);if(i>=0)conflicts.splice(i,1);});
+        const records=side=>paths.filter(p=>side.has(p)).map(p=>({path:p,value:copy(side.get(p))}));
+        conflicts.push({path:JSON.stringify(['deletion','asisFechas',aula,date]),paths,local:records(l),remote:records(r),reason:'Fecha eliminada frente a asistencia existente. Elija la fecha y sus marcas como conjunto.'});
+      });
+    }
     identityGroups.forEach(paths=>{
       if(conflicts.some(c=>c.paths&&c.paths.some(p=>paths.includes(p))))return;
       // Diferentes claves de una misma identidad no son cambios disjuntos.
@@ -103,7 +125,11 @@
         const choice=choices[c.path];if(choice!=='local'&&choice!=='remote')throw Error('Hay conflictos sin resolver.');
         const v=c[choice];if(c.paths){(v||[]).forEach(record=>result.set(record.path,copy(record.value)));}
         else if(v!==undefined)result.set(c.path,copy(v));
-      });const payload=inflate(result,aliases);dateContexts.forEach(k=>{if(!has(payload.asisFechas,k))payload.asisFechas[k]=[];});return payload;
+      });const payload=inflate(result,aliases);dateContexts.forEach(k=>{if(!has(payload.asisFechas,k))payload.asisFechas[k]=[];});
+      if(options.sharedAttendance)Object.entries(payload.asisFechasEstado).forEach(([key,v])=>{
+        if(!v.borrado)return;const cut=key.lastIndexOf('||'),aula=key.slice(0,cut),date=key.slice(cut+2);
+        payload.asisFechas[aula]=(payload.asisFechas[aula]||[]).filter(d=>d!==date);
+      });return payload;
     }};
   }
   // Nombres heredados se relacionan solo mediante aliases inequívocos existentes.
@@ -129,7 +155,38 @@
     });
     return [...groups.values()].filter(set=>set.size>1).map(set=>[...set]);
   }
-  function choose(conflicts,isCurrent){
+  function conflictView(c,context={}){
+    const path=JSON.parse(c.paths&&c.paths[0]||c.path),field=path[0],parts=typeof path[1]==='string'?path[1].split('||'):[];
+    const types={grades:'Evidencia de evaluación',finales:'Calificación directa',concComp:'Conclusión de competencia',concArea:'Conclusión histórica',asistencia:'Marca de asistencia',asisFechas:'Fecha de asistencia',asisFechasEstado:'Estado de fecha',sessions:'Sesión de evaluación',competenciasEstado:'Competencia trabajada',capsSel:'Capacidades',meta:'Contexto del registro'};
+    const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase();
+    const tail=parts.at(-1)||'',decode=s=>{try{return decodeURIComponent(s);}catch(e){return s;}};
+    const candidates=(context.roster||[]).filter(al=>{
+      const id=typeof global.studentKey==='function'?global.studentKey(al):al.idSiagie?'id:'+encodeURIComponent(al.idSiagie):al.codigoEstudiante?'cod:'+encodeURIComponent(al.codigoEstudiante):'nom:'+encodeURIComponent(normalize(al.nombre));
+      return id===tail||(al.codigoEstudiante&&tail==='cod:'+encodeURIComponent(al.codigoEstudiante))||[al.nombre,...(context.aliases&&context.aliases[id]||[])].some(n=>normalize(n)===normalize(decode(tail.replace(/^nom:/,''))));
+    });
+    const student=candidates.length===1?candidates[0]:null;
+    const individual=['grades','finales','concComp','concArea','asistencia'].includes(field);
+    let title=types[field]||'Dato del registro';
+    if(individual)title+=' · '+(student?student.nombre+' · Orden '+student.orden+(student.idSiagie?' · ID '+student.idSiagie:student.codigoEstudiante?' · Código '+student.codigoEstudiante:''):candidates.length>1?'Estudiante ambiguo: revisar identificación técnica':'Estudiante fuera del padrón actual: revisar identificación técnica');
+    if(['grades','finales','concComp','competenciasEstado','capsSel'].includes(field)&&parts[5])title+=' · '+parts[5];
+    if(field==='grades'&&parts[6])title+=' · '+parts[6]+' · '+parts[7];
+    if(field==='asistencia')title+=' · '+parts[4];
+    if(field==='asisFechas')title+=' · '+path[2];
+    if(field==='asisFechasEstado')title+=' · '+parts.at(-1);
+    if(c.reason)title+=' · '+c.reason;
+    function value(v){
+      if(v===undefined)return 'Ausente / eliminación';
+      if(Array.isArray(v))return v.map(record=>conflictView({path:record.path,local:record.value},context).title+': '+value(record.value)).join('\n');
+      if(v&&typeof v==='object'){
+        if(v.borrado)return 'Eliminado';
+        const lines=[];for(const [key,label] of Object.entries({nivel:'Nivel',nota20:'Nota',valor:'Valor',texto:'Texto',text:'Texto',marca:'Marca',hora:'Hora',trabajada:'Trabajada',fecha:'Fecha',comp:'Competencia',capacidad:'Capacidad',origen:'Modo'}))if(has(v,key))lines.push(label+': '+v[key]);
+        return lines.length?lines.join(' · '):'Datos del registro (ver detalles técnicos)';
+      }
+      return v===true?'Presente':String(v);
+    }
+    return {title,local:value(c.local),remote:value(c.remote)};
+  }
+  function choose(conflicts,isCurrent,context={}){
     if(!conflicts.length)return Promise.resolve({});
     return new Promise(resolve=>{
       const overlay=document.createElement('div');overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Revisar conflictos académicos');
@@ -139,22 +196,23 @@
       const help=document.createElement('p');help.textContent='Elige por dato. Ninguna calificación se envía hasta resolver todos los conflictos. Cancelar conserva el borrador.';panel.appendChild(help);
       const choices={},apply=document.createElement('button'),cancel=document.createElement('button'),previous=document.activeElement;
       conflicts.forEach((c,i)=>{
-        const field=document.createElement('fieldset'),label=document.createElement('legend');label.textContent=JSON.parse(c.path).join(' · ')+(c.reason?' · '+c.reason:'');field.appendChild(label);
+        const view=conflictView(c,context),field=document.createElement('fieldset'),label=document.createElement('legend');label.textContent=view.title;field.appendChild(label);
         for(const side of ['local','remote']){
           const row=document.createElement('label'),radio=document.createElement('input'),text=document.createElement('pre');radio.type='radio';radio.name='academic-conflict-'+i;
-          text.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere';text.textContent=(side==='local'?'Este dispositivo: ':'Nube: ')+(c[side]===undefined?'Ausente / eliminación':JSON.stringify(clean(c[side]),null,2));
+          text.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere';text.textContent=(side==='local'?'Este dispositivo: ':'Nube: ')+view[side];
           radio.onchange=()=>{choices[c.path]=side;apply.disabled=conflicts.some(x=>!choices[x.path]);};row.appendChild(radio);row.appendChild(text);field.appendChild(row);
-        }panel.appendChild(field);
+        }
+        const details=document.createElement('details'),summary=document.createElement('summary'),technical=document.createElement('pre');summary.textContent='Identificación y detalles técnicos';technical.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere';technical.textContent=JSON.stringify(c,null,2);details.appendChild(summary);details.appendChild(technical);field.appendChild(details);panel.appendChild(field);
       });
       apply.type=cancel.type='button';apply.textContent='Continuar con las decisiones';cancel.textContent='Cancelar';apply.disabled=true;
       for(const btn of [apply,cancel]){btn.style.cssText='padding:10px;margin:6px;border:1px solid #64748b;border-radius:6px';panel.appendChild(btn);}
       let done=false;const finish=value=>{if(done)return;done=true;clearInterval(watch);document.removeEventListener('keydown',key);overlay.remove();if(previous&&previous.focus)previous.focus();resolve(value);};
-      const key=e=>{if(e.key==='Escape'){e.preventDefault();finish(null);}if(e.key==='Tab'){const nodes=Array.from(panel.querySelectorAll('input,button')).filter(n=>!n.disabled);if(e.shiftKey&&document.activeElement===nodes[0]){e.preventDefault();nodes[nodes.length-1].focus();}else if(!e.shiftKey&&document.activeElement===nodes[nodes.length-1]){e.preventDefault();nodes[0].focus();}}};
+      const key=e=>{if(e.key==='Escape'){e.preventDefault();finish(null);}if(e.key==='Tab'){const nodes=Array.from(panel.querySelectorAll('input,button,summary')).filter(n=>!n.disabled);if(e.shiftKey&&document.activeElement===nodes[0]){e.preventDefault();nodes[nodes.length-1].focus();}else if(!e.shiftKey&&document.activeElement===nodes[nodes.length-1]){e.preventDefault();nodes[0].focus();}}};
       const watch=setInterval(()=>{if(!isCurrent())finish(null);},300);apply.onclick=()=>finish(isCurrent()?choices:null);cancel.onclick=()=>finish(null);
       document.addEventListener('keydown',key);document.body.appendChild(overlay);cancel.focus();
     });
   }
-  const api={copy,equal,signature,plan,identityConflicts,choose,has};
+  const api={copy,equal,signature,plan,identityConflicts,conflictView,choose,has};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   global.IERegistroReconcile=api;
 })(typeof window!=='undefined'?window:globalThis);

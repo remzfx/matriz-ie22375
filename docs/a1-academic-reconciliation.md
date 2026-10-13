@@ -21,6 +21,8 @@ cliente real contra un Apps Script ejecutado en VM y hojas exclusivamente en mem
   Ignora timestamps para elegir contenido, pero conserva los registros originales.
 - Solo fusiona automáticamente modificaciones de datos distintos y cambios de un solo
   lado respecto a la base. Cambios divergentes y eliminación contra edición se detienen.
+- Asistencia, fechas y estados son compartidos por aula/bimestre: la versión de un área no demuestra su causalidad. Diferencias presentes en ambos lados requieren elección explícita, aunque coincidan con la base del área. Ausencias no borran marcas/fechas locales. Una fecha eliminada frente a marcas activas se decide con sus marcas como conjunto. No se elige por timestamps.
+- El diálogo muestra estudiante, orden/identidad oficial, competencia, tipo de dato y alternativas legibles; las claves y valores originales quedan en detalles técnicos colapsados. Todo se renderiza mediante texto DOM.
 - El diálogo exige una decisión Este dispositivo/Nube por conflicto; no preselecciona
   ganador. Cancelar no escribe. Utiliza texto DOM, foco acotado y Escape.
 - Sesiones/fechas eliminadas frente a evidencias/marcas nuevas se resuelven conjuntamente;
@@ -33,7 +35,7 @@ cliente real contra un Apps Script ejecutado en VM y hojas exclusivamente en mem
 - Conserva el borrador anterior y la lectura remota antes de enviar. El contenido local
   solo se concilia tras una descarga protegida confirmada o confirmación de la subida.
   Recuperar borrador anterior a conciliación restaura únicamente el contexto actual,
-  con confirmación, conservando el trabajo sustituido como respaldo. No escribe en nube.
+  con confirmación, conservando el trabajo sustituido como respaldo. La recuperación académica no restaura ni sustituye asistencia compartida, fechas o sus estados. No escribe en nube.
 - El POST utiliza la versión recién leída y el lock/CAS ya existente en el servidor.
   Un CONFLICT no avanza la base causal ni reintenta escrituras automáticamente.
 - Antes del POST conserva el intento. Si se pierde su respuesta, una nueva acción explícita
@@ -47,7 +49,7 @@ cliente real contra un Apps Script ejecutado en VM y hojas exclusivamente en mem
 
 ## Validación y límites
 
-Suite: 1.700 pruebas, 1.700 aprobadas, 0 fallidas, 0 omitidas. 59 regresiones A1 nuevas.
+Suite: 1.716 pruebas, 1.716 aprobadas, 0 fallidas, 0 omitidas. 75 regresiones A1 (16 añadidas tras revisión).
 Incluye cliente, diálogo DOM, Apps Script simulado, permisos, cierre, revocación,
 concurrencia, pérdida de respuesta, cancelación, tombstones, asistencia y claves históricas.
 Las pruebas anteriores se adaptan al módulo y SW; las comparaciones históricas de
@@ -58,6 +60,8 @@ intento. Aumenta su tamaño: si el navegador rechaza la persistencia, se detiene
 y conserva el trabajo en memoria. No cerrar ni limpiar el navegador ante ese aviso.
 No protege frente a la eliminación deliberada del almacenamiento del navegador.
 No se conservan indefinidamente todas las versiones: el respaldo recuperable es el último.
+
+La asistencia puede requerir más decisiones explícitas porque las copias por área no tienen una versión común de aula. Esta intervención protege el borrador conocido; no unifica las copias de asistencia del servidor ni puede descubrir cambios de otras áreas que aún no se hayan leído. Esa limitación requiere revisión futura del contrato, fuera de A1.
 
 Cada sincronización agrega una lectura protegida para disponer de una versión fresca.
 La latencia de Apps Script puede seguir retrasando la operación; no se autoriza escritura
@@ -74,7 +78,7 @@ cancelación, foco y texto DOM. Revisar desktop y móvil con información fictic
    `git diff --check`; comprobar CI para el SHA exacto del PR.
 2. En una copia aislada con alumnos ficticios, abrir Comunicación 1.º A III en dos
    perfiles. Editar datos diferentes y conciliar; luego editar la misma nota en ambos.
-   Revisar ambas decisiones y Cancelar; comprobar el respaldo recuperable.
+   Revisar ambas decisiones y Cancelar; comprobar el respaldo recuperable. Cambiar de área con una copia remota de asistencia antigua, revisar la fecha/marks como conjunto y verificar que recuperar notas conserva la asistencia actual.
 3. Interrumpir la respuesta de una subida, comprobar que el trabajo sigue local y que
    la siguiente acción consulta antes de decidir si necesita otro POST.
 4. Escribir mientras llega una respuesta; verificar que la nota posterior sigue pendiente.

@@ -197,3 +197,50 @@ test('A1 conflict dialog traps keyboard focus within choices and actions',async(
 test('A1 worker precaches required reconcile module and cleans prior version without changing private exclusions',()=>{
  const sw=read('sw.js');assert.match(sw,/CACHE_PREFIX \+ 'v20'/);assert.match(sw,/'\.\/registro-reconcile\.js'/);assert.match(read('registro.html'),/<script src="registro-reconcile.js" defer><\/script>/);assert.ok(read('registro.html').indexOf('registro-reconcile.js')<read('registro.html').indexOf('registro-academic-model.js'));
 });
+const AULA='secundaria||III||1||A',DATE='2026-10-12',MARK=AULA+'||'+DATE+'||id:1';
+function attendance(marca,ts=1){return {asistencia:{[MARK]:{marca,hora:'08:00',ts}},asisFechas:{[AULA]:[DATE]},asisFechasEstado:{[AULA+'||'+DATE]:{borrado:false,ts}}};}
+for(const field of ['asistencia','asisFechasEstado'])test('A1 shared '+field+' cannot trust unchanged area base over newer classroom data',()=>{
+ const l=attendance('P',900),r=attendance('F',1),b=copy(l);if(field==='asisFechasEstado')r.asisFechasEstado[AULA+'||'+DATE]={borrado:false,revision:'remote'};
+ const plan=api.plan(b,l,r,[],{sharedAttendance:true});assert.ok(plan.conflicts.some(c=>JSON.parse(c.path)[0]===field));assert.throws(()=>plan.resolve(),/sin resolver/);
+ const out=plan.resolve(Object.fromEntries(plan.conflicts.map(c=>[c.path,'local'])));assert.deepEqual(copy(out[field]),l[field]);
+});
+test('A1 shared absence in another area never removes classroom marks or dates',()=>{
+ const local=attendance('P'),out=api.plan(local,local,{},[],{sharedAttendance:true}).resolve();assert.deepEqual(copy(out.asistencia),local.asistencia);assert.deepEqual(out.asisFechas[AULA],[DATE]);assert.deepEqual(copy(out.asisFechasEstado),local.asisFechasEstado);
+});
+for(const side of ['local','remote'])test('A1 shared deleted date versus active marks requires coherent '+side+' choice',()=>{
+ const local=attendance('P',999),remote=attendance('F',1);remote.asisFechas[AULA]=[];remote.asisFechasEstado[AULA+'||'+DATE]={borrado:true,ts:1};remote.asistencia[MARK]={borrado:true,ts:1};
+ const plan=api.plan(local,local,remote,[],{sharedAttendance:true});assert.equal(plan.conflicts.length,1);const out=plan.resolve({[plan.conflicts[0].path]:side});assert.deepEqual(out.asisFechas[AULA],side==='local'?[DATE]:[]);assert.equal(out.asistencia[MARK].borrado,side==='remote'?true:undefined);
+});
+for(const action of ['bajarRegistroNube','subirRegistroNube'])test('A1 actual '+action+' cancels stale other-area attendance without mutating draft/base',async()=>{
+ const f=client(),a=f.c.asisCtxKey(),date=DATE,key=a+'||'+date+'||id:1';f.c.store.asistencia[key]={marca:'P',ts:900};f.c.store.asisFechas[a]=[date];f.c.store.asisFechasEstado[a+'||'+date]={borrado:false,ts:900};f.b.basePayload=copy(f.c.sliceRegistroArea());const remote=copy(f.remote());remote.payload=copy(f.b.basePayload);remote.payload.asistencia[key]={marca:'F',ts:1};f.setRemote(remote);
+ f.c.IERegistroReconcile.choose=async cs=>{assert.ok(cs.some(c=>JSON.parse(c.path)[0]==='asistencia'));return null};const before=copy(f.c.store);assert.equal(await f.c[action](),false);assert.deepEqual(copy(f.c.store),before);assert.equal(f.writes(),0);
+});
+test('A1 actual download retains shared attendance changed in another area and other classroom',async()=>{
+ const f=client(),a=f.c.asisCtxKey(),key=a+'||'+DATE+'||id:1';f.c.store.asistencia[key]={marca:'P',ts:900};f.c.store.asisFechas[a]=[DATE];f.b.basePayload=copy(f.c.sliceRegistroArea());const remote=copy(f.remote());remote.payload=copy(f.b.basePayload);remote.payload.asistencia[key]={marca:'F',ts:1};f.setRemote(remote);f.c.store.asistencia['other-classroom']={marca:'T'};
+ f.c.IERegistroReconcile.choose=async cs=>Object.fromEntries(cs.map(c=>[c.path,'local']));assert.equal(await f.c.bajarRegistroNube(),true);assert.equal(f.c.store.asistencia[key].marca,'P');assert.equal(f.c.store.asistencia['other-classroom'].marca,'T');assert.deepEqual(copy(f.c.store.asisFechas[a]),[DATE]);
+});
+test('A1 backup recovery preserves all current shared attendance fields',()=>{
+ const f=client(),a=f.c.asisCtxKey();f.b.recovery={local:copy(f.c.sliceRegistroArea())};f.c.store.asistencia[a+'||'+DATE+'||id:1']={marca:'T',ts:900};f.c.store.asisFechas[a]=[DATE];f.c.store.asisFechasEstado[a+'||'+DATE]={borrado:false,ts:900};const before=copy(f.c.store);assert.equal(f.c.recuperarBorradorAcademico(),true);for(const field of ['asistencia','asisFechas','asisFechasEstado'])assert.deepEqual(copy(f.c.store[field]),before[field]);assert.equal(f.writes(),0);
+});
+test('A1 shared changes while server responds remain pending, never replaced',async()=>{
+ const f=client(),a=f.c.asisCtxKey(),key=a+'||'+DATE+'||id:1';setLocal(f);const send=f.c.fetch;f.c.fetch=async(...args)=>{const response=await send(...args);f.c.store.asistencia[key]={marca:'P',ts:900};f.c.store.asisFechas[a]=[DATE];return response};assert.equal(await f.c.subirRegistroNube(),false);assert.equal(f.c.store.asistencia[key].marca,'P');assert.deepEqual(copy(f.c.store.asisFechas[a]),[DATE]);assert.equal(f.c.dirty,true);
+});
+test('A1 conflict labels show student, competence, data type and readable alternatives',()=>{
+ const view=api.conflictView({path:JSON.stringify(['finales',K]),local:n(15),remote:n(8)},{roster:[{nombre:'Alumno ficticio Ñ',orden:7,idSiagie:'1'}]});assert.match(view.title,/Calificación directa/);assert.match(view.title,/Alumno ficticio Ñ · Orden 7 · ID 1/);assert.match(view.title,/Competencia/);assert.doesNotMatch(view.title,/\|\|/);assert.match(view.local,/Nota: 15/);assert.match(view.remote,/Nota: 8/);
+});
+test('A1 homonymous students remain distinct through official identity and order',()=>{
+ const roster=[{nombre:'Nombre ficticio',orden:1,idSiagie:'1'},{nombre:'Nombre ficticio',orden:2,idSiagie:'2'}];const a=api.conflictView({path:JSON.stringify(['finales',K])},{roster}),b=api.conflictView({path:JSON.stringify(['finales',K.replace('id:1','id:2')])},{roster});assert.notEqual(a.title,b.title);assert.match(a.title,/ID 1/);assert.match(b.title,/ID 2/);
+});
+test('A1 conflict UI retains exact technical identification in collapsed safe details',async()=>{
+ const f=dialog(),field=f.panel.children.find(x=>x.tag==='fieldset'),details=field.children.find(x=>x.tag==='details');assert.equal(details.open,undefined);assert.match(details.children[1].textContent,/id:synthetic/);assert.equal(details.children[1].innerHTML,undefined);assert.match(field.children[1].children[1].textContent,/Este dispositivo/);assert.match(field.children[2].children[1].textContent,/Nube/);f.cancel.onclick();assert.equal(await f.pending,null);
+});
+test('A1 switching to another area with an older copy never silently reverts shared attendance',async()=>{
+ const f=client(),a=f.c.asisCtxKey(),key=a+'||'+DATE+'||id:1';f.c.cloudClaveReg=()=>[f.c.nivel,f.c.bim,f.c.grado,f.c.seccion,f.c.areaActual].join('||');f.c.prefijoReg=()=>f.c.cloudClaveReg()+'||';f.c.store.asistencia[key]={marca:'P',ts:900};f.c.store.asisFechas[a]=[DATE];f.c.areaActual='Comunicación';const b=f.c.baselineAcademica();b.basePayload=copy(f.c.sliceRegistroArea());b.version=1;const remote={version:1,payload:copy(b.basePayload)};remote.payload.asistencia[key]={marca:'F',ts:1};f.setRemote(remote);f.c.IERegistroReconcile.choose=async cs=>{assert.equal(cs.length,1);return {[cs[0].path]:'local'}};
+ assert.equal(await f.c.bajarRegistroNube(),true);assert.equal(f.c.store.asistencia[key].marca,'P');assert.deepEqual(copy(f.c.store.asisFechas[a]),[DATE]);assert.equal(f.writes(),0);
+});
+test('A1 canceling backup recovery preserves shared dates, marks and academic draft',()=>{
+ const f=client();setLocal(f);f.b.recovery={local:copy(f.c.sliceRegistroArea())};Object.assign(f.c.store,attendance('P'));const before=copy(f.c.store);f.c.confirm=()=>false;assert.equal(f.c.recuperarBorradorAcademico(),false);assert.deepEqual(copy(f.c.store),before);assert.equal(f.writes(),0);
+});
+test('A1 readable conclusion and attendance conflicts retain exact values and dates',()=>{
+ const roster=[{nombre:'Estudiante ficticio',orden:1,idSiagie:'1'}],c=api.conflictView({path:JSON.stringify(['concComp',K]),local:{texto:'Texto sintético <visible>'},remote:{texto:'Otro texto'}},{roster});assert.match(c.title,/Conclusión de competencia/);assert.equal(c.local,'Texto: Texto sintético <visible>');const a=api.conflictView({path:JSON.stringify(['asistencia',MARK]),local:{marca:'P',hora:'08:00'},remote:{marca:'F',hora:''}},{roster});assert.match(a.title,/Estudiante ficticio/);assert.match(a.title,/2026-10-12/);assert.match(a.local,/Marca: P · Hora: 08:00/);
+});

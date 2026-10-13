@@ -2605,15 +2605,16 @@ async function leerEstadoRemotoAcademico(c,key,token){
   const row=rows[0];if(row&&(typeof row.ts!=='number'||!Number.isFinite(row.ts)||row.ts<0))throw Error('Versión remota inválida.');
   return {version:row?Number(row.ts):0,payload:row?row.payload||{}:{},exists:!!row};
 }
-function aplicarRegistroConciliado(payload){
+function aplicarRegistroConciliado(payload,conservarAsistencia=false){
   const pref=prefijoReg(),aula=asisCtxKey(),asisPref=aula+'||',c=ctxBase();
   for(const field of ['grades','finales','concArea','concComp','competenciasEstado','capsSel','asistencia','asisFechasEstado']){
+    if(conservarAsistencia&&['asistencia','asisFechasEstado'].includes(field))continue;
     store[field]=store[field]||{};const prefix=['asistencia','asisFechasEstado'].includes(field)?asisPref:pref;
     Object.keys(store[field]).filter(k=>k.startsWith(prefix)).forEach(k=>delete store[field][k]);
     Object.entries(payload[field]||{}).filter(([k])=>k.startsWith(prefix)).forEach(([k,v])=>store[field][k]=IERegistroReconcile.copy(v));
   }
   store.sessions=(store.sessions||[]).filter(s=>!(s.nivel===c.nivel&&s.bim===c.bim&&String(s.grado)===String(c.grado)&&s.seccion===c.seccion&&s.area===c.area)).concat(IERegistroReconcile.copy((payload.sessions||[]).filter(s=>s.nivel===c.nivel&&s.bim===c.bim&&String(s.grado)===String(c.grado)&&s.seccion===c.seccion&&s.area===c.area)));
-  store.asisFechas=store.asisFechas||{};store.asisFechas[aula]=IERegistroReconcile.copy((payload.asisFechas||{})[aula]||[]);
+  store.asisFechas=store.asisFechas||{};if(!conservarAsistencia)store.asisFechas[aula]=IERegistroReconcile.copy((payload.asisFechas||{})[aula]||[]);
   store.meta=store.meta||{};store.meta[cloudClaveReg()]=IERegistroReconcile.copy(payload.meta||{});
   Object.entries(payload.meta&&payload.meta.studentAliases||{}).forEach(([id,names])=>{if(Array.isArray(names))aliasesAula()[id]=[...new Set([...(aliasesAula()[id]||[]),...names])];});
 }
@@ -2623,7 +2624,7 @@ function recuperarBorradorAcademico(){
   const b=baselineAcademica(),snapshot=b&&b.recovery&&b.recovery.local;if(!snapshot){toast('No hay un respaldo de conciliación para esta área y bimestre.');return false;}
   if(!confirm('Restaurar el borrador local anterior a la conciliación de esta área y bimestre. El trabajo actual se conservará como respaldo. No se enviará nada a la nube. ¿Continuar?'))return false;
   const before=IERegistroReconcile.copy(store),current=IERegistroReconcile.copy(sliceRegistroArea());
-  try{aplicarRegistroConciliado(snapshot);b.recovery.local=current;saveStore();}catch(e){store=before;toast('No se pudo guardar la recuperación. Trabajo actual conservado.');return false;}
+  try{aplicarRegistroConciliado(snapshot,true);b.recovery.local=current;saveStore();}catch(e){store=before;toast('No se pudo guardar la recuperación. Trabajo actual conservado.');return false;}
   dirtyAcademico();pintarRegistroConciliado();toast('Borrador recuperado localmente. Sin escritura en nube.');return true;
 }
 function pintarRegistroConciliado(){
@@ -2656,8 +2657,8 @@ async function prepararVersionAcademica(){
   const b=baselineAcademica();let base=b.basePayload||null;
   if(b.attempt&&IERegistroAcademico.canonical(remote.payload)===IERegistroAcademico.canonical(b.attempt.payload)&&remote.version>b.attempt.version)base=b.attempt.local;
   const groups=IERegistroReconcile.identityConflicts(local,remote.payload,estudiantes(),typeof IEStudentIdentity==='undefined'?null:IEStudentIdentity);
-  const reconciliation=IERegistroReconcile.plan(base,local,remote.payload,groups);
-  const choices=await IERegistroReconcile.choose(reconciliation.conflicts,current);
+  const reconciliation=IERegistroReconcile.plan(base,local,remote.payload,groups,{sharedAttendance:true});
+  const choices=await IERegistroReconcile.choose(reconciliation.conflicts,current,{roster:estudiantes(),aliases:local.meta&&local.meta.studentAliases});
   if(!choices){toast('Conflicto pendiente. El trabajo local se conserva; ninguna nota fue enviada.');return false;}
   if(!current())throw Error('El contexto, la sesión o el borrador cambió. Reintente sin cerrar la pestaña.');
   const payload=reconciliation.resolve(choices);
