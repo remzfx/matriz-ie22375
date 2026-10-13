@@ -1590,7 +1590,7 @@ function competenciasParaEvaluar(){
 async function guardarRegistroIntegrado(){
   if(document.getElementById('registroTutorPanel')?.hidden===false){toast('Guarda la decisión desde el módulo del Tutor.');return false;}
   if(registroSoloLectura()||bimCerradoDocente())return false;
-  const invalidas=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>{const root=inp.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return false;return !inp.readOnly&&inp.value!==''&&(!Number.isFinite(Number(inp.value))||Number(inp.value)<0||Number(inp.value)>20);});
+  const invalidas=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>{if(inp.dataset?.registroContexto&&inp.dataset.registroContexto!==cloudClaveReg())return false;const root=inp.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return false;return !inp.readOnly&&inp.value!==''&&(!Number.isFinite(Number(inp.value))||Number(inp.value)<0||Number(inp.value)>20);});
   if(invalidas){toast('Hay notas inválidas. Corrige los valores antes de guardar; el borrador se conserva.');return false;}
   const key=cloudClaveReg(),token=(getLoginSession()||{}).token;
   const adapter=typeof IERegistroTransversales==='undefined'?null:IERegistroTransversales;
@@ -1787,8 +1787,9 @@ function activarSesion() {
 function recolectarPantalla() {
   document.querySelectorAll(".academic-conclusion").forEach(el=>{const root=el.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return;setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value);});
   if (registroSoloLectura()) return false;
-  try { const active=document.activeElement,root=active?.closest?.('#finLista');if(active&&active.blur&&(!root?.dataset?.registroContexto||root.dataset.registroContexto===cloudClaveReg()))active.blur(); } catch (e) {}
+  try { const active=document.activeElement,root=active?.closest?.('#finLista');if(active&&active.blur&&(!active.dataset?.registroContexto||active.dataset.registroContexto===cloudClaveReg())&&(!root?.dataset?.registroContexto||root.dataset.registroContexto===cloudClaveReg()))active.blur(); } catch (e) {}
   document.querySelectorAll('.cal-nota').forEach(inp => {
+    if (inp.dataset.registroContexto && inp.dataset.registroContexto !== cloudClaveReg()) return;
     if (inp.readOnly) return;
     const nombre = decodeURIComponent(inp.dataset.nom || '');
     const cap = decodeURIComponent(inp.dataset.cap || '');
@@ -2047,6 +2048,7 @@ function upsertSesionCap(comp, cap) {
   else store.sessions[idx] = Object.assign({}, store.sessions[idx], s);
 }
 function renderStudents() {
+  const contextoCalificar = cloudClaveReg();
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const list = estudiantes();
   const box = document.getElementById('stuList');
@@ -2115,7 +2117,9 @@ function renderStudents() {
   if (cad) cad.textContent = cAD;
 
   box.querySelectorAll('.cal-nota').forEach(inp => {
+    inp.dataset.registroContexto = contextoCalificar;
     inp.addEventListener('change', function() {
+      if (contextoCalificar !== cloudClaveReg()) return;
       if (registroSoloLectura()) return;
       if (inp.readOnly) return;
       const nombre = decodeURIComponent(inp.dataset.nom);
@@ -2141,6 +2145,7 @@ function renderStudents() {
   });
   box.querySelectorAll('.fin-cell button[data-val]').forEach(btn => {
     btn.addEventListener('click', function() {
+      if (contextoCalificar !== cloudClaveReg()) return;
       if (registroSoloLectura()) return;
       if (btn.disabled) return;
       const cell = btn.closest('[data-nom]');

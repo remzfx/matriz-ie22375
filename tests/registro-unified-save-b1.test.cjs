@@ -49,3 +49,26 @@ for(const failure of ['unverified','network','CONFLICT'])test('B1 real transvers
 test('B1 collecting does not blur an obsolete Promedios input into the new context',async()=>{
  const f=fixture();f.el('finLista').dataset.registroContexto='another-area';let blurred=0;f.c.document.activeElement={closest:()=>f.el('finLista'),blur(){blurred++;f.c.store.finales.incorrect={nota20:20}}};assert.equal(await f.c.guardarRegistroIntegrado(),true);assert.equal(blurred,0);assert.equal(f.c.store.finales.incorrect,undefined);
 });
+
+function calificarFixture(){
+ const f=fixture(),events={},inp=f.input(15);inp.addEventListener=(type,fn)=>events[type]=fn;inp.parentElement={querySelector:()=>null};
+ const cell={dataset:{...inp.dataset}},btn={dataset:{val:'B'},disabled:false,closest:()=>cell,addEventListener:(type,fn)=>events['letter-'+type]=fn};
+ Object.assign(f.c,{estudiantes:()=>[{nombre:'Estudiante sintético',idSiagie:'ficticio'}],studentKey:()=> 'id:ficticio',colsCalificar:()=>[{comp:'Competencia ficticia',cap:'Capacidad ficticia'}],modoCalif:'num',escapeRegistro:x=>x,pad2:n=>String(n),eqClass:()=>'',sincronizarEdicionRegistro:()=>{},letterToNum:()=>12});
+ f.el('inpFecha').value='2026-10-12';f.el('stuList').querySelectorAll=s=>s==='.cal-nota'?[inp]:s==='.fin-cell button[data-val]'?[btn]:[];
+ vm.runInContext(extract('renderStudents'),f.c);f.c.renderStudents();f.fields.cal.push(inp);
+ return {...f,inp,events};
+}
+for(const changed of ['área','grado','sección','bimestre'])test('B1 stale rendered Calificar cannot write after changing '+changed,async()=>{
+ const f=calificarFixture(),previous=f.c.cloudClaveReg();f.c.store.grades.previous={nota20:8,nivel:'C',ts:1};const before=clone(f.c.store);
+ f.c.cloudClaveReg=()=>previous+'-new-'+changed;f.inp.value='21';let blurred=0;f.inp.blur=()=>{blurred++;f.events.change()};f.c.document.activeElement=f.inp;
+ assert.equal(await f.c.guardarRegistroIntegrado(),true);assert.equal(blurred,0);assert.deepEqual(clone(f.c.store.grades),before.grades);
+ f.inp.value='15';const saves=f.saves();f.events.change();f.events['letter-click']();assert.deepEqual(clone(f.c.store.grades),before.grades);assert.equal(f.saves(),saves);assert.equal(f.sends(),0);
+});
+test('B1 current rendered Calificar and Promedios retain notes and conclusions with local-only academic save',async()=>{
+ const f=calificarFixture();assert.equal(f.inp.dataset.registroContexto,f.c.cloudClaveReg());f.final(8);f.el('finLista').dataset.registroContexto=f.c.cloudClaveReg();f.fields.conclusion.push({dataset:{comp:encodeURIComponent('Competencia ficticia'),id:encodeURIComponent('id:ficticio')},value:'Conclusión ficticia',closest:()=>f.el('finLista')});
+ assert.equal(await f.c.guardarRegistroIntegrado(),true);assert.equal(Object.values(f.disk().grades)[0].nota20,15);assert.equal(Object.values(f.disk().finales)[0].nota20,8);assert.equal(Object.values(f.disk().concComp)[0].texto,'Conclusión ficticia');assert.equal(f.sends(),0);
+ f.inp.value='12';f.events.change();assert.equal(Object.values(f.disk().grades)[0].nota20,12);assert.equal(f.sends(),0);
+});
+test('B1 detached Calificar retains its original stamp when its container is rendered again',async()=>{
+ const f=calificarFixture(),oldStamp=f.inp.dataset.registroContexto;f.c.cloudClaveReg=()=>oldStamp+'-new-area';f.el('stuList').querySelectorAll=()=>[];f.c.renderStudents();assert.equal(f.inp.dataset.registroContexto,oldStamp);const before=clone(f.c.store.grades);f.events.change();assert.deepEqual(clone(f.c.store.grades),before);assert.equal(f.saves(),0);assert.equal(f.sends(),0);
+});
