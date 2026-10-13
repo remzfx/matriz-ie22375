@@ -235,6 +235,84 @@
 .trans-toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:12px;margin:8px 0}.trans-toolbar-left{display:flex;flex:1 1 280px;flex-wrap:wrap;align-items:end;gap:12px;min-width:0}.trans-mode-group{margin-left:auto;flex:0 0 auto;max-width:100%}.trans-control-group{display:flex;flex-direction:column;gap:4px;min-width:0}.trans-control-group>span{font-size:12px;color:#64748b;font-weight:600}.trans-segment{display:flex;flex-wrap:wrap;gap:4px}.trans-segment button{margin:0;padding:8px 12px;border:1px solid #dbe3ed;border-radius:8px;background:#f1f5f9;color:#334155;font-size:13px;transition:background .15s,color .15s}.trans-segment button[aria-pressed="true"],.trans-segment button[aria-selected="true"]{background:#075985;border-color:#075985;color:#fff;font-weight:600}.trans-segment button:hover:not(:disabled){border-color:#075985}.trans-segment button:focus-visible,.trans-context button:focus-visible{outline:2px solid #0ea5e9;outline-offset:2px}.trans-apply{margin:0;padding:8px 12px;background:#fff;color:#075985;border:1px solid #94a3b8;border-radius:8px;font-size:13px}
 .trans-progress{margin:8px 0;font-size:12px;color:#475569}.trans-notice{margin:6px 0;font-size:13px;line-height:1.4;padding:8px 10px;border-left:3px solid #0ea5e9;background:#f0f7ff}.trans-notice:empty{display:none}#transStatus{margin:6px 0;font-size:13px;color:#475569}.trans-heading-row{display:flex;flex-wrap:wrap;align-items:start;gap:8px 16px;margin:8px 0}.trans-competence-title{flex:1 1 280px;margin:0;font-size:14px;line-height:1.4;font-weight:600;color:#16324a}.trans-help{font-size:12px;max-width:100%;min-width:0}.trans-help>summary{cursor:pointer;min-height:32px;color:#075985}.trans-help p{max-width:640px;margin:4px 0;line-height:1.5}.trans-actions{display:flex;flex-wrap:wrap;gap:8px}.trans-actions button{margin:0}
 @media(max-width:640px){.trans-context{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.trans-context button{grid-column:1/-1}.trans-toolbar{gap:10px}.trans-toolbar-left{flex-basis:100%;gap:10px}.trans-mode-group{margin-left:0}.trans-heading-row{gap:6px}.trans-tutor-header h2{font-size:16px}}
+/* Visual Registro 3/6/7/10: solo presentación y estadísticas de lectura. */
+@media screen {
+  #panelFinales .fin-panel-card {padding:10px;}
+  #panelFinales .fin-header-main {display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;}
+  #panelFinales .fin-header-context {flex:1 1 250px;min-width:0;}
+  #panelFinales .fin-header-aux {gap:4px 8px;margin-top:2px;}
+  #panelFinales .fin-mode-info > span {padding:2px 0;background:transparent;font-size:10px;}
+  #panelFinales .fin-header-controls {flex:0 1 auto;gap:4px 8px;margin-left:auto;}
+  #panelFinales .fin-bulk-actions {gap:4px;}
+  #panelFinales .fin-bulk-actions .chip {border-radius:8px;min-width:44px;min-height:44px;padding:4px;font-size:12px;}
+  #panelFinales .fin-remove-bulk {min-height:44px;padding:4px 8px;}
+  #panelFinales .mode-toggle {gap:2px;padding:3px;}
+  #panelFinales .mode-toggle button {min-height:44px;padding:4px 8px;}
+  #finLista .fin-grid {width:100%;min-width:0;}
+  #finLista .fin-grid .fin-nom {width:auto;min-width:230px;max-width:none;}
+  #finLista .fin-grid .fin-nom .font-bold {white-space:nowrap;font-size:12px;line-height:1.35;}
+  #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:204px;min-width:204px;}
+  #finLista .fin-grid td:has(.final-conclusion) {width:400px;min-width:400px;}
+  #finLista .fin-grid th,#finLista .fin-grid td {padding:6px;}
+  #finLista .final-cell-layout {grid-template-columns:188px minmax(0,1fr);gap:6px;}
+  #finLista .final-grade {width:188px;min-width:188px;}
+  #finLista .final-grade > .fin-cell:has(> button[data-val]) {gap:3px 4px;}
+  #finLista .final-grade > .fin-cell > .chip[data-val] {width:44px;min-width:44px;min-height:44px;border-radius:8px;font-size:12px;padding:4px;}
+  #finLista .chip[data-val].on {box-shadow:inset 0 0 0 2px #0f172a;outline:1px solid #fff;outline-offset:-4px;}
+  #finLista .nivel-a.on {background:#4d7c0f;border-color:#4d7c0f;}
+  #finLista .nivel-b.on {background:#c2410c;border-color:#c2410c;}
+  #finLista .nivel-ad.on {background:#15803d;border-color:#15803d;}
+  #finLista .chip[data-val]:focus-visible {outline:3px solid #0369a1;outline-offset:2px;}
+  #finLista .chip[data-val]:disabled {cursor:default;}
+  #avanceBox .fin-grid {width:100%;}
+  #avanceBox .summary-student,#avanceBox .summary-student-header {width:auto;min-width:230px;max-width:none;padding:6px 8px;}
+  #avanceBox .summary-student-name {white-space:nowrap;font-size:12px;line-height:1.35;}
+  #avanceBox .summary-competence,#avanceBox .fin-grid thead th:not(.fin-nom):not(.summary-reference) {min-width:150px;max-width:240px;padding:6px;overflow-wrap:normal;}
+  #avanceBox .summary-competence .fin-cell {font-weight:800;font-size:15px;}
+  @media(max-width:640px) {
+    #panelFinales .fin-header-context {flex-basis:100%;}
+    #panelFinales .fin-header-controls {width:100%;margin-left:0;justify-content:space-between;}
+    #panelFinales .fin-bulk-actions > span {display:none;}
+    #panelFinales .fin-bulk-actions {width:100%;justify-content:flex-start;}
+    #panelFinales .fin-header-controls .mode-toggle {flex-basis:180px;}
+    #finLista .fin-grid .fin-nom,#avanceBox .summary-student,#avanceBox .summary-student-header {width:120px;min-width:120px;max-width:120px;}
+    #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:196px;min-width:196px;}
+    #finLista .final-grade {width:182px;min-width:182px;}
+    #finLista .final-cell-layout {grid-template-columns:182px minmax(0,1fr);}
+    #finLista .final-grade > .fin-cell:has(> button[data-val]) {column-gap:2px;}
+    #finLista .fin-grid .fin-nom .font-bold,#avanceBox .summary-student-name {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
+    #finLista .fin-grid td:has(.final-conclusion) {width:244px;min-width:244px;}
+    #finLista .final-conclusion {grid-column:1 / -1;grid-row:2;}
+  }
+}
+.competence-stats {margin:10px 0 0;padding:8px;border:1px solid #cbd5e1;border-radius:10px;font-size:12px;min-width:0;}
+.competence-stats h3 {margin:0 0 4px;font-size:13px;font-weight:800;}
+.competence-stats p {margin:4px 0;color:#475569;font-size:11px;}
+.competence-stats .stats-scroll {overflow-x:auto;max-width:100%;}
+.competence-stats table {border-collapse:collapse;width:100%;min-width:760px;}
+.competence-stats th,.competence-stats td {padding:6px;border-bottom:1px solid #e2e8f0;text-align:center;}
+.competence-stats th:first-child {text-align:left;min-width:200px;max-width:320px;font-weight:600;}
+.competence-stats td {white-space:nowrap;}
+.competence-stats thead {background:#f1f5f9;color:#0f172a;}
+.competence-stats progress {display:block;width:70px;height:6px;margin:3px auto;accent-color:#0284c7;}
+@media print {
+  body > :not(#printArea) {display:none!important;}
+  #printArea {position:static!important;background:#fff;}
+  #printArea:has(.summary-stats) {page:registro-resumen;padding:0;}
+  #printArea .fin-grid {table-layout:fixed;}
+  #printArea .fin-grid th,#printArea .fin-grid td {min-width:0!important;width:auto;max-width:none;white-space:normal;overflow-wrap:anywhere;}
+  #printArea .fin-grid .summary-student,#printArea .fin-grid .summary-student-header {width:24%;min-width:0!important;max-width:none;}
+  #printArea .fin-grid .summary-student-name {white-space:normal;overflow-wrap:anywhere;font-size:8pt;}
+  #printArea .fin-grid .summary-reference {width:12%;min-width:0!important;max-width:none;}
+  #printArea .competence-stats {font-size:8pt;break-inside:auto;}
+  #printArea .competence-stats table {min-width:0;width:100%;table-layout:fixed;}
+  #printArea .competence-stats th,#printArea .competence-stats td {min-width:0;max-width:none;white-space:normal;overflow-wrap:anywhere;border:1px solid #777;padding:3px;}
+  #printArea .competence-stats th:first-child {width:30%;}
+  #printArea thead {display:table-header-group;}
+  #printArea .competence-stats progress {display:none;}
+}
+@page registro-resumen {size:A4 landscape;margin:10mm;}
+/* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
@@ -378,8 +456,11 @@
             <div class="fin-header-context">
               <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
+              <div class="fin-header-aux">
+                <div class="fin-mode-info" id="finModeInfo"></div>
+                <div id="finResumen"></div>
+              </div>
             </div>
-            <div class="fin-mode-info" id="finModeInfo"></div>
             <div class="fin-header-controls">
               <div class="fin-bulk-actions" aria-label="Calificar competencias del área">
                 <span>Todo el área:</span>
@@ -395,11 +476,9 @@
               </div>
             </div>
           </div>
-          <div class="fin-header-aux">
-            <div id="finResumen"></div>
-          </div>
         </header>
         <div id="finLista" class="fin-wrap fin-scroll-body"></div>
+        <div id="finEstadisticas"></div>
       </div>
     </div>
 
@@ -2821,6 +2900,8 @@ function renderFinales() {
   const modeInfo = document.getElementById('finModeInfo');
   const bloqueado = bimCerradoDocente();
   const alumnos = estudiantes();
+  const estadisticas = document.getElementById('finEstadisticas');
+  if(estadisticas && typeof estadisticasCompetenciasHTML==='function') estadisticas.innerHTML=estadisticasCompetenciasHTML(comps,alumnos);
   if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; modeInfo.innerHTML=''; if(typeof sincronizarFondoPromedios==='function')sincronizarFondoPromedios(); return; }
 
   const capsPor = {};
@@ -2860,7 +2941,7 @@ function renderFinales() {
       if (modoCalif === 'letra') {
         const L = letra || ofi.letra || '';
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
-          ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
+          ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" aria-pressed="'+(L===v)+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+ev.letra+'</div>' : '') +
           (Object.keys(original).length&&!original.borrado&&!lock&&!registroSoloLectura()?'<button type="button" class="fin-clear-direct" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" title="Quitar directo" aria-label="Quitar directo">×</button>':'')+'</div>';
       } else {
@@ -2920,7 +3001,7 @@ function renderFinales() {
   });
   box.querySelectorAll('[data-quitar-directo]').forEach(el=>el.onclick=()=>quitarFinalManual(decodeURIComponent(el.dataset.quitarDirecto),decodeURIComponent(el.dataset.alumno)));
   box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
-  IEConclusionSuggestions.bindCompact(box,(el,text)=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),text));
+  IEConclusionSuggestions.bindCompact(box,(el,text)=>{const changed=setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),text);if(changed && estadisticas && typeof estadisticasCompetenciasHTML==='function')estadisticas.innerHTML=estadisticasCompetenciasHTML(comps,alumnos);return changed;});
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);
   if (typeof sincronizarFondoPromedios==='function') sincronizarFondoPromedios();
   sincronizarEdicionRegistro();
@@ -3163,11 +3244,26 @@ function promedioNums(arr) {
 }
 
 function escapeRegistro(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function datosEstadisticasCompetencias(comps,alumnos) {
+  const c=ctxBase();
+  return comps.map(comp=>{
+    const trabajada=competenciaTrabajada(comp),letras=trabajada?alumnos.map(al=>notaCompAlumno(comp,studentKey(al)).letra):[];
+    const s=IERegistroAcademico.statistics(letras);
+    const conclusionesPendientes=trabajada?alumnos.filter(al=>IERegistroAcademico.requiresConclusion(c.nivel,notaCompAlumno(comp,studentKey(al)).letra)&&!concCompAlumno(comp,studentKey(al))).length:0;
+    return {competencia:comp,trabajada,...s,matriculados:alumnos.length,pendientes:trabajada?s.noEvaluados:0,conclusionesPendientes,avance:trabajada&&alumnos.length?s.evaluados/alumnos.length*100:0};
+  });
+}
+function estadisticasCompetenciasHTML(comps,alumnos) {
+  if(!comps.length)return '';
+  const rows=datosEstadisticasCompetencias(comps,alumnos);
+  return '<section class="competence-stats"><h3>Estadísticas por competencia</h3><p>AD: Destacado · A: Logrado · B: Proceso · C: Inicio. Porcentajes sobre estudiantes evaluados; avance sobre matriculados. Calificar no confirma conclusiones ni cierre SIAGIE.</p><div class="stats-scroll" tabindex="0" role="region" aria-label="Estadísticas por competencia"><table><thead><tr><th>Competencia</th>'+['AD','A','B','C','Sin nota','Conclusiones pendientes','Avance'].map(l=>'<th>'+l+'</th>').join('')+'</tr></thead><tbody>'+rows.map(s=>'<tr><th scope="row">'+escapeRegistro(s.competencia)+'</th>'+(!s.trabajada?'<td colspan="7">No trabajada este bimestre</td>':['AD','A','B','C'].map(l=>'<td>'+s.niveles[l]+' · '+s.porcentajes[l].toFixed(1)+' %</td>').join('')+'<td>'+s.pendientes+'</td><td>'+s.conclusionesPendientes+'</td><td>'+s.evaluados+'/'+s.matriculados+' · '+s.avance.toFixed(1)+' %<progress max="100" value="'+s.avance+'" aria-label="Avance de calificación"></progress></td>')+'</tr>').join('')+'</tbody></table></div></section>';
+}
 function estadisticaResumenHTML(){const s=IERegistroAcademico.statistics(estudiantes().map(al=>promReferencialAlumno(studentKey(al)).letra));return '<section class="summary-stats"><h3>RESUMEN ESTADÍSTICO</h3><div class="summary-counts">'+[['Matriculados',s.matriculados],['Evaluados',s.evaluados],['No evaluados',s.noEvaluados],['Aprobados',s.aprobados],['Desaprobados',s.desaprobados]].map(([l,n])=>'<span>'+l+': <strong>'+n+'</strong></span>').join('')+'</div><table><thead><tr><th>Nivel</th><th>Frecuencia</th><th>Porcentaje</th></tr></thead><tbody>'+Object.keys(s.niveles).map(l=>'<tr><th>'+l+'</th><td>'+s.niveles[l]+'</td><td>'+s.porcentajes[l].toFixed(1)+' %</td></tr>').join('')+'<tr><th>TOTAL</th><td>'+s.evaluados+'</td><td>'+(s.evaluados?'100':'0')+' %</td></tr></tbody></table><small>Clasificación estadística: AD/A/B aprobados; C desaprobados. Promedio referencial informativo; no determina promoción ni SIAGIE.</small></section>';}
 function renderAvance() {
  const box=document.getElementById('avanceBox'),c=ctxBase(),comps=competencias();document.getElementById('lblAvanceCtx').textContent=c.area+' · Bim '+c.bim;
  let html='<div class="fin-wrap fin-scroll-body"><table class="fin-grid"><thead><tr><th class="fin-nom summary-student-header">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'<th class="summary-reference">Promedio referencial<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
  estudiantes().forEach((al,i)=>{const id=studentKey(al);html+='<tr><th class="fin-nom summary-student"><span class="summary-student-order">'+escapeRegistro(al.numeroVisual??i+1)+'</span><span class="summary-student-name">'+escapeRegistro(al.nombre)+'</span></th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td class="summary-competence">No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id);html+='<td class="summary-competence"><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+escapeRegistro(d.letra||'Pendiente')+'</span></div></td>';});const r=promReferencialAlumno(id);html+='<td class="summary-reference">'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>'+estadisticaResumenHTML();
+ if(typeof estadisticasCompetenciasHTML==='function')box.innerHTML+=estadisticasCompetenciasHTML(comps,estudiantes());
  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
 }
 function imprimirResumen(){

@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{execFileSync}=require('node:child_process');
-const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8'),clone=x=>JSON.parse(JSON.stringify(x));
+const read=f=>{const s=fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/\r\n/g,'\n');return f==='registro.html'?require('./registro-visual-snapshot.cjs')(s):s;},clone=x=>JSON.parse(JSON.stringify(x));
 const backend=new Function('require','__dirname',read('tests/primary-area-assignments.test.cjs').split('\nfor(const action')[0]+'\nreturn backend;')(require,__dirname);
 for(const user of ['admin','test-primary','synthetic-ef'])test('B2 existing protected POST loadreg reads every authorized area without an area filter: '+user,()=>{
  const s=backend(),sheet=s.tables.get('RegistroNotas');for(const area of ['Comunicación','Matemática','Educación Física'])sheet.rows.push(['primaria||I||6||ÚNICA||'+area,'primaria','I',6,'ÚNICA',area,'Synthetic',10,JSON.stringify({modeloAcademico:1,finales:{}})]);
