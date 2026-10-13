@@ -1034,6 +1034,10 @@
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
   <script src="matrix-teachers.js"></script>
+<script src="student-identity.js"></script>
+<script src="registro-academic-model.js"></script>
+<script src="registro-evaluation.js"></script>
+<script src="matrix-registry-import.js"></script>
   <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body class="text-slate-800">
@@ -2860,73 +2864,31 @@ window.__IE_gradoOK = function(gradoVal) {
             if (n>=11) return 'B';
             return 'C';
         }
+        let importadorRegistroMatriz = null;
         function traerDesdeRegistro() {
             if (impedirEdicionPeriodo()) return;
-            let store = {};
-            try { store = JSON.parse(localStorage.getItem('ie22375_registro_notas_v2') || '{}'); } catch(e) { store = {}; }
-            const finales = store.finales || {};
-            const grades = store.grades || {};
-            const sessions = store.sessions || [];
-            const gradoN = String(gradoNumSec(estado.grado));
-            const sec = (estado.seccion === 'ÚNICA' || estado.seccion === 'UNICA') ? 'Unica' : estado.seccion;
-            const bim = estado.bimestre;
-            const areas = Object.keys(ESTRUCTURA_AREAS).filter(n => areaVisibleSesion(n));
-            const usar = estado.areaActual ? [estado.areaActual] : areas;
-            let llenas = 0;
-            usar.forEach(area => {
-                (ESTRUCTURA_AREAS[area].competencias || []).forEach(comp => {
-                    const conteo = { inicio:0, proceso:0, previsto:0, destacado:0 };
-                    const vistos = {};
-                    Object.keys(finales).forEach(k => {
-                        const p = k.split('||');
-                        if (p[0]!=='secundaria' || p[1]!==bim || String(p[2])!==gradoN) return;
-                        const secR = String(p[3]||'');
-                        if (sec === 'Unica') { if (secR.toLowerCase().indexOf('unic')<0) return; }
-                        else if (secR !== sec) return;
-                        if (p[4]!==area || p[5]!==comp) return;
-                        const f = finales[k] || {};
-                        const L = f.nivel || (f.nota20!=null && f.nota20!=='' ? numToLetterMat(f.nota20) : '');
-                        const nv = letraANivelMatriz(L);
-                        if (nv) { conteo[nv]++; vistos[p[6]] = 1; llenas++; }
-                    });
-                    sessions.forEach(s => {
-                        const secSesion = String(s.seccion || '').toUpperCase().replace('UNICA','ÚNICA');
-                        const secActual = String(sec || '').toUpperCase().replace('UNICA','ÚNICA');
-                        if (s.nivel!=='secundaria' || s.bim!==bim || String(s.grado)!==gradoN ||
-                            secSesion!==secActual || s.area!==area || s.comp!==comp) return;
-                        Object.keys(grades).forEach(gk => {
-                            const p = gk.split('||');
-                            const secNota = String(p[3] || '').toUpperCase().replace('UNICA','ÚNICA');
-                            if (p[0]!=='secundaria' || p[1]!==bim || String(p[2])!==gradoN ||
-                                secNota!==secActual || p[4]!==area || p[5]!==comp) return;
-                            if (String(p[6] || '') !== String(s.capacidad || '') || String(p[7] || '') !== String(s.fecha || '')) return;
-                            const nom = p[p.length-1];
-                            if (vistos[nom]) return;
-                            const g = grades[gk] || {};
-                            const L = g.nivel || (g.nota20!=null && g.nota20!=='' ? numToLetterMat(g.nota20) : '');
-                            const nv = letraANivelMatriz(L);
-                            if (nv) { conteo[nv]++; vistos[nom]=1; llenas++; }
-                        });
-                    });
-                    const dato = getDato(area, comp);
-                    dato.inicio = conteo.inicio;
-                    dato.proceso = conteo.proceso;
-                    dato.previsto = conteo.previsto;
-                    dato.destacado = conteo.destacado;
-                });
+            if (typeof IEMatrixRegistryImport === 'undefined') {mostrarToast('No se pudo cargar el importador. Actualice con conexión.');return;}
+            if (!importadorRegistroMatriz) importadorRegistroMatriz = IEMatrixRegistryImport.create({
+                api: CLOUD_API_URL,
+                context: () => ({nivel: CLOUD_NIVEL, bim: estado.bimestre, grado: gradoNumSec(estado.grado), seccion: estado.seccion || 'UNICA', areaSeleccionada: estado.areaActual}),
+                catalog: () => Object.fromEntries(Object.entries(ESTRUCTURA_AREAS).filter(([area]) => area !== 'Competencias Transversales' && (!window.__IE_areasOK || window.__IE_areasOK(area))).map(([area, value]) => [area, value.competencias])),
+                current: () => JSON.parse(JSON.stringify(estado.datos[claveAula()] || {})),
+                apply: rows => {
+                    if (impedirEdicionPeriodo() || (IEStudents.session() || {}).role !== 'admin') throw Error('Solo Admin puede aplicar en un bimestre abierto.');
+                    if (!storageDisponible) throw Error('No se puede conservar el resultado en este dispositivo.');
+                    const next = JSON.parse(JSON.stringify(estado)), key = claveAula();
+                    next.datos[key] = next.datos[key] || {};
+                    rows.forEach(row => {next.datos[key][row.area] = next.datos[key][row.area] || {};next.datos[key][row.area][row.comp] = {...(next.datos[key][row.area][row.comp] || {}), ...row.counts};});
+                    next.ultimaModificacion = Date.now();
+                    localStorage.setItem('matriz_SEC_IE22375', JSON.stringify(next));
+                    estado = next;
+                    if (estado.areaActual) {renderizarCompetencias();crearGraficos();renderizarResumen();}
+                },
+                notify: message => mostrarToast(message)
             });
-            if (typeof guardarDatos === 'function') guardarDatos();
-            if (estado.areaActual) {
-                renderizarCompetencias();
-                if (typeof crearGraficos === 'function') crearGraficos();
-                if (typeof renderizarResumen === 'function') renderizarResumen();
-            }
-            if (typeof mostrarToast === 'function') mostrarToast(
-                llenas ? 'Conteo traído del registro auxiliar' : 'Esta sección no tiene notas: se dejó en blanco en la matriz',
-                llenas ? 'ok' : 'success'
-            );
-            else alert(llenas ? 'Conteo traído del registro auxiliar' : 'Esta sección no tiene notas: se dejó en blanco en la matriz');
+            return importadorRegistroMatriz.open();
         }
+
 
         let chartResumenGradoAdmin = null;
 

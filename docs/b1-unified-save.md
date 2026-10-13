@@ -20,7 +20,9 @@ La nota académica se guarda localmente; savereg continúa siendo exclusivo de S
 
 Sin cambios en Apps Script, Sheets, students.js, matrices, módulo transversal ni SW v20. No hay nueva dependencia estática que requiera renovar SW. Una copia HTML offline anterior puede mostrar los botones antiguos; los contratos y almacenamiento siguen siendo compatibles.
 
-## B2 — diagnóstico confirmado, sin implementación
+## B2 — diagnóstico original y seguimiento
+
+Implementación frontend desde la base posterior al PR #79: [B2 — importación segura](b2-matrix-registry-import.md). El diagnóstico y la propuesta siguientes documentan el comportamiento anterior, reemplazado por lecturas protegidas de nube y confirmación local explícita.
 
 En primaria.html y secundaria.html, traerDesdeRegistro lee ie22375_registro_notas_v2 del navegador. Usa solo estado.areaActual cuando está seleccionada; recorre directos/evidencias y reemplaza conteos inicio/proceso/previsto/destacado sin preview ni aprobación del reemplazo. No verifica si son registros confirmados en servidor. El primer resultado encontrado para una identidad puede prevalecer por orden de iteración; no calcula necesariamente el promedio efectivo completo del Registro.
 

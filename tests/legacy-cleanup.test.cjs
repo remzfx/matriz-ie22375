@@ -202,13 +202,11 @@ test('Registro keeps cloud actions on one mobile row', () => {
 
 
 test('Secundaria Desde registro never mixes notes between A and B', () => {
-  const src = read('secundaria.html');
-  assert.match(src, /secSesion!==secActual/);
-  assert.match(src, /secNota!==secActual/);
-  assert.match(src, /p\[1\]!==bim/);
-  assert.match(src, /String\(p\[2\]\)!==gradoN/);
-  assert.match(src, /String\(p\[6\] \|\| ''\) !== String\(s\.capacidad \|\| ''\)/);
-  assert.match(src, /String\(p\[7\] \|\| ''\) !== String\(s\.fecha \|\| ''\)/);
+  const src = read('matrix-registry-import.js');
+  assert.match(src, /norm\(a.seccion\)===norm\(b.seccion\)/);
+  assert.match(src, /!same\(s,c\)\|\|s.area!==c.area\|\|s.comp!==comp/);
+  assert.match(src, /s.capacidad,s.fecha/);
+  assert.match(read('secundaria.html'), /IEMatrixRegistryImport.create/);
 });
 
 

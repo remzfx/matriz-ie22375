@@ -18,7 +18,7 @@ test('login stays compact inside shell-auth and Registro entry selector uses the
 });
 test('Unrelated module HTML remains identical to the approved responsive shells base',()=>{
  const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['aula_innovacion.html','primaria.html','secundaria.html']){
- let current=withoutPr73Escaping(read(file));
+ let current=withoutPr73Escaping(require('./b2-snapshot.cjs')(file,read(file)));
  assert.equal(current,execFileSync('git',['show',baseNow+':'+file],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n'));
  }
 });
@@ -49,7 +49,7 @@ test('Photochecks retains shell-wide while upgrading A4 print and high-resolutio
  assert.match(now,/vendor\/qrcodejs\.min\.js/);
 });
 test('SW changes only static version and shared stylesheet entry, preserving API transport and cache policy',()=>{
- const sw=read('sw.js').replace(/\r\n/g,'\n');assert.match(sw,/CACHE_PREFIX \+ 'v20'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace(", './registro-reconcile.js'",'').replace("CACHE_PREFIX + 'v20'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
+ const sw=read('sw.js').replace(/\r\n/g,'\n').replace(" './matrix-registry-import.js',",'');assert.match(sw,/CACHE_PREFIX \+ 'v20'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace(", './registro-reconcile.js'",'').replace("CACHE_PREFIX + 'v20'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
 });
 test('v20 installs actual shared CSS and serves it offline without caching external Apps Script POST',async()=>{
  const setup=new Function('require','__dirname',read('tests/service-worker-static.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname),s=setup(),css=read('layout-shells.css');

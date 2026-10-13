@@ -40,7 +40,7 @@ test('B1 UI exposes one academic Guardar, cloud labels and unchanged handlers',(
 });
 test('B1 preserves academic upload/download, manual averages, backend, student client and worker',()=>{
  for(const n of ['subirRegistroNube','bajarRegistroNube','guardarFinales','aplicarFinalManual','guardarAsistencia','guardarTodo'])assert.equal(extract(n).replace(/Subir Nube/g,'Nube Subir').replace(/Bajar Nube/g,'Nube Bajar').replace(/\r\n/g,'\n'),extract(n,old).replace(/\r\n/g,'\n'),n);
- for(const file of ['apps-script/Codigo.js','registro-transversales.js','registro-academic-model.js','students.js','sw.js','primaria.html','secundaria.html'])assert.equal(read(file).replace(/\r\n/g,'\n'),execFileSync('git',['show',base+':'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'),file);
+ for(const file of ['apps-script/Codigo.js','registro-transversales.js','registro-academic-model.js','students.js','sw.js','primaria.html','secundaria.html'])assert.equal(require('./b2-snapshot.cjs')(file,read(file)).replace(/\r\n/g,'\n'),execFileSync('git',['show',base+':'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'),file);
 });
 const transversalUI=new Function('require','__dirname',read('tests/registro-transversales-integracion.test.cjs').split('\ntest(')[0]+'\nreturn ui;')(require,__dirname);
 function integrated(){const f=transversalUI();let locals=0;f.c.guardarTodo=()=>{locals++;return true};f.c.cloudClaveReg=()=>JSON.stringify(f.c.ctxBase());vm.runInContext(extract('guardarRegistroIntegrado'),f.c);return {...f,locals:()=>locals};}
