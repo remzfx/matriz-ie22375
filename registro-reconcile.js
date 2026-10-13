@@ -190,24 +190,53 @@
     if(!conflicts.length)return Promise.resolve({});
     return new Promise(resolve=>{
       const overlay=document.createElement('div');overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label','Revisar conflictos académicos');
-      overlay.style.cssText='position:fixed;inset:0;background:#0f172acc;z-index:100;display:flex;align-items:center;justify-content:center;padding:12px';
-      const panel=document.createElement('div');panel.style.cssText='background:white;color:#0f172a;border-radius:12px;padding:16px;max-width:760px;width:100%;max-height:90vh;overflow:auto';overlay.appendChild(panel);
-      const heading=document.createElement('h2');heading.textContent='Conflictos pendientes · el trabajo local se conserva';panel.appendChild(heading);
-      const help=document.createElement('p');help.textContent='Elige por dato. Ninguna calificación se envía hasta resolver todos los conflictos. Cancelar conserva el borrador.';panel.appendChild(help);
+      overlay.className='academic-conflict-dialog';
+      const panel=document.createElement('div');panel.className='academic-conflict-panel';overlay.appendChild(panel);
+      const style=document.createElement('style');style.textContent=`
+        .academic-conflict-dialog{position:fixed;inset:0;background:#0f172acc;z-index:100;display:flex;align-items:center;justify-content:center;padding:12px;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+        .academic-conflict-dialog,.academic-conflict-dialog *{box-sizing:border-box;}
+        .academic-conflict-panel{display:flex;flex-direction:column;min-width:0;width:100%;max-width:800px;max-height:90vh;max-height:90dvh;overflow:hidden;background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:12px;}
+        .academic-conflict-header{flex-shrink:0;padding:14px 16px 10px;border-bottom:1px solid #e2e8f0;}
+        .academic-conflict-header h2{margin:0;font-size:17px;font-weight:600;line-height:1.35;overflow-wrap:anywhere;}
+        .academic-conflict-header p{margin:5px 0 0;font-size:13px;line-height:1.4;color:#475569;}
+        .academic-conflict-content{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:12px 16px;display:flex;flex-direction:column;gap:10px;}
+        .academic-conflict-card{flex-shrink:0;min-width:0;margin:0;padding:10px;border:1px solid #cbd5e1;border-radius:9px;background:#f8fafc;}
+        .academic-conflict-card legend{max-width:100%;padding:0 4px;font-size:13px;font-weight:600;line-height:1.45;white-space:normal;overflow-wrap:anywhere;}
+        .academic-conflict-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+        .academic-conflict-option{display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px;align-items:start;min-width:0;min-height:44px;padding:9px;margin:0;background:#fff;border:1px solid #cbd5e1;border-radius:7px;cursor:pointer;}
+        .academic-conflict-option input{appearance:auto;flex-shrink:0;width:18px;height:18px;margin:1px 0 0;accent-color:#0284c7;}
+        .academic-conflict-option strong{display:block;font-size:13px;font-weight:600;line-height:1.4;}
+        .academic-conflict-value{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.4;}
+        .academic-conflict-card details{margin-top:7px;font-size:12px;color:#475569;}
+        .academic-conflict-card summary{cursor:pointer;min-height:28px;padding:4px 0;}
+        .academic-conflict-card pre{margin:5px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.4 ui-monospace,monospace;}
+        .academic-conflict-footer{flex-shrink:0;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px solid #e2e8f0;background:#fff;}
+        .academic-conflict-footer button{min-height:44px;max-width:100%;margin:0;padding:9px 12px;border:1px solid #64748b;border-radius:7px;background:#fff;color:#334155;font:600 13px/1.4 system-ui,sans-serif;white-space:normal;cursor:pointer;}
+        .academic-conflict-footer .academic-conflict-apply{background:#0284c7;border-color:#0284c7;color:#fff;}
+        .academic-conflict-footer button:disabled{opacity:.5;cursor:not-allowed;}
+        .academic-conflict-dialog button:focus-visible,.academic-conflict-dialog input:focus-visible,.academic-conflict-dialog summary:focus-visible{outline:2px solid #0284c7;outline-offset:3px;}
+        .academic-conflict-option:focus-within{border-color:#0284c7;}
+        @media(max-width:600px){.academic-conflict-options{grid-template-columns:minmax(0,1fr);}.academic-conflict-header{padding:12px;}.academic-conflict-content{padding:10px 12px;}.academic-conflict-footer{padding:10px 12px;}.academic-conflict-header h2{font-size:16px;}}
+      `;overlay.appendChild(style);
+      const header=document.createElement('div');header.className='academic-conflict-header';panel.appendChild(header);
+      const heading=document.createElement('h2');heading.textContent='Conflictos pendientes · el trabajo local se conserva';header.appendChild(heading);
+      const help=document.createElement('p');help.textContent='Elige por dato. Ninguna calificación se envía hasta resolver todos los conflictos. Cancelar conserva el borrador.';header.appendChild(help);
+      const content=document.createElement('div');content.className='academic-conflict-content';panel.appendChild(content);
       const choices={},apply=document.createElement('button'),cancel=document.createElement('button'),previous=document.activeElement;
       conflicts.forEach((c,i)=>{
-        const view=conflictView(c,context),field=document.createElement('fieldset'),label=document.createElement('legend');label.textContent=view.title;field.appendChild(label);
+        const view=conflictView(c,context),field=document.createElement('fieldset'),label=document.createElement('legend');field.className='academic-conflict-card';label.textContent=view.title;field.appendChild(label);
+        const options=document.createElement('div');options.className='academic-conflict-options';field.appendChild(options);
         for(const side of ['local','remote']){
-          const row=document.createElement('label'),radio=document.createElement('input'),text=document.createElement('pre');radio.type='radio';radio.name='academic-conflict-'+i;
-          text.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere';text.textContent=(side==='local'?'Este dispositivo: ':'Nube: ')+view[side];
-          radio.onchange=()=>{choices[c.path]=side;apply.disabled=conflicts.some(x=>!choices[x.path]);};row.appendChild(radio);row.appendChild(text);field.appendChild(row);
+          const row=document.createElement('label'),radio=document.createElement('input'),text=document.createElement('div'),source=document.createElement('strong'),value=document.createElement('div');row.className='academic-conflict-option';radio.type='radio';radio.name='academic-conflict-'+i;
+          source.textContent=side==='local'?'Este dispositivo':'Nube';value.className='academic-conflict-value';value.textContent=view[side];text.appendChild(source);text.appendChild(value);
+          radio.onchange=()=>{choices[c.path]=side;apply.disabled=conflicts.some(x=>!choices[x.path]);};row.appendChild(radio);row.appendChild(text);options.appendChild(row);
         }
-        const details=document.createElement('details'),summary=document.createElement('summary'),technical=document.createElement('pre');summary.textContent='Identificación y detalles técnicos';technical.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere';technical.textContent=JSON.stringify(c,null,2);details.appendChild(summary);details.appendChild(technical);field.appendChild(details);panel.appendChild(field);
+        const details=document.createElement('details'),summary=document.createElement('summary'),technical=document.createElement('pre');summary.textContent='Identificación y detalles técnicos';technical.textContent=JSON.stringify(c,null,2);details.appendChild(summary);details.appendChild(technical);field.appendChild(details);content.appendChild(field);
       });
       apply.type=cancel.type='button';apply.textContent='Continuar con las decisiones';cancel.textContent='Cancelar';apply.disabled=true;
-      for(const btn of [apply,cancel]){btn.style.cssText='padding:10px;margin:6px;border:1px solid #64748b;border-radius:6px';panel.appendChild(btn);}
+      const footer=document.createElement('div');footer.className='academic-conflict-footer';apply.className='academic-conflict-apply';footer.appendChild(cancel);footer.appendChild(apply);panel.appendChild(footer);
       let done=false;const finish=value=>{if(done)return;done=true;clearInterval(watch);document.removeEventListener('keydown',key);overlay.remove();if(previous&&previous.focus)previous.focus();resolve(value);};
-      const key=e=>{if(e.key==='Escape'){e.preventDefault();finish(null);}if(e.key==='Tab'){const nodes=Array.from(panel.querySelectorAll('input,button,summary')).filter(n=>!n.disabled);if(e.shiftKey&&document.activeElement===nodes[0]){e.preventDefault();nodes[nodes.length-1].focus();}else if(!e.shiftKey&&document.activeElement===nodes[nodes.length-1]){e.preventDefault();nodes[0].focus();}}};
+      const key=e=>{if(e.key==='Escape'){e.preventDefault();finish(null);}if(e.key==='Tab'){const candidates=Array.from(panel.querySelectorAll('input,button,summary')).filter(n=>!n.disabled);const nodes=candidates.filter(n=>{if(n.type!=='radio')return true;const group=candidates.filter(x=>x.type==='radio'&&x.name===n.name);return n===(group.find(x=>x.checked)||group[0]);});if(e.shiftKey&&document.activeElement===nodes[0]){e.preventDefault();nodes[nodes.length-1].focus();}else if(!e.shiftKey&&document.activeElement===nodes[nodes.length-1]){e.preventDefault();nodes[0].focus();}}};
       const watch=setInterval(()=>{if(!isCurrent())finish(null);},300);apply.onclick=()=>finish(isCurrent()?choices:null);cancel.onclick=()=>finish(null);
       document.addEventListener('keydown',key);document.body.appendChild(overlay);cancel.focus();
     });

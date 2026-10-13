@@ -24,7 +24,7 @@ cliente real contra un Apps Script ejecutado en VM y hojas exclusivamente en mem
 - Asistencia, fechas y estados son compartidos por aula/bimestre: la versión de un área no demuestra su causalidad. Diferencias presentes en ambos lados requieren elección explícita, aunque coincidan con la base del área. Ausencias no borran marcas/fechas locales. Una fecha eliminada frente a marcas activas se decide con sus marcas como conjunto. No se elige por timestamps.
 - El diálogo muestra estudiante, orden/identidad oficial, competencia, tipo de dato y alternativas legibles; las claves y valores originales quedan en detalles técnicos colapsados. Todo se renderiza mediante texto DOM.
 - El diálogo exige una decisión Este dispositivo/Nube por conflicto; no preselecciona
-  ganador. Cancelar no escribe. Utiliza texto DOM, foco acotado y Escape.
+  ganador. Cancelar no escribe. Utiliza texto DOM, foco acotado y Escape. Presenta tarjetas compactas, opciones alineadas en dos columnas (una en móvil), tipografía del sistema y un pie de acciones fuera del contenido desplazable. Tab/Shift+Tab consideran el radio seleccionado de cada grupo.
 - Sesiones/fechas eliminadas frente a evidencias/marcas nuevas se resuelven conjuntamente;
   no quedan notas ocultas por una sesión eliminada automáticamente.
 - Los identificadores estables y aliases inequívocos detectan representaciones históricas
@@ -49,7 +49,7 @@ cliente real contra un Apps Script ejecutado en VM y hojas exclusivamente en mem
 
 ## Validación y límites
 
-Suite: 1.716 pruebas, 1.716 aprobadas, 0 fallidas, 0 omitidas. 75 regresiones A1 (16 añadidas tras revisión).
+Suite: 1.724 pruebas, 1.724 aprobadas, 0 fallidas, 0 omitidas. 83 regresiones A1 (16 de integridad y 8 de interfaz añadidas tras revisión).
 Incluye cliente, diálogo DOM, Apps Script simulado, permisos, cierre, revocación,
 concurrencia, pérdida de respuesta, cancelación, tombstones, asistencia y claves históricas.
 Las pruebas anteriores se adaptan al módulo y SW; las comparaciones históricas de

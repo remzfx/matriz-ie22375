@@ -175,16 +175,16 @@ for(const reject of ['closed','revoked','unauthorized'])test('A1 simulated serve
  if(reject==='unauthorized'){w.s.docentes[1].asignaciones={'Matemática':['1|A']};w.s.docentes[1].areas=['Matemática'];w.s.tables.get('DocentesAcceso').rows[1][2]=JSON.stringify(w.s.docentes);}
  if(reject!=='closed'){w.s.state.held=true;w.s.c.CacheService.getScriptCache().remove('IE22375_DOCENTE_ACCESOS_V1');w.s.state.held=false;}assert.equal(await w.c.subirRegistroNube(),false);assert.equal(w.c.store.finales[key].nota20,18);assert.equal(JSON.stringify(w.s.tables.get('RegistroNotas').rows),before);assert.equal(w.s.state.held,false);
 });
-function dialog(){
+function dialog(count=1){
  const c=vm.createContext({}),events={};let watch,current=true;c.window=c;c.setInterval=f=>(watch=f,1);c.clearInterval=()=>watch=null;
  const d={activeElement:null,addEventListener:(k,f)=>events[k]=f,removeEventListener:k=>delete events[k]};
- class Node{constructor(tag){this.tag=tag;this.children=[];this.style={};this.attrs={};this.disabled=false;}setAttribute(k,v){this.attrs[k]=v;}appendChild(n){this.children.push(n);return n;}remove(){d.body.children=d.body.children.filter(n=>n!==this);}focus(){d.activeElement=this;}querySelectorAll(){return this.children.flatMap(n=>['input','button'].includes(n.tag)?[n,...n.querySelectorAll()]:n.querySelectorAll());}}
- d.createElement=t=>new Node(t);d.body=new Node('body');c.document=d;vm.runInContext(read('registro-reconcile.js'),c);const conflicts=[{path:JSON.stringify(['finales','id:synthetic']),local:{nivel:'A',text:'<synthetic-tag>'},remote:{nivel:'B'}}];
+ class Node{constructor(tag){this.tag=tag;this.children=[];this.style={};this.attrs={};this.disabled=false;}setAttribute(k,v){this.attrs[k]=v;}appendChild(n){this.children.push(n);return n;}remove(){d.body.children=d.body.children.filter(n=>n!==this);}focus(){d.activeElement=this;}querySelectorAll(){return this.children.flatMap(n=>['input','button','summary'].includes(n.tag)?[n,...n.querySelectorAll()]:n.querySelectorAll());}}
+ d.createElement=t=>new Node(t);d.body=new Node('body');c.document=d;vm.runInContext(read('registro-reconcile.js'),c);const conflicts=Array.from({length:count},(_,i)=>({path:JSON.stringify(['finales','id:synthetic'+(i||'')]),local:{nivel:'A',text:'<synthetic-tag>'},remote:{nivel:'B'}}));
  const pending=c.IERegistroReconcile.choose(conflicts,()=>current);const root=d.body.children[0],panel=root.children[0],nodes=panel.querySelectorAll(),radios=nodes.filter(x=>x.tag==='input'),buttons=nodes.filter(x=>x.tag==='button');
- return {c,d,events,root,panel,radios,apply:buttons[0],cancel:buttons[1],pending,stale:()=>{current=false;watch()},path:conflicts[0].path};
+ return {c,d,events,root,panel,content:panel.children[1],footer:panel.children[2],radios,apply:buttons[1],cancel:buttons[0],pending,stale:()=>{current=false;watch()},path:conflicts[0].path};
 }
 test('A1 explicit conflict dialog has no implicit winner and renders data as text, not HTML',async()=>{
- const f=dialog();assert.equal(f.root.attrs['role'],'dialog');assert.equal(f.root.attrs['aria-modal'],'true');assert.equal(f.apply.disabled,true);const pre=f.panel.children.find(x=>x.tag==='fieldset').children[1].children[1];assert.match(pre.textContent,/<synthetic-tag>/);assert.equal(pre.innerHTML,undefined);
+ const f=dialog();assert.equal(f.root.attrs['role'],'dialog');assert.equal(f.root.attrs['aria-modal'],'true');assert.equal(f.apply.disabled,true);const pre=f.content.children.find(x=>x.tag==='fieldset').children[1].children[0].children[1].children[1];assert.match(pre.textContent,/<synthetic-tag>/);assert.equal(pre.innerHTML,undefined);
  f.radios[0].onchange();assert.equal(f.apply.disabled,false);f.apply.onclick();assert.equal((await f.pending)[f.path],'local');assert.equal(f.d.body.children.length,0);
 });
 test('A1 conflict cancel and Escape never resolve or send a selected value',async()=>{
@@ -192,7 +192,7 @@ test('A1 conflict cancel and Escape never resolve or send a selected value',asyn
 });
 test('A1 conflict dialog cancels on context/token/revision change',async()=>{const f=dialog();f.stale();assert.equal(await f.pending,null);});
 test('A1 conflict dialog traps keyboard focus within choices and actions',async()=>{
- const f=dialog();let prevented=0;f.cancel.focus();f.events.keydown({key:'Tab',shiftKey:false,preventDefault(){prevented++}});assert.equal(f.d.activeElement,f.radios[0]);f.events.keydown({key:'Tab',shiftKey:true,preventDefault(){prevented++}});assert.equal(f.d.activeElement,f.cancel);assert.equal(prevented,2);f.cancel.onclick();await f.pending;
+ const f=dialog();let prevented=0;f.apply.disabled=false;f.apply.focus();f.events.keydown({key:'Tab',shiftKey:false,preventDefault(){prevented++}});assert.equal(f.d.activeElement,f.radios[0]);f.events.keydown({key:'Tab',shiftKey:true,preventDefault(){prevented++}});assert.equal(f.d.activeElement,f.apply);assert.equal(prevented,2);f.cancel.onclick();await f.pending;
 });
 test('A1 worker precaches required reconcile module and cleans prior version without changing private exclusions',()=>{
  const sw=read('sw.js');assert.match(sw,/CACHE_PREFIX \+ 'v20'/);assert.match(sw,/'\.\/registro-reconcile\.js'/);assert.match(read('registro.html'),/<script src="registro-reconcile.js" defer><\/script>/);assert.ok(read('registro.html').indexOf('registro-reconcile.js')<read('registro.html').indexOf('registro-academic-model.js'));
@@ -232,7 +232,7 @@ test('A1 homonymous students remain distinct through official identity and order
  const roster=[{nombre:'Nombre ficticio',orden:1,idSiagie:'1'},{nombre:'Nombre ficticio',orden:2,idSiagie:'2'}];const a=api.conflictView({path:JSON.stringify(['finales',K])},{roster}),b=api.conflictView({path:JSON.stringify(['finales',K.replace('id:1','id:2')])},{roster});assert.notEqual(a.title,b.title);assert.match(a.title,/ID 1/);assert.match(b.title,/ID 2/);
 });
 test('A1 conflict UI retains exact technical identification in collapsed safe details',async()=>{
- const f=dialog(),field=f.panel.children.find(x=>x.tag==='fieldset'),details=field.children.find(x=>x.tag==='details');assert.equal(details.open,undefined);assert.match(details.children[1].textContent,/id:synthetic/);assert.equal(details.children[1].innerHTML,undefined);assert.match(field.children[1].children[1].textContent,/Este dispositivo/);assert.match(field.children[2].children[1].textContent,/Nube/);f.cancel.onclick();assert.equal(await f.pending,null);
+ const f=dialog(),field=f.content.children.find(x=>x.tag==='fieldset'),details=field.children.find(x=>x.tag==='details');assert.equal(details.open,undefined);assert.match(details.children[1].textContent,/id:synthetic/);assert.equal(details.children[1].innerHTML,undefined);assert.match(field.children[1].children[0].children[1].children[0].textContent,/Este dispositivo/);assert.match(field.children[1].children[1].children[1].children[0].textContent,/Nube/);f.cancel.onclick();assert.equal(await f.pending,null);
 });
 test('A1 switching to another area with an older copy never silently reverts shared attendance',async()=>{
  const f=client(),a=f.c.asisCtxKey(),key=a+'||'+DATE+'||id:1';f.c.cloudClaveReg=()=>[f.c.nivel,f.c.bim,f.c.grado,f.c.seccion,f.c.areaActual].join('||');f.c.prefijoReg=()=>f.c.cloudClaveReg()+'||';f.c.store.asistencia[key]={marca:'P',ts:900};f.c.store.asisFechas[a]=[DATE];f.c.areaActual='Comunicación';const b=f.c.baselineAcademica();b.basePayload=copy(f.c.sliceRegistroArea());b.version=1;const remote={version:1,payload:copy(b.basePayload)};remote.payload.asistencia[key]={marca:'F',ts:1};f.setRemote(remote);f.c.IERegistroReconcile.choose=async cs=>{assert.equal(cs.length,1);return {[cs[0].path]:'local'}};
@@ -243,4 +243,28 @@ test('A1 canceling backup recovery preserves shared dates, marks and academic dr
 });
 test('A1 readable conclusion and attendance conflicts retain exact values and dates',()=>{
  const roster=[{nombre:'Estudiante ficticio',orden:1,idSiagie:'1'}],c=api.conflictView({path:JSON.stringify(['concComp',K]),local:{texto:'Texto sintético <visible>'},remote:{texto:'Otro texto'}},{roster});assert.match(c.title,/Conclusión de competencia/);assert.equal(c.local,'Texto: Texto sintético <visible>');const a=api.conflictView({path:JSON.stringify(['asistencia',MARK]),local:{marca:'P',hora:'08:00'},remote:{marca:'F',hora:''}},{roster});assert.match(a.title,/Estudiante ficticio/);assert.match(a.title,/2026-10-12/);assert.match(a.local,/Marca: P · Hora: 08:00/);
+});
+test('A1 compact dialog separates header, scroll content and always-visible footer',async()=>{
+ const f=dialog(12),css=f.root.children.find(n=>n.tag==='style').textContent;assert.equal(f.content.className,'academic-conflict-content');assert.equal(f.footer.className,'academic-conflict-footer');assert.equal(f.content.children.length,12);assert.deepEqual(f.footer.children,[f.cancel,f.apply]);assert.match(css,/\.academic-conflict-panel\{[^}]*display:flex;flex-direction:column[^}]*overflow:hidden/);assert.match(css,/\.academic-conflict-content\{[^}]*min-height:0;overflow-y:auto;overflow-x:hidden/);assert.match(css,/\.academic-conflict-footer\{flex-shrink:0/);assert.match(css,/max-height:90vh;max-height:90dvh/);f.cancel.onclick();assert.equal(await f.pending,null);
+});
+test('A1 conflict cards align labeled radios and values without preformatted primary typography',async()=>{
+ const f=dialog(),card=f.content.children[0],options=card.children[1];assert.equal(card.className,'academic-conflict-card');assert.equal(card.children[0].tag,'legend');assert.equal(options.className,'academic-conflict-options');for(const [i,row] of options.children.entries()){assert.equal(row.tag,'label');assert.equal(row.className,'academic-conflict-option');assert.equal(row.children[0],f.radios[i]);assert.equal(row.children[1].children[0].textContent,i?'Nube':'Este dispositivo');assert.equal(row.children[1].children[1].className,'academic-conflict-value');assert.equal(row.children[1].children[1].tag,'div');}f.cancel.onclick();await f.pending;
+});
+test('A1 desktop options use equal columns and mobile 390px stacks without clipping names or values',async()=>{
+ const f=dialog(),css=f.root.children.find(n=>n.tag==='style').textContent;assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);assert.match(css,/@media\(max-width:600px\)\{\.academic-conflict-options\{grid-template-columns:minmax\(0,1fr\)/);assert.match(css,/\.academic-conflict-card legend\{[^}]*max-width:100%[^}]*white-space:normal;overflow-wrap:anywhere/);assert.match(css,/\.academic-conflict-value\{[^}]*overflow-wrap:anywhere/);assert.match(css,/\.academic-conflict-dialog,\.academic-conflict-dialog \*\{box-sizing:border-box/);f.cancel.onclick();await f.pending;
+});
+test('A1 dialog controls retain visible focus and touch sizes with scoped styles',async()=>{
+ const f=dialog(),css=f.root.children.find(n=>n.tag==='style').textContent;assert.match(css,/font-family:ui-sans-serif,system-ui/);assert.match(css,/\.academic-conflict-footer button\{min-height:44px/);assert.match(css,/\.academic-conflict-option\{[^}]*min-height:44px/);assert.match(css,/button:focus-visible[^}]*input:focus-visible[^}]*summary:focus-visible\{outline:2px solid/);assert.match(css,/button:disabled\{opacity:\.5/);assert.equal(f.apply.disabled,true);f.cancel.onclick();await f.pending;
+});
+test('A1 footer apply remains disabled until every compact card has an explicit choice',async()=>{
+ const f=dialog(3);f.radios[0].onchange();assert.equal(f.apply.disabled,true);f.radios[3].onchange();assert.equal(f.apply.disabled,true);f.radios[4].onchange();assert.equal(f.apply.disabled,false);f.apply.onclick();const choices=await f.pending;assert.equal(Object.keys(choices).length,3);assert.deepEqual(Object.values(choices),['local','remote','local']);
+});
+test('A1 compact dialog keyboard includes technical disclosures and cancel closes with no choices applied',async()=>{
+ const f=dialog();assert.ok(f.panel.querySelectorAll().some(n=>n.tag==='summary'));assert.equal(f.d.activeElement,f.cancel);f.radios[0].onchange();f.events.keydown({key:'Escape',preventDefault(){}});assert.equal(await f.pending,null);assert.equal(f.d.body.children.length,0);
+});
+test('A1 visual revision leaves reconciliation and human data interpretation exactly unchanged',()=>{
+ const {execFileSync}=require('node:child_process'),before=execFileSync('git',['show','2846e16e3231defc9988267ad2bd162873d0bc23:registro-reconcile.js'],{encoding:'utf8'}),current=read('registro-reconcile.js');assert.equal(current.split('  function choose(')[0].replace(/\r\n/g,'\n'),before.split('  function choose(')[0].replace(/\r\n/g,'\n'));
+});
+test('A1 Shift Tab from the first selected remote radio stays inside compact dialog',async()=>{
+ const f=dialog();f.radios[1].checked=true;f.radios[1].onchange();f.radios[1].focus();let prevented=false;f.events.keydown({key:'Tab',shiftKey:true,preventDefault(){prevented=true}});assert.equal(prevented,true);assert.equal(f.d.activeElement,f.apply);f.events.keydown({key:'Tab',shiftKey:false,preventDefault(){}});assert.equal(f.d.activeElement,f.radios[1]);f.cancel.onclick();assert.equal(await f.pending,null);
 });
