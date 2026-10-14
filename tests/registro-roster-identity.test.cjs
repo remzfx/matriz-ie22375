@@ -14,6 +14,7 @@ function fixture(){
  const c=vm.createContext({setTimeout:()=>0,clearTimeout(){},window:{},document:{getElementById:el,querySelectorAll:()=>[],querySelector:s=>s==='main'?main:null},console,alert:v=>alerts.push(v),toast(){},saveStore(){},renderStudents(){},getLoginSession:()=>({role:'docente'}),bimestreHabilitado:()=>true,
    IEStudents:{validToken:()=> 'synthetic-token',empty:()=>roster([]),peekRoster:()=>c.base || null,loadRoster:async bim=>{requests.push(bim);return roster(c.next,bim);}}});
  new vm.Script(read('student-identity.js')).runInContext(c);c.studentKey=c.window.studentKey;c.IEStudentIdentity=c.window.IEStudentIdentity;
+ c.pintarBotonesContextoRegistro=c.actualizarBotonesContextoRegistro=()=>{};
  const run=s=>new vm.Script(s).runInContext(c);
  run(`let nivel='secundaria',areaActual='Matemática',store={sessions:[],grades:{},finales:{},concArea:{},meta:{},studentAliases:{}},notas={},sesionActiva={comp:'Resuelve',capacidad:'Capacidad',fecha:'2026-10-03'},padronVerificadoServidor=true,tokenPadron='synthetic-token',vencimientoCachePadron,cargandoEstudiantes=false,padronBimestre='III',solicitudPadron=0,bdEstudiantes=IEStudents.empty();
    function ctxBase(){return {nivel,bim:document.getElementById('selBim').value,grado:4,seccion:'B',area:areaActual};}

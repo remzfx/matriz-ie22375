@@ -498,6 +498,18 @@
 #finLista .comp-hist .comp-hist-c{background:#fee2e2;color:#991b1b}
 #finLista .comp-hist .comp-hist-ad{background:#dbeafe;color:#1d4ed8}
 @media print{.fin-comparativo-toggle,#finLista .comp-hist-line{display:none!important}}
+  /* Solo impresión Promedios: textos completos, sin afectar otros reportes. */
+  @media print {
+    #printArea .promedios-print .print-conclusions {margin:5mm 0;}
+    #printArea .promedios-print .print-conclusions h3 {font-size:9pt;margin:0 0 2mm;break-after:avoid;}
+    #printArea .promedios-print .print-conclusions table {width:100%;border-collapse:collapse;table-layout:fixed;font-size:7.5pt;line-height:1.3;}
+    #printArea .promedios-print .print-conclusions th,#printArea .promedios-print .print-conclusions td {padding:2mm;border:1px solid #94a3b8;text-align:left;vertical-align:top;white-space:normal;overflow-wrap:anywhere;font-weight:400;}
+    #printArea .promedios-print .print-conclusions thead {display:table-header-group;}
+    #printArea .promedios-print .print-conclusions thead th {font-weight:700;background:#f1f5f9;}
+    #printArea .promedios-print .print-conclusions tr {break-inside:avoid;page-break-inside:avoid;}
+    #printArea .promedios-print .print-conclusion-text {white-space:pre-wrap;}
+    #printArea .promedios-print .print-conclusion-level {text-align:center;vertical-align:middle;font-weight:700;}
+  }
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
@@ -3736,11 +3748,18 @@ function imprimirResumen(opciones){
  const anio=cfg&&Number.isInteger(Number(cfg.anio))&&Number(cfg.anio)>=2000&&Number(cfg.anio)<=2100?String(cfg.anio):'No configurado';
  const fecha=new Date().toLocaleDateString('es-PE');
  const nivelTexto=c.nivel==='primaria'?'Primaria':'Secundaria';
- let html='<article class="bimestral-report"><header class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>'+ (esPromedios?'RESULTADOS FINALES POR COMPETENCIA':'REGISTRO AUXILIAR BIMESTRAL')+'</h2></header>';
+ let html='<article class="bimestral-report'+(esPromedios?' promedios-print':'')+'"><header class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>'+ (esPromedios?'RESULTADOS FINALES POR COMPETENCIA':'REGISTRO AUXILIAR BIMESTRAL')+'</h2></header>';
  html+='<div class="bimestral-meta">'+[['Área',c.area],['Nivel',nivelTexto],['Grado',c.grado+'°'],['Sección',c.seccion],['Bimestre',c.bim],['Año',anio],['Docente',doc],['Fecha',fecha]].map(([label,value])=>'<span><b>'+label+':</b> '+escapeRegistro(value)+'</span>').join('')+'</div>';
  html+='<table class="bimestral-table"><colgroup><col class="bimestral-number-column"><col class="bimestral-name-column">'+comps.map(()=>'<col>').join('')+'</colgroup><thead><tr><th class="bimestral-number">N.º</th><th class="bimestral-name">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'</tr></thead><tbody>';
  alumnos.forEach((al,i)=>{const id=studentKey(al);html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+comps.map(cp=>'<td class="bimestral-grade">'+(competenciaTrabajada(cp)?'<span class="bimestral-result">'+escapeRegistro(notaCompAlumno(cp,id).letra||'—')+'</span>':'<small>No trabajada este bimestre</small>')+'</td>').join('')+'</tr>';});
- html+='</tbody></table>'+(esPromedios?'':estadisticaResumenHTML()+estadisticasCompetenciasHTML(comps,alumnos))+'<footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(doc)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
+ html+='</tbody></table>';
+ if(esPromedios){
+   const conclusiones=[];
+   alumnos.forEach((al,i)=>comps.forEach(cp=>{const id=studentKey(al),texto=concCompAlumno(cp,id);if(!texto)return;const letra=competenciaTrabajada(cp)?notaCompAlumno(cp,id).letra||'—':'No trabajada';conclusiones.push('<tr><th scope="row">'+(i+1)+'. '+escapeRegistro(al.nombre)+'</th><td>'+escapeRegistro(cp)+'</td><td class="print-conclusion-level">'+escapeRegistro(letra)+'</td><td class="print-conclusion-text">'+escapeRegistro(texto)+'</td></tr>');}));
+   if(conclusiones.length)html+='<section class="print-conclusions"><h3>Conclusiones descriptivas registradas</h3><table><colgroup><col style="width:23%"><col style="width:23%"><col style="width:8%"><col style="width:46%"></colgroup><thead><tr><th>Estudiante</th><th>Competencia</th><th>Nivel</th><th>Conclusión</th></tr></thead><tbody>'+conclusiones.join('')+'</tbody></table></section>';
+   if(c.nivel==='primaria')html+=estadisticaResumenHTML()+estadisticasCompetenciasHTML(comps,alumnos);
+ }else html+=estadisticaResumenHTML()+estadisticasCompetenciasHTML(comps,alumnos);
+ html+='<footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(doc)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
  const pa=document.getElementById('printArea');pa.innerHTML=html;
  window.print();
 }

@@ -17,6 +17,7 @@ function fixture(){
  const response=(name='Synthetic Verified',bimestre='III')=>({ok:true,inicializada:true,version:'v',bimestre,padronInicializado:true,estudiantes:[{nivel:'secundaria',grado:4,seccion:'B',idSiagie:'42',nombre:name}]});
  c.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>response()};};
  new vm.Script(read('registro-academic-model.js')).runInContext(c);c.IERegistroAcademico=c.window.IERegistroAcademico;new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;
+ c.pintarBotonesContextoRegistro=c.actualizarBotonesContextoRegistro=()=>{};
  const run=code=>new vm.Script(code).runInContext(c);
  run(`let nivel='secundaria',bdEstudiantes=IEStudents.empty(),cargandoEstudiantes=false,padronBimestre='',solicitudPadron=0,padronVerificadoServidor=false,tokenPadron='',vencimientoCachePadron,sesionActiva=null,notas={},areaActual='Matemática',store={meta:{},grades:{},asistencia:{}},renders=0;
  function recordarPadron(){};function saveStore(){};function renderStudents(){renders++;};function llenarAulasPadron(){};
