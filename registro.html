@@ -2400,6 +2400,12 @@ function renderStudents() {
       const k = capKeyHoy(cp, cap, nombre);
       const previo = leerNota(store.grades, k) || {};
       const letraPrevia = previo.nivel || ((previo.nota20!=='' && previo.nota20!=null) ? numToLetter(previo.nota20) : '');
+      // Una nota existente requiere confirmación antes de cambiar o quitar esta evidencia.
+      if (letraPrevia) {
+        const alumno=estudiantes().find(al=>studentKey(al)===nombre);
+        const accion=letraPrevia===val?'quitar la evidencia '+letraPrevia:'cambiar la evidencia de '+letraPrevia+' a '+val;
+        if (!confirm('¿Confirmas '+accion+'?\\nEstudiante: '+(alumno?.nombre||nombre)+'\\nCompetencia: '+cp+'\\nCapacidad: '+cap+'\\nFecha: '+fecha+'\\nLas otras evidencias se conservarán.')) return;
+      }
       // Repetir la selección quita únicamente la evidencia de esta celda.
       if (letraPrevia === val) {
         store.grades[k] = Object.assign({},store.grades[k]||{},{borrado:true,ts:Date.now()});
@@ -3007,6 +3013,14 @@ function aplicarFinalManual(comp, nombre, val, posponerRender) {
 function seleccionarFinalReversible(comp, nombre, val) {
   const original=leerNota(store.finales,finalKey(comp,nombre));
   const letra=original&&(original.nivel||((original.nota20!==''&&original.nota20!=null)?numToLetter(original.nota20):''));
+  if (letra) {
+    const alumno=estudiantes().find(al=>studentKey(al)===nombre);
+    const quitar=letra===val;
+    const mensaje=(quitar?'¿Quitar la nota directa '+letra+'?':'¿Cambiar la nota directa de '+letra+' a '+val+'?')+
+      '\\nEstudiante: '+(alumno?.nombre||nombre)+'\\nCompetencia: '+comp+
+      '\\nLas evidencias y conclusiones se conservarán.';
+    if(!confirm(mensaje))return false;
+  }
   if(original && letra===val)return quitarFinalManual(comp,nombre);
   return aplicarFinalManual(comp,nombre,val);
 }
