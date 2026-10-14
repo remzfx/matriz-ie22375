@@ -91,3 +91,11 @@ En 0–20, vaciar el campo quita su nota. En Promedios el indicador de nivel per
 Se añadieron 37 regresiones de selección/sustitución/deselección, números, gates, contextos, persistencia/reload con copia legacy de sesión, guardado unificado y sincronización de tombstones con Apps Script simulado (CAS y rechazo de versión vieja). Se sustituyeron regresiones obsoletas que exigían la X; no se modificaron backend ni contratos. Snapshots históricos excluyen explícitamente los dos renderizadores/helper aprobados; las regresiones nuevas ejercitan fuente actual y handlers reales, sin normalización.
 
 Validación: 1900 pruebas aprobadas, 0 fallidas/omitidas. Cambios locales sin escrituras académicas a nube no solicitadas. Apps Script, A1/B1/B2 y módulo de aportes transversales permanecen sin modificaciones. La comprobación visual real permanece pendiente por el entorno documentado; el ajuste conserva la cuadrícula/paleta compacta aprobada.
+
+## Confirmación de opción 2 y conservación de fechas
+
+La regla elegida ya estaba implementada. Se añadieron seis pruebas explícitas (Primaria/Secundaria) sin modificar código productivo: deselección de una celda conserva otra evidencia de fecha anterior, las sesiones/fechas académicas, las fechas y marcas de asistencia y conclusiones. Quitar el directo de Promedios recupera el calculado sin modificar ninguna evidencia.
+
+Se ejecutó el motor A1 real con base/local/remoto sintéticos: combina el tombstone local con la edición remota de otra celda, conservando fechas; si la nube editó la misma celda, detiene la operación y requiere elegir Este dispositivo/Nube. No decide por el timestamp remoto mayor y no modifica el borrador mientras falta una decisión.
+
+Validación de esta ampliación: 1906 aprobadas, 0 fallidas/omitidas; 43 pruebas específicas de selección reversible. Sin cambios en Apps Script, A1/B1/B2, producción ni diseño. No merge ni deploy.
