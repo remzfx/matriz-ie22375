@@ -111,7 +111,12 @@
     }
     identityGroups.forEach(paths=>{
       if(conflicts.some(c=>c.paths&&c.paths.some(p=>paths.includes(p))))return;
-      // Diferentes claves de una misma identidad no son cambios disjuntos.
+      // Comparar cada representación con su misma ruta, incluyendo ausencias.
+      // La divergencia histórica interna no demuestra una edición concurrente.
+      const sameGroup=(a,z)=>paths.every(p=>equal(a.get(p),z.get(p)));
+      if(sameGroup(l,r)||b&&(sameGroup(l,b)||sameGroup(r,b)))return;
+      // Cambios bilaterales en diferentes claves de la misma identidad
+      // requieren revisar el conjunto; no decidir por marcas de tiempo.
       const localRecords=paths.filter(p=>l.has(p)).map(path=>({path,value:l.get(path)}));
       const remoteRecords=paths.filter(p=>r.has(p)).map(path=>({path,value:r.get(path)}));
       const records=localRecords.concat(remoteRecords);

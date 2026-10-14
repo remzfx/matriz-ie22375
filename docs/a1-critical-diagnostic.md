@@ -1,5 +1,7 @@
 # Auditoría crítica A1 — fase diagnóstica
 
+Este documento conserva los hallazgos del HEAD diagnóstico `68200806318b668adb0ea3f59b26cb6fbb7c7c4b`. La corrección posterior autorizada y sus regresiones se describen en [segunda fase](a1-causal-correction.md); las observaciones siguientes no representan el comportamiento corregido ni una validación en producción.
+
 Base: `61c9d188b6736032d30c5a7b8f8e37423e9824b7` (main, PR #81 fusionado).
 No se ejecutaron lecturas ni escrituras de producción. Solo documentos y pruebas nuevas; código funcional, A1/B1/B2, interfaz, Apps Script y almacenamiento real permanecen intactos.
 

@@ -1,4 +1,4 @@
-// Diagnostic counterexamples use fictitious records, memory storage and no network.
+// A1 causal regressions use fictitious records, memory storage and no network.
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8'),api=require('../registro-reconcile.js'),fixture=require('./reconcile-fixture.cjs'),copy=api.copy;
 const ui=new Function('require','__dirname',read('tests/registro-academic-model.test.cjs').split('\nfor(const level')[0]+'\nreturn ui;')(require,__dirname);
@@ -29,15 +29,15 @@ test('C/F: true conflict cancellation and reopen preserve local, remote and caus
 test('F: explicit reconciliation retains recovery across reopen; recovery writes memory only',async()=>{
  const r=cloud(),f=session(r);f.set(15);await f.c.subirRegistroNube();f.set(18);r.payload.finales[f.key].nota20=12;r.payload.finales[f.key].nivel='B';r.version++;f.c.IERegistroReconcile.choose=async cs=>Object.fromEntries(cs.map(x=>[x.path,'remote']));assert.equal(await f.c.bajarRegistroNube(),true);const next=f.reopen();assert.equal(next.c.store.finales[next.key].nota20,12);assert.equal(next.c.recuperarBorradorAcademico(),true);assert.equal(next.c.store.finales[next.key].nota20,18);assert.equal(next.c.baselineAcademica().recovery.local.finales[next.key].nota20,12);assert.equal(r.writes,1);
 });
-test('Diagnostic D: identical payload/base with divergent historical alias produces recurring conflict after reopen',async()=>{
+test('D: identical payload/base with divergent historical alias stays conflict-free after reopen',async()=>{
  const r=cloud(),f=session(r);f.set(15);const old=f.key.slice(0,f.key.lastIndexOf('||')+2)+'Estudiante Ficticio Uno';f.c.store.finales[old]={nivel:'C',origen:'letra',nota20:8,ts:1};r.payload=copy(f.c.sliceRegistroArea());const b=f.c.baselineAcademica();b.version=r.version;b.basePayload=copy(r.payload);b.baseline=f.c.IERegistroAcademico.canonical(r.payload);f.c.saveStore();
- for(const current of [f,f.reopen()]){assert.equal(api.signature(current.c.sliceRegistroArea()),api.signature(r.payload));const before=copy(current.c.store.finales);assert.equal(await current.c.bajarRegistroNube(),false);assert.equal(current.choices.at(-1).length,1);assert.match(current.choices.at(-1)[0].reason,/representaciones históricas/);assert.deepEqual(copy(current.c.store.finales),before);const identity=current.c.IEStudentIdentity;assert.equal(identity.leer(current.c.store.finales,current.key,current.roster[0],{}).nota20,15);}assert.equal(r.writes,0);
+ for(const current of [f,f.reopen()]){assert.equal(api.signature(current.c.sliceRegistroArea()),api.signature(r.payload));const before=copy(current.c.store.finales);assert.equal(await current.c.bajarRegistroNube(),true);assert.equal(current.choices.at(-1).length,0);assert.deepEqual(copy(current.c.store.finales),before);const identity=current.c.IEStudentIdentity;assert.equal(identity.leer(current.c.store.finales,current.key,current.roster[0],{}).nota20,15);}assert.equal(r.writes,0);
 });
 test('Diagnostic D: historical untagged reference differs from tagged letter; distinct exact numbers remain distinct',()=>{
  assert.equal(api.equal({nivel:'B',nota20:12},{nivel:'B',nota20:12,origen:'letra'}),false);assert.equal(api.equal({nivel:'B',nota20:12,origen:'letra'},{nivel:'B',nota20:13,origen:'letra'}),true);assert.equal(api.equal({nivel:'B',nota20:12,origen:'numero'},{nivel:'B',nota20:13,origen:'numero'}),false);
 });
-test('Diagnostic D: selecting identical historical sets cannot clear the recurring conflict',async()=>{
- const r=cloud(),f=session(r);f.set(15);const old=f.key.slice(0,f.key.lastIndexOf('||')+2)+f.roster[0].nombre;f.c.store.finales[old]={nivel:'C',nota20:8,origen:'letra'};r.payload=copy(f.c.sliceRegistroArea());f.c.IERegistroReconcile.choose=async cs=>Object.fromEntries(cs.map(x=>[x.path,'remote']));assert.equal(await f.c.bajarRegistroNube(),true);const next=f.reopen();assert.equal(await next.c.bajarRegistroNube(),false);assert.equal(next.choices.at(-1).length,1);assert.equal(next.c.store.finales[next.key].nota20,15);assert.equal(next.c.store.finales[old].nivel,'C');assert.equal(r.writes,0);
+test('D: cold download of identical historical sets stays conflict-free after reopening',async()=>{
+ const r=cloud(),f=session(r);f.set(15);const old=f.key.slice(0,f.key.lastIndexOf('||')+2)+f.roster[0].nombre;f.c.store.finales[old]={nivel:'C',nota20:8,origen:'letra'};r.payload=copy(f.c.sliceRegistroArea());assert.equal(await f.c.bajarRegistroNube(),true);assert.equal(f.choices.at(-1).length,0);const next=f.reopen();assert.equal(await next.c.bajarRegistroNube(),true);assert.equal(next.choices.at(-1).length,0);assert.equal(next.c.store.finales[next.key].nota20,15);assert.equal(next.c.store.finales[old].nivel,'C');assert.equal(r.writes,0);
 });
 test('C: both devices preserve their competing exact numbers and demand explicit resolution',async()=>{
  const r=cloud(),a=session(r);a.set(15);await a.c.subirRegistroNube();const b=session(r);await b.c.bajarRegistroNube();a.set(18);b.set(12);assert.equal(await a.c.subirRegistroNube(),true);assert.equal(await b.c.bajarRegistroNube(),false);assert.equal(b.c.store.finales[b.key].nota20,12);assert.equal(r.payload.finales[a.key].nota20,18);assert.equal(b.choices.at(-1).length,1);assert.equal(r.writes,2);
@@ -47,4 +47,37 @@ test('E: slice and reconciliation leave unrelated student, section, area, bimest
 });
 test('G: concurrent cloud edit after preparation rejects stale upload and preserves both grades',async()=>{
  const r=cloud(),f=session(r);f.set(15);await f.c.subirRegistroNube();f.set(18);const send=f.c.fetch;f.c.fetch=async(...args)=>{r.version++;r.payload.finales[f.key].nota20=12;r.payload.finales[f.key].nivel='B';return send(...args);};assert.equal(await f.c.subirRegistroNube(),false);assert.equal(f.c.store.finales[f.key].nota20,18);assert.equal(r.payload.finales[f.key].nota20,12);assert.equal(f.c.baselineAcademica().basePayload.finales[f.key].nota20,15);
+});
+function historical(field='finales'){
+ const prefix='secundaria||III||1||A||Matemática||Competencia ficticia||',id=prefix+'id:synthetic-1',old=prefix+'Estudiante Ficticio Uno';
+ const base={[field]:{[id]:{nivel:'A',nota20:15,origen:'numero'},[old]:{nivel:'C',nota20:8,origen:'letra'}}};
+ return {field,id,old,base,groups:[[JSON.stringify([field,id]),JSON.stringify([field,old])]]};
+}
+for(const field of ['grades','finales','concComp'])for(const side of ['local','remote'])test('Causal group '+field+': unilateral '+side+' change preserves historical routes and source snapshots',()=>{
+ const f=historical(field);if(field==='concComp')f.base[field]={[f.id]:{texto:'Conclusión ficticia actual'},[f.old]:{texto:'Conclusión ficticia histórica'}};
+ const local=copy(f.base),remote=copy(f.base),changed=side==='local'?local:remote;changed[field][f.id]=field==='concComp'?{texto:'Conclusión ficticia nueva',ts:1}:{nota20:18,nivel:'AD',origen:'numero',ts:1};const before=JSON.stringify([f.base,local,remote]),plan=api.plan(f.base,local,remote,f.groups);assert.equal(plan.conflicts.length,0);assert.deepEqual(copy(plan.resolve()[field]),changed[field]);assert.equal(JSON.stringify([f.base,local,remote]),before);
+});
+for(const side of ['local','remote'])test('Causal group: unilateral tombstone and physical deletion on '+side+' do not resurrect historical values',()=>{
+ for(const tombstone of [false,true]){const f=historical(),l=copy(f.base),r=copy(f.base),changed=side==='local'?l:r;if(tombstone)changed.finales[f.id]={borrado:true,ts:1};else delete changed.finales[f.id];const plan=api.plan(f.base,l,r,f.groups);assert.equal(plan.conflicts.length,0);assert.deepEqual(copy(plan.resolve().finales),changed.finales);assert.deepEqual(plan.resolve().finales[f.old],f.base.finales[f.old]);}
+});
+test('Causal group: bilateral edits across ID/alias demand a whole-set choice and retain both candidates',()=>{
+ const f=historical(),l=copy(f.base),r=copy(f.base);l.finales[f.id]={nivel:'AD',nota20:18,origen:'numero',ts:1};r.finales[f.old]={nivel:'B',nota20:12,origen:'numero',ts:9999};const plan=api.plan(f.base,l,r,f.groups);assert.equal(plan.conflicts.length,1);assert.throws(()=>plan.resolve(),/sin resolver/);const conflict=plan.conflicts[0];assert.deepEqual(copy(plan.resolve({[conflict.path]:'local'}).finales),l.finales);assert.deepEqual(copy(plan.resolve({[conflict.path]:'remote'}).finales),r.finales);
+});
+test('Causal group: deletion versus concurrent historical edit never silently drops the competing evidence',()=>{
+ for(const tombstone of [false,true]){const f=historical(),l=copy(f.base),r=copy(f.base);if(tombstone)l.finales[f.id]={borrado:true};else delete l.finales[f.id];r.finales[f.old]={nivel:'B',nota20:12,origen:'numero'};const plan=api.plan(f.base,l,r,f.groups);assert.equal(plan.conflicts.length,1);const conflict=plan.conflicts[0];assert.deepEqual(copy(plan.resolve({[conflict.path]:'local'}).finales),l.finales);assert.deepEqual(copy(plan.resolve({[conflict.path]:'remote'}).finales),r.finales);}
+});
+test('Causal group: exact numbers in the same achievement band remain conflicting decisions',()=>{
+ const f=historical(),l=copy(f.base),r=copy(f.base);f.base.finales[f.id]={nivel:'B',nota20:11,origen:'numero'};l.finales[f.id]={nivel:'B',nota20:12,origen:'numero'};r.finales[f.id]={nivel:'B',nota20:13,origen:'numero'};const plan=api.plan(f.base,l,r,f.groups);assert.equal(plan.conflicts.length,1);const c=plan.conflicts[0];assert.equal(plan.resolve({[c.path]:'local'}).finales[f.id].nota20,12);assert.equal(plan.resolve({[c.path]:'remote'}).finales[f.id].nota20,13);
+});
+test('Causal group: unknown base does not imply a unilateral edit between different representations',()=>{
+ const f=historical(),l={finales:{[f.id]:f.base.finales[f.id]}},r={finales:{[f.old]:f.base.finales[f.old]}};assert.equal(api.plan(null,l,r,f.groups).conflicts.length,1);
+});
+test('Causal group: ambiguous names stay separate and are never assigned to an arbitrary ID',()=>{
+ const f=session(cloud()),prefix=f.key.slice(0,f.key.lastIndexOf('||')+2),l={finales:{[f.key]:{nivel:'A',nota20:15}}},r={finales:{[prefix+'Igual Ficticio']:{nivel:'C',nota20:8}}},roster=[{idSiagie:'synthetic-1',nombre:'Igual Ficticio'},{idSiagie:'synthetic-2',nombre:'Igual Ficticio'}];const groups=f.c.IERegistroReconcile.identityConflicts(l,r,roster,f.c.IEStudentIdentity);assert.equal(groups.length,0);const out=api.plan(null,l,r,groups).resolve();assert.deepEqual(copy(out.finales),{...l.finales,...r.finales});assert.equal(f.c.IEStudentIdentity.leer(r.finales,f.key,roster[0],{},false),undefined);
+});
+test('Permission denial on protected download preserves pending grades and sends no academic POST',async()=>{
+ const r=cloud(),f=session(r);f.set(18);const before=copy(f.c.store);f.c.fetchLecturaNube=async()=>({status:403,text:async()=>JSON.stringify({ok:false,code:'SESSION',error:'Sesión ficticia revocada'})});assert.equal(await f.c.bajarRegistroNube(),false);assert.deepEqual(copy(f.c.store),before);assert.equal(r.writes,0);
+});
+test('Unilateral pending ID edit with a historical alias survives download and reopening without POST',async()=>{
+ const r=cloud(),f=session(r);f.set(15);const old=f.key.slice(0,f.key.lastIndexOf('||')+2)+f.roster[0].nombre;f.c.store.finales[old]={nivel:'C',nota20:8,origen:'letra'};r.payload=copy(f.c.sliceRegistroArea());await f.c.bajarRegistroNube();f.set(18);const next=f.reopen();assert.equal(await next.c.bajarRegistroNube(),true);assert.equal(next.choices.at(-1).length,0);assert.equal(next.c.store.finales[next.key].nota20,18);assert.equal(next.c.store.finales[old].nivel,'C');assert.equal(next.c.dirty,true);assert.equal(r.payload.finales[next.key].nota20,15);assert.equal(r.writes,0);
 });
