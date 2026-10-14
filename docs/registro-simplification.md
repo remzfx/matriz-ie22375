@@ -93,3 +93,29 @@ Las regresiones cubren debounce, recuperación/no pérdida, cierre/permisos, CAS
 En Live Server abrir `docs/demos/recovery-preview.html?session=absent` para comprobar el estado sin autenticación (parámetro de demostración sin credenciales). [Captura móvil sin sesión](demos/recovery-session-absent.png). La demostración con sesión ficticia conserva los tres botones, comparación y cancelación; CSP bloquea las APIs. No usar sesiones oficiales para validar reemplazos. Permanecen pendientes Safari/iPhone físico y el transporte real en un entorno autorizado de prueba.
 
 Resultado de la auditoría de rendimiento: **2228 aprobadas, 0 fallidas, 0 canceladas, 0 omitidas, 0 TODO**. Incluye 12 nuevas regresiones de rendimiento/eventos/expiración, además de todas las protecciones funcionales previas. Sintaxis: **123 JS/GS, 30 scripts inline y 73 dependencias locales**. git diff --check y git diff --cached --check pasan. El CI del nuevo HEAD se enlaza en el PR #83, que permanece en borrador.
+
+## Corrección acotada del comentario #6180807049: EPT vacío
+
+Referencia revisada: **39845b6af3e36565815c782995dee85d33e2dcb1**. No se inspeccionaron notas oficiales ni almacenamiento real del usuario; 0/30 finales visibles no permite atribuir la captura a una causa concreta. La reproducción usa Secundaria 1.º A / III / Educación para el Trabajo (EPT), la competencia real del catálogo, accessors reales de aliases/metadata y transporte ficticio.
+
+Resultados demostrados:
+
+| Caso ficticio | Plan A1 | Lectura remota | Comportamiento anterior | Corrección |
+| --- | --- | --- | --- | --- |
+| Local/remoto académicos vacíos, incluso con baseline histórico | 0 conflictos | Confirmada | Sin conflicto; mensaje genérico | Sin notas registradas, sin resolución |
+| Escritura local seguida de baseline aún solo en memoria | 0 conflictos | No iniciada, bloqueo diskSafe | Hay notas diferentes… | Aviso de guardado local no verificable, sin resolución |
+| Botón viejo visible y una lectura/resolución fallida sin resultado | 0 conflictos del caso actual | Sin prueba actual de conflicto | Reutilizaba la visibilidad como prueba | Oculta el botón; no inventa conflicto ni vacío |
+| Resultado de otra área/token o con cero paths | No acredita conflicto actual | No válida para ese contexto | Aceptaba estado global | Rechazado por clave, token y cantidad real de conflictos |
+| Tombstone local frente a nota remota editada | Conflicto real | Confirmada | Bloqueo A1 correcto | Se conserva el bloqueo y ambos candidatos |
+
+La corrección está en la clasificación del pie. `bajarRegistroNube.resultado` comunica únicamente la cantidad real de conflictos y el contexto/token ya existentes; cancelar una revisión cuyo borrador cambió produce estado pendiente. No se modifica `registro-reconcile.js`, su plan causal ni la resolución de notas. No se normalizan ni eliminan tombstones. Los fallos de almacenamiento siguen cancelando sin alterar datos; **no** se relajó `diskSafe()` para hacer pasar una lectura.
+
+«Sin notas registradas» requiere conciliación confirmada del contexto/token y ausencia de datos académicos tanto en el payload actual como en el remoto verificado. Evidencias, sesiones, conclusiones, selección/estado de competencias y tombstones impiden tratarlo como vacío inocuo. Una eliminación física local pendiente frente a una nota aún remota continúa como **Cambios pendientes de subir**. Una diferencia real de asistencia compartida también exige revisión aunque no existan finales.
+
+`tests/registro-empty-ept.test.cjs` contiene reproducciones ejecutadas contra el adaptador del SHA revisado y regresiones de vacíos/baselines/aliases, fallo de almacenamiento, resultados viejos, respuesta atrasada, edición durante cancelación, tombstones, borrado pendiente, evidencias/conclusiones/sesiones y asistencia. Todo usa datos ficticios; cero escrituras académicas remotas.
+
+[Comparación de rendimiento contra el HEAD revisado](demos/registro-empty-ept-performance.json): para 30/40 alumnos y cinco competencias, se mantienen exactamente los contadores anteriores en carga, cambio de aula, minuto idle, offline, red lenta y sesión vencida. Para 40: 12025 serializaciones de primera carga, 3223 al cambiar aula; minuto idle con cero requests/IndexedDB/hashes/serializaciones/renders/escrituras de estado. No se añade polling ni otra petición. Las regresiones de presupuestos originales también se ejecutan.
+
+Se conservan los tres botones, A1/B1/B2, versiones/CAS, permisos, cierres, notas, conclusiones, asistencia, recuperación y rendimiento. Sin cambios en Apps Script/Sheets, Service Worker, students.js ni módulos transversales. PR #83 continúa en borrador, sin merge ni deploy. La captura original necesita diagnóstico autorizado separado si se quiere identificar cuál variante ocurrió en esa sesión real.
+
+Resultado final de esta corrección: **2254 aprobadas, 0 fallidas, 0 canceladas, 0 omitidas, 0 TODO**, incluidas 26 regresiones nuevas de EPT. Sintaxis: **124 JS/GS, 30 scripts inline, 73 dependencias locales**. git diff --check y git diff --cached --check pasan. El CI del HEAD final se enlaza en el mismo PR #83 en borrador.

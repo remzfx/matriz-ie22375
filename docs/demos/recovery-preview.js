@@ -27,7 +27,7 @@ function estudiantes(){return [{idSiagie:'synthetic-1',nombre:'ESTUDIANTE FICTIC
 function pintarRegistroConciliado(){if(previewAbsent)return;document.getElementById('previewGrade').textContent=store.finales[gradeKey]?.nota20??'—';}
 async function leerEstadoRemotoAcademico(){return {exists:true,...clone(remote)};}
 async function subirRegistroNube(){return false;}
-async function bajarRegistroNube(options){await leerEstadoRemotoAcademico();if(options?.validar&&!options.validar())return false;bajarRegistroNube.resultado={estado:'verificado'};return true;}
+async function bajarRegistroNube(options){await leerEstadoRemotoAcademico();if(options?.validar&&!options.validar())return false;bajarRegistroNube.resultado={key:cloudClaveReg(),token:getLoginSession()?.token,estado:'verificado'};return true;}
 async function guardarRegistroIntegrado(){guardarTodo();return IERegistroTransversales.save();}
 const IERegistroTransversales={current:()=>transversal,capture(){},save:async()=>!transversal.dirty};
 window.fetch=async()=>{throw Error('La demostración no permite consultas de red.');};
