@@ -439,7 +439,20 @@
       font-weight:800!important;color:#172b4d!important;font-size:15px;
     }
   }
-  /* Fin Visual Registro 3/6/7/10. */
+  /* Resumen estadistico: presentacion compacta */
+@media screen {
+#avanceBox .summary-stats{padding:16px;border-radius:14px;background:#fff;}
+#avanceBox .summary-stats h3{font-size:15px;font-weight:800;color:#173454;margin-bottom:12px;}
+#avanceBox .summary-counts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:14px;}
+#avanceBox .summary-counts span{display:flex;flex-direction:column;padding:10px;border:1px solid #dbe5ef;border-radius:10px;background:#f8fafc;font-size:12px;}
+#avanceBox .summary-counts strong{font-size:20px;color:#173454;}
+#avanceBox .summary-stats table{border-collapse:collapse;width:100%;max-width:650px;margin-bottom:12px;}
+#avanceBox .summary-stats table th,#avanceBox .summary-stats table td{padding:8px 12px;border:1px solid #dbe5ef;text-align:center;}
+#avanceBox .summary-stats table thead,#avanceBox .summary-stats table tbody tr:last-child{background:#e9f0f8;font-weight:800;}
+#avanceBox .summary-stats table tbody th{text-align:left;}
+@media(max-width:760px){#avanceBox .summary-counts{grid-template-columns:repeat(2,minmax(0,1fr));}}
+}
+/* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
