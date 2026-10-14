@@ -21,10 +21,6 @@
   .final-grade{grid-column:1;width:144px;min-width:144px;display:flex;flex-direction:column;align-items:center;}
   .final-grade > .fin-cell{width:100%;min-width:0;}
   .final-grade button{max-width:100%;overflow-wrap:anywhere;}
-  .final-grade .fin-clear-direct{box-sizing:border-box;display:flex;align-items:center;justify-content:center;align-self:center;flex:0 0 auto;width:18px;height:18px;min-width:18px;min-height:18px;margin:2px 0 0;padding:0;border:1px solid #475569;border-radius:4px;background:#475569;color:#fff;font-size:12px;font-weight:600;line-height:1;cursor:pointer;box-shadow:none;}
-  .final-grade .fin-clear-direct:hover{background:#334155;border-color:#334155;}
-  .final-grade .fin-clear-direct:focus-visible{outline:2px solid #334155;outline-offset:2px;}
-  @media(max-width:640px){.final-grade .fin-clear-direct{width:20px;height:20px;min-width:20px;min-height:20px;}}
   .final-conclusion{text-align:left;min-width:0;width:100%;max-width:100%;font-size:11px;}
   .final-conclusion label{display:block;font-size:10px;font-weight:600;}
   .final-conclusion select,.final-conclusion textarea{width:100%;min-width:0;box-sizing:border-box;font-size:11px;line-height:1.25;padding:4px;}
@@ -335,6 +331,9 @@
   :is(#stuList,#finLista) .chip[data-val].nivel-b.on {background:#fef3c7;color:#92400e;border-color:#fcd34d;}
   :is(#stuList,#finLista) .chip[data-val].nivel-a.on {background:#dcfce7;color:#166534;border-color:#86efac;}
   :is(#stuList,#finLista) .chip[data-val].nivel-ad.on {background:#e0f2fe;color:#075985;border-color:#7dd3fc;}
+  #finLista .final-level-toggle {border:0;cursor:pointer;font:inherit;}
+  #finLista .final-level-toggle:disabled {cursor:default;}
+  #finLista .final-level-toggle:focus-visible {outline:2px solid #0369a1;outline-offset:2px;}
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
@@ -2222,14 +2221,14 @@ function renderStudents() {
     inp.dataset.registroContexto = contextoCalificar;
     inp.addEventListener('change', function() {
       if (contextoCalificar !== cloudClaveReg()) return;
-      if (registroSoloLectura()) return;
+      if (registroSoloLectura() || bimCerradoDocente()) return;
       if (inp.readOnly) return;
       const nombre = decodeURIComponent(inp.dataset.nom);
       const cap = decodeURIComponent(inp.dataset.cap);
       const cp = decodeURIComponent(inp.dataset.comp || '') || ((document.getElementById('selComp')||{}).value || '');
       if(!competenciaTrabajada(cp))return;
       let n = inp.value === '' ? '' : Number(inp.value);
-      if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); inp.value = ''; n = ''; }
+      if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); return; }
       if (n !== '') n = Math.round(n);
       const letra = n === '' ? '' : numToLetter(n);
       const badge = inp.parentElement.querySelector('.eq-letter');
@@ -2238,17 +2237,19 @@ function renderStudents() {
         badge.className = 'eq-letter ' + (letra ? eqClass(letra) : 'eq-none');
       }
       if (n !== '') inp.value = pad2(n);
-      upsertSesionCap(cp, cap);
       const k = capKeyHoy(cp, cap, nombre);
-      if (n === '') store.grades[k] = {borrado:true,ts:Date.now()};
-      else store.grades[k] = { nota20: n, nivel: letra, origen: 'numero', ts: Date.now() };
+      const previo=leerNota(store.grades,k);
+      if((n===''&&!previo)||(n!==''&&previo&&previo.origen!=='letra'&&Number(previo.nota20)===n))return;
+      upsertSesionCap(cp, cap);
+      if (n === '') store.grades[k] = Object.assign({},store.grades[k]||{},{borrado:true,ts:Date.now()});
+      else {store.grades[k] = Object.assign({},store.grades[k]||{},{nota20:n,nivel:letra,origen:'numero',ts:Date.now()});delete store.grades[k].borrado;}
       saveStore();
     });
   });
   box.querySelectorAll('.fin-cell button[data-val]').forEach(btn => {
     btn.addEventListener('click', function() {
       if (contextoCalificar !== cloudClaveReg()) return;
-      if (registroSoloLectura()) return;
+      if (registroSoloLectura() || bimCerradoDocente()) return;
       if (btn.disabled) return;
       const cell = btn.closest('[data-nom]');
       if (!cell) return;
@@ -2260,14 +2261,17 @@ function renderStudents() {
       const k = capKeyHoy(cp, cap, nombre);
       const previo = leerNota(store.grades, k) || {};
       const letraPrevia = previo.nivel || ((previo.nota20!=='' && previo.nota20!=null) ? numToLetter(previo.nota20) : '');
-      // Tocar la misma letra no reemplaza ni borra una nota exacta ya guardada.
+      // Repetir la selección quita únicamente la evidencia de esta celda.
       if (letraPrevia === val) {
-        toast('Se conserva la calificación original');
+        store.grades[k] = Object.assign({},store.grades[k]||{},{borrado:true,ts:Date.now()});
+        saveStore();
+        renderStudents();
         return;
       }
       const n = letterToNum(val);
       upsertSesionCap(cp, cap);
-      store.grades[k] = { nota20: n, nivel: val, origen: 'letra', ts: Date.now() };
+      store.grades[k] = Object.assign({},store.grades[k]||{},{nota20:n,nivel:val,origen:'letra',ts:Date.now()});
+      delete store.grades[k].borrado;
       saveStore();
       renderStudents();
     });
@@ -2859,6 +2863,12 @@ function aplicarFinalManual(comp, nombre, val, posponerRender) {
   if (!posponerRender) renderFinales();
   return true;
 }
+function seleccionarFinalReversible(comp, nombre, val) {
+  const original=leerNota(store.finales,finalKey(comp,nombre));
+  const letra=original&&(original.nivel||((original.nota20!==''&&original.nota20!=null)?numToLetter(original.nota20):''));
+  if(original && letra===val)return quitarFinalManual(comp,nombre);
+  return aplicarFinalManual(comp,nombre,val);
+}
 function calificarAreaMasiva(val) {
   if (registroSoloLectura() || bimCerradoDocente() || !['AD','A','B','C'].includes(val)) return false;
   const comps=competencias().filter(competenciaTrabajada),alumnos=estudiantes();
@@ -2966,13 +2976,13 @@ function renderFinales() {
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" aria-pressed="'+(L===v)+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+ev.letra+'</div>' : '') +
-          (Object.keys(original).length&&!original.borrado&&!lock&&!registroSoloLectura()?'<button type="button" class="fin-clear-direct" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" title="Quitar directo" aria-label="Quitar directo">×</button>':'')+'</div>';
+          '</div>';
       } else {
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
-          '<span class="eq-letter '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'">'+(letra||ofi.letra||'—')+'</span>' +
+          '<button type="button" class="eq-letter final-level-toggle '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'" data-final-toggle="'+encC+'" data-alumno="'+encN+'" '+(lock||registroSoloLectura()||!letra?'disabled':'')+' title="Quitar la nota directa; conservar evidencias" aria-label="Quitar nota directa '+escapeRegistro(letra||'')+'">'+(letra||ofi.letra||'—')+'</button>' +
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+(numeroExactoComp(cp,studentKey(al))?pad2(ev.nota)+' · ':'')+ev.letra+'</div>' : '') +
-          (Object.keys(original).length&&!original.borrado&&!lock&&!registroSoloLectura()?'<button type="button" class="fin-clear-direct" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" title="Quitar directo" aria-label="Quitar directo">×</button>':'')+'</div>';
+          '</div>';
       }
       const required=IERegistroAcademico.requiresConclusion(c.nivel,ofi.letra);
       const conclusion=required?IEConclusionSuggestions.compactHtml(cp,concCompAlumno(cp,studentKey(al)),'data-id="'+encN+'" data-comp="'+encC+'"',lock):'';
@@ -2986,14 +2996,14 @@ function renderFinales() {
 
   box.querySelectorAll('.fin-nota').forEach(inp => {
     inp.addEventListener('change', function() {
-      if (registroSoloLectura()) return;
+      if (registroSoloLectura() || bimCerradoDocente() || [c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')!==cloudClaveReg()) return;
       const cell = inp.closest('[data-fin]');
       if (!cell || inp.readOnly) return;
       const nombre = decodeURIComponent(cell.dataset.fin);
       const comp = decodeURIComponent(cell.dataset.comp);
       if(!competenciaTrabajada(comp))return;
       let n = inp.value === '' ? '' : Number(inp.value);
-      if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); inp.value = ''; n = ''; }
+      if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); return; }
       if (n !== '') n = Math.round(n);
       const letra = n === '' ? '' : numToLetter(n);
       const badge = cell.querySelector('.eq-letter');
@@ -3003,6 +3013,8 @@ function renderFinales() {
       }
       if (n !== '') inp.value = pad2(n);
       const k = finalKey(comp, nombre);
+      const previo=leerNota(store.finales,k);
+      if((n===''&&!previo)||(n!==''&&previo&&previo.origen!=='letra'&&Number(previo.nota20)===n))return;
       if (n === '') store.finales[k] = {borrado: true, ts: Date.now()};
       else store.finales[k] = { nota20: n, nivel: letra, origen: 'numero', ts: Date.now() };
       saveStore();
@@ -3019,10 +3031,11 @@ function renderFinales() {
       const comp = decodeURIComponent(cell.dataset.comp);
       if(!competenciaTrabajada(comp))return;
       const val = btn.dataset.val;
-      aplicarFinalManual(comp,nombre,val);
+      if([c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')!==cloudClaveReg())return;
+      seleccionarFinalReversible(comp,nombre,val);
     });
   });
-  box.querySelectorAll('[data-quitar-directo]').forEach(el=>el.onclick=()=>quitarFinalManual(decodeURIComponent(el.dataset.quitarDirecto),decodeURIComponent(el.dataset.alumno)));
+  box.querySelectorAll('[data-final-toggle]').forEach(el=>el.onclick=()=>{if(el.disabled||[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')!==cloudClaveReg())return;quitarFinalManual(decodeURIComponent(el.dataset.finalToggle),decodeURIComponent(el.dataset.alumno));});
   box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
   IEConclusionSuggestions.bindCompact(box,(el,text)=>{const changed=setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),text);if(changed && estadisticas && typeof estadisticasCompetenciasHTML==='function')estadisticas.innerHTML=estadisticasCompetenciasHTML(comps,alumnos);return changed;});
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);

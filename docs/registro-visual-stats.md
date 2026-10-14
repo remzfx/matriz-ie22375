@@ -79,3 +79,15 @@ La cuadrícula de Calificar conserva cuatro decisiones horizontales con gaps de 
 Se ajustaron las pruebas de tamaño y se añadieron cinco regresiones de paleta, contraste, neutralidad y ausencia de estilos saturados antiguos. Validación: 1867 aprobadas, 0 fallidas/omitidas; sintaxis 93 JS/GS, 28 scripts inline, 67 dependencias; diff limpio.
 
 Las fixtures estáticas se regeneraron con datos ficticios y el CSS nuevo para Primaria (5 competencias) y Secundaria (4). La revisión física a 1366/390 px continúa pendiente por los bloqueos de navegador documentados arriba. Las pruebas de estructura, contraste y geometría CSS no certifican solapamientos reales ni sustituyen capturas de navegador.
+
+## Selección reversible aprobada
+
+Se retiraron las X de directos académicos, junto con sus estilos/listeners. En Promedios, repetir la letra del directo lo quita mediante `quitarFinalManual()`: solo se registra el tombstone de ese directo, conservando evidencias y conclusiones. Si el nivel visible procede de evidencias, pulsarlo crea un directo; no elimina la evidencia. Pulsar otro nivel sustituye el directo.
+
+En Calificar cada nota pertenece a una capacidad/fecha. El usuario autorizó expresamente que repetir su selección quite únicamente esa evidencia de celda. Se conserva la sesión, demás capacidades, estudiantes, contextos y conclusiones. La eliminación usa el tombstone existente y persistencia local; no elimina físicamente historial ni notas del servidor. La calificación masiva sigue asignando, sin alternar valores repetidos.
+
+En 0–20, vaciar el campo quita su nota. En Promedios el indicador de nivel permite quitar un directo existente (incluido un directo originalmente ingresado como letra, cuyo campo numérico se muestra vacío). Si el indicador procede solo de evidencias está deshabilitado. Reenfocar o repetir un número no elimina nada; valores fuera de rango se conservan para corrección y nunca se convierten en borrado. Se mantienen cierres, solo lectura y contexto de los callbacks.
+
+Se añadieron 37 regresiones de selección/sustitución/deselección, números, gates, contextos, persistencia/reload con copia legacy de sesión, guardado unificado y sincronización de tombstones con Apps Script simulado (CAS y rechazo de versión vieja). Se sustituyeron regresiones obsoletas que exigían la X; no se modificaron backend ni contratos. Snapshots históricos excluyen explícitamente los dos renderizadores/helper aprobados; las regresiones nuevas ejercitan fuente actual y handlers reales, sin normalización.
+
+Validación: 1900 pruebas aprobadas, 0 fallidas/omitidas. Cambios locales sin escrituras académicas a nube no solicitadas. Apps Script, A1/B1/B2 y módulo de aportes transversales permanecen sin modificaciones. La comprobación visual real permanece pendiente por el entorno documentado; el ajuste conserva la cuadrícula/paleta compacta aprobada.
