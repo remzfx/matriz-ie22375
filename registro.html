@@ -334,6 +334,13 @@
   #finLista .final-level-toggle {border:0;cursor:pointer;font:inherit;}
   #finLista .final-level-toggle:disabled {cursor:default;}
   #finLista .final-level-toggle:focus-visible {outline:2px solid #0369a1;outline-offset:2px;}
+  /* Separación tenue entre competencias; encabezado y celdas comparten columna. */
+  @media screen {
+    #finLista .fin-grid > thead > tr > th:nth-child(n+3),
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+3),
+    #avanceBox .fin-grid > thead > tr > th:nth-child(n+3):not(.summary-reference),
+    #avanceBox .fin-grid > tbody > tr > td:nth-child(n+3):not(.summary-reference) {border-left:1px solid rgba(148,163,184,.28);}
+  }
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>

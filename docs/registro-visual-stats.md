@@ -99,3 +99,9 @@ La regla elegida ya estaba implementada. Se añadieron seis pruebas explícitas 
 Se ejecutó el motor A1 real con base/local/remoto sintéticos: combina el tombstone local con la edición remota de otra celda, conservando fechas; si la nube editó la misma celda, detiene la operación y requiere elegir Este dispositivo/Nube. No decide por el timestamp remoto mayor y no modifica el borrador mientras falta una decisión.
 
 Validación de esta ampliación: 1906 aprobadas, 0 fallidas/omitidas; 43 pruebas específicas de selección reversible. Sin cambios en Apps Script, A1/B1/B2, producción ni diseño. No merge ni deploy.
+
+## Separación visual entre competencias
+
+Promedios y Resumen reciben un divisor vertical fino (1 px, gris azulado al 28 % de opacidad) entre competencias, aplicado a la misma columna del encabezado y las filas. No se añaden columnas, espacios entre tablas, padding ni cambios de ancho. El primer bloque y la columna fija de estudiantes no reciben el divisor; en Resumen se conserva el separador propio del promedio referencial. Las estadísticas se mantienen independientes, sin bordes adicionales. La regla es solo de pantalla: no altera impresión/PDF.
+
+Siete regresiones nuevas comprueban áreas oficiales de 1–5 competencias con 40 estudiantes ficticios, integridad de alineación estructural, conclusiones y estadísticas, ausencia de mutaciones/escrituras, scroll existente y equivalencia exacta de todo el HTML/JS fuera de CSS respecto del HEAD 54439bf. La suite total es 1913 aprobadas, 0 fallidas/omitidas. La validación visual real continúa pendiente por las limitaciones documentadas del navegador.
