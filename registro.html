@@ -256,7 +256,8 @@
   #panelFinales .fin-remove-bulk {min-height:44px;padding:4px 8px;}
   #panelFinales .mode-toggle {gap:2px;padding:3px;}
   #panelFinales .mode-toggle button {min-height:44px;padding:4px 8px;}
-  #finLista .fin-grid {width:100%;min-width:0;}
+  /* No expandir Estudiante cuando hay pocas competencias: columnas desde la izquierda. */
+  #finLista .fin-grid {width:max-content;min-width:0;max-width:none;}
   #finLista .fin-grid .fin-nom {width:auto;min-width:230px;max-width:none;}
   #finLista .fin-grid .fin-nom .font-bold {white-space:nowrap;font-size:12px;line-height:1.35;}
   #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:212px;min-width:212px;padding:6px 10px;}
