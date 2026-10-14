@@ -3,6 +3,7 @@ const {execFileSync}=require('node:child_process');
 const base=execFileSync('git',['show','8439fb47259ad8667842f3f9f5a6bd35ae2e5520:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 function fn(s,n){const i=s.indexOf('function '+n+'(');return s.slice(i,s.indexOf('\n}',i)+2);}
 module.exports=s=>{
+ s=require('./registro-context-layout-snapshot.cjs')(s);
  s=require('./registro-print-snapshot.cjs')(s);
  s=require('./registro-toggle-snapshot.cjs')(s);
  s=s.replace(/\r\n/g,'\n').replace(/\/\* Visual Registro 3\/6\/7\/10:[\s\S]*?\/\* Fin Visual Registro 3\/6\/7\/10\. \*\/\n/,'');

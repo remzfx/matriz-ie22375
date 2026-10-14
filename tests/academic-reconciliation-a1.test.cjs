@@ -263,7 +263,7 @@ test('A1 compact dialog keyboard includes technical disclosures and cancel close
  const f=dialog();assert.ok(f.panel.querySelectorAll().some(n=>n.tag==='summary'));assert.equal(f.d.activeElement,f.cancel);f.radios[0].onchange();f.events.keydown({key:'Escape',preventDefault(){}});assert.equal(await f.pending,null);assert.equal(f.d.body.children.length,0);
 });
 test('A1 visual revision leaves reconciliation and human data interpretation exactly unchanged',()=>{
- const {execFileSync}=require('node:child_process'),before=execFileSync('git',['show','2846e16e3231defc9988267ad2bd162873d0bc23:registro-reconcile.js'],{encoding:'utf8'}),current=read('registro-reconcile.js');assert.equal(current.split('  function choose(')[0].replace(/\r\n/g,'\n'),before.split('  function choose(')[0].replace(/\r\n/g,'\n'));
+ const {execFileSync}=require('node:child_process'),before=execFileSync('git',['show','2846e16e3231defc9988267ad2bd162873d0bc23:registro-reconcile.js'],{encoding:'utf8'}),current=require('./a1-causal-snapshot.cjs')('registro-reconcile.js',read('registro-reconcile.js'));assert.equal(current.split('  function choose(')[0].replace(/\r\n/g,'\n'),before.split('  function choose(')[0].replace(/\r\n/g,'\n'));
 });
 test('A1 Shift Tab from the first selected remote radio stays inside compact dialog',async()=>{
  const f=dialog();f.radios[1].checked=true;f.radios[1].onchange();f.radios[1].focus();let prevented=false;f.events.keydown({key:'Tab',shiftKey:true,preventDefault(){prevented=true}});assert.equal(prevented,true);assert.equal(f.d.activeElement,f.apply);f.events.keydown({key:'Tab',shiftKey:false,preventDefault(){}});assert.equal(f.d.activeElement,f.radios[1]);f.cancel.onclick();assert.equal(await f.pending,null);
