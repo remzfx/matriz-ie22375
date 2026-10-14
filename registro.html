@@ -124,7 +124,7 @@
     @media (max-width:1023px) { .fin-header-main { flex-wrap:wrap; } }
     @media (max-width:640px) { .fin-header-context { flex-basis:100%; } }
     .fin-panel-card > button { margin-top:8px; }
-    .registro-datos-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .registro-datos-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); column-gap:24px;row-gap:10px;align-items:start; }
     .registro-datos-grid > div { min-width:0; }
     /* Botones compactos: el select original conserva los eventos y la autorización académica. */
     .registro-datos-grid .registro-select-con-botones > select {position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none;}
@@ -618,12 +618,12 @@
             <div class="registro-aulas-grupo">
               <select id="selGrado" onchange="onGrado()"></select>
               <div id="registroBotonesGrado" class="registro-opciones" role="group" aria-label="Seleccionar grado"></div>
-              <div id="wrapSeccion">
+            </div>
+          </div>
+          <div id="wrapSeccion">
             <label class="text-[10px] font-bold text-slate-500">Sección</label>
             <select id="selSeccion" onchange="onContexto()"></select>
-                <div id="registroBotonesSeccion" class="registro-opciones" role="group" aria-label="Seleccionar sección"></div>
-              </div>
-            </div>
+            <div id="registroBotonesSeccion" class="registro-opciones" role="group" aria-label="Seleccionar sección"></div>
           </div>
         </div>
         <div class="registro-datos-meta">
