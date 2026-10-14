@@ -341,6 +341,13 @@
     #avanceBox .fin-grid > thead > tr > th:nth-child(n+3):not(.summary-reference),
     #avanceBox .fin-grid > tbody > tr > td:nth-child(n+3):not(.summary-reference) {border-left:1px solid rgba(148,163,184,.28);}
   }
+  /* Fondos alternos casi blancos; la cabecera oscura y los colores de nota se conservan. */
+  @media screen {
+    #finLista .fin-grid > tbody > tr > td:nth-child(even):not(.fin-nom),
+    #avanceBox .fin-grid > tbody > tr > td.summary-competence:nth-child(even) {background:#f3f9fd;}
+    #finLista .fin-grid > tbody > tr > td:nth-child(odd):not(.fin-nom),
+    #avanceBox .fin-grid > tbody > tr > td.summary-competence:nth-child(odd) {background:#f4faf6;}
+  }
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
