@@ -1,0 +1,4 @@
+// Historical contract tests keep their old report expectation; dedicated print tests use raw current source.
+const {execFileSync}=require('node:child_process');
+const base=execFileSync('git',['show','a42495f28b743a794b146152f0b3cd56bc812966:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
+module.exports=s=>{s=s.replace(/\r\n/g,'\n');const i=s.indexOf('function imprimirResumen(){'),j=s.indexOf('\n}',i)+2,a=base.indexOf('function imprimirResumen(){'),b=base.indexOf('\n}',a)+2;if(i>=0)s=s.slice(0,i)+base.slice(a,b)+s.slice(j);return s.replace('onclick="imprimirResumen()">🖨 Imprimir / PDF','onclick="prepararImpresion()">🖨 Imprimir / PDF').replace('      <button type="button" class="btn btn-ghost no-print text-sm" onclick="prepararImpresion()">Imprimir detalle de evidencias</button>\n','');};

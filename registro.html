@@ -358,6 +358,24 @@
   #finLista .chip[data-val].nivel-b.on {background:#fde68a;color:#78350f;border-color:#fbbf24;}
   #finLista .chip[data-val].nivel-a.on {background:#bbf7d0;color:#14532d;border-color:#4ade80;}
   #finLista .chip[data-val].nivel-ad.on {background:#bae6fd;color:#0c4a6e;border-color:#38bdf8;}
+  /* Reporte bimestral independiente; no copia grillas de evidencias ni controles. */
+  @media print {
+    #printArea:has(> .bimestral-report) {page:registro-resumen;padding:0!important;}
+    #printArea .bimestral-report {font-family:Arial,Helvetica,sans-serif;font-size:8pt;line-height:1.25;}
+    #printArea .bimestral-meta {display:flex;flex-wrap:wrap;gap:4px 16px;margin:6px 0 10px;font-size:8pt;}
+    #printArea .bimestral-table {width:100%;border-collapse:collapse;table-layout:fixed;}
+    #printArea .bimestral-number-column {width:9mm;}
+    #printArea .bimestral-name-column {width:30%;}
+    #printArea .bimestral-table th,#printArea .bimestral-table td {border:1px solid #94a3b8;padding:4px 5px;white-space:normal;overflow-wrap:anywhere;}
+    #printArea .bimestral-table th {text-align:center;vertical-align:middle;background:#f1f5f9;font-size:7.5pt;}
+    #printArea .bimestral-table .bimestral-name {text-align:left;white-space:normal;overflow-wrap:anywhere;}
+    #printArea .bimestral-table .bimestral-number,#printArea .bimestral-table .bimestral-grade {text-align:center;vertical-align:middle;}
+    #printArea .bimestral-result {font-size:10pt;font-weight:700;}
+    #printArea .bimestral-table thead {display:table-header-group;}
+    #printArea .bimestral-table tr,#printArea .competence-stats tr {break-inside:avoid;page-break-inside:avoid;}
+    #printArea .bimestral-report .stats-scroll {overflow:visible;max-height:none;}
+    #printArea .bimestral-report .competence-stats {break-inside:auto;margin-top:10px;}
+  }
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
@@ -491,7 +509,7 @@
       <button type="button" id="tabFin" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('fin')">Promedios</button>
       <button type="button" id="tabAv" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('av')">Resumen</button>
       <button type="button" id="tabAs" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('as')">Asistencia</button>
-      <button type="button" class="btn btn-ghost flex-1 text-sm" onclick="prepararImpresion()">🖨 Imprimir / PDF</button>
+      <button type="button" class="btn btn-ghost flex-1 text-sm" onclick="imprimirResumen()">🖨 Imprimir / PDF</button>
     </div>
 
     <!-- PANEL PROMEDIOS DIRECTOS -->
@@ -610,6 +628,7 @@
       <p class="text-[11px] text-slate-500 mb-1">Un chip por día. Tócalo para abrir esa fecha.</p>
       <div id="listaSesiones" class="flex flex-wrap gap-1"></div>
       <p class="text-[11px] text-slate-400 mt-1" id="lblSinSesiones">Aún no hay sesiones guardadas.</p>
+      <button type="button" class="btn btn-ghost no-print text-sm" onclick="prepararImpresion()">Imprimir detalle de evidencias</button>
     </div>
 
     <!-- Calificar -->
@@ -3327,8 +3346,18 @@ function renderAvance() {
  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
 }
 function imprimirResumen(){
- renderAvance();const c=ctxBase(),doc=document.getElementById('inpDocente').value||'';
- document.getElementById('printArea').innerHTML='<div class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>RESUMEN DE RESULTADOS · '+escapeRegistro(c.nivel)+' · '+escapeRegistro(c.grado)+'° '+escapeRegistro(c.seccion)+' · '+escapeRegistro(c.area)+' · Bim '+escapeRegistro(c.bim)+'</h2><p>Docente: '+escapeRegistro(doc)+'</p></div>'+document.getElementById('avanceBox').innerHTML;
+ const c=ctxBase(),alumnos=estudiantes(),comps=competencias();
+ const doc=(document.getElementById('inpDocente').value||'').trim()||'No registrado';
+ const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
+ const anio=cfg&&Number.isInteger(Number(cfg.anio))&&Number(cfg.anio)>=2000&&Number(cfg.anio)<=2100?String(cfg.anio):'No configurado';
+ const fecha=new Date().toLocaleDateString('es-PE');
+ const nivelTexto=c.nivel==='primaria'?'Primaria':'Secundaria';
+ let html='<article class="bimestral-report"><header class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>REGISTRO AUXILIAR BIMESTRAL</h2></header>';
+ html+='<div class="bimestral-meta">'+[['Área',c.area],['Nivel',nivelTexto],['Grado',c.grado+'°'],['Sección',c.seccion],['Bimestre',c.bim],['Año',anio],['Docente',doc],['Fecha',fecha]].map(([label,value])=>'<span><b>'+label+':</b> '+escapeRegistro(value)+'</span>').join('')+'</div>';
+ html+='<table class="bimestral-table"><colgroup><col class="bimestral-number-column"><col class="bimestral-name-column">'+comps.map(()=>'<col>').join('')+'</colgroup><thead><tr><th class="bimestral-number">N.º</th><th class="bimestral-name">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'</tr></thead><tbody>';
+ alumnos.forEach((al,i)=>{const id=studentKey(al);html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+comps.map(cp=>'<td class="bimestral-grade">'+(competenciaTrabajada(cp)?'<span class="bimestral-result">'+escapeRegistro(notaCompAlumno(cp,id).letra||'—')+'</span>':'<small>No trabajada este bimestre</small>')+'</td>').join('')+'</tr>';});
+ html+='</tbody></table>'+estadisticasCompetenciasHTML(comps,alumnos)+'</article>';
+ const pa=document.getElementById('printArea');pa.innerHTML=html;
  window.print();
 }
 

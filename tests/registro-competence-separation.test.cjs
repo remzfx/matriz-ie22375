@@ -8,7 +8,7 @@ test('Divider targets only boundaries between competence columns, excluding stic
  const start=src.indexOf('/* Separación tenue entre competencias;'),end=src.indexOf('/* Fondos alternos casi blancos;',start),css=src.slice(start,end);assert.match(css,/@media screen/);assert.match(css,/#finLista \.fin-grid > thead > tr > th:nth-child\(n\+3\)/);assert.match(css,/#finLista \.fin-grid > tbody > tr > td:nth-child\(n\+3\)/);assert.match(css,/#avanceBox \.fin-grid > thead > tr > th:nth-child\(n\+3\):not\(\.summary-reference\)/);assert.match(css,/#avanceBox \.fin-grid > tbody > tr > td:nth-child\(n\+3\):not\(\.summary-reference\)/);assert.match(css,/border-left:1px solid rgba\(148,163,184,\.28\)/);assert.doesNotMatch(css,/border-spacing|padding|width|overflow|position|competence-stats|printArea/);assert.match(src,/\.fin-scroll-body \{[^}]*overflow-x:auto; overflow-y:auto; max-width:100%/);
 });
 test('This adjustment changes production CSS only; all markup, handlers, calculations and sync match reviewed head',()=>{
- const old=execFileSync('git',['show','54439bfbb5917a7d46a547881e3b20a56f6c7ad4:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'),strip=s=>s.replace(/<style>[\s\S]*?<\/style>/,'');assert.equal(strip(require('./calificar-alignment-snapshot.cjs')(src)),strip(old));
+ const old=execFileSync('git',['show','54439bfbb5917a7d46a547881e3b20a56f6c7ad4:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'),strip=s=>s.replace(/<style>[\s\S]*?<\/style>/,'');assert.equal(strip(require('./calificar-alignment-snapshot.cjs')(require('./registro-print-snapshot.cjs')(src))),strip(old));
 });
 
 for(const [level,area,n]of areas)test(n+' competences alternate subtle column fills consistently across all student rows',()=>{

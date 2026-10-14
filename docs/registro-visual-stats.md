@@ -127,3 +127,22 @@ Los botones de letras de Promedios y la barra masiva pasan de 40 a 38 px, con ti
 Promedios refuerza su selección con fondos todavía claros: C rojo #fecaca, B ámbar #fde68a, A verde #bbf7d0 y AD azul #bae6fd; texto oscuro y bordes cromáticos ligeramente más definidos. Contraste superior a 4,5:1 en todos los estados. Opciones neutras, fondos alternos por competencia y divisor atenuado permanecen intactos. No cambia la paleta de Calificar ni los indicadores numéricos.
 
 Seis regresiones nuevas de tamaño/espaciado/contraste y equivalencia de source fuera de CSS; las pruebas existentes siguen cubriendo áreas de 1–5 competencias, notas, conclusiones y sincronización. Validación: 1940 aprobadas, 0 fallidas/omitidas. La revisión física de navegador permanece pendiente por las limitaciones documentadas; las fixtures estáticas se regeneran con el CSS actual.
+
+## Reporte auxiliar bimestral para impresión
+
+La acción general Imprimir/PDF llamaba a prepararImpresion(), que añadía grillas de evidencia con PROM y NL después del reporte. Ahora llama a imprimirResumen(), que construye únicamente la relación bimestral y sus estadísticas desde las funciones vigentes de resultados efectivos. El detalle conserva su implementación original y una acción explícita «Imprimir detalle de evidencias» en Calificar.
+
+El reporte incluye institución, área, nivel, grado, sección, bimestre, año configurado, docente y fecha. N.º es correlativo sobre la lista autorizada completa; no se reinicia por página. Los nombres se muestran completos y las notas se centran horizontal y verticalmente. Se utiliza A4 horizontal con márgenes de 10 mm, encabezados de tabla repetibles y reglas para evitar dividir filas. Las estadísticas originales por competencia quedan al final: cantidades/porcentajes AD/A/B/C, sin nota, conclusiones pendientes y avance. No se imprimen controles ni promedio referencial. No cambian reglas académicas, datos, permisos, cierres, A1/B1/B2 ni Apps Script.
+
+36 pruebas nuevas ejecutan el generador real con 30/40 estudiantes ficticios, Letras/0–20 y catálogos de 1–5 competencias de Primaria/Secundaria. Comprueban numeración, nombres, notas, estadísticas, contexto, escape, independencia del DOM anterior y ausencia de mutaciones/peticiones. Las pruebas históricas adaptan exclusivamente expectativas de presentación; las nuevas no normalizan la función actual. Suite completa: 1976 aprobadas, 0 fallidas/omitidas.
+
+Fixture autónoma para Live Server (sin red ni datos oficiales):
+
+```powershell
+node tests/registro-bimestral-print-fixture.cjs reporte-primaria40.html primaria "Personal Social" 40
+node tests/registro-bimestral-print-fixture.cjs reporte-secundaria30.html secundaria "Arte y Cultura" 30
+```
+
+Abrir la fixture con Live Server y pulsar Abrir impresión/PDF. Comprobar A4 horizontal, márgenes de 10 mm, escala 100 %, encabezados repetidos, numeración continua, nombres completos, notas centradas, estadísticas al final y ausencia de filas partidas. Repetir 30/40 alumnos y áreas de 1–5 competencias. El preview de pantalla es orientativo. La paginación y geometría reales no están verificadas: el navegador automatizado disponible no pudo generar un PDF nativo. No se presenta una simulación como evidencia de paginación.
+
+Reversión: revertir el commit de este ajuste restaura las dos acciones de impresión anteriores; no requiere migraciones ni cambios en Sheets.
