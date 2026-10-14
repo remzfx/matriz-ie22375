@@ -571,7 +571,7 @@
       <button type="button" id="tabFin" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('fin')">Promedios</button>
       <button type="button" id="tabAv" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('av')">Resumen</button>
       <button type="button" id="tabAs" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('as')">Asistencia</button>
-      <button type="button" class="btn btn-ghost flex-1 text-sm" onclick="imprimirResumen()">🖨 Imprimir / PDF</button>
+      <button type="button" class="btn btn-ghost flex-1 text-sm" onclick="imprimirPestanaActiva()">🖨 Imprimir / PDF</button>
     </div>
 
     <!-- PANEL PROMEDIOS DIRECTOS -->
@@ -2607,23 +2607,25 @@ async function rellenarSiagieExcel() {
   toast('Excel SIAGIE listo · '+escritos+' notas');
   if (sinMatch) console.log('SIAGIE sin match de nombre:', sinMatch);
 }
-function prepararImpresion() {
+function prepararImpresion(opciones) {
   loadStore();
+  opciones=opciones||{};
   const c = ctxBase();
   const alumnos = estudiantes();
   const docente = document.getElementById('inpDocente').value.trim() || '________________';
   const sess = (store.sessions || []).filter(s =>
-    s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
-    s.seccion === c.seccion && s.area === c.area
+    s.nivel === c.nivel && s.bim === c.bim && String(s.grado) === String(c.grado) &&
+    s.seccion === c.seccion && s.area === c.area &&
+    (!opciones.desde || s.fecha >= opciones.desde) && (!opciones.hasta || s.fecha <= opciones.hasta)
   ).sort((a,b) => (a.fecha||'').localeCompare(b.fecha||'') || (a.comp||'').localeCompare(b.comp||''));
 
-  if (!sess.length && !alumnos.some(al=>competencias().some(cp=>notaCompAlumno(cp,studentKey(al)).letra))) {
+  if (!sess.length && (opciones.desde || opciones.hasta || !alumnos.some(al=>competencias().some(cp=>notaCompAlumno(cp,studentKey(al)).letra)))) {
     alert('No hay resultados guardados en este bimestre/área para imprimir.');
     return;
   }
 
   // Cada resultado C requiere su propia conclusión; el promedio es solo referencial.
-  const faltanConc = validarConclusionesOficial(c, alumnos, sess);
+  const faltanConc = opciones.desde ? [] : validarConclusionesOficial(c, alumnos, sess);
   if (faltanConc.length) {
     const lista = faltanConc.slice(0, 12).map(x => '• ' + x).join('\n');
     const extra = faltanConc.length > 12 ? '\n… y ' + (faltanConc.length-12) + ' más' : '';
@@ -2653,7 +2655,7 @@ function prepararImpresion() {
   html += `<div class="print-hdr">
     <div style="font-size:9pt">IE 22375 SANTA ROSA DE LOS MOLINOS</div>
     <h1>REGISTRO AUXILIAR DE EVALUACIÓN</h1>
-    <h2>${(c.area||'').toUpperCase()} · BIMESTRE ${c.bim} · ${nivelTxt}</h2>
+    <h2>${(c.area||'').toUpperCase()} · BIMESTRE ${c.bim} · ${nivelTxt}${opciones.desde?' · '+opciones.desde+' al '+opciones.hasta:''}</h2>
   </div>
   <table class="print-meta"><tr>
     <td><b>Grado / Sección:</b> ${c.grado}° ${c.seccion}</td>
@@ -2664,9 +2666,9 @@ function prepararImpresion() {
   </tr></table>`;
 
   const escImpresion=v=>String(v||'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
-  html+='<h2>Resultados bimestrales por competencia</h2><table class="print-tbl"><thead><tr><th>Estudiante</th>'+competencias().map(cp=>'<th>'+escImpresion(cp)+'</th>').join('')+'</tr></thead><tbody>';
-  alumnos.forEach(al=>{html+='<tr><td>'+escImpresion(al.nombre)+'</td>'+competencias().map(cp=>{if(!competenciaTrabajada(cp))return '<td>No trabajada este bimestre</td>';const r=notaCompAlumno(cp,studentKey(al));return '<td>'+escImpresion(r.letra||'Pendiente')+(IERegistroAcademico.requiresConclusion(c.nivel,r.letra)?'<p>'+escImpresion(concCompAlumno(cp,studentKey(al)))+'</p>':'')+'</td>';}).join('')+'</tr>';});
-  html+='</tbody></table>';
+  if (!opciones.desde) html+='<h2>Resultados bimestrales por competencia</h2><table class="print-tbl"><thead><tr><th>Estudiante</th>'+competencias().map(cp=>'<th>'+escImpresion(cp)+'</th>').join('')+'</tr></thead><tbody>';
+  if (!opciones.desde) alumnos.forEach(al=>{html+='<tr><td>'+escImpresion(al.nombre)+'</td>'+competencias().map(cp=>{if(!competenciaTrabajada(cp))return '<td>No trabajada este bimestre</td>';const r=notaCompAlumno(cp,studentKey(al));return '<td>'+escImpresion(r.letra||'Pendiente')+(IERegistroAcademico.requiresConclusion(c.nivel,r.letra)?'<p>'+escImpresion(concCompAlumno(cp,studentKey(al)))+'</p>':'')+'</td>';}).join('')+'</tr>';});
+  if (!opciones.desde) html+='</tbody></table>';
 
   // Detail per competencia
   comps.forEach((comp, idx) => {
@@ -3406,6 +3408,45 @@ function renderAvance() {
  estudiantes().forEach((al,i)=>{const id=studentKey(al);html+='<tr><th class="fin-nom summary-student"><span class="summary-student-order">'+escapeRegistro(al.numeroVisual??i+1)+'</span><span class="summary-student-name">'+escapeRegistro(al.nombre)+'</span></th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td class="summary-competence">No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id);html+='<td class="summary-competence"><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+escapeRegistro(d.letra||'Pendiente')+'</span></div></td>';});const r=promReferencialAlumno(id);html+='<td class="summary-reference">'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>'+estadisticaResumenHTML();
  if(typeof estadisticasCompetenciasHTML==='function')box.innerHTML+=estadisticasCompetenciasHTML(comps,estudiantes());
  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
+}
+function imprimirPestanaActiva(){
+ const active=['panelCalificar','panelFinales','panelAvance','panelAsistencia'].find(id=>document.getElementById(id)?.classList.contains('on'));
+ if(active==='panelCalificar') {abrirSelectorImpresionCalificar();return;}
+ if(active==='panelAsistencia') {imprimirAsistenciaRegistro();return;}
+ // Promedios y Resumen comparten resultados oficiales por competencia, con estadísticas y firmas.
+ imprimirResumen();
+}
+function abrirSelectorImpresionCalificar(){
+ const previo=document.getElementById('selectorImpresionCalificar');if(previo)previo.remove();
+ const dialog=document.createElement('dialog');dialog.id='selectorImpresionCalificar';
+ dialog.style.cssText='border:1px solid #cbd5e1;border-radius:14px;max-width:min(92vw,480px);width:100%;padding:20px;box-shadow:0 14px 50px #0f172a33';
+ dialog.innerHTML='<form method="dialog" style="display:grid;gap:12px"><h2 style="font-size:18px;font-weight:800">Imprimir Calificar</h2><label for="impModo">Periodo</label><select id="impModo"><option value="dia">Sesión diaria</option><option value="semana">Sesiones semanales (lunes a viernes)</option><option value="bimestre">Todas las sesiones del bimestre</option></select><label for="impFecha">Fecha de referencia</label><input id="impFecha" type="date" required><p style="font-size:12px;color:#475569">La semana comprende lunes a viernes. Solo se incluyen sesiones registradas.</p><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" id="impCancelar" class="btn btn-ghost">Cancelar</button><button type="button" id="impConfirmar" class="btn btn-primary">Imprimir / PDF</button></div></form>';
+ document.body.appendChild(dialog);
+ const fecha=dialog.querySelector('#impFecha'),modo=dialog.querySelector('#impModo');
+ fecha.value=(document.getElementById('inpFecha')?.value||new Date().toISOString().slice(0,10));
+ const actualizar=()=>{fecha.disabled=modo.value==='bimestre';fecha.required=modo.value!=='bimestre';};modo.addEventListener('change',actualizar);actualizar();
+ dialog.querySelector('#impCancelar').onclick=()=>dialog.close();
+ dialog.querySelector('#impConfirmar').onclick=()=>{
+   let options={};if(modo.value!=='bimestre'){
+     if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha.value)){fecha.reportValidity();return;}
+     if(modo.value==='dia')options={desde:fecha.value,hasta:fecha.value};
+     else {const d=new Date(fecha.value+'T12:00:00');if(Number.isNaN(d.getTime()))return;const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);const monday=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');d.setDate(d.getDate()+4);const friday=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');options={desde:monday,hasta:friday};}
+   }
+   dialog.close();prepararImpresion(options);
+ };
+ dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+}
+function imprimirAsistenciaRegistro(){
+ loadStore();
+ const c=ctxBase(),alumnos=estudiantes(),fechas=(store.asisFechas?.[asisCtxKey()]||[]).filter(f=>/^\d{4}-\d{2}-\d{2}$/.test(f)&&!store.asisFechasEstado?.[asisCtxKey()+'||'+f]?.borrado).slice().sort();
+ if(!fechas.length){alert('No hay fechas de asistencia registradas en este bimestre.');return;}
+ const docente=document.getElementById('inpDocente')?.value||'No registrado';
+ let html='<article class="bimestral-report"><header class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>REGISTRO DE ASISTENCIA</h2></header>';
+ html+='<div class="bimestral-meta"><span><b>Área:</b> '+escapeRegistro(c.area)+'</span><span><b>Nivel:</b> '+escapeRegistro(c.nivel)+'</span><span><b>Aula:</b> '+escapeRegistro(c.grado+'° '+c.seccion)+'</span><span><b>Bimestre:</b> '+escapeRegistro(c.bim)+'</span><span><b>Docente:</b> '+escapeRegistro(docente)+'</span><span><b>Impresión:</b> '+new Date().toLocaleDateString('es-PE')+'</span></div>';
+ html+='<table class="bimestral-table"><thead><tr><th>N.º</th><th>Estudiante</th>'+fechas.map(f=>'<th>'+escapeRegistro(f.slice(5))+'</th>').join('')+'</tr></thead><tbody>';
+ alumnos.forEach((al,i)=>{html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+fechas.map(f=>{const rec=asisGet(leerNota(store.asistencia,asisMarkKey(f,studentKey(al))));return '<td class="bimestral-grade">'+escapeRegistro(rec.marca||'—')+'</td>';}).join('')+'</tr>';});
+ html+='</tbody></table><p style="margin-top:12px;font-size:9pt">P = Presente · F = Falta · T = Tardanza · J = Justificado · — = Sin registro</p><footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente</span></div><div class="bimestral-signature"><span>Dirección</span></div></footer></article>';
+ document.getElementById('printArea').innerHTML=html;window.print();
 }
 function imprimirResumen(){
  const c=ctxBase(),alumnos=estudiantes(),comps=competencias();
