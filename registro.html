@@ -424,6 +424,20 @@
   /* Ocultar contadores redundantes del pie: siguen presentes para los scripts existentes. */
   #registroAcademicFooter > .shell > div:first-child {display:none!important;}
   #registroAcademicFooter > .shell {justify-content:flex-end!important;}
+  /* Resumen: destacar visualmente Promedio referencial sin cambiar su carácter informativo. */
+  @media screen {
+    #avanceBox .fin-grid thead th.summary-reference {
+      background:#16365a!important;color:#fff!important;
+      border-left:2px solid #6886a7!important;
+      font-weight:800!important;
+    }
+    #avanceBox .fin-grid thead th.summary-reference small {
+      color:#e2eaf6!important;opacity:1!important;font-weight:500!important;
+    }
+    #avanceBox .fin-grid tbody td.summary-reference {
+      font-weight:800!important;color:#172b4d!important;font-size:15px;
+    }
+  }
   /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
