@@ -107,7 +107,7 @@ test('actual printed Resumen uses consecutive visual numbers rather than origina
  const ui=new Function('require','__dirname',read('tests/registro-academic-model.test.cjs').split('\nfor(const level')[0]+'\nreturn ui;')(require,__dirname),f=ui(),p=page();
  const input=[{nivel:'secundaria',grado:2,seccion:'A',orden:10,idSiagie:'synthetic-print-a',nombre:'Synthetic Print A'},{nivel:'secundaria',grado:2,seccion:'A',orden:13,idSiagie:'synthetic-print-b',nombre:'Synthetic Print B'}],before=JSON.stringify(input);
  f.c.estudiantes=()=>p.c.IEStudentIdentity.numbered(input);f.c.print=()=>{};vm.runInContext(extract('registro.html','imprimirResumen'),f.c);f.c.imprimirResumen();
- assert.deepEqual([...f.el('printArea').innerHTML.matchAll(/summary-student-order">(\d+)</g)].map(m=>Number(m[1])),[1,2]);assert.equal(JSON.stringify(input),before);
+ assert.deepEqual([...f.el('printArea').innerHTML.matchAll(/bimestral-number">(\d+)</g)].map(m=>Number(m[1])),[1,2]);assert.equal(JSON.stringify(input),before);
 });
 
 test('actual Auxiliar attendance report numbers the complete classroom with no gaps',()=>{

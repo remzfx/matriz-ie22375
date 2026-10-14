@@ -14,6 +14,7 @@ function fixture(){
  const c=vm.createContext({setTimeout:()=>0,clearTimeout(){},window:{},document:{getElementById:el,querySelectorAll:()=>[],querySelector:s=>s==='main'?main:null},console,alert:v=>alerts.push(v),toast(){},saveStore(){},renderStudents(){},getLoginSession:()=>({role:'docente'}),bimestreHabilitado:()=>true,
    IEStudents:{validToken:()=> 'synthetic-token',empty:()=>roster([]),peekRoster:()=>c.base || null,loadRoster:async bim=>{requests.push(bim);return roster(c.next,bim);}}});
  new vm.Script(read('student-identity.js')).runInContext(c);c.studentKey=c.window.studentKey;c.IEStudentIdentity=c.window.IEStudentIdentity;
+ c.pintarBotonesContextoRegistro=c.actualizarBotonesContextoRegistro=()=>{};
  const run=s=>new vm.Script(s).runInContext(c);
  run(`let nivel='secundaria',areaActual='Matemática',store={sessions:[],grades:{},finales:{},concArea:{},meta:{},studentAliases:{}},notas={},sesionActiva={comp:'Resuelve',capacidad:'Capacidad',fecha:'2026-10-03'},padronVerificadoServidor=true,tokenPadron='synthetic-token',vencimientoCachePadron,cargandoEstudiantes=false,padronBimestre='III',solicitudPadron=0,bdEstudiantes=IEStudents.empty();
    function ctxBase(){return {nivel,bim:document.getElementById('selBim').value,grado:4,seccion:'B',area:areaActual};}
@@ -105,7 +106,7 @@ test('Real grade collection writes a stable key while retaining the historical n
  const s=fixture();s.c.base=s.roster([{idSiagie:'42',nombre:'Synthetic Student'}]);s.run('bdEstudiantes=base');
  s.run("store.grades[cloudClaveReg()+'||Resuelve||Capacidad||2026-10-03||Synthetic Student']={nota20:12}");
  s.c.document.querySelectorAll=selector=>selector==='.cal-nota'?[{value:'18',readOnly:false,dataset:{nom:'id%3A42',cap:'Capacidad',comp:'Resuelve'}}]:[];
- s.run('function upsertSesionCap(){}');s.run(extract('registro.html','capKeyHoy'));s.run(extract('registro.html','recolectarPantalla'));s.run('function numToLetter(n){return n>=17?\'AD\':\'A\'}');
+ s.run('function upsertSesionCap(){}');s.run(extract('registro.html','capKeyHoy'));s.c.confirm=()=>true;s.run(extract('registro.html','confirmarEdicionNumerica'));s.run(extract('registro.html','recolectarPantalla'));s.run('function numToLetter(n){return n>=17?\'AD\':\'A\'}');
  s.c.recolectarPantalla();assert.equal(s.run("store.grades[cloudClaveReg()+'||Resuelve||Capacidad||2026-10-03||id:42'].nota20"),18);
  assert.equal(s.run("store.grades[cloudClaveReg()+'||Resuelve||Capacidad||2026-10-03||Synthetic Student'].nota20"),12);
 });

@@ -21,10 +21,6 @@
   .final-grade{grid-column:1;width:144px;min-width:144px;display:flex;flex-direction:column;align-items:center;}
   .final-grade > .fin-cell{width:100%;min-width:0;}
   .final-grade button{max-width:100%;overflow-wrap:anywhere;}
-  .final-grade .fin-clear-direct{box-sizing:border-box;display:flex;align-items:center;justify-content:center;align-self:center;flex:0 0 auto;width:18px;height:18px;min-width:18px;min-height:18px;margin:2px 0 0;padding:0;border:1px solid #475569;border-radius:4px;background:#475569;color:#fff;font-size:12px;font-weight:600;line-height:1;cursor:pointer;box-shadow:none;}
-  .final-grade .fin-clear-direct:hover{background:#334155;border-color:#334155;}
-  .final-grade .fin-clear-direct:focus-visible{outline:2px solid #334155;outline-offset:2px;}
-  @media(max-width:640px){.final-grade .fin-clear-direct{width:20px;height:20px;min-width:20px;min-height:20px;}}
   .final-conclusion{text-align:left;min-width:0;width:100%;max-width:100%;font-size:11px;}
   .final-conclusion label{display:block;font-size:10px;font-weight:600;}
   .final-conclusion select,.final-conclusion textarea{width:100%;min-width:0;box-sizing:border-box;font-size:11px;line-height:1.25;padding:4px;}
@@ -43,7 +39,7 @@
   .fin-cell .chip { min-width:1.7rem; padding:.2rem .32rem; font-size:11px; margin:1px; }
   #finLista .final-grade > .fin-cell:has(> button[data-val]) { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px 1px; align-items:center; }
   #finLista .final-grade > .fin-cell > .chip[data-val] { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:2px 1px; margin:0; font-size:11px; white-space:nowrap; overflow-wrap:normal; }
-  #finLista .final-grade > .fin-cell:has(> button[data-val]) > :not([data-val]) { grid-column:1 / -1; justify-self:center; }
+  #finLista .final-grade > .fin-cell:has(> button[data-val]) > :not([data-val]) { grid-column:1 / -1; justify-self:start; }
   .nivel-c, .nivel-b, .nivel-a, .nivel-ad {
     background:#f1f5f9; color:#64748b; border-color:#cbd5e1;
   }
@@ -130,6 +126,18 @@
     .fin-panel-card > button { margin-top:8px; }
     .registro-datos-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
     .registro-datos-grid > div { min-width:0; }
+    /* Botones compactos: el select original conserva los eventos y la autorización académica. */
+    .registro-datos-grid .registro-select-con-botones > select {position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none;}
+    .registro-opciones {display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:3px;}
+    .registro-opcion {min-width:34px;min-height:33px;padding:4px 9px;border:1px solid #cbd5e1;border-radius:8px;background:#f1f5f9;color:#334155;font-size:12px;font-weight:750;cursor:pointer;line-height:1.2;}
+    .registro-opcion[aria-pressed="true"] {background:#0284c7;border-color:#0284c7;color:white;}
+    .registro-opcion:focus-visible {outline:2px solid #0369a1;outline-offset:2px;}
+    .registro-opcion:disabled {opacity:.55;cursor:default;}
+    .registro-opcion-candado {font-size:10px;margin-left:3px;}
+    .registro-aulas-grupo {display:flex;flex-wrap:wrap;align-items:center;gap:4px;}
+    .registro-aulas-grupo #wrapSeccion {display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:0;}
+    .registro-aulas-grupo #wrapSeccion > label {font-size:10px;color:#64748b;}
+    .registro-aulas-grupo #wrapSeccion .registro-opciones {margin:0;}
     .registro-datos-meta { display:flex; flex-wrap:wrap; gap:4px 20px; margin-top:8px; font-size:12px; overflow-wrap:anywhere; }
     #registroDatosPanel[hidden] { display:none; }
     #btnRegistroDatos[aria-expanded="true"] { box-shadow:inset 0 0 0 2px #0284c7; }
@@ -235,6 +243,281 @@
 .trans-toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:12px;margin:8px 0}.trans-toolbar-left{display:flex;flex:1 1 280px;flex-wrap:wrap;align-items:end;gap:12px;min-width:0}.trans-mode-group{margin-left:auto;flex:0 0 auto;max-width:100%}.trans-control-group{display:flex;flex-direction:column;gap:4px;min-width:0}.trans-control-group>span{font-size:12px;color:#64748b;font-weight:600}.trans-segment{display:flex;flex-wrap:wrap;gap:4px}.trans-segment button{margin:0;padding:8px 12px;border:1px solid #dbe3ed;border-radius:8px;background:#f1f5f9;color:#334155;font-size:13px;transition:background .15s,color .15s}.trans-segment button[aria-pressed="true"],.trans-segment button[aria-selected="true"]{background:#075985;border-color:#075985;color:#fff;font-weight:600}.trans-segment button:hover:not(:disabled){border-color:#075985}.trans-segment button:focus-visible,.trans-context button:focus-visible{outline:2px solid #0ea5e9;outline-offset:2px}.trans-apply{margin:0;padding:8px 12px;background:#fff;color:#075985;border:1px solid #94a3b8;border-radius:8px;font-size:13px}
 .trans-progress{margin:8px 0;font-size:12px;color:#475569}.trans-notice{margin:6px 0;font-size:13px;line-height:1.4;padding:8px 10px;border-left:3px solid #0ea5e9;background:#f0f7ff}.trans-notice:empty{display:none}#transStatus{margin:6px 0;font-size:13px;color:#475569}.trans-heading-row{display:flex;flex-wrap:wrap;align-items:start;gap:8px 16px;margin:8px 0}.trans-competence-title{flex:1 1 280px;margin:0;font-size:14px;line-height:1.4;font-weight:600;color:#16324a}.trans-help{font-size:12px;max-width:100%;min-width:0}.trans-help>summary{cursor:pointer;min-height:32px;color:#075985}.trans-help p{max-width:640px;margin:4px 0;line-height:1.5}.trans-actions{display:flex;flex-wrap:wrap;gap:8px}.trans-actions button{margin:0}
 @media(max-width:640px){.trans-context{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.trans-context button{grid-column:1/-1}.trans-toolbar{gap:10px}.trans-toolbar-left{flex-basis:100%;gap:10px}.trans-mode-group{margin-left:0}.trans-heading-row{gap:6px}.trans-tutor-header h2{font-size:16px}}
+/* Visual Registro 3/6/7/10: solo presentación y estadísticas de lectura. */
+@media screen {
+  #panelFinales .fin-panel-card {padding:10px;}
+  #panelFinales .fin-header-main {display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;}
+  #panelFinales .fin-header-context {flex:1 1 250px;min-width:0;}
+  #panelFinales .fin-header-aux {gap:4px 8px;margin-top:2px;}
+  #panelFinales .fin-mode-info > span {padding:2px 0;background:transparent;font-size:10px;}
+  #panelFinales .fin-header-controls {flex:0 1 auto;gap:4px 8px;margin-left:auto;}
+  #panelFinales .fin-bulk-actions {gap:4px;}
+  #panelFinales .fin-bulk-actions .chip {border-radius:10px;min-width:38px;min-height:38px;padding:4px;font-size:12px;}
+  #panelFinales .fin-remove-bulk {min-height:44px;padding:4px 8px;}
+  #panelFinales .mode-toggle {gap:2px;padding:3px;}
+  #panelFinales .mode-toggle button {min-height:44px;padding:4px 8px;}
+  /* No expandir Estudiante cuando hay pocas competencias: columnas desde la izquierda. */
+  #finLista .fin-grid {width:max-content;min-width:0;max-width:none;}
+  /* Promedios: numeración lateral compacta y nombre en dos líneas sin crecer filas. */
+  #finLista .fin-grid .fin-nom {width:202px;min-width:202px;max-width:202px;}
+  #finLista .fin-grid td.fin-nom {position:sticky;padding:5px 6px 5px 25px;vertical-align:middle;}
+  #finLista .fin-grid td.fin-nom > div:first-child {position:absolute;left:6px;top:50%;transform:translateY(-50%);width:16px;text-align:left;}
+  #panelFinales .fin-header-main > .fin-comparativo-toggle {flex:0 0 auto;align-self:center;white-space:nowrap;margin:0 4px;}
+  #finLista .fin-grid td.fin-nom > .font-bold {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;white-space:normal;font-size:11px;line-height:1.25;max-height:2.5em;}
+  #finLista .fin-grid th.fin-nom {text-align:left;}
+  #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:212px;min-width:212px;padding:6px 10px;}
+  #finLista .fin-grid td:has(.final-conclusion) {width:340px;min-width:340px;}
+  #finLista .fin-grid th,#finLista .fin-grid td {padding:6px;}
+  #finLista .final-cell-layout {grid-template-columns:188px minmax(0,1fr);gap:6px;}
+  #finLista .final-grade {width:188px;min-width:188px;}
+  #finLista .final-conclusion {max-width:132px;}
+  #finLista .final-conclusion select {height:32px;min-height:32px;max-width:132px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
+  #finLista .final-grade > .fin-cell:has(> button[data-val]) {grid-template-columns:repeat(4,34px);width:max-content;max-width:100%;gap:3px 2px;margin-left:0;margin-right:auto;}
+  #finLista .final-grade > .fin-cell > .chip[data-val] {width:34px;min-width:34px;min-height:34px;height:34px;justify-self:center;border-radius:9px;font-size:12px;padding:3px;}
+  #finLista .chip[data-val].on {box-shadow:none;outline:none;font-weight:800;}
+  #finLista .chip[data-val]:focus-visible {outline:3px solid #0369a1;outline-offset:2px;}
+  #finLista .chip[data-val]:disabled {cursor:default;}
+  #avanceBox .fin-grid {width:100%;}
+  #avanceBox .summary-student,#avanceBox .summary-student-header {width:auto;min-width:230px;max-width:none;padding:6px 8px;}
+  #avanceBox .summary-student-name {white-space:nowrap;font-size:12px;line-height:1.35;}
+  #avanceBox .summary-competence,#avanceBox .fin-grid thead th:not(.fin-nom):not(.summary-reference) {min-width:150px;max-width:240px;padding:6px;overflow-wrap:normal;}
+  #avanceBox .summary-competence .fin-cell {font-weight:800;font-size:15px;}
+  @media(max-width:640px) {
+    #panelFinales .fin-header-context {flex-basis:100%;}
+    #panelFinales .fin-header-controls {width:100%;margin-left:0;justify-content:space-between;}
+    #panelFinales .fin-bulk-actions > span {display:none;}
+    #panelFinales .fin-bulk-actions {width:100%;justify-content:flex-start;}
+    #panelFinales .fin-header-controls .mode-toggle {flex-basis:180px;}
+    #finLista .fin-grid .fin-nom {width:150px;min-width:150px;max-width:150px;}
+    #avanceBox .summary-student,#avanceBox .summary-student-header {width:120px;min-width:120px;max-width:120px;}
+    #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:204px;min-width:204px;}
+    #finLista .final-grade {width:182px;min-width:182px;}
+    #finLista .final-cell-layout {grid-template-columns:182px minmax(0,1fr);}
+    #finLista .final-grade > .fin-cell:has(> button[data-val]) {column-gap:2px;}
+    #finLista .fin-grid td.fin-nom > .font-bold {font-size:10px;line-height:1.2;max-height:2.4em;}
+    #avanceBox .summary-student-name {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
+    #finLista .fin-grid td:has(.final-conclusion) {width:252px;min-width:252px;}
+    #finLista .final-conclusion {grid-column:1 / -1;grid-row:2;}
+  }
+}
+.competence-stats {margin:10px 0 0;padding:8px;border:1px solid #cbd5e1;border-radius:10px;font-size:12px;min-width:0;}
+.competence-stats h3 {margin:0 0 4px;font-size:13px;font-weight:800;}
+.competence-stats p {margin:4px 0;color:#475569;font-size:11px;}
+.competence-stats .stats-scroll {overflow-x:auto;max-width:100%;}
+.competence-stats table {border-collapse:collapse;width:100%;min-width:760px;}
+.competence-stats th,.competence-stats td {padding:6px;border-bottom:1px solid #e2e8f0;text-align:center;}
+.competence-stats th:first-child {text-align:left;min-width:200px;max-width:320px;font-weight:600;}
+.competence-stats td {white-space:nowrap;}
+.competence-stats thead {background:#f1f5f9;color:#0f172a;}
+.competence-stats progress {display:block;width:70px;height:6px;margin:3px auto;accent-color:#0284c7;}
+@media print {
+  body > :not(#printArea) {display:none!important;}
+  #printArea {position:static!important;background:#fff;}
+  #printArea:has(.summary-stats) {page:registro-resumen;padding:0;}
+  #printArea .fin-grid {table-layout:fixed;}
+  #printArea .fin-grid th,#printArea .fin-grid td {min-width:0!important;width:auto;max-width:none;white-space:normal;overflow-wrap:anywhere;}
+  #printArea .fin-grid .summary-student,#printArea .fin-grid .summary-student-header {width:24%;min-width:0!important;max-width:none;}
+  #printArea .fin-grid .summary-student-name {white-space:normal;overflow-wrap:anywhere;font-size:8pt;}
+  #printArea .fin-grid .summary-reference {width:12%;min-width:0!important;max-width:none;}
+  #printArea .competence-stats {font-size:8pt;break-inside:auto;}
+  #printArea .competence-stats table {min-width:0;width:100%;table-layout:fixed;}
+  #printArea .competence-stats th,#printArea .competence-stats td {min-width:0;max-width:none;white-space:normal;overflow-wrap:anywhere;border:1px solid #777;padding:3px;}
+  #printArea .competence-stats th:first-child {width:30%;}
+  #printArea thead {display:table-header-group;}
+  #printArea .competence-stats progress {display:none;}
+}
+@page registro-resumen {size:A4 landscape;margin:10mm;}
+  /* Calificar: cuatro decisiones táctiles en una fila, dentro del scroll de la tabla. */
+  #stuList {min-width:0;max-width:100%;--cal-student-width:230px;--cal-competence-width:220px;}
+  #stuList .fin-grid {width:calc(var(--cal-student-width) + var(--cal-columns)*var(--cal-competence-width));min-width:0;table-layout:fixed;}
+  #stuList .fin-grid th,#stuList .fin-grid td {padding:6px;}
+  #stuList .fin-grid .fin-nom {width:auto;min-width:230px;max-width:none;text-align:left;}
+  #stuList .fin-grid .fin-nom .font-bold {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
+  #stuList .fin-grid th:not(.fin-nom),#stuList .fin-grid td:not(.fin-nom) {width:var(--cal-competence-width);min-width:0;text-align:center;}
+  #stuList .fin-cell:has(> button[data-val]) {display:grid;grid-template-columns:repeat(4,40px);gap:4px;width:172px;min-width:172px;align-items:center;}
+  #stuList .fin-cell > .chip[data-val] {box-sizing:border-box;width:40px;min-width:40px;min-height:40px;height:40px;margin:0;padding:4px;border-radius:10px;font-size:12px;white-space:nowrap;}
+  #stuList .chip[data-val].on {box-shadow:none;outline:none;font-weight:800;}
+  #stuList .chip[data-val]:focus-visible {outline:3px solid #0369a1;outline-offset:2px;}
+  #stuList .chip[data-val]:disabled {cursor:default;}
+  #asisLista .stu-row > .flex {display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;}
+  #asisLista .truncate {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+  #asisLista .asis-chip {box-sizing:border-box;min-width:44px;height:44px;margin:0;}
+  #registroAcademicFooter button {min-height:44px;}
+  @media(max-width:640px) {
+    #stuList {--cal-student-width:120px;}
+    #stuList .fin-grid .fin-nom {width:120px;min-width:120px;max-width:120px;}
+  }
+  /* Paleta suave compartida por las decisiones académicas, sin alterar indicadores numéricos. */
+  :is(#stuList,#finLista) .chip[data-val],#panelFinales .fin-bulk-actions .chip {background:#f8fafc;color:#475569;border:1px solid #cbd5e1;box-shadow:none;touch-action:manipulation;}
+  :is(#stuList,#finLista) .chip[data-val]:hover:not(:disabled):not(.on),#panelFinales .fin-bulk-actions .chip:hover:not(:disabled) {background:#f1f5f9;border-color:#94a3b8;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-c.on {background:#fee2e2;color:#991b1b;border-color:#fca5a5;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-b.on {background:#fef3c7;color:#92400e;border-color:#fcd34d;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-a.on {background:#dcfce7;color:#166534;border-color:#86efac;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-ad.on {background:#e0f2fe;color:#075985;border-color:#7dd3fc;}
+  #finLista .final-level-toggle {border:0;cursor:pointer;font:inherit;}
+  #finLista .final-level-toggle:disabled {cursor:default;}
+  #finLista .final-level-toggle:focus-visible {outline:2px solid #0369a1;outline-offset:2px;}
+  /* Separación tenue entre competencias; encabezado y celdas comparten columna. */
+  @media screen {
+    #finLista .fin-grid > thead > tr > th:nth-child(n+3),
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+3),
+    #avanceBox .fin-grid > thead > tr > th:nth-child(n+3):not(.summary-reference),
+    #avanceBox .fin-grid > tbody > tr > td:nth-child(n+3):not(.summary-reference) {border-left:1px solid rgba(148,163,184,.28);}
+  }
+  /* Fondos alternos casi blancos; la cabecera oscura y los colores de nota se conservan. */
+  @media screen {
+    #finLista .fin-grid > tbody > tr > td:nth-child(even):not(.fin-nom),
+    #avanceBox .fin-grid > tbody > tr > td.summary-competence:nth-child(even) {background:#f3f9fd;}
+    #finLista .fin-grid > tbody > tr > td:nth-child(odd):not(.fin-nom),
+    #avanceBox .fin-grid > tbody > tr > td.summary-competence:nth-child(odd) {background:#f4faf6;}
+  }
+  #stuList .cal-student-column {width:var(--cal-student-width);}
+  #stuList .cal-competence-column {width:var(--cal-competence-width);}
+  #stuList .fin-cell {margin-inline:auto;}
+  #stuList .cal-competence-header .fin-caps {white-space:normal;overflow-wrap:anywhere;word-break:normal;}
+  /* Promedios: selección algo más definida sobre fondos casi blancos. */
+  #finLista .chip[data-val].nivel-c.on {background:#fecaca;color:#991b1b;border-color:#f87171;}
+  #finLista .chip[data-val].nivel-b.on {background:#fde68a;color:#78350f;border-color:#fbbf24;}
+  #finLista .chip[data-val].nivel-a.on {background:#bbf7d0;color:#14532d;border-color:#4ade80;}
+  #finLista .chip[data-val].nivel-ad.on {background:#bae6fd;color:#0c4a6e;border-color:#38bdf8;}
+  /* Reporte bimestral independiente; no copia grillas de evidencias ni controles. */
+  @media print {
+    #printArea:has(> .bimestral-report) {page:registro-resumen;padding:0!important;}
+    #printArea .bimestral-report {font-family:Arial,Helvetica,sans-serif;font-size:8pt;line-height:1.25;}
+    #printArea .bimestral-meta {display:flex;flex-wrap:wrap;gap:4px 16px;margin:6px 0 10px;font-size:8pt;}
+    #printArea .bimestral-table {width:100%;border-collapse:collapse;table-layout:fixed;}
+    #printArea .bimestral-number-column {width:9mm;}
+    #printArea .bimestral-name-column {width:30%;}
+    #printArea .bimestral-table th,#printArea .bimestral-table td {border:1px solid #94a3b8;padding:4px 5px;white-space:normal;overflow-wrap:anywhere;}
+    #printArea .bimestral-table th {text-align:center;vertical-align:middle;background:#f1f5f9;font-size:7.5pt;}
+    #printArea .bimestral-table .bimestral-name {text-align:left;white-space:normal;overflow-wrap:anywhere;}
+    #printArea .bimestral-table .bimestral-number,#printArea .bimestral-table .bimestral-grade {text-align:center;vertical-align:middle;}
+    #printArea .bimestral-result {font-size:10pt;font-weight:700;}
+    #printArea .bimestral-table thead {display:table-header-group;}
+    #printArea .bimestral-table tr,#printArea .competence-stats tr {break-inside:avoid;page-break-inside:avoid;}
+    #printArea .bimestral-report .stats-scroll {overflow:visible;max-height:none;}
+    #printArea .bimestral-report .competence-stats {break-inside:auto;margin-top:10px;}
+  }
+/* Ajustes finales PR #81: impresiones, barra de Calificar y separación blanca de Promedios. */
+  @media screen {
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+2) {background:#fff!important;}
+    #finLista .fin-grid > thead > tr > th:nth-child(n+3),
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+3) {border-left:2px solid #cbd5e1!important;}
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+2) {padding-left:10px;padding-right:10px;}
+    #stuList .fin-scroll-body,#stuList.fin-scroll-body {background:#fff;}
+    #stuList .fin-grid thead,#stuList .fin-grid thead tr {background:#0f172a!important;}
+    #stuList .fin-grid thead th {background:#0f172a!important;color:#fff!important;}
+    #stuList .fin-grid {min-width:100%;width:max(100%,calc(var(--cal-student-width) + var(--cal-columns)*var(--cal-competence-width)));}
+  }
+  .bimestral-signatures {display:grid;grid-template-columns:1fr 1fr;gap:12%;margin:55px 7% 0;align-items:end;}
+  .bimestral-signature {text-align:center;border-top:1px solid #334155;padding-top:6px;font-weight:600;font-size:10pt;}
+  .bimestral-signature small {display:block;font-size:8pt;font-weight:400;margin-top:3px;line-height:1.35;overflow-wrap:anywhere;}
+  @media print {
+    #printArea .bimestral-signatures {break-inside:avoid;page-break-inside:avoid;margin-top:22mm;}
+    #printArea .bimestral-signature {color:#000;border-top:1px solid #000;font-size:9pt;}
+  }
+  /* Pulido: controles compactos y reporte bimestral institucional. */
+  @media screen and (min-width:641px) {
+    #stuList .fin-cell:has(> button[data-val]) {grid-template-columns:repeat(4,36px);width:156px;min-width:156px;gap:4px;}
+    #stuList .fin-cell > .chip[data-val] {width:36px;min-width:36px;height:36px;min-height:36px;border-radius:9px;font-size:12px;}
+  }
+  @media screen and (max-width:640px) {
+    #stuList .fin-cell:has(> button[data-val]) {grid-template-columns:repeat(4,40px);width:172px;min-width:172px;gap:4px;}
+    #stuList .fin-cell > .chip[data-val] {width:40px;min-width:40px;height:40px;min-height:40px;}
+  }
+  @media print {
+    #printArea .bimestral-report {color:#172033;font-family:Arial,Helvetica,sans-serif;font-size:8.5pt;line-height:1.35;}
+    #printArea .bimestral-report .print-hdr {text-align:center;margin:0 0 10mm;padding-bottom:5mm;border-bottom:1px solid #94a3b8;}
+    #printArea .bimestral-report .print-hdr h1 {font-size:10pt;font-weight:700;letter-spacing:.4px;margin:0 0 3mm;text-transform:uppercase;}
+    #printArea .bimestral-report .print-hdr h2 {font-size:15pt;font-weight:700;letter-spacing:.3px;margin:0;}
+    #printArea .bimestral-meta {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3mm 5mm;padding:4mm;background:#f8fafc;border:1px solid #cbd5e1;border-radius:3mm;margin:0 0 6mm;}
+    #printArea .bimestral-meta span {font-size:8.5pt;min-width:0;overflow-wrap:anywhere;}
+    #printArea .bimestral-table {border:1px solid #475569;}
+    #printArea .bimestral-table thead th {font-size:8pt;line-height:1.3;background:#e9eff6!important;color:#172033!important;border-color:#64748b;padding:5px;}
+    #printArea .bimestral-table tbody td {font-size:8.5pt;border-color:#94a3b8;padding:4px 6px;line-height:1.35;}
+    #printArea .bimestral-table tbody tr:nth-child(even) {background:#f8fafc!important;}
+    #printArea .bimestral-table .bimestral-grade,#printArea .bimestral-table .bimestral-number {text-align:center!important;vertical-align:middle!important;}
+    #printArea .bimestral-result {font-size:10pt;font-weight:700;}
+    #printArea .competence-stats {margin-top:7mm;border:0;padding:0;}
+    #printArea .competence-stats h3 {font-size:11pt;color:#172033;margin-bottom:3mm;}
+    #printArea .competence-stats th {background:#e9eff6!important;font-weight:700;}
+    #printArea .bimestral-signatures {margin-top:20mm;gap:15%;}
+    #printArea .bimestral-signature {padding-top:3mm;font-size:9pt;}
+  }
+  /* Ocultar contadores redundantes del pie: siguen presentes para los scripts existentes. */
+  #registroAcademicFooter > .shell > div:first-child {display:none!important;}
+  #registroAcademicFooter > .shell {justify-content:flex-end!important;}
+  /* Resumen: destacar visualmente Promedio referencial sin cambiar su carácter informativo. */
+  @media screen {
+    #avanceBox .fin-grid thead th.summary-reference {
+      background:#16365a!important;color:#fff!important;
+      border-left:2px solid #6886a7!important;
+      font-weight:800!important;
+    }
+    #avanceBox .fin-grid thead th.summary-reference small {
+      color:#e2eaf6!important;opacity:1!important;font-weight:500!important;
+    }
+    #avanceBox .fin-grid tbody td.summary-reference {
+      font-weight:800!important;color:#172b4d!important;font-size:15px;
+    }
+  }
+  /* Resumen estadistico: presentacion compacta */
+@media screen {
+#avanceBox .summary-stats{padding:16px;border-radius:14px;background:#fff;}
+#avanceBox .summary-stats h3{font-size:15px;font-weight:800;color:#173454;margin-bottom:12px;}
+#avanceBox .summary-counts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:14px;}
+#avanceBox .summary-counts span{display:flex;flex-direction:column;padding:10px;border:1px solid #dbe5ef;border-radius:10px;background:#f8fafc;font-size:12px;}
+#avanceBox .summary-counts strong{font-size:20px;color:#173454;}
+#avanceBox .summary-stats table{border-collapse:collapse;width:100%;max-width:650px;margin-bottom:12px;}
+#avanceBox .summary-stats table th,#avanceBox .summary-stats table td{padding:8px 12px;border:1px solid #dbe5ef;text-align:center;}
+#avanceBox .summary-stats table thead,#avanceBox .summary-stats table tbody tr:last-child{background:#e9f0f8;font-weight:800;}
+#avanceBox .summary-stats table tbody th{text-align:left;}
+@media(max-width:760px){#avanceBox .summary-counts{grid-template-columns:repeat(2,minmax(0,1fr));}}
+}
+/* Presentación general de estadísticas: centrado en pantalla e impresión */
+@media screen {
+  #avanceBox .summary-stats > table {margin-left:auto;margin-right:auto;}
+  #avanceBox .summary-stats > table th,#avanceBox .summary-stats > table td {text-align:center;vertical-align:middle;}
+  #avanceBox .summary-stats > table tbody th {text-align:center;}
+}
+@media print {
+  #printArea .summary-stats {break-inside:avoid;page-break-inside:avoid;margin:7mm 0;padding:3mm;border:1px solid #cbd5e1;}
+  #printArea .summary-stats h3 {font-size:10pt;font-weight:700;text-align:center;margin:0 0 3mm;}
+  #printArea .summary-counts {display:flex;flex-wrap:wrap;justify-content:center;gap:2mm 5mm;margin-bottom:4mm;}
+  #printArea .summary-stats > table {width:80%;max-width:170mm;margin:0 auto 3mm;border-collapse:collapse;table-layout:fixed;}
+  #printArea .summary-stats > table th,#printArea .summary-stats > table td {border:1px solid #94a3b8;padding:2mm;text-align:center!important;vertical-align:middle;}
+  #printArea .summary-stats > small {display:block;text-align:center;font-size:7pt;}
+}
+/* Ultimos ajustes de lectura: leyenda centrada y divisores discretos. */
+@media screen {
+ #avanceBox .summary-stats > small {display:block;text-align:center;margin:10px auto 0;max-width:950px;line-height:1.5;}
+ #finLista .fin-grid > thead > tr > th:nth-child(n+3),
+ #finLista .fin-grid > tbody > tr > td:nth-child(n+3) {border-left:1px solid #e2e8f0!important;}
+}
+
+.fin-comparativo-toggle{font-size:10px;font-weight:800;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;border-radius:8px;padding:3px 7px;cursor:pointer}
+.fin-comparativo-toggle.on{background:#dbeafe;color:#1d4ed8}
+#finLista .comp-hist-line{display:flex;align-self:flex-start;align-items:center;justify-content:flex-start;gap:5px;width:142px;max-width:100%;height:12px;line-height:11px;font-size:9px;white-space:nowrap;text-align:left}
+#finLista .comp-hist{display:inline-flex;gap:2px;align-items:center;color:#64748b;font-weight:700}
+#finLista .comp-hist b{font-weight:800;padding:0 2px;border-radius:3px;background:#f1f5f9;color:#64748b}
+#finLista .comp-hist .comp-hist-a{background:#dcfce7;color:#166534}
+#finLista .comp-hist .comp-hist-b{background:#fef3c7;color:#92400e}
+#finLista .comp-hist .comp-hist-c{background:#fee2e2;color:#991b1b}
+#finLista .comp-hist .comp-hist-ad{background:#dbeafe;color:#1d4ed8}
+@media print{.fin-comparativo-toggle,#finLista .comp-hist-line{display:none!important}}
+  /* Solo impresión Promedios: textos completos, sin afectar otros reportes. */
+  @media print {
+    #printArea .promedios-print .print-conclusions {margin:5mm 0;}
+    #printArea .promedios-print .print-conclusions h3 {font-size:9pt;margin:0 0 2mm;break-after:avoid;}
+    #printArea .promedios-print .print-conclusions table {width:100%;border-collapse:collapse;table-layout:fixed;font-size:7.5pt;line-height:1.3;}
+    #printArea .promedios-print .print-conclusions th,#printArea .promedios-print .print-conclusions td {padding:2mm;border:1px solid #94a3b8;text-align:left;vertical-align:top;white-space:normal;overflow-wrap:anywhere;font-weight:400;}
+    #printArea .promedios-print .print-conclusions thead {display:table-header-group;}
+    #printArea .promedios-print .print-conclusions thead th {font-weight:700;background:#f1f5f9;}
+    #printArea .promedios-print .print-conclusions tr {break-inside:avoid;page-break-inside:avoid;}
+    #printArea .promedios-print .print-conclusion-text {white-space:pre-wrap;}
+    #printArea .promedios-print .print-conclusion-level {text-align:center;vertical-align:middle;font-weight:700;}
+  }
+/* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
@@ -326,14 +609,19 @@
           <div>
             <label class="text-[10px] font-bold text-slate-500">Bimestre</label>
             <select id="selBim" onchange="cambiarBimestreRegistro()"></select>
+            <div id="registroBotonesBim" class="registro-opciones" role="group" aria-label="Seleccionar bimestre"></div>
           </div>
           <div>
             <label class="text-[10px] font-bold text-slate-500">Grado</label>
-            <select id="selGrado" onchange="onGrado()"></select>
-          </div>
-          <div id="wrapSeccion">
+            <div class="registro-aulas-grupo">
+              <select id="selGrado" onchange="onGrado()"></select>
+              <div id="registroBotonesGrado" class="registro-opciones" role="group" aria-label="Seleccionar grado"></div>
+              <div id="wrapSeccion">
             <label class="text-[10px] font-bold text-slate-500">Sección</label>
             <select id="selSeccion" onchange="onContexto()"></select>
+                <div id="registroBotonesSeccion" class="registro-opciones" role="group" aria-label="Seleccionar sección"></div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="registro-datos-meta">
@@ -367,7 +655,7 @@
       <button type="button" id="tabFin" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('fin')">Promedios</button>
       <button type="button" id="tabAv" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('av')">Resumen</button>
       <button type="button" id="tabAs" class="btn btn-ghost flex-1 text-sm" onclick="showPanel('as')">Asistencia</button>
-      <button type="button" class="btn btn-ghost flex-1 text-sm" onclick="prepararImpresion()">🖨 Imprimir / PDF</button>
+      <button type="button" class="btn btn-ghost flex-1 text-sm" onclick="imprimirPestanaActiva()">🖨 Imprimir / PDF</button>
     </div>
 
     <!-- PANEL PROMEDIOS DIRECTOS -->
@@ -378,8 +666,12 @@
             <div class="fin-header-context">
               <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
+              <div class="fin-header-aux">
+                <div class="fin-mode-info" id="finModeInfo"></div>
+                <div id="finResumen"></div>
+              </div>
             </div>
-            <div class="fin-mode-info" id="finModeInfo"></div>
+            <button type="button" class="fin-comparativo-toggle" id="btnComparativoBim" aria-pressed="false" onclick="alternarComparativoBim()">Comparativo bimestral</button>
             <div class="fin-header-controls">
               <div class="fin-bulk-actions" aria-label="Calificar competencias del área">
                 <span>Todo el área:</span>
@@ -395,11 +687,9 @@
               </div>
             </div>
           </div>
-          <div class="fin-header-aux">
-            <div id="finResumen"></div>
-          </div>
         </header>
         <div id="finLista" class="fin-wrap fin-scroll-body"></div>
+        <div id="finEstadisticas"></div>
       </div>
     </div>
 
@@ -485,6 +775,7 @@
       <p class="text-[11px] text-slate-500 mb-1">Un chip por día. Tócalo para abrir esa fecha.</p>
       <div id="listaSesiones" class="flex flex-wrap gap-1"></div>
       <p class="text-[11px] text-slate-400 mt-1" id="lblSinSesiones">Aún no hay sesiones guardadas.</p>
+      <button type="button" class="btn btn-ghost no-print text-sm" onclick="prepararImpresion()">Imprimir detalle de evidencias</button>
     </div>
 
     <!-- Calificar -->
@@ -824,6 +1115,7 @@ async function subirRegistroNube() {
   try { return await tarea; } finally { subirRegistroNube.pending=null; }
 }
 async function bajarRegistroNube() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())return cargarRegistroHistorico();
   if(!nivel||!areaActual){toast('Elija nivel y área');return false;}
   if(subirRegistroNube.pending||bajarRegistroNube.pending){toast('Hay una sincronización en curso. Espere su resultado.');return false;}
   const tarea=(async()=>{try{
@@ -934,6 +1226,7 @@ function metaRegistro() {
 }
 let padronBimestre = '', solicitudPadron = 0, padronVerificadoServidor = false, tokenPadron = '', vencimientoCachePadron;
 function registroSoloLectura() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())return true;
   // Solo bloquea edición local si ya no existe un padrón autorizado para esta misma sesión/bimestre.
   return !padronBimestre || document.getElementById('selBim').value !== padronBimestre ||
     !tokenPadron || IEStudents.validToken() !== tokenPadron || !IEStudents.peekRoster(padronBimestre);
@@ -979,7 +1272,7 @@ function pintarPadronInmediato(base, bimestre, desdeCache) {
   // Recolectar antes de cambiar nombres/IDs o reconstruir la grilla; nunca subir automáticamente.
   if (mismoPadron && guardarTodo() === false) throw Object.assign(new Error('No se pudo conservar el trabajo local. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.'),{code:'LOCAL_STORAGE',retryable:true});
   bdEstudiantes = base; padronBimestre = bimestre;
-  try { recordarPadron(base); saveStore(); }
+  try { if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()){recordarPadron(base); saveStore();} }
   catch(e) { throw Object.assign(new Error('No se pudo conservar el padrón local. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.'),{code:'LOCAL_STORAGE',retryable:true}); }
   llenarAulasPadron(nivel);
   onContexto({localOnly:desdeCache, preservar:mismoPadron && contextoAnterior === JSON.stringify(ctxBase())});
@@ -1007,8 +1300,9 @@ async function cargarPadronRegistro(bimestre) {
   }
   tokenPadron = tokenSolicitud; cargandoEstudiantes = true;
   bloquearRegistroMientrasValida(true);
-  recordarPadron(bdEstudiantes);
-  const cache = IEStudents.peekRoster(bimestre);
+  if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica())recordarPadron(bdEstudiantes);
+  const candidata = IEStudents.peekRoster(bimestre);
+  const cache = typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&candidata?.padronInicializado!==true?null:candidata;
   try {
   if (cache) pintarPadronInmediato(cache,bimestre,true);
   else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
@@ -1018,6 +1312,7 @@ async function cargarPadronRegistro(bimestre) {
     const base = await IEStudents.loadRoster(bimestre);
     if (solicitud !== solicitudPadron) return false;
     if (IEStudents.validToken() !== tokenSolicitud) throw Object.assign(new Error('La sesión cambió.'),{code:'SESSION'});
+    if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&base.padronInicializado!==true)throw Object.assign(new Error('El bimestre no tiene padrón histórico confirmado. No se utiliza BASE_ACTUAL para esta consulta.'),{code:'ROSTER_MISSING'});
     cargandoEstudiantes = false;
     bloquearRegistroMientrasValida(!!base.offline);
     pintarPadronInmediato(base,bimestre,!!base.offline);
@@ -1046,7 +1341,8 @@ async function cambiarBimestreRegistro() {
     if (guardarTodo() === false && !registroSoloLectura()) return;
     sel.value = solicitado;
   }
-  await cargarPadronRegistro(solicitado);
+  try { await cargarPadronRegistro(solicitado); }
+  finally { actualizarBotonesContextoRegistro(); }
 }
 async function reintentarPadronRegistro() {
   if (cargandoEstudiantes) return;
@@ -1112,17 +1408,49 @@ function bimestreHabilitado(b) {
   return st === 'abierto';
 }
 
+// Presentación únicamente: nunca altera las reglas de permisos, padrón ni cierre.
+function pintarBotonesContextoRegistro(tipo){
+  const bim=tipo==='bim',grado=tipo==='grado',sel=document.getElementById(bim?'selBim':grado?'selGrado':'selSeccion');
+  const box=document.getElementById(bim?'registroBotonesBim':grado?'registroBotonesGrado':'registroBotonesSeccion');
+  if(!sel||!box)return;
+  const opciones=Array.from(sel.options).filter(o=>o.value&&!o.hidden);
+  const cfg=bim?loadPeriodosAdmin():null;
+  box.replaceChildren();
+  opciones.forEach(o=>{
+    const btn=document.createElement('button');btn.type='button';btn.className='registro-opcion';
+    const cerrado=bim&&cfg&&cfg.bimestres&&cfg.bimestres[o.value]!=='abierto';
+    btn.textContent=bim?o.value:String(o.textContent||o.value).trim();
+    if(cerrado){const lock=document.createElement('span');lock.className='registro-opcion-candado';lock.textContent='🔒';lock.setAttribute('aria-hidden','true');btn.appendChild(lock);}
+    btn.title=bim?'Bimestre '+o.value+(cerrado?' · Solo lectura':''):grado?'Grado '+o.value+'°':'Sección '+o.value;
+    btn.setAttribute('aria-label',btn.title);btn.setAttribute('aria-pressed',String(sel.value===o.value));
+    btn.disabled=sel.disabled||o.disabled;
+    btn.addEventListener('click',()=>{
+      if(btn.disabled||sel.value===o.value)return;
+      sel.value=o.value;
+      pintarBotonesContextoRegistro(tipo);
+      sel.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+    box.appendChild(btn);
+  });
+  sel.parentElement.classList.toggle('registro-select-con-botones',opciones.length>0);
+  box.hidden=!opciones.length;
+}
+function actualizarBotonesContextoRegistro(){
+  pintarBotonesContextoRegistro('bim');pintarBotonesContextoRegistro('grado');pintarBotonesContextoRegistro('seccion');
+}
+
 function pintarBimestresRegistro(cfg) {
   const selBim = document.getElementById('selBim');
   if (!selBim) return false;
 
   const sLogin = getLoginSession();
-  const esAdmin = sLogin && (sLogin.role === 'admin' || sLogin.user === 'admin');
+  const puedeConsultar = sLogin && ['admin','docente'].includes(sLogin.role);
   const anterior = selBim.value || '';
 
-  if (!cfg || !cfg.bimestres) {
+  if (!cfg || !cfg.bimestres || !puedeConsultar) {
     selBim.innerHTML = '<option value="">Cargando bimestres…</option>';
     selBim.disabled = true;
+    pintarBotonesContextoRegistro('bim');
     return anterior !== '';
   }
 
@@ -1130,15 +1458,15 @@ function pintarBimestresRegistro(cfg) {
   selBim.innerHTML = ['I','II','III','IV'].map(function(b) {
     const st = cfg.bimestres[b] || 'bloqueado';
     const ok = st === 'abierto';
-    if (!esAdmin && !ok) return '';
-    const label = 'Bimestre ' + b + (ok ? '' : ' (' + st + ')');
-    return '<option value="' + b + '"' + (ok ? '' : ' disabled') + '>' + label + '</option>';
+    const label = 'Bimestre ' + b + (ok ? '' : ' 🔒');
+    return '<option value="' + b + '">' + label + '</option>';
   }).join('') || '<option value="">Sin bimestres abiertos</option>';
 
   const valores = Array.from(selBim.options).filter(function(o){ return !o.disabled && o.value; }).map(function(o){ return o.value; });
   if (anterior && valores.indexOf(anterior) >= 0) selBim.value = anterior;
-  else if (valores.length) selBim.value = valores[0];
+  else if (valores.length) selBim.value = valores.find(b=>cfg.bimestres[b]==='abierto')||valores[0];
 
+  pintarBotonesContextoRegistro('bim');
   return anterior !== selBim.value;
 }
 function getLoginSession() {
@@ -1476,6 +1804,7 @@ function llenarAulasPadron(n) {
   const selGrado = document.getElementById('selGrado');
   selGrado.innerHTML = grados.map(g => `<option value="${escapeRegistro(g)}">${escapeRegistro(g)}°</option>`).join('');
 
+  pintarBotonesContextoRegistro('grado');
   if (!grados.length) {
     estadoPadron('No hay estudiantes disponibles para este contexto.',!padronVerificadoServidor);
   }
@@ -1501,6 +1830,8 @@ function onGrado(options) {
   }
   document.getElementById('selSeccion').innerHTML = secs.map(s => `<option value="${escapeRegistro(s)}">${escapeRegistro(s)}</option>`).join('');
   document.getElementById('wrapSeccion').style.display = (secs.length <= 1 && nivel==='primaria') ? 'none' : 'block';
+  pintarBotonesContextoRegistro('seccion');
+  pintarBotonesContextoRegistro('grado');
   if (!options || !options.sinContexto) onContexto();
 }
 
@@ -1510,6 +1841,7 @@ function actualizarUnidades() {
  sel.value=IERegistroAcademico.unitsForBim(bim).includes(Number(prev))&&prev!==''?prev:'';
 }
 function onContexto(options) {
+  actualizarBotonesContextoRegistro();
   actualizarUnidades();
   if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   options = options || {};
@@ -1529,6 +1861,11 @@ function onContexto(options) {
   const c = ctxBase();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
   actualizarDocenteResponsable();
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()){
+    sesionActiva=null;notas={};capsElegidas=[];updateHdr();
+    void cargarRegistroHistorico();sincronizarEdicionRegistro();return;
+  }
+  if(typeof registroHistoricoActual!=='undefined')registroHistoricoActual=null;
   if (!options.preservar) {
     // Al cambiar contexto: limpiar capacidad (fecha la elige el docente)
     fillCaps();
@@ -1784,9 +2121,21 @@ function activarSesion() {
   toast('Capacidad agregada');
 }
 
+function confirmarEdicionNumerica(inp,comp,id,previo,n,cap) {
+  if(!previo)return true;
+  const alumno=estudiantes().find(al=>studentKey(al)===id);
+  const anterior=previo.origen==='letra'?previo.nivel:previo.nota20;
+  const mensaje=(n===''?'¿Quitar '+(cap?'esta evidencia':'la nota directa')+'?':'¿Cambiar '+anterior+' a '+n+'?')+
+    '\nEstudiante: '+(alumno?.nombre||id)+'\nCompetencia: '+comp+
+    (cap?'\nCapacidad: '+cap+'\nFecha: '+document.getElementById('inpFecha').value:'')+
+    '\nLas demás evidencias y conclusiones se conservarán.';
+  if(confirm(mensaje))return true;
+  inp.value=previo.origen==='letra'?'':pad2(previo.nota20);
+  return false;
+}
 function recolectarPantalla() {
   document.querySelectorAll(".academic-conclusion").forEach(el=>{const root=el.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return;setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value);});
-  if (registroSoloLectura()) return false;
+  if (registroSoloLectura() || bimCerradoDocente()) return false;
   try { const active=document.activeElement,root=active?.closest?.('#finLista');if(active&&active.blur&&(!active.dataset?.registroContexto||active.dataset.registroContexto===cloudClaveReg())&&(!root?.dataset?.registroContexto||root.dataset.registroContexto===cloudClaveReg()))active.blur(); } catch (e) {}
   document.querySelectorAll('.cal-nota').forEach(inp => {
     if (inp.dataset.registroContexto && inp.dataset.registroContexto !== cloudClaveReg()) return;
@@ -1798,13 +2147,14 @@ function recolectarPantalla() {
     let n = inp.value === '' ? '' : Number(inp.value);
     if (n !== '' && (isNaN(n) || n < 0 || n > 20)) return;
     if (n !== '') n = Math.round(n);
-    upsertSesionCap(comp, cap);
     const k = capKeyHoy(comp, cap, nombre);
     const previo = leerNota(store.grades, k);
     if (n === '' && previo && previo.origen==='letra') return;
     if (previo && previo.origen!=='letra' && n!=='' && Number(previo.nota20)===n) return;
-    if (n === '') store.grades[k] = {borrado:true,ts:Date.now()};
-    else store.grades[k] = { nota20: n, nivel: numToLetter(n), origen:'numero', ts: Date.now() };
+    if (!confirmarEdicionNumerica(inp,comp,nombre,previo,n,cap)) return;
+    upsertSesionCap(comp, cap);
+    if (n === '') store.grades[k] = Object.assign({},store.grades[k]||{},{borrado:true,ts:Date.now()});
+    else {store.grades[k] = Object.assign({},store.grades[k]||{},{nota20:n,nivel:numToLetter(n),origen:'numero',ts:Date.now()});delete store.grades[k].borrado;}
   });
   document.querySelectorAll('#finLista [data-fin][data-comp]').forEach(cell => {
     const root=document.getElementById('finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return;
@@ -1818,6 +2168,7 @@ function recolectarPantalla() {
     const previo = leerNota(store.finales, k);
     if (nraw === '' && previo && previo.origen==='letra') return;
     if (previo && previo.origen!=='letra' && nraw!=='' && Number(previo.nota20)===Math.round(nraw)) return;
+    if (!confirmarEdicionNumerica(inp,cp,nombre,previo,nraw)) return;
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
     store.finales[k] = { nota20: n, nivel: numToLetter(n), origen: 'numero', ts: Date.now() };
@@ -1853,6 +2204,7 @@ function guardarTodo() {
 }
 
 function renderSesiones() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderSesiones',()=>renderSesiones());
   const c = ctxBase();
   const list = (store.sessions || []).concat(typeof IERegistroTransversales!=='undefined'?IERegistroTransversales.sessions():[]).filter(s =>
     s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
@@ -1899,6 +2251,7 @@ function renderSesiones() {
   sincronizarEdicionRegistro();
 }
 function abrirSesionFecha(fecha) {
+ if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return conRegistroHistorico(()=>abrirSesionFecha(fecha));
   const c = ctxBase();
   const delDia = (store.sessions || []).concat(typeof IERegistroTransversales!=='undefined'?IERegistroTransversales.sessions():[]).filter(s =>
     s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
@@ -2048,6 +2401,7 @@ function upsertSesionCap(comp, cap) {
   else store.sessions[idx] = Object.assign({}, store.sessions[idx], s);
 }
 function renderStudents() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderStudents',()=>renderStudents());
   const contextoCalificar = cloudClaveReg();
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const list = estudiantes();
@@ -2076,7 +2430,7 @@ function renderStudents() {
 
   let head = '<th class="fin-nom">Estudiante</th>';
   cols.forEach((col, i) => {
-    head += '<th>C'+(i+1)+
+    head += '<th class="cal-competence-header">C'+(i+1)+
       ' <button type="button" title="Borrar esta capacidad" data-reg-write onclick="quitarCapGrilla('+i+')" style="border:0;background:#fecaca;color:#991b1b;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0;margin-left:4px">×</button>'+
       '<div class="fin-caps">'+escapeRegistro(col.comp||'')+'<br>'+escapeRegistro(col.cap||'')+'</div></th>';
   });
@@ -2108,7 +2462,7 @@ function renderStudents() {
     return '<tr>'+tds+'</tr>';
   }).join('');
 
-  box.innerHTML = '<div class="fin-wrap"><table class="fin-grid"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  box.innerHTML = '<div class="fin-wrap"><table class="fin-grid" style="--cal-columns:'+cols.length+'"><colgroup><col class="cal-student-column">'+cols.map(()=>'<col class="cal-competence-column">').join('')+'</colgroup><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.bind(box);
   const cc = document.getElementById('cC'), cb = document.getElementById('cB'), ca = document.getElementById('cA'), cad = document.getElementById('cAD');
   if (cc) cc.textContent = cC;
@@ -2120,15 +2474,19 @@ function renderStudents() {
     inp.dataset.registroContexto = contextoCalificar;
     inp.addEventListener('change', function() {
       if (contextoCalificar !== cloudClaveReg()) return;
-      if (registroSoloLectura()) return;
+      if (registroSoloLectura() || bimCerradoDocente()) return;
       if (inp.readOnly) return;
       const nombre = decodeURIComponent(inp.dataset.nom);
       const cap = decodeURIComponent(inp.dataset.cap);
       const cp = decodeURIComponent(inp.dataset.comp || '') || ((document.getElementById('selComp')||{}).value || '');
       if(!competenciaTrabajada(cp))return;
       let n = inp.value === '' ? '' : Number(inp.value);
-      if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); inp.value = ''; n = ''; }
+      if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); return; }
       if (n !== '') n = Math.round(n);
+      const k = capKeyHoy(cp, cap, nombre);
+      const previo=leerNota(store.grades,k);
+      if((n===''&&!previo)||(n!==''&&previo&&previo.origen!=='letra'&&Number(previo.nota20)===n))return;
+      if (!confirmarEdicionNumerica(inp,cp,nombre,previo,n,cap)) return;
       const letra = n === '' ? '' : numToLetter(n);
       const badge = inp.parentElement.querySelector('.eq-letter');
       if (badge) {
@@ -2137,16 +2495,15 @@ function renderStudents() {
       }
       if (n !== '') inp.value = pad2(n);
       upsertSesionCap(cp, cap);
-      const k = capKeyHoy(cp, cap, nombre);
-      if (n === '') store.grades[k] = {borrado:true,ts:Date.now()};
-      else store.grades[k] = { nota20: n, nivel: letra, origen: 'numero', ts: Date.now() };
+      if (n === '') store.grades[k] = Object.assign({},store.grades[k]||{},{borrado:true,ts:Date.now()});
+      else {store.grades[k] = Object.assign({},store.grades[k]||{},{nota20:n,nivel:letra,origen:'numero',ts:Date.now()});delete store.grades[k].borrado;}
       saveStore();
     });
   });
   box.querySelectorAll('.fin-cell button[data-val]').forEach(btn => {
     btn.addEventListener('click', function() {
       if (contextoCalificar !== cloudClaveReg()) return;
-      if (registroSoloLectura()) return;
+      if (registroSoloLectura() || bimCerradoDocente()) return;
       if (btn.disabled) return;
       const cell = btn.closest('[data-nom]');
       if (!cell) return;
@@ -2158,14 +2515,23 @@ function renderStudents() {
       const k = capKeyHoy(cp, cap, nombre);
       const previo = leerNota(store.grades, k) || {};
       const letraPrevia = previo.nivel || ((previo.nota20!=='' && previo.nota20!=null) ? numToLetter(previo.nota20) : '');
-      // Tocar la misma letra no reemplaza ni borra una nota exacta ya guardada.
+      // Una nota existente requiere confirmación antes de cambiar o quitar esta evidencia.
+      if (letraPrevia) {
+        const alumno=estudiantes().find(al=>studentKey(al)===nombre);
+        const accion=letraPrevia===val?'quitar la evidencia '+letraPrevia:'cambiar la evidencia de '+letraPrevia+' a '+val;
+        if (!confirm('¿Confirmas '+accion+'?\nEstudiante: '+(alumno?.nombre||nombre)+'\nCompetencia: '+cp+'\nCapacidad: '+cap+'\nFecha: '+fecha+'\nLas otras evidencias se conservarán.')) return;
+      }
+      // Repetir la selección quita únicamente la evidencia de esta celda.
       if (letraPrevia === val) {
-        toast('Se conserva la calificación original');
+        store.grades[k] = Object.assign({},store.grades[k]||{},{borrado:true,ts:Date.now()});
+        saveStore();
+        renderStudents();
         return;
       }
       const n = letterToNum(val);
       upsertSesionCap(cp, cap);
-      store.grades[k] = { nota20: n, nivel: val, origen: 'letra', ts: Date.now() };
+      store.grades[k] = Object.assign({},store.grades[k]||{},{nota20:n,nivel:val,origen:'letra',ts:Date.now()});
+      delete store.grades[k].borrado;
       saveStore();
       renderStudents();
     });
@@ -2396,23 +2762,27 @@ async function rellenarSiagieExcel() {
   toast('Excel SIAGIE listo · '+escritos+' notas');
   if (sinMatch) console.log('SIAGIE sin match de nombre:', sinMatch);
 }
-function prepararImpresion() {
-  loadStore();
+function prepararImpresion(opciones) {
+ if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return conRegistroHistorico(()=>prepararImpresion(opciones));
+  opciones=opciones||{};
   const c = ctxBase();
+  const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
+  const anio=cfg&&Number.isInteger(Number(cfg.anio))&&Number(cfg.anio)>=2000&&Number(cfg.anio)<=2100?String(cfg.anio):'No configurado';
   const alumnos = estudiantes();
   const docente = document.getElementById('inpDocente').value.trim() || '________________';
   const sess = (store.sessions || []).filter(s =>
-    s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
-    s.seccion === c.seccion && s.area === c.area
+    s.nivel === c.nivel && s.bim === c.bim && String(s.grado) === String(c.grado) &&
+    s.seccion === c.seccion && s.area === c.area &&
+    (!opciones.desde || s.fecha >= opciones.desde) && (!opciones.hasta || s.fecha <= opciones.hasta)
   ).sort((a,b) => (a.fecha||'').localeCompare(b.fecha||'') || (a.comp||'').localeCompare(b.comp||''));
 
-  if (!sess.length && !alumnos.some(al=>competencias().some(cp=>notaCompAlumno(cp,studentKey(al)).letra))) {
+  if (!sess.length) {
     alert('No hay resultados guardados en este bimestre/área para imprimir.');
     return;
   }
 
   // Cada resultado C requiere su propia conclusión; el promedio es solo referencial.
-  const faltanConc = validarConclusionesOficial(c, alumnos, sess);
+  const faltanConc = opciones.desde ? [] : validarConclusionesOficial(c, alumnos, sess);
   if (faltanConc.length) {
     const lista = faltanConc.slice(0, 12).map(x => '• ' + x).join('\n');
     const extra = faltanConc.length > 12 ? '\n… y ' + (faltanConc.length-12) + ' más' : '';
@@ -2442,27 +2812,22 @@ function prepararImpresion() {
   html += `<div class="print-hdr">
     <div style="font-size:9pt">IE 22375 SANTA ROSA DE LOS MOLINOS</div>
     <h1>REGISTRO AUXILIAR DE EVALUACIÓN</h1>
-    <h2>${(c.area||'').toUpperCase()} · BIMESTRE ${c.bim} · ${nivelTxt}</h2>
+    <h2>${escapeRegistro((c.area||'').toUpperCase())} · BIMESTRE ${c.bim} · ${nivelTxt}${opciones.desde?' · '+opciones.desde+' al '+opciones.hasta:''}</h2>
   </div>
   <table class="print-meta"><tr>
-    <td><b>Grado / Sección:</b> ${c.grado}° ${c.seccion}</td>
-    <td><b>Año:</b> 2026</td>
+    <td><b>Grado / Sección:</b> ${escapeRegistro(c.grado)}° ${escapeRegistro(c.seccion)}</td>
+    <td><b>Año:</b> ${escapeRegistro(anio)}</td>
   </tr><tr>
-    <td><b>Docente:</b> ${docente}</td>
+    <td><b>Docente:</b> ${escapeRegistro(docente)}</td>
     <td><b>Fecha de impresión:</b> ${new Date().toLocaleDateString('es-PE')}</td>
   </tr></table>`;
-
-  const escImpresion=v=>String(v||'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
-  html+='<h2>Resultados bimestrales por competencia</h2><table class="print-tbl"><thead><tr><th>Estudiante</th>'+competencias().map(cp=>'<th>'+escImpresion(cp)+'</th>').join('')+'</tr></thead><tbody>';
-  alumnos.forEach(al=>{html+='<tr><td>'+escImpresion(al.nombre)+'</td>'+competencias().map(cp=>{if(!competenciaTrabajada(cp))return '<td>No trabajada este bimestre</td>';const r=notaCompAlumno(cp,studentKey(al));return '<td>'+escImpresion(r.letra||'Pendiente')+(IERegistroAcademico.requiresConclusion(c.nivel,r.letra)?'<p>'+escImpresion(concCompAlumno(cp,studentKey(al)))+'</p>':'')+'</td>';}).join('')+'</tr>';});
-  html+='</tbody></table>';
 
   // Detail per competencia
   comps.forEach((comp, idx) => {
     const evidencias = byComp[comp].slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
     html += `<div class="${idx===0?'':'print-break'}"></div>`;
     html += `<div class="print-hdr" style="margin-top:10px">
-      <h2 style="font-size:11pt;font-weight:bold">Competencia: ${comp}</h2>
+      <h2 style="font-size:11pt;font-weight:bold">Competencia: ${escapeRegistro(comp)}</h2>
     </div>`;
 
     // header row: # | Alumno | ev1 | ev2 | ... | PROM | LETRA
@@ -2470,7 +2835,7 @@ function prepararImpresion() {
       <th style="width:28px">N°</th>
       <th style="text-align:left">Estudiante</th>`;
     evidencias.forEach(e => {
-      html += `<th style="font-size:7.5pt;max-width:70px">${(e.fecha||'').slice(5)}<br>${(e.capacidad||'').slice(0,18)}</th>`;
+      html += `<th style="font-size:7.5pt;max-width:70px">${(e.fecha||'').slice(5)}<br>${escapeRegistro(e.capacidad||'')}</th>`;
     });
     html += `<th>PROM</th><th>NL</th></tr></thead><tbody>`;
 
@@ -2491,13 +2856,13 @@ function prepararImpresion() {
             if (m !== '') vals.push(Number(m));
           }
         }
-        cells += `<td style="text-align:center">${show}</td>`;
+        cells += `<td style="text-align:center;vertical-align:middle;font-weight:bold">${escapeRegistro(show)}</td>`;
       });
       const prom = promedioNums(vals);
       const letra = prom != null ? numToLetter(prom) : '';
       html += `<tr>
         <td style="text-align:center">${i+1}</td>
-        <td style="text-align:left;font-size:8pt">${al.nombre}</td>
+        <td style="text-align:left;font-size:8pt">${escapeRegistro(al.nombre)}</td>
         ${cells}
         <td style="text-align:center;font-weight:bold">${prom != null && exacto ? pad2(prom) : ''}</td>
         <td style="text-align:center;font-weight:bold">${letra}</td>
@@ -2508,7 +2873,7 @@ function prepararImpresion() {
   });
 
   html += `<div class="print-sign">
-    <div>Docente responsable<br><span style="font-size:8pt">${docente}</span></div>
+    <div>Docente responsable<br><span style="font-size:8pt">${escapeRegistro(docente)}</span></div>
     <div>V° B° Dirección / Coordinación</div>
   </div>
   <div class="print-foot">IE 22375 Santa Rosa de los Molinos · Registro auxiliar digital · Uso supervisiones UGEL / DRE · Generado para impresión</div>`;
@@ -2757,6 +3122,21 @@ function aplicarFinalManual(comp, nombre, val, posponerRender) {
   if (!posponerRender) renderFinales();
   return true;
 }
+function seleccionarFinalReversible(comp, nombre, val) {
+  if(registroSoloLectura()||bimCerradoDocente()||!competenciaTrabajada(comp)||!estudiantes().some(al=>studentKey(al)===nombre)||!competencias().includes(comp))return false;
+  const original=leerNota(store.finales,finalKey(comp,nombre));
+  const letra=original&&(original.nivel||((original.nota20!==''&&original.nota20!=null)?numToLetter(original.nota20):''));
+  if (letra) {
+    const alumno=estudiantes().find(al=>studentKey(al)===nombre);
+    const quitar=letra===val;
+    const mensaje=(quitar?'¿Quitar la nota directa '+letra+'?':'¿Cambiar la nota directa de '+letra+' a '+val+'?')+
+      '\nEstudiante: '+(alumno?.nombre||nombre)+'\nCompetencia: '+comp+
+      '\nLas evidencias y conclusiones se conservarán.';
+    if(!confirm(mensaje))return false;
+  }
+  if(original && letra===val)return quitarFinalManual(comp,nombre);
+  return aplicarFinalManual(comp,nombre,val);
+}
 function calificarAreaMasiva(val) {
   if (registroSoloLectura() || bimCerradoDocente() || !['AD','A','B','C'].includes(val)) return false;
   const comps=competencias().filter(competenciaTrabajada),alumnos=estudiantes();
@@ -2807,7 +3187,132 @@ function sincronizarFondoPromedios() {
     window.addEventListener('resize',sincronizarFondoPromedios);
   }
 }
+
+let registroHistoricoActual=null, registroHistoricoSecuencia=0, registroHistoricoProyectando=false;
+function registroConsultaHistorica(){
+ const cfg=loadPeriodosAdmin(),b=document.getElementById('selBim').value;
+ return !cfg||!cfg.bimestres||cfg.bimestres[b]!=='abierto';
+}
+function historicoContextoIgual(row,c){
+ return row&&String(row.nivel).toLowerCase()===c.nivel&&String(row.bimestre??row.bim)===c.bim&&String(row.grado)===String(c.grado)&&row.seccion===c.seccion&&row.area===c.area;
+}
+function historicoPayloadAcotado(payload,c){
+ if(!payload||typeof payload!=='object'||Array.isArray(payload))throw Error('Registro histórico inválido.');
+ const clave=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||'),aula=[c.nivel,c.bim,c.grado,c.seccion].join('||'),out={sessions:[],meta:{}};
+ for(const name of ['grades','finales','concComp','competenciasEstado','concArea','capsSel','asistencia','asisFechas','asisFechasEstado']){
+   out[name]={};const map=payload[name];if(map!=null&&(typeof map!=='object'||Array.isArray(map)))throw Error('Mapa histórico inválido.');
+   Object.entries(map||{}).forEach(([key,value])=>{const shared=['asistencia','asisFechas','asisFechasEstado'].includes(name),pref=shared?aula:clave;if(key===pref||key.startsWith(pref+'||'))out[name][key]=JSON.parse(JSON.stringify(value));});
+ }
+ if(payload.sessions!=null&&!Array.isArray(payload.sessions))throw Error('Sesiones históricas inválidas.');
+ out.sessions=(payload.sessions||[]).filter(row=>historicoContextoIgual(row,c)).map(row=>JSON.parse(JSON.stringify(row)));
+ const aliases=payload.meta?.studentAliases||{};out.meta[clave]={studentAliases:JSON.parse(JSON.stringify(aliases))};out.studentAliases={[[c.nivel,c.grado,c.seccion].join('||')]:JSON.parse(JSON.stringify(aliases))};return out;
+}
+async function leerRegistroHistorico(c,token){
+ const actual=()=>IEStudents.validToken()===token&&(getLoginSession()||{}).token===token;
+ if(!token||!actual())throw Error('Sesión histórica no autorizada.');
+ const base=await IEStudents.loadRoster(c.bim);
+ if(!actual())throw Error('La sesión cambió.');
+ if(base.offline||base.bimestre!==c.bim||base.padronInicializado!==true)throw Error('Padrón histórico no confirmado; no se usa BASE_ACTUAL ni caché sin verificación.');
+ const roster=(base[c.nivel]?.estudiantes||[]).filter(al=>String(al.grado)===String(c.grado)&&al.seccion===c.seccion);
+ const data=await IEStudents.fetchJSON(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},cache:'no-store',body:JSON.stringify({action:'loadreg',token,nivel:c.nivel,bimestre:c.bim,grado:String(c.grado),seccion:c.seccion,area:c.area})},10000);
+ if(!actual())throw Error('La sesión cambió.');
+ if(data?.ok!==true){if(['SESSION','DENIED'].includes(data?.code)&&typeof retirarVerificacionNube==='function')retirarVerificacionNube(token,padronBimestre,data);throw Error(data?.error||'Lectura histórica rechazada.');}
+ if(data.soportaModeloAcademico!==true||!Array.isArray(data.items))throw Error('Backend histórico incompatible.');
+ const key=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||');
+ if(data.items.some(row=>row.clave!==key||!historicoContextoIgual(row,c))||data.items.length>1)throw Error('Respuesta histórica ambigua o de otro contexto.');
+ return {key,token,c:{...c},roster,missing:!data.items.length,payload:historicoPayloadAcotado(data.items[0]?.payload||{},c)};
+}
+function conRegistroHistorico(fn){
+ const proof=registroHistoricoActual;
+ if(!proof||proof.key!==cloudClaveReg()||proof.token!==IEStudents.validToken())return false;
+ if(registroHistoricoProyectando)return fn();
+ const original=store,load=loadStore,save=saveStore,lista=estudiantes,trans=typeof IERegistroTransversales==='undefined'?null:IERegistroTransversales;
+ // Proyección síncrona aislada: nunca se mezcla ni persiste en el borrador editable.
+ registroHistoricoProyectando=true;store=JSON.parse(JSON.stringify(proof.payload));loadStore=()=>{};saveStore=()=>{throw Error('El histórico es solo lectura.');};estudiantes=()=>IEStudentIdentity.numbered(proof.roster,proof.c.nivel);if(trans)IERegistroTransversales=undefined;
+ try{return fn();}finally{store=original;loadStore=load;saveStore=save;estudiantes=lista;if(trans)IERegistroTransversales=trans;registroHistoricoProyectando=false;}
+}
+function renderRegistroHistorico(nombre,fn){
+ const ids={renderStudents:'stuList',renderFinales:'finLista',renderAvance:'avanceBox',renderAsistencia:'asisLista',renderSesiones:'listaSesiones'};
+ if(!registroHistoricoActual||registroHistoricoActual.key!==cloudClaveReg()||registroHistoricoActual.token!==IEStudents.validToken()){
+   const box=document.getElementById(ids[nombre]);if(box)box.innerHTML='';return false;
+ }
+ return conRegistroHistorico(fn);
+}
+async function cargarRegistroHistorico(){
+ const c=ctxBase(),key=cloudClaveReg(),token=IEStudents.validToken(),seq=++registroHistoricoSecuencia;
+ registroHistoricoActual=null;['stuList','finLista','avanceBox','asisLista','listaSesiones'].forEach(id=>{const box=document.getElementById(id);if(box)box.innerHTML='';});
+ const actual=()=>registroConsultaHistorica()&&seq===registroHistoricoSecuencia&&key===cloudClaveReg()&&token===IEStudents.validToken();
+ try{
+   const proof=await leerRegistroHistorico(c,token);if(!actual())return false;
+   registroHistoricoActual=proof;sesionActiva=null;notas={};capsElegidas=[];
+   conRegistroHistorico(()=>{updateHdr();fillComps();const fechas=proof.payload.sessions.map(s=>s.fecha).filter(Boolean).sort();if(fechas.length)abrirSesionFecha(fechas[fechas.length-1]);renderSesiones();renderStudents();renderFinales();renderAvance();renderAsistencia();});
+   estadoPadron('Bimestre '+(loadPeriodosAdmin()?.bimestres[c.bim]==='cerrado'?'cerrado':'bloqueado')+' · Solo lectura'+(proof.missing?' · Sin registro remoto.':''),false);return true;
+ }catch(e){if(actual()){registroHistoricoActual=null;estadoPadron('Consulta histórica no disponible: '+e.message,true);}return false;}
+}
+let comparativoBimActivo=false, comparativoBimDatos={}, comparativoBimContexto='', comparativoBimSecuencia=0, comparativoBimToken='';
+function comparativoIndice(b){return ({I:1,II:2,III:3,IV:4,1:1,2:2,3:3,4:4})[String(b).toUpperCase()]||0;}
+function comparativoNotaAnterior(payload,c,comp,al,roster){
+ const pref=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');
+ if(payload.competenciasEstado?.[pref]?.trabajada===false)return '';
+ const aliases=payload.meta?.[[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')]?.studentAliases||{};
+ const unique=(roster||[]).filter(x=>IEStudentIdentity.normalizarNombre(x.nombre)===IEStudentIdentity.normalizarNombre(al.nombre)).length===1;
+ const leer=(map,key)=>IEStudentIdentity.leer(map,key,al,aliases,unique);
+ const f=leer(payload.finales,pref+'||'+studentKey(al));
+ if(f){const letra=f.nivel||(f.nota20!==''&&f.nota20!=null?numToLetter(f.nota20):'');if(['AD','A','B','C'].includes(letra))return letra;}
+ const nums=[];
+ (payload.sessions||[]).filter(x=>historicoContextoIgual(x,c)&&x.comp===comp).forEach(x=>{
+  const key=[pref,x.capacidad,x.fecha,studentKey(al)].join('||'),g=leer(payload.grades,key);if(!g)return;
+  const n=g.nota20!==''&&g.nota20!=null?Number(g.nota20):g.nivel?letterToNum(g.nivel):'';
+  if(n!==''&&Number.isFinite(Number(n))&&n>=0&&n<=20)nums.push(Number(n));
+ });
+ const media=promedioNums(nums);return media==null?'':numToLetter(media);
+}
+function comparativoAlumnoAnterior(al,roster){
+ const normal=IEStudentIdentity.normalizarNombre,ids=roster.filter(x=>al.idSiagie&&x.idSiagie&&String(x.idSiagie)===String(al.idSiagie));
+ if(ids.length===1)return ids[0];if(ids.length>1)return null;
+ const codes=roster.filter(x=>al.codigoEstudiante&&x.codigoEstudiante&&String(x.codigoEstudiante)===String(al.codigoEstudiante)&&(!al.idSiagie||!x.idSiagie));
+ if(codes.length===1)return codes[0];if(codes.length>1)return null;
+ // No identificar un alumno nuevo por nombre contra otra identidad estable ni homónimos.
+ const names=roster.filter(x=>normal(x.nombre)===normal(al.nombre));
+ const actuales=estudiantes().filter(x=>normal(x.nombre)===normal(al.nombre));
+ if(names.length!==1||actuales.length!==1)return null;
+ const prior=names[0];if((al.idSiagie&&prior.idSiagie)||(al.codigoEstudiante&&prior.codigoEstudiante))return null;
+ return prior;
+}
+function comparativoLinea(comp,id){
+ if(!comparativoBimActivo||comparativoBimContexto!==cloudClaveReg()||comparativoBimToken!==IEStudents.validToken())return '';
+ const n=comparativoIndice(ctxBase().bim);
+ if(n<2)return '';
+ const linea=Array.from({length:Math.max(0,n-1)},(_,i)=>{
+   const nota=comparativoBimDatos[i+1]?.[comp]?.[id]||'—';
+   return '<span class="comp-hist"><span>'+['I','II','III'][i]+':</span><b class="comp-hist-'+nota.toLowerCase().replace(/[^a-z]/g,'')+'">'+escapeRegistro(nota)+'</b></span>';
+ }).join('');
+ return '<div class="comp-hist-line" title="Notas anteriores: solo lectura">'+linea+'</div>';
+}
+function alternarComparativoBim(){
+ comparativoBimActivo=!comparativoBimActivo;comparativoBimDatos={};comparativoBimSecuencia++;
+ comparativoBimContexto=comparativoBimActivo?cloudClaveReg():'';comparativoBimToken=comparativoBimActivo?IEStudents.validToken():'';
+ renderFinales();if(comparativoBimActivo)void cargarComparativoBim();
+}
+async function cargarComparativoBim(){
+ const c=ctxBase(),clave=cloudClaveReg(),numero=comparativoIndice(c.bim),token=IEStudents.validToken(),seq=++comparativoBimSecuencia;
+ const actual=()=>comparativoBimActivo&&seq===comparativoBimSecuencia&&cloudClaveReg()===clave&&IEStudents.validToken()===token;
+ if(numero<2||!token)return;
+ const alumnos=estudiantes().slice(),comps=competencias().slice(),datos={};
+ try{
+  for(let i=1;i<numero;i++){
+   const proof=await leerRegistroHistorico({...c,bim:['','I','II','III'][i]},token);if(!actual())return;
+   datos[i]={};comps.forEach(cp=>{datos[i][cp]={};alumnos.forEach(al=>{const prior=comparativoAlumnoAnterior(al,proof.roster);datos[i][cp][studentKey(al)]=prior?comparativoNotaAnterior(proof.payload,proof.c,cp,prior,proof.roster):'';});});
+  }
+  if(actual()){comparativoBimDatos=datos;renderFinales();}
+ }catch(e){if(actual()){comparativoBimDatos={};toast('Comparativo histórico no disponible: '+e.message+' No se modificaron notas.');renderFinales();}}
+}
+
 function renderFinales() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderFinales',()=>renderFinales());
+  if(typeof comparativoBimContexto!=='undefined'&&comparativoBimContexto&&(comparativoBimContexto!==cloudClaveReg()||comparativoBimToken!==IEStudents.validToken())){comparativoBimActivo=false;comparativoBimDatos={};comparativoBimContexto='';comparativoBimSecuencia++;}
+  const comparativoBtn=document.getElementById('btnComparativoBim');
+  if(comparativoBtn&&typeof comparativoBimActivo!=='undefined'){comparativoBtn.textContent=comparativoBimActivo?'Ocultar comparativo':'Comparativo bimestral';comparativoBtn.setAttribute('aria-pressed',String(comparativoBimActivo));comparativoBtn.classList.toggle('on',comparativoBimActivo);}
   loadStore();
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const c = ctxBase();
@@ -2821,6 +3326,8 @@ function renderFinales() {
   const modeInfo = document.getElementById('finModeInfo');
   const bloqueado = bimCerradoDocente();
   const alumnos = estudiantes();
+  const estadisticas = document.getElementById('finEstadisticas');
+  if(estadisticas && typeof estadisticasCompetenciasHTML==='function') estadisticas.innerHTML=estadisticasCompetenciasHTML(comps,alumnos);
   if (!comps.length) { box.innerHTML = '<p class="text-sm text-slate-400 p-3">Sin competencias para esta área.</p>'; res.innerHTML=''; modeInfo.innerHTML=''; if(typeof sincronizarFondoPromedios==='function')sincronizarFondoPromedios(); return; }
 
   const capsPor = {};
@@ -2860,16 +3367,17 @@ function renderFinales() {
       if (modoCalif === 'letra') {
         const L = letra || ofi.letra || '';
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
-          ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
+          ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" aria-pressed="'+(L===v)+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+ev.letra+'</div>' : '') +
-          (Object.keys(original).length&&!original.borrado&&!lock&&!registroSoloLectura()?'<button type="button" class="fin-clear-direct" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" title="Quitar directo" aria-label="Quitar directo">×</button>':'')+'</div>';
+          '</div>';
       } else {
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
-          '<span class="eq-letter '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'">'+(letra||ofi.letra||'—')+'</span>' +
+          '<button type="button" class="eq-letter final-level-toggle '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'" data-final-toggle="'+encC+'" data-alumno="'+encN+'" '+(lock||registroSoloLectura()||!letra?'disabled':'')+' title="Quitar la nota directa; conservar evidencias" aria-label="Quitar nota directa '+escapeRegistro(letra||'')+'">'+(letra||ofi.letra||'—')+'</button>' +
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+(numeroExactoComp(cp,studentKey(al))?pad2(ev.nota)+' · ':'')+ev.letra+'</div>' : '') +
-          (Object.keys(original).length&&!original.borrado&&!lock&&!registroSoloLectura()?'<button type="button" class="fin-clear-direct" data-quitar-directo="'+encC+'" data-alumno="'+encN+'" title="Quitar directo" aria-label="Quitar directo">×</button>':'')+'</div>';
+          '</div>';
       }
+      grade=(typeof comparativoLinea==='function'?comparativoLinea(cp,studentKey(al)):'')+grade;
       const required=IERegistroAcademico.requiresConclusion(c.nivel,ofi.letra);
       const conclusion=required?IEConclusionSuggestions.compactHtml(cp,concCompAlumno(cp,studentKey(al)),'data-id="'+encN+'" data-comp="'+encC+'"',lock):'';
       tds+='<td><div class="final-cell-layout'+(required?' has-conclusion':'')+'"><div class="final-grade">'+grade+'</div>'+conclusion+'</div></td>';
@@ -2882,15 +3390,19 @@ function renderFinales() {
 
   box.querySelectorAll('.fin-nota').forEach(inp => {
     inp.addEventListener('change', function() {
-      if (registroSoloLectura()) return;
+      if (registroSoloLectura() || bimCerradoDocente() || [c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')!==cloudClaveReg()) return;
       const cell = inp.closest('[data-fin]');
       if (!cell || inp.readOnly) return;
       const nombre = decodeURIComponent(cell.dataset.fin);
       const comp = decodeURIComponent(cell.dataset.comp);
       if(!competenciaTrabajada(comp))return;
       let n = inp.value === '' ? '' : Number(inp.value);
-      if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); inp.value = ''; n = ''; }
+      if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); return; }
       if (n !== '') n = Math.round(n);
+      const k = finalKey(comp, nombre);
+      const previo=leerNota(store.finales,k);
+      if((n===''&&!previo)||(n!==''&&previo&&previo.origen!=='letra'&&Number(previo.nota20)===n))return;
+      if (!confirmarEdicionNumerica(inp,comp,nombre,previo,n)) return;
       const letra = n === '' ? '' : numToLetter(n);
       const badge = cell.querySelector('.eq-letter');
       if (badge) {
@@ -2898,7 +3410,6 @@ function renderFinales() {
         badge.className = 'eq-letter ' + (letra ? eqClass(letra) : 'eq-none');
       }
       if (n !== '') inp.value = pad2(n);
-      const k = finalKey(comp, nombre);
       if (n === '') store.finales[k] = {borrado: true, ts: Date.now()};
       else store.finales[k] = { nota20: n, nivel: letra, origen: 'numero', ts: Date.now() };
       saveStore();
@@ -2915,12 +3426,13 @@ function renderFinales() {
       const comp = decodeURIComponent(cell.dataset.comp);
       if(!competenciaTrabajada(comp))return;
       const val = btn.dataset.val;
-      aplicarFinalManual(comp,nombre,val);
+      if([c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')!==cloudClaveReg())return;
+      seleccionarFinalReversible(comp,nombre,val);
     });
   });
-  box.querySelectorAll('[data-quitar-directo]').forEach(el=>el.onclick=()=>quitarFinalManual(decodeURIComponent(el.dataset.quitarDirecto),decodeURIComponent(el.dataset.alumno)));
+  box.querySelectorAll('[data-final-toggle]').forEach(el=>el.onclick=()=>{if(el.disabled||[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')!==cloudClaveReg())return;const comp=decodeURIComponent(el.dataset.finalToggle),id=decodeURIComponent(el.dataset.alumno),previo=leerNota(store.finales,finalKey(comp,id));if(previo)seleccionarFinalReversible(comp,id,previo.nivel||numToLetter(previo.nota20));});
   box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
-  IEConclusionSuggestions.bindCompact(box,(el,text)=>setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),text));
+  IEConclusionSuggestions.bindCompact(box,(el,text)=>{const changed=setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),text);if(changed && estadisticas && typeof estadisticasCompetenciasHTML==='function')estadisticas.innerHTML=estadisticasCompetenciasHTML(comps,alumnos);return changed;});
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);
   if (typeof sincronizarFondoPromedios==='function') sincronizarFondoPromedios();
   sincronizarEdicionRegistro();
@@ -2940,6 +3452,7 @@ function guardarFinales() {
     const previo = leerNota(store.finales, k);
     if (nraw === '' && previo && previo.origen==='letra') return;
     if (previo && previo.origen!=='letra' && nraw!=='' && Number(previo.nota20)===Math.round(nraw)) return;
+    if (!confirmarEdicionNumerica(inp,comp,nombre,previo,nraw)) return;
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
     store.finales[k] = { nota20: n, nivel: numToLetter(n), origen:'numero', ts: Date.now() };
@@ -3074,6 +3587,7 @@ function borrarFechaAsis(fecha) {
 }
 
 function renderAsistencia() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderAsistencia',()=>renderAsistencia());
   loadStore();
   const c = ctxBase();
   document.getElementById('lblAsisCtx').textContent =
@@ -3163,16 +3677,98 @@ function promedioNums(arr) {
 }
 
 function escapeRegistro(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function datosEstadisticasCompetencias(comps,alumnos) {
+  const c=ctxBase();
+  return comps.map(comp=>{
+    const trabajada=competenciaTrabajada(comp),letras=trabajada?alumnos.map(al=>notaCompAlumno(comp,studentKey(al)).letra):[];
+    const s=IERegistroAcademico.statistics(letras);
+    const conclusionesPendientes=trabajada?alumnos.filter(al=>IERegistroAcademico.requiresConclusion(c.nivel,notaCompAlumno(comp,studentKey(al)).letra)&&!concCompAlumno(comp,studentKey(al))).length:0;
+    return {competencia:comp,trabajada,...s,matriculados:alumnos.length,pendientes:trabajada?s.noEvaluados:0,conclusionesPendientes,avance:trabajada&&alumnos.length?s.evaluados/alumnos.length*100:0};
+  });
+}
+function estadisticasCompetenciasHTML(comps,alumnos) {
+  if(!comps.length)return '';
+  const rows=datosEstadisticasCompetencias(comps,alumnos);
+  return '<section class="competence-stats"><h3>Estadísticas por competencia</h3><p>AD: Destacado · A: Logrado · B: Proceso · C: Inicio. Porcentajes sobre estudiantes evaluados; avance sobre matriculados. Calificar no confirma conclusiones ni cierre SIAGIE.</p><div class="stats-scroll" tabindex="0" role="region" aria-label="Estadísticas por competencia"><table><thead><tr><th>Competencia</th>'+['AD','A','B','C','Sin nota','Conclusiones pendientes','Avance'].map(l=>'<th>'+l+'</th>').join('')+'</tr></thead><tbody>'+rows.map(s=>'<tr><th scope="row">'+escapeRegistro(s.competencia)+'</th>'+(!s.trabajada?'<td colspan="7">No trabajada este bimestre</td>':['AD','A','B','C'].map(l=>'<td>'+s.niveles[l]+' · '+s.porcentajes[l].toFixed(1)+' %</td>').join('')+'<td>'+s.pendientes+'</td><td>'+s.conclusionesPendientes+'</td><td>'+s.evaluados+'/'+s.matriculados+' · '+s.avance.toFixed(1)+' %<progress max="100" value="'+s.avance+'" aria-label="Avance de calificación"></progress></td>')+'</tr>').join('')+'</tbody></table></div></section>';
+}
 function estadisticaResumenHTML(){const s=IERegistroAcademico.statistics(estudiantes().map(al=>promReferencialAlumno(studentKey(al)).letra));return '<section class="summary-stats"><h3>RESUMEN ESTADÍSTICO</h3><div class="summary-counts">'+[['Matriculados',s.matriculados],['Evaluados',s.evaluados],['No evaluados',s.noEvaluados],['Aprobados',s.aprobados],['Desaprobados',s.desaprobados]].map(([l,n])=>'<span>'+l+': <strong>'+n+'</strong></span>').join('')+'</div><table><thead><tr><th>Nivel</th><th>Frecuencia</th><th>Porcentaje</th></tr></thead><tbody>'+Object.keys(s.niveles).map(l=>'<tr><th>'+l+'</th><td>'+s.niveles[l]+'</td><td>'+s.porcentajes[l].toFixed(1)+' %</td></tr>').join('')+'<tr><th>TOTAL</th><td>'+s.evaluados+'</td><td>'+(s.evaluados?'100':'0')+' %</td></tr></tbody></table><small>Clasificación estadística: AD/A/B aprobados; C desaprobados. Promedio referencial informativo; no determina promoción ni SIAGIE.</small></section>';}
 function renderAvance() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderAvance',()=>renderAvance());
  const box=document.getElementById('avanceBox'),c=ctxBase(),comps=competencias();document.getElementById('lblAvanceCtx').textContent=c.area+' · Bim '+c.bim;
  let html='<div class="fin-wrap fin-scroll-body"><table class="fin-grid"><thead><tr><th class="fin-nom summary-student-header">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'<th class="summary-reference">Promedio referencial<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
  estudiantes().forEach((al,i)=>{const id=studentKey(al);html+='<tr><th class="fin-nom summary-student"><span class="summary-student-order">'+escapeRegistro(al.numeroVisual??i+1)+'</span><span class="summary-student-name">'+escapeRegistro(al.nombre)+'</span></th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td class="summary-competence">No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id);html+='<td class="summary-competence"><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+escapeRegistro(d.letra||'Pendiente')+'</span></div></td>';});const r=promReferencialAlumno(id);html+='<td class="summary-reference">'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>'+estadisticaResumenHTML();
+ if(typeof estadisticasCompetenciasHTML==='function')box.innerHTML+=estadisticasCompetenciasHTML(comps,estudiantes());
  if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.summary(box);
 }
-function imprimirResumen(){
- renderAvance();const c=ctxBase(),doc=document.getElementById('inpDocente').value||'';
- document.getElementById('printArea').innerHTML='<div class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>RESUMEN DE RESULTADOS · '+escapeRegistro(c.nivel)+' · '+escapeRegistro(c.grado)+'° '+escapeRegistro(c.seccion)+' · '+escapeRegistro(c.area)+' · Bim '+escapeRegistro(c.bim)+'</h2><p>Docente: '+escapeRegistro(doc)+'</p></div>'+document.getElementById('avanceBox').innerHTML;
+function imprimirPestanaActiva(){
+ const active=['panelCalificar','panelFinales','panelAvance','panelAsistencia'].find(id=>document.getElementById(id)?.classList.contains('on'));
+ if(active==='panelCalificar') {abrirSelectorImpresionCalificar();return;}
+ if(active==='panelAsistencia') {imprimirAsistenciaRegistro();return;}
+ if(active==='panelFinales') {imprimirResumen({promedios:true});return;}
+ if(active!=='panelAvance'){toast('Selecciona una pestaña académica para imprimir.');return;}
+ // Resumen conserva sus estadísticas generales y por competencia, además de firmas.
+ imprimirResumen();
+}
+function abrirSelectorImpresionCalificar(){
+ const previo=document.getElementById('selectorImpresionCalificar');if(previo)previo.remove();
+ const dialog=document.createElement('dialog');dialog.id='selectorImpresionCalificar';
+ dialog.style.cssText='border:1px solid #cbd5e1;border-radius:14px;max-width:min(92vw,480px);width:100%;padding:20px;box-shadow:0 14px 50px #0f172a33';
+ dialog.innerHTML='<form method="dialog" style="display:grid;gap:12px"><h2 style="font-size:18px;font-weight:800">Imprimir Calificar</h2><label for="impModo">Periodo</label><select id="impModo"><option value="dia">Sesión diaria</option><option value="semana">Sesiones semanales (lunes a viernes)</option><option value="bimestre">Todas las sesiones del bimestre</option></select><label for="impFecha">Fecha de referencia</label><input id="impFecha" type="date" required><p style="font-size:12px;color:#475569">La semana comprende lunes a viernes. Solo se incluyen sesiones registradas.</p><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" id="impCancelar" class="btn btn-ghost">Cancelar</button><button type="button" id="impConfirmar" class="btn btn-primary">Imprimir / PDF</button></div></form>';
+ document.body.appendChild(dialog);
+ const fecha=dialog.querySelector('#impFecha'),modo=dialog.querySelector('#impModo');
+ fecha.value=(document.getElementById('inpFecha')?.value||new Date().toISOString().slice(0,10));
+ const actualizar=()=>{fecha.disabled=modo.value==='bimestre';fecha.required=modo.value!=='bimestre';};modo.addEventListener('change',actualizar);actualizar();
+ dialog.querySelector('#impCancelar').onclick=()=>dialog.close();
+ dialog.querySelector('#impConfirmar').onclick=()=>{
+   let options={};if(modo.value!=='bimestre'){
+     if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha.value)){fecha.reportValidity();return;}
+     if(modo.value==='dia')options={desde:fecha.value,hasta:fecha.value};
+     else {const d=new Date(fecha.value+'T12:00:00');if(Number.isNaN(d.getTime()))return;const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);const monday=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');d.setDate(d.getDate()+4);const friday=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');options={desde:monday,hasta:friday};}
+   }
+   dialog.close();prepararImpresion(options);
+ };
+ dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+}
+function imprimirAsistenciaRegistro(){
+ if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return conRegistroHistorico(()=>imprimirAsistenciaRegistro());
+ const c=ctxBase(),alumnos=estudiantes(),fechas=(store.asisFechas?.[asisCtxKey()]||[]).filter(f=>/^\d{4}-\d{2}-\d{2}$/.test(f)&&!store.asisFechasEstado?.[asisCtxKey()+'||'+f]?.borrado).slice().sort();
+ if(!fechas.length){alert('No hay fechas de asistencia registradas en este bimestre.');return;}
+ const docente=document.getElementById('inpDocente')?.value||'No registrado';
+ let html='<article class="bimestral-report"><header class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>REGISTRO DE ASISTENCIA</h2></header>';
+ html+='<div class="bimestral-meta"><span><b>Área:</b> '+escapeRegistro(c.area)+'</span><span><b>Nivel:</b> '+escapeRegistro(c.nivel)+'</span><span><b>Aula:</b> '+escapeRegistro(c.grado+'° '+c.seccion)+'</span><span><b>Bimestre:</b> '+escapeRegistro(c.bim)+'</span><span><b>Docente:</b> '+escapeRegistro(docente)+'</span><span><b>Impresión:</b> '+new Date().toLocaleDateString('es-PE')+'</span></div>';
+ const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
+ html+='<p>Año: '+escapeRegistro(cfg?.anio||'No configurado')+'</p>';
+ const todasFechas=fechas.slice();
+ for(let offset=0;offset<todasFechas.length;offset+=12){const fechas=todasFechas.slice(offset,offset+12);
+ html+='<table class="bimestral-table"><colgroup><col class="bimestral-number-column"><col class="bimestral-name-column">'+fechas.map(()=>'<col>').join('')+'</colgroup><thead><tr><th>N.º</th><th>Estudiante</th>'+fechas.map(f=>'<th>'+escapeRegistro(f.slice(5))+'</th>').join('')+'</tr></thead><tbody>';
+ alumnos.forEach((al,i)=>{html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+fechas.map(f=>{const rec=asisGet(leerNota(store.asistencia,asisMarkKey(f,studentKey(al))));return '<td class="bimestral-grade">'+escapeRegistro(rec.marca||'—')+'</td>';}).join('')+'</tr>';});
+ html+='</tbody></table>';
+ }
+ html+='<p style="margin-top:12px;font-size:9pt">P = Presente · F = Falta · T = Tardanza · J = Justificado · — = Sin registro</p><footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(docente)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
+ document.getElementById('printArea').innerHTML=html;window.print();
+}
+function imprimirResumen(opciones){
+ if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return conRegistroHistorico(()=>imprimirResumen(opciones));
+ const esPromedios=!!(opciones&&opciones.promedios);
+ const c=ctxBase(),alumnos=estudiantes(),comps=competencias();
+ const doc=(document.getElementById('inpDocente').value||'').trim()||'No registrado';
+ const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
+ const anio=cfg&&Number.isInteger(Number(cfg.anio))&&Number(cfg.anio)>=2000&&Number(cfg.anio)<=2100?String(cfg.anio):'No configurado';
+ const fecha=new Date().toLocaleDateString('es-PE');
+ const nivelTexto=c.nivel==='primaria'?'Primaria':'Secundaria';
+ let html='<article class="bimestral-report'+(esPromedios?' promedios-print':'')+'"><header class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>'+ (esPromedios?'RESULTADOS FINALES POR COMPETENCIA':'REGISTRO AUXILIAR BIMESTRAL')+'</h2></header>';
+ html+='<div class="bimestral-meta">'+[['Área',c.area],['Nivel',nivelTexto],['Grado',c.grado+'°'],['Sección',c.seccion],['Bimestre',c.bim],['Año',anio],['Docente',doc],['Fecha',fecha]].map(([label,value])=>'<span><b>'+label+':</b> '+escapeRegistro(value)+'</span>').join('')+'</div>';
+ html+='<table class="bimestral-table"><colgroup><col class="bimestral-number-column"><col class="bimestral-name-column">'+comps.map(()=>'<col>').join('')+'</colgroup><thead><tr><th class="bimestral-number">N.º</th><th class="bimestral-name">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'</tr></thead><tbody>';
+ alumnos.forEach((al,i)=>{const id=studentKey(al);html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+comps.map(cp=>'<td class="bimestral-grade">'+(competenciaTrabajada(cp)?'<span class="bimestral-result">'+escapeRegistro(notaCompAlumno(cp,id).letra||'—')+'</span>':'<small>No trabajada este bimestre</small>')+'</td>').join('')+'</tr>';});
+ html+='</tbody></table>';
+ if(esPromedios){
+   const conclusiones=[];
+   alumnos.forEach((al,i)=>comps.forEach(cp=>{const id=studentKey(al),texto=concCompAlumno(cp,id);if(!texto)return;const letra=competenciaTrabajada(cp)?notaCompAlumno(cp,id).letra||'—':'No trabajada';conclusiones.push('<tr><th scope="row">'+(i+1)+'. '+escapeRegistro(al.nombre)+'</th><td>'+escapeRegistro(cp)+'</td><td class="print-conclusion-level">'+escapeRegistro(letra)+'</td><td class="print-conclusion-text">'+escapeRegistro(texto)+'</td></tr>');}));
+   if(conclusiones.length)html+='<section class="print-conclusions"><h3>Conclusiones descriptivas registradas</h3><table><colgroup><col style="width:23%"><col style="width:23%"><col style="width:8%"><col style="width:46%"></colgroup><thead><tr><th>Estudiante</th><th>Competencia</th><th>Nivel</th><th>Conclusión</th></tr></thead><tbody>'+conclusiones.join('')+'</tbody></table></section>';
+   if(c.nivel==='primaria')html+=estadisticaResumenHTML()+estadisticasCompetenciasHTML(comps,alumnos);
+ }else html+=estadisticaResumenHTML()+estadisticasCompetenciasHTML(comps,alumnos);
+ html+='<footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(doc)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
+ const pa=document.getElementById('printArea');pa.innerHTML=html;
  window.print();
 }
 

@@ -25,7 +25,7 @@ function fixture(role='admin'){
   c.IEAuxPermissions={configurar(){},niveles(){return ['primaria','secundaria']}};
   new vm.Script(read('registro-evaluation.js')).runInContext(c);new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;new vm.Script(read('student-identity.js')).runInContext(c);c.IEStudentIdentity=c.window.IEStudentIdentity;c.studentKey=c.window.studentKey;
   const run=code=>new vm.Script(code).runInContext(c);
-  return {c,run,calls,memory,storage,session,elements,alerts};
+  c.pintarBotonesContextoRegistro=c.actualizarBotonesContextoRegistro=()=>{};return {c,run,calls,memory,storage,session,elements,alerts};
 }
 function checkRequest(s,bimestre){
   assert.equal(s.calls.length,1);const {url,options}=s.calls[0];

@@ -1,0 +1,166 @@
+# Registro — bloque visual 3, 6, 7 y 10
+
+Base auditada: main `8439fb47259ad8667842f3f9f5a6bd35ae2e5520`, después de fusionar PR #80. Sin notas reales ni consultas a producción.
+
+## Auditoría y diseño
+
+Promedios ya tenía una fila C/B/A/AD, encabezado oscuro continuo, controles masivos y ampliación por conclusiones. La forma circular, ancho fijo del nombre y acumulación de contexto/aviso/controles dificultaban leer y seleccionar. Resumen ya mostraba resultados por competencia, promedio referencial y estadísticas de ese promedio, pero faltaban estadísticas por competencia y sus columnas podían quedar demasiado angostas al imprimir.
+
+El diseño mantiene la estructura académica: botones rectangulares con esquinas de 8 px, 44×44 px, selección con contraste/borde y aria-pressed; separaciones compactas sin reducir el objetivo táctil. Contexto, aviso y conteo se agrupan; la barra masiva y Letras/0–20 comparten fila en PC y usan dos filas compactas en móvil. No se elimina ningún control.
+
+Los nombres completos ocupan una línea en PC y se ajustan sin truncar en móvil. Cada competencia conserva su columna; las que necesitan conclusión se amplían con el criterio existente (Primaria B/C, Secundaria C). La tabla mantiene scroll interno y encabezado oscuro continuo. En móvil se reserva espacio para los cuatro botones al lado del nombre sticky: 120 px de nombre + 182 px de botones/gaps + 12 px de padding, dentro de 316 px disponibles en la fixture de 390 px.
+
+## Estadísticas de lectura
+
+Se reutiliza IERegistroAcademico.statistics y notaCompAlumno: el directo efectivo prevalece; las evidencias se interpretan mediante la lógica actual. Ninguna estadística recalcula ni guarda una nota.
+
+- AD/A/B/C: cantidad y porcentaje sobre estudiantes evaluados de esa competencia. Si no hay evaluados, porcentajes 0; no NaN/Infinity.
+- Sin nota: estudiantes matriculados de esa competencia trabajada que todavía no tienen resultado efectivo.
+- Conclusiones pendientes: conclusiones obligatorias ausentes según las reglas actuales; se muestra solo el conteo, nunca el contenido.
+- Avance: evaluados/matriculados y porcentaje. No equivale a cierre confirmado ni registro completo para SIAGIE.
+- No trabajada: etiqueta explícita; no se inventan pendientes ni calificaciones.
+
+Se muestran en Promedios y Resumen para Docente/Admin, usando el alumnado/competencias ya filtrados por la sesión. Al editar una conclusión se actualiza el conteo usando el mismo setter y guardado existente; la actualización estadística no hace un guardado adicional. Los resultados y las conclusiones almacenadas permanecen intactos al renderizar/cambiar la presentación.
+
+## Impresión y PDF
+
+Resumen conserva el botón imprimir/PDF y su función original. Sus reglas de impresión ajustan nombres/competencias sin truncar, repiten encabezados, ocultan controles y el resto de la aplicación para evitar espacio vacío. El resumen usa una página nombrada A4 horizontal y las estadísticas por competencia también se imprimen. La clasificación del promedio referencial sigue siendo informativa y no reemplaza resultados SIAGIE.
+
+Se comprobó visualmente una representación de las reglas reales @media print con datos ficticios; no se exportó un PDF real desde el navegador integrado. Revisar la paginación/márgenes finales en la vista nativa de impresión de Chrome/Edge/Safari antes de producción, especialmente con aulas grandes. El tamaño de papel nombrado depende del soporte del navegador; el ajuste de texto no depende de esa opción.
+
+## Compatibilidad y validación
+
+No cambia aplicarFinalManual, calificarAreaMasiva, quitarFinalManual, quitarAreaMasiva, selector general, cálculos, conclusiones, guardado, cierres, permisos, sincronización ni Apps Script. No cambia A1, B1, B2, students.js, módulos transversales ni Service Worker.
+
+Las regresiones actuales comparan todo el código previo tras excluir únicamente el bloque CSS/HTML nuevo y los hooks estadísticos declarados en registro-visual-snapshot.cjs. Las pruebas nuevas usan fuente actual sin esa normalización y verifican denominadores, cero evaluados, no trabajadas, readonly, impresión, actualización de conclusiones y ausencia de escrituras remotas.
+
+Demostración reproducible aislada:
+
+```powershell
+node tests/registro-visual-demo.cjs "$env:TEMP\registro-visual.html"
+node tests/registro-visual-demo.cjs "$env:TEMP\registro-visual-print.html" --print-preview
+```
+
+Abrir estos HTML locales en un navegador/Live Server. El generador incluye el CSS, render y handlers actuales, con roster/notas exclusivamente ficticios. Red bloqueada por CSP y stub; almacenamiento en memoria. Las confirmaciones masivas se cancelan deliberadamente en la fixture; no son cambios a producción. El modo de impresión aplica las reglas reales de impresión a la pantalla para inspeccionar el contenido sin abrir diálogos del sistema.
+
+Revisión visual realizada en PC 1280×900 y móvil 390×844: EPT (1), Arte y Cultura (2), Comunicación (3), Ciencia y Tecnología (3), Matemática (4), Personal Social Primaria (5). Cuatro controles 44×44 en la misma coordenada vertical, nombres íntegros, ampliación por conclusiones y scroll interno. Documento móvil 375 px de ancho más 15 px de scrollbar, sin desbordamiento horizontal de página. Resumen Admin/Docente y modo cerrado conservan resultados, restricciones y selector de presentación.
+
+No merge ni deploy sin autorización expresa.
+
+Validación local final: 1825 pruebas aprobadas, 0 fallidas/omitidas. Sintaxis: 91 JS/GS y 28 scripts inline. Dependencias locales: 67. git diff --check correcto.
+
+## Revisión integral adicional de Registro (Calificar y secciones relacionadas)
+
+Se reprodujo la causa estructural del apilamiento: `.fin-cell` es vertical por defecto y la cuadrícula de cuatro botones estaba acotada a `#finLista`. La corrección aplica una cuadrícula de cuatro columnas de 44 px únicamente a las decisiones de Calificar en `#stuList`, conservando controles numéricos, indicadores, eventos y claves. El ancho interno es 188 px; las celdas reservan 200 px con padding. Los nombres completos se ajustan y la tabla conserva su scroll interno. Selección y foco quedan visibles; los botones rectangulares mantienen objetivos táctiles de 44 px.
+
+La revisión del HTML/CSS detectó también nombres de Asistencia con `truncate` y controles P/F/T/J de 32 px. Se corrigieron mediante reglas específicas: nombre sin ellipsis, columna flexible para texto y marcas de 44 px. Guardar/Subir Nube/Bajar Nube mantienen sus handlers y tienen altura mínima de 44 px. No se cambió código funcional ni markup de producción.
+
+Se añadieron 37 regresiones: renderizadores reales con 40 estudiantes ficticios, nombres largos, conclusiones, áreas oficiales de una a cinco competencias, Primaria/Secundaria, abierto/cerrado, reglas responsive de 1366/390 px, estructura de Datos/formulario/navegación/Asistencia/pie, ausencia de escrituras y comparación de toda la fuente fuera de CSS. Primaria no tiene áreas oficiales de una competencia; Secundaria no tiene áreas de cinco. Se probaron los catálogos reales, sin inventar competencias. Los escenarios etiquetados 1366/390 verifican estructura y reglas CSS, NO geometría calculada en navegador.
+
+Fixture estática completa, sin scripts/red, generada desde markup y renderizadores actuales:
+
+```powershell
+node tests/registro-full-visual-fixture.cjs registro-ficticio-primaria.html primaria "Personal Social"
+node tests/registro-full-visual-fixture.cjs registro-ficticio-secundaria.html secundaria "Matemática" closed
+```
+
+La fixture incorpora utilidades CSS mínimas para inspección aislada; no equivale a una sesión productiva ni certifica el CSS de Tailwind completo. Las secciones se muestran juntas para revisar su contenido; las pruebas de handlers y cambios de pestaña siguen en la suite existente.
+
+**Validación visual real pendiente:** Edge/Playwright no inicia por Crashpad (`TransactNamedPipe`, 0x6D). El navegador integrado no pudo abrir el servidor local aislado (ERR_CONNECTION_TIMED_OUT); además rechazó navegación `data:` por su política de URLs. No se eludió esa política. No se obtuvieron capturas nuevas ni se certifican ausencia de solapamientos/desbordamiento real, altura real de filas, sticky ni impresión paginada. Antes de aprobar la revisión visual integral, comprobar las fixtures y el Registro aislado en navegador real a 1366 y 390 px, incluyendo navegación/pie fijo y Tailwind vigente. No se usaron datos oficiales.
+
+Apps Script, A1, B1, B2, cálculos, almacenamiento, permisos y cierres permanecen byte a byte intactos; la única modificación productiva es CSS en registro.html.
+
+## Pulido de botones de calificación
+
+Calificar y Promedios usan botones de 40 × 40 px, esquinas de 10 px y bordes de 1 px. Se retiró el anillo oscuro/sombra interior de selección: la opción activa se distingue por fondo suave, texto oscuro y borde cromático. C rojo claro, B ámbar, A verde claro y AD azul claro; los no seleccionados son neutros. Los cuatro pares de texto/fondo seleccionados superan contraste 4,5:1. El foco de teclado visible permanece intacto.
+
+La cuadrícula de Calificar conserva cuatro decisiones horizontales con gaps de 4 px; Promedios mantiene su zona fija de nota y ubicación de conclusiones. No se cambian selectores, handlers, notas, cálculos, A1/B1/B2 ni almacenamiento. Los controles P/F/T/J y el pie conservan 44 px.
+
+Se ajustaron las pruebas de tamaño y se añadieron cinco regresiones de paleta, contraste, neutralidad y ausencia de estilos saturados antiguos. Validación: 1867 aprobadas, 0 fallidas/omitidas; sintaxis 93 JS/GS, 28 scripts inline, 67 dependencias; diff limpio.
+
+Las fixtures estáticas se regeneraron con datos ficticios y el CSS nuevo para Primaria (5 competencias) y Secundaria (4). La revisión física a 1366/390 px continúa pendiente por los bloqueos de navegador documentados arriba. Las pruebas de estructura, contraste y geometría CSS no certifican solapamientos reales ni sustituyen capturas de navegador.
+
+## Selección reversible aprobada
+
+Se retiraron las X de directos académicos, junto con sus estilos/listeners. En Promedios, repetir la letra del directo lo quita mediante `quitarFinalManual()`: solo se registra el tombstone de ese directo, conservando evidencias y conclusiones. Si el nivel visible procede de evidencias, pulsarlo crea un directo; no elimina la evidencia. Pulsar otro nivel sustituye el directo.
+
+En Calificar cada nota pertenece a una capacidad/fecha. El usuario autorizó expresamente que repetir su selección quite únicamente esa evidencia de celda. Se conserva la sesión, demás capacidades, estudiantes, contextos y conclusiones. La eliminación usa el tombstone existente y persistencia local; no elimina físicamente historial ni notas del servidor. La calificación masiva sigue asignando, sin alternar valores repetidos.
+
+En 0–20, vaciar el campo quita su nota. En Promedios el indicador de nivel permite quitar un directo existente (incluido un directo originalmente ingresado como letra, cuyo campo numérico se muestra vacío). Si el indicador procede solo de evidencias está deshabilitado. Reenfocar o repetir un número no elimina nada; valores fuera de rango se conservan para corrección y nunca se convierten en borrado. Se mantienen cierres, solo lectura y contexto de los callbacks.
+
+Se añadieron 37 regresiones de selección/sustitución/deselección, números, gates, contextos, persistencia/reload con copia legacy de sesión, guardado unificado y sincronización de tombstones con Apps Script simulado (CAS y rechazo de versión vieja). Se sustituyeron regresiones obsoletas que exigían la X; no se modificaron backend ni contratos. Snapshots históricos excluyen explícitamente los dos renderizadores/helper aprobados; las regresiones nuevas ejercitan fuente actual y handlers reales, sin normalización.
+
+Validación: 1900 pruebas aprobadas, 0 fallidas/omitidas. Cambios locales sin escrituras académicas a nube no solicitadas. Apps Script, A1/B1/B2 y módulo de aportes transversales permanecen sin modificaciones. La comprobación visual real permanece pendiente por el entorno documentado; el ajuste conserva la cuadrícula/paleta compacta aprobada.
+
+## Confirmación de opción 2 y conservación de fechas
+
+La regla elegida ya estaba implementada. Se añadieron seis pruebas explícitas (Primaria/Secundaria) sin modificar código productivo: deselección de una celda conserva otra evidencia de fecha anterior, las sesiones/fechas académicas, las fechas y marcas de asistencia y conclusiones. Quitar el directo de Promedios recupera el calculado sin modificar ninguna evidencia.
+
+Se ejecutó el motor A1 real con base/local/remoto sintéticos: combina el tombstone local con la edición remota de otra celda, conservando fechas; si la nube editó la misma celda, detiene la operación y requiere elegir Este dispositivo/Nube. No decide por el timestamp remoto mayor y no modifica el borrador mientras falta una decisión.
+
+Validación de esta ampliación: 1906 aprobadas, 0 fallidas/omitidas; 43 pruebas específicas de selección reversible. Sin cambios en Apps Script, A1/B1/B2, producción ni diseño. No merge ni deploy.
+
+## Separación visual entre competencias
+
+Promedios y Resumen reciben un divisor vertical fino (1 px, gris azulado al 28 % de opacidad) entre competencias, aplicado a la misma columna del encabezado y las filas. No se añaden columnas, espacios entre tablas, padding ni cambios de ancho. El primer bloque y la columna fija de estudiantes no reciben el divisor; en Resumen se conserva el separador propio del promedio referencial. Las estadísticas se mantienen independientes, sin bordes adicionales. La regla es solo de pantalla: no altera impresión/PDF.
+
+Siete regresiones nuevas comprueban áreas oficiales de 1–5 competencias con 40 estudiantes ficticios, integridad de alineación estructural, conclusiones y estadísticas, ausencia de mutaciones/escrituras, scroll existente y equivalencia exacta de todo el HTML/JS fuera de CSS respecto del HEAD 54439bf. La suite total es 1913 aprobadas, 0 fallidas/omitidas. La validación visual real continúa pendiente por las limitaciones documentadas del navegador.
+
+## Fondos alternos sutiles por competencia
+
+Las celdas de competencia alternan celeste casi blanco (#f3f9fd) y verde casi blanco (#f4faf6) en Promedios y Resumen. La alternancia es por columna, no por estudiante: el primer bloque es celeste, el segundo verde y así sucesivamente. Se conserva el divisor vertical tenue. La cabecera oscura, columna de nombres, promedio referencial, estadísticas, controles de nota y conclusiones mantienen sus estilos/colores actuales; no se alteran anchos ni scroll. La regla solo aplica en pantalla, sin cambiar impresión/PDF.
+
+Siete regresiones adicionales cubren áreas de 1–5 competencias con 40 estudiantes ficticios, alcance de los selectores, consistencia entre filas, ausencia de mutaciones/escrituras y contraste de texto superior a 7:1 sobre los fondos nuevos. Se conserva la paleta de selección C/B/A/AD. Total: 1920 pruebas aprobadas, 0 fallidas/omitidas. La validación visual real continúa pendiente por los bloqueos del entorno ya documentados.
+
+## Alineación de bloques en Calificar
+
+Se confirmó una diferencia estructural: el encabezado se centraba sobre la columna expandida, mientras el grupo de botones de ancho fijo se anclaba al borde izquierdo. Calificar ahora usa `colgroup` nativo, tabla de layout fijo y una dimensión compartida de 220 px por competencia/capacidad. Encabezado y cuerpo permanecen en la misma columna; los grupos se centran con margin-inline:auto. Los botones conservan 40 px y colores suaves. El texto de competencia/capacidad se ajusta dentro de su encabezado, sin ellipsis. Nombres completos en una columna de 230 px (120 en móvil); las tablas amplias siguen dentro de fin-wrap con scroll horizontal.
+
+Solo cambian CSS y dos cadenas de presentación de renderStudents (clase de encabezado y colgroup/cantidad de columnas). No se agrupan capacidades ni se alteran su orden, claves, eventos, evidencia, selección reversible o permisos. Promedios/Resumen, fondos alternos y separadores permanecen intactos.
+
+14 regresiones nuevas verifican 1–5 columnas en Letras/0–20 con 40 estudiantes ficticios, encabezado C1/C2/nombre/capacidad correspondiente a cada celda, múltiples capacidades de una misma competencia, dimensiones compartidas, centrado y reglas móviles. Pruebas históricas normalizan únicamente las dos cadenas visuales aprobadas; las nuevas pruebas usan fuente actual. Suite: 1934 aprobadas, 0 fallidas/omitidas. La geometría visual real en navegador continúa pendiente por las limitaciones ya documentadas.
+
+## Refinamiento de Promedios: 38 px, espacio lateral y selección definida
+
+Los botones de letras de Promedios y la barra masiva pasan de 40 a 38 px, con tipografía de 12 px y esquinas redondeadas. Calificar conserva 40 px y su alineación recién aprobada. Se suman 4 px de padding a cada lado de las competencias, en encabezado y cuerpo. Los anchos aumentan 8 px para conservar el espacio interior y la zona fija de nota/conclusión: columna 212 px en escritorio/204 móvil y con conclusión 408/252 px. El scroll sigue dentro del viewport.
+
+Promedios refuerza su selección con fondos todavía claros: C rojo #fecaca, B ámbar #fde68a, A verde #bbf7d0 y AD azul #bae6fd; texto oscuro y bordes cromáticos ligeramente más definidos. Contraste superior a 4,5:1 en todos los estados. Opciones neutras, fondos alternos por competencia y divisor atenuado permanecen intactos. No cambia la paleta de Calificar ni los indicadores numéricos.
+
+Seis regresiones nuevas de tamaño/espaciado/contraste y equivalencia de source fuera de CSS; las pruebas existentes siguen cubriendo áreas de 1–5 competencias, notas, conclusiones y sincronización. Validación: 1940 aprobadas, 0 fallidas/omitidas. La revisión física de navegador permanece pendiente por las limitaciones documentadas; las fixtures estáticas se regeneran con el CSS actual.
+
+## Reporte auxiliar bimestral para impresión
+
+La acción general Imprimir/PDF llamaba a prepararImpresion(), que añadía grillas de evidencia con PROM y NL después del reporte. Ahora llama a imprimirResumen(), que construye únicamente la relación bimestral y sus estadísticas desde las funciones vigentes de resultados efectivos. El detalle conserva su implementación original y una acción explícita «Imprimir detalle de evidencias» en Calificar.
+
+El reporte incluye institución, área, nivel, grado, sección, bimestre, año configurado, docente y fecha. N.º es correlativo sobre la lista autorizada completa; no se reinicia por página. Los nombres se muestran completos y las notas se centran horizontal y verticalmente. Se utiliza A4 horizontal con márgenes de 10 mm, encabezados de tabla repetibles y reglas para evitar dividir filas. Las estadísticas originales por competencia quedan al final: cantidades/porcentajes AD/A/B/C, sin nota, conclusiones pendientes y avance. No se imprimen controles ni promedio referencial. No cambian reglas académicas, datos, permisos, cierres, A1/B1/B2 ni Apps Script.
+
+36 pruebas nuevas ejecutan el generador real con 30/40 estudiantes ficticios, Letras/0–20 y catálogos de 1–5 competencias de Primaria/Secundaria. Comprueban numeración, nombres, notas, estadísticas, contexto, escape, independencia del DOM anterior y ausencia de mutaciones/peticiones. Las pruebas históricas adaptan exclusivamente expectativas de presentación; las nuevas no normalizan la función actual. Suite completa: 1976 aprobadas, 0 fallidas/omitidas.
+
+Fixture autónoma para Live Server (sin red ni datos oficiales):
+
+```powershell
+node tests/registro-bimestral-print-fixture.cjs reporte-primaria40.html primaria "Personal Social" 40
+node tests/registro-bimestral-print-fixture.cjs reporte-secundaria30.html secundaria "Arte y Cultura" 30
+```
+
+Abrir la fixture con Live Server y pulsar Abrir impresión/PDF. Comprobar A4 horizontal, márgenes de 10 mm, escala 100 %, encabezados repetidos, numeración continua, nombres completos, notas centradas, estadísticas al final y ausencia de filas partidas. Repetir 30/40 alumnos y áreas de 1–5 competencias. El preview de pantalla es orientativo. La paginación y geometría reales no están verificadas: el navegador automatizado disponible no pudo generar un PDF nativo. No se presenta una simulación como evidencia de paginación.
+
+Reversión: revertir el commit de este ajuste restaura las dos acciones de impresión anteriores; no requiere migraciones ni cambios en Sheets.
+
+## Estabilización final desde 3effb867
+
+CI #162: 1932 aprobadas y 44 fallidas, reproducidas localmente. Clasificación: 32 expectativas del reporte bimestral que prohibían la nueva leyenda del resumen general y esperaban dos tablas en vez de tres; una expectativa del botón general/detalle anterior; un render aislado sin mock de confirmación; diez comparaciones históricas de fuente que no contemplaban las nuevas funciones autorizadas. No se eliminaron ni omitieron tests. Las fixtures cargan las dependencias reales nuevas; los contratos de impresión se actualizan a las modalidades solicitadas. El normalizador histórico acota funciones explícitas de confirmación/impresión, mientras 44 regresiones nuevas ejecutan el source actual sin normalizar. Los módulos protegidos y funciones de cálculo/sincronización se comparan byte a byte con 3effb867.
+
+Defectos funcionales adicionales: los cambios numéricos y el indicador de nivel podían quitar/reemplazar una nota sin confirmación; Guardar podía capturar un cambio sin el evento change; los mensajes de letras contenían saltos escapados literalmente; el detalle fijaba 2026 y truncaba capacidades. Se completaron confirmaciones con alumno, competencia, capacidad/fecha cuando corresponda. Cancelar restaura el campo y no modifica ni persiste el registro; primero vacío y mismo número no piden confirmación. Se conserva la advertencia existente de conclusiones al imprimir el detalle bimestral. No hay envíos automáticos ni cambios a calificación masiva, A1, guardado integrado B1, B2, cálculos, permisos, cierres o backend. El collector conserva también la conclusión histórica de capacidad al reemplazar/eliminar su evidencia.
+
+Impresión por pestaña: Calificar ofrece día, semana lunes–viernes o bimestre; incluye únicamente sesiones registradas del contexto y rango. Promedios imprime resultados finales por competencia y firmas. Resumen incluye relación numerada, resumen general, estadísticas por competencia y firmas. Asistencia lee marcas P/F/T/J y fechas del aula/bimestre, excluye fechas eliminadas y divide tablas de más de 12 fechas para mantener espacio para nombres. Imprimir no recarga el store y no descarta borradores. Los estilos de pantalla aprobados permanecen idénticos.
+
+La fixture admite una modalidad opcional: resumen, promedios, dia, semana, bimestre o asistencia. Por ejemplo:
+
+```powershell
+node tests/registro-bimestral-print-fixture.cjs reporte.html secundaria "Arte y Cultura" 30 semana
+```
+
+Se generaron seis ejemplos sin red y con datos ficticios. Verificar en Live Server impresión nativa A4 horizontal/márgenes, repeticiones de encabezado, filas completas, nombres y firmas; con 30/40 alumnos y hasta cinco competencias. El entorno sigue sin poder generar PDF nativo: no se certifican paginación o geometría física. Las pruebas de HTML/CSS no reemplazan esa comprobación.
+
+Validación: 2020 pruebas aprobadas, 0 fallidas, 0 omitidas (1976 conservadas + 44 nuevas). Reversión: revertir este commit desde 3effb867; no hay migración de almacenamiento, datos o Sheets. No merge ni deploy.

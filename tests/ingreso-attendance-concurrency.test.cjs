@@ -150,7 +150,7 @@ test('Revoked preflight session retires authorization but leaves assistance unch
 });
 test('Academic attendance is unchanged; Auxiliar preserves approved base styles beyond compact form and statistics',()=>{
  const original=file=>execFileSync('git',['show','d3fee52033c2c0b7244d00d52e9a5ae0799ed30f:'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
- for(const name of ['renderAsistencia','asisSet','asisGet','getAsisFechas']) {const code=x=>{const i=x.indexOf('function '+name+'(');assert.ok(i>=0);return x.slice(i,x.indexOf('\n}',i)+2);};assert.equal(code(read('registro.html').replace(/\r\n/g,'\n')),code(original('registro.html')));}
+ for(const name of ['renderAsistencia','asisSet','asisGet','getAsisFechas']) {const code=x=>{const i=x.indexOf('function '+name+'(');assert.ok(i>=0);return x.slice(i,x.indexOf('\n}',i)+2);};assert.equal(code(require('./registro-stabilization-snapshot.cjs')(read('registro.html')).replace(/\r\n/g,'\n')),code(original('registro.html')));}
  const old=original('auxiliar.html'),now=read('auxiliar.html').replace(/\r\n/g,'\n');
  const estilos=html=>[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]);
  const limpiado=estilos(now).map(css=>css

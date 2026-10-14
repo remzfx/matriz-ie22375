@@ -1,0 +1,2 @@
+// Only undo the two approved Calificar presentation strings for historical contract tests.
+module.exports=s=>s.replace("head += '<th class=\"cal-competence-header\">C'", "head += '<th>C'").replace("box.innerHTML = '<div class=\"fin-wrap\"><table class=\"fin-grid\" style=\"--cal-columns:'+cols.length+'\"><colgroup><col class=\"cal-student-column\">'+cols.map(()=>'<col class=\"cal-competence-column\">').join('')+'</colgroup><thead>", "box.innerHTML = '<div class=\"fin-wrap\"><table class=\"fin-grid\"><thead>");
