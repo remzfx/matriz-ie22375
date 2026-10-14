@@ -258,8 +258,13 @@
   #panelFinales .mode-toggle button {min-height:44px;padding:4px 8px;}
   /* No expandir Estudiante cuando hay pocas competencias: columnas desde la izquierda. */
   #finLista .fin-grid {width:max-content;min-width:0;max-width:none;}
-  #finLista .fin-grid .fin-nom {width:auto;min-width:230px;max-width:none;}
-  #finLista .fin-grid .fin-nom .font-bold {white-space:nowrap;font-size:12px;line-height:1.35;}
+  /* Promedios: numeración lateral compacta y nombre en dos líneas sin crecer filas. */
+  #finLista .fin-grid .fin-nom {width:202px;min-width:202px;max-width:202px;}
+  #finLista .fin-grid td.fin-nom {position:sticky;padding:5px 6px 5px 25px;vertical-align:middle;}
+  #finLista .fin-grid td.fin-nom > div:first-child {position:absolute;left:6px;top:50%;transform:translateY(-50%);width:16px;text-align:left;}
+  #panelFinales .fin-header-main > .fin-comparativo-toggle {flex:0 0 auto;align-self:center;white-space:nowrap;margin:0 4px;}
+  #finLista .fin-grid td.fin-nom > .font-bold {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;white-space:normal;font-size:11px;line-height:1.25;max-height:2.5em;}
+  #finLista .fin-grid th.fin-nom {text-align:left;}
   #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:212px;min-width:212px;padding:6px 10px;}
   #finLista .fin-grid td:has(.final-conclusion) {width:340px;min-width:340px;}
   #finLista .fin-grid th,#finLista .fin-grid td {padding:6px;}
@@ -283,12 +288,14 @@
     #panelFinales .fin-bulk-actions > span {display:none;}
     #panelFinales .fin-bulk-actions {width:100%;justify-content:flex-start;}
     #panelFinales .fin-header-controls .mode-toggle {flex-basis:180px;}
-    #finLista .fin-grid .fin-nom,#avanceBox .summary-student,#avanceBox .summary-student-header {width:120px;min-width:120px;max-width:120px;}
+    #finLista .fin-grid .fin-nom {width:150px;min-width:150px;max-width:150px;}
+    #avanceBox .summary-student,#avanceBox .summary-student-header {width:120px;min-width:120px;max-width:120px;}
     #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:204px;min-width:204px;}
     #finLista .final-grade {width:182px;min-width:182px;}
     #finLista .final-cell-layout {grid-template-columns:182px minmax(0,1fr);}
     #finLista .final-grade > .fin-cell:has(> button[data-val]) {column-gap:2px;}
-    #finLista .fin-grid .fin-nom .font-bold,#avanceBox .summary-student-name {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
+    #finLista .fin-grid td.fin-nom > .font-bold {font-size:10px;line-height:1.2;max-height:2.4em;}
+    #avanceBox .summary-student-name {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
     #finLista .fin-grid td:has(.final-conclusion) {width:252px;min-width:252px;}
     #finLista .final-conclusion {grid-column:1 / -1;grid-row:2;}
   }
@@ -660,10 +667,11 @@
               <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
               <div class="fin-header-aux">
-                <button type="button" class="fin-comparativo-toggle" id="btnComparativoBim" aria-pressed="false" onclick="alternarComparativoBim()">Comparativo bimestral</button><div class="fin-mode-info" id="finModeInfo"></div>
+                <div class="fin-mode-info" id="finModeInfo"></div>
                 <div id="finResumen"></div>
               </div>
             </div>
+            <button type="button" class="fin-comparativo-toggle" id="btnComparativoBim" aria-pressed="false" onclick="alternarComparativoBim()">Comparativo bimestral</button>
             <div class="fin-header-controls">
               <div class="fin-bulk-actions" aria-label="Calificar competencias del área">
                 <span>Todo el área:</span>
