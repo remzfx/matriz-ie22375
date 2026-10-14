@@ -240,20 +240,20 @@
   #panelFinales .fin-mode-info > span {padding:2px 0;background:transparent;font-size:10px;}
   #panelFinales .fin-header-controls {flex:0 1 auto;gap:4px 8px;margin-left:auto;}
   #panelFinales .fin-bulk-actions {gap:4px;}
-  #panelFinales .fin-bulk-actions .chip {border-radius:10px;min-width:40px;min-height:40px;padding:4px;font-size:12px;}
+  #panelFinales .fin-bulk-actions .chip {border-radius:10px;min-width:38px;min-height:38px;padding:4px;font-size:12px;}
   #panelFinales .fin-remove-bulk {min-height:44px;padding:4px 8px;}
   #panelFinales .mode-toggle {gap:2px;padding:3px;}
   #panelFinales .mode-toggle button {min-height:44px;padding:4px 8px;}
   #finLista .fin-grid {width:100%;min-width:0;}
   #finLista .fin-grid .fin-nom {width:auto;min-width:230px;max-width:none;}
   #finLista .fin-grid .fin-nom .font-bold {white-space:nowrap;font-size:12px;line-height:1.35;}
-  #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:204px;min-width:204px;}
-  #finLista .fin-grid td:has(.final-conclusion) {width:400px;min-width:400px;}
+  #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:212px;min-width:212px;padding:6px 10px;}
+  #finLista .fin-grid td:has(.final-conclusion) {width:408px;min-width:408px;}
   #finLista .fin-grid th,#finLista .fin-grid td {padding:6px;}
   #finLista .final-cell-layout {grid-template-columns:188px minmax(0,1fr);gap:6px;}
   #finLista .final-grade {width:188px;min-width:188px;}
   #finLista .final-grade > .fin-cell:has(> button[data-val]) {gap:3px 4px;}
-  #finLista .final-grade > .fin-cell > .chip[data-val] {width:40px;min-width:40px;min-height:40px;height:40px;justify-self:center;border-radius:10px;font-size:12px;padding:4px;}
+  #finLista .final-grade > .fin-cell > .chip[data-val] {width:38px;min-width:38px;min-height:38px;height:38px;justify-self:center;border-radius:10px;font-size:12px;padding:4px;}
   #finLista .chip[data-val].on {box-shadow:none;outline:none;font-weight:800;}
   #finLista .chip[data-val]:focus-visible {outline:3px solid #0369a1;outline-offset:2px;}
   #finLista .chip[data-val]:disabled {cursor:default;}
@@ -269,12 +269,12 @@
     #panelFinales .fin-bulk-actions {width:100%;justify-content:flex-start;}
     #panelFinales .fin-header-controls .mode-toggle {flex-basis:180px;}
     #finLista .fin-grid .fin-nom,#avanceBox .summary-student,#avanceBox .summary-student-header {width:120px;min-width:120px;max-width:120px;}
-    #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:196px;min-width:196px;}
+    #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:204px;min-width:204px;}
     #finLista .final-grade {width:182px;min-width:182px;}
     #finLista .final-cell-layout {grid-template-columns:182px minmax(0,1fr);}
     #finLista .final-grade > .fin-cell:has(> button[data-val]) {column-gap:2px;}
     #finLista .fin-grid .fin-nom .font-bold,#avanceBox .summary-student-name {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
-    #finLista .fin-grid td:has(.final-conclusion) {width:244px;min-width:244px;}
+    #finLista .fin-grid td:has(.final-conclusion) {width:252px;min-width:252px;}
     #finLista .final-conclusion {grid-column:1 / -1;grid-row:2;}
   }
 }
@@ -353,6 +353,11 @@
   #stuList .cal-competence-column {width:var(--cal-competence-width);}
   #stuList .fin-cell {margin-inline:auto;}
   #stuList .cal-competence-header .fin-caps {white-space:normal;overflow-wrap:anywhere;word-break:normal;}
+  /* Promedios: selección algo más definida sobre fondos casi blancos. */
+  #finLista .chip[data-val].nivel-c.on {background:#fecaca;color:#991b1b;border-color:#f87171;}
+  #finLista .chip[data-val].nivel-b.on {background:#fde68a;color:#78350f;border-color:#fbbf24;}
+  #finLista .chip[data-val].nivel-a.on {background:#bbf7d0;color:#14532d;border-color:#4ade80;}
+  #finLista .chip[data-val].nivel-ad.on {background:#bae6fd;color:#0c4a6e;border-color:#38bdf8;}
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>

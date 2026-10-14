@@ -119,3 +119,11 @@ Se confirmó una diferencia estructural: el encabezado se centraba sobre la colu
 Solo cambian CSS y dos cadenas de presentación de renderStudents (clase de encabezado y colgroup/cantidad de columnas). No se agrupan capacidades ni se alteran su orden, claves, eventos, evidencia, selección reversible o permisos. Promedios/Resumen, fondos alternos y separadores permanecen intactos.
 
 14 regresiones nuevas verifican 1–5 columnas en Letras/0–20 con 40 estudiantes ficticios, encabezado C1/C2/nombre/capacidad correspondiente a cada celda, múltiples capacidades de una misma competencia, dimensiones compartidas, centrado y reglas móviles. Pruebas históricas normalizan únicamente las dos cadenas visuales aprobadas; las nuevas pruebas usan fuente actual. Suite: 1934 aprobadas, 0 fallidas/omitidas. La geometría visual real en navegador continúa pendiente por las limitaciones ya documentadas.
+
+## Refinamiento de Promedios: 38 px, espacio lateral y selección definida
+
+Los botones de letras de Promedios y la barra masiva pasan de 40 a 38 px, con tipografía de 12 px y esquinas redondeadas. Calificar conserva 40 px y su alineación recién aprobada. Se suman 4 px de padding a cada lado de las competencias, en encabezado y cuerpo. Los anchos aumentan 8 px para conservar el espacio interior y la zona fija de nota/conclusión: columna 212 px en escritorio/204 móvil y con conclusión 408/252 px. El scroll sigue dentro del viewport.
+
+Promedios refuerza su selección con fondos todavía claros: C rojo #fecaca, B ámbar #fde68a, A verde #bbf7d0 y AD azul #bae6fd; texto oscuro y bordes cromáticos ligeramente más definidos. Contraste superior a 4,5:1 en todos los estados. Opciones neutras, fondos alternos por competencia y divisor atenuado permanecen intactos. No cambia la paleta de Calificar ni los indicadores numéricos.
+
+Seis regresiones nuevas de tamaño/espaciado/contraste y equivalencia de source fuera de CSS; las pruebas existentes siguen cubriendo áreas de 1–5 competencias, notas, conclusiones y sincronización. Validación: 1940 aprobadas, 0 fallidas/omitidas. La revisión física de navegador permanece pendiente por las limitaciones documentadas; las fixtures estáticas se regeneran con el CSS actual.
