@@ -393,6 +393,34 @@
     #printArea .bimestral-signatures {break-inside:avoid;page-break-inside:avoid;margin-top:22mm;}
     #printArea .bimestral-signature {color:#000;border-top:1px solid #000;font-size:9pt;}
   }
+  /* Pulido: controles compactos y reporte bimestral institucional. */
+  @media screen and (min-width:641px) {
+    #stuList .fin-cell:has(> button[data-val]) {grid-template-columns:repeat(4,36px);width:156px;min-width:156px;gap:4px;}
+    #stuList .fin-cell > .chip[data-val] {width:36px;min-width:36px;height:36px;min-height:36px;border-radius:9px;font-size:12px;}
+  }
+  @media screen and (max-width:640px) {
+    #stuList .fin-cell:has(> button[data-val]) {grid-template-columns:repeat(4,40px);width:172px;min-width:172px;gap:4px;}
+    #stuList .fin-cell > .chip[data-val] {width:40px;min-width:40px;height:40px;min-height:40px;}
+  }
+  @media print {
+    #printArea .bimestral-report {color:#172033;font-family:Arial,Helvetica,sans-serif;font-size:8.5pt;line-height:1.35;}
+    #printArea .bimestral-report .print-hdr {text-align:center;margin:0 0 10mm;padding-bottom:5mm;border-bottom:1px solid #94a3b8;}
+    #printArea .bimestral-report .print-hdr h1 {font-size:10pt;font-weight:700;letter-spacing:.4px;margin:0 0 3mm;text-transform:uppercase;}
+    #printArea .bimestral-report .print-hdr h2 {font-size:15pt;font-weight:700;letter-spacing:.3px;margin:0;}
+    #printArea .bimestral-meta {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3mm 5mm;padding:4mm;background:#f8fafc;border:1px solid #cbd5e1;border-radius:3mm;margin:0 0 6mm;}
+    #printArea .bimestral-meta span {font-size:8.5pt;min-width:0;overflow-wrap:anywhere;}
+    #printArea .bimestral-table {border:1px solid #475569;}
+    #printArea .bimestral-table thead th {font-size:8pt;line-height:1.3;background:#e9eff6!important;color:#172033!important;border-color:#64748b;padding:5px;}
+    #printArea .bimestral-table tbody td {font-size:8.5pt;border-color:#94a3b8;padding:4px 6px;line-height:1.35;}
+    #printArea .bimestral-table tbody tr:nth-child(even) {background:#f8fafc!important;}
+    #printArea .bimestral-table .bimestral-grade,#printArea .bimestral-table .bimestral-number {text-align:center!important;vertical-align:middle!important;}
+    #printArea .bimestral-result {font-size:10pt;font-weight:700;}
+    #printArea .competence-stats {margin-top:7mm;border:0;padding:0;}
+    #printArea .competence-stats h3 {font-size:11pt;color:#172033;margin-bottom:3mm;}
+    #printArea .competence-stats th {background:#e9eff6!important;font-weight:700;}
+    #printArea .bimestral-signatures {margin-top:20mm;gap:15%;}
+    #printArea .bimestral-signature {padding-top:3mm;font-size:9pt;}
+  }
   /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
