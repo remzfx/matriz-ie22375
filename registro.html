@@ -128,6 +128,8 @@
     .registro-datos-grid > div { min-width:0; }
     /* Botones compactos: el select original conserva los eventos y la autorización académica. */
     .registro-datos-grid .registro-select-con-botones > select {position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none;}
+    /* Ocultar los selectores nativos desde el primer render, incluso mientras carga el padrón. */
+    .registro-datos-grid #selGrado,.registro-datos-grid #selSeccion {position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none;}
     .registro-opciones {display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:3px;}
     .registro-opcion {min-width:34px;min-height:33px;padding:4px 9px;border:1px solid #cbd5e1;border-radius:8px;background:#f1f5f9;color:#334155;font-size:12px;font-weight:750;cursor:pointer;line-height:1.2;}
     .registro-opcion[aria-pressed="true"] {background:#0284c7;border-color:#0284c7;color:white;}
