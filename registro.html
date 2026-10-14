@@ -800,7 +800,6 @@
   </div><!-- /registroAcademicoPanel -->
 </main>
 
-  <div class="shell shell-work px-3"><button type="button" class="btn btn-ghost text-xs" data-reg-write onclick="recuperarBorradorAcademico()">Recuperar borrador anterior a conciliación</button></div>
   <div id="registroAcademicFooter" class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
     <div class="shell shell-work max-w-3xl mx-auto px-3 py-2 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between text-xs font-bold">
       <div class="flex gap-1.5 flex-wrap">
@@ -811,12 +810,11 @@
       </div>
       <div class="grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex sm:flex-wrap">
         <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#fee2e2;color:#991b1b;min-height:44px" data-reg-write onclick="IERegistroRecovery.recover()">Recuperar Nube</button>
-        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="subirRegistroNube()">Subir Nube</button>
-        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#0284c7;color:#fff" onclick="bajarRegistroNube()">Bajar Nube</button>
-        <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" data-reg-write onclick="IERegistroRecovery.local()">Guardar local</button>
-        <button type="button" class="btn btn-primary text-[11px] !py-2 !px-2" data-reg-cloud onclick="IERegistroRecovery.upload()">Guardar y subir</button>
-        <button type="button" class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.drafts()">Revisar borradores</button>
-        <span id="registroSaveState" role="status" aria-live="polite" class="text-[11px] font-normal col-span-3 sm:basis-full">Sin cambios verificados</span>
+        <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 whitespace-nowrap" data-reg-write onclick="IERegistroRecovery.local()">Guardar</button>
+        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="IERegistroRecovery.upload()">Subir Nube</button>
+        <span id="registroSaveState" role="status" aria-live="polite" class="text-[11px] font-normal col-span-3 sm:basis-full">Verificando notas…</span>
+        <button id="registroDraftOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2 col-span-3" data-reg-write onclick="IERegistroRecovery.drafts()">Recuperar borrador</button>
+        <button id="registroConflictOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2 col-span-3" onclick="IERegistroRecovery.resolve()">Revisar diferencias</button>
         <p id="registroEmergencyWarning" role="alert" hidden class="col-span-3 sm:basis-full text-[11px]" style="background:#fef2f2;color:#991b1b;padding:8px;border-radius:8px"></p>
       </div>
     </div>
@@ -1121,19 +1119,22 @@ async function subirRegistroNube() {
   subirRegistroNube.pending=tarea;
   try { return await tarea; } finally { subirRegistroNube.pending=null; }
 }
-async function bajarRegistroNube() {
+async function bajarRegistroNube(options) {
+  options=options||{};bajarRegistroNube.resultado=null;
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())return cargarRegistroHistorico();
   if(!nivel||!areaActual){toast('Elija nivel y área');return false;}
   if(subirRegistroNube.pending||bajarRegistroNube.pending){toast('Hay una sincronización en curso. Espere su resultado.');return false;}
   const tarea=(async()=>{try{
     if(!registroSoloLectura()&&guardarTodo()===false)return false;
     toast('Verificando el registro remoto…');
-    if(!await prepararVersionAcademica())return false;
+    if(!await prepararVersionAcademica(options))return false;
     const plan=prepararVersionAcademica.plan;
     if(plan.key!==cloudClaveReg()||plan.token!==(getLoginSession()||{}).token)return false;
-    const applied=confirmarRegistroConciliado(plan,plan.remote);
+    if(options.validar&&!options.validar())return false;
+    const applied=confirmarRegistroConciliado(plan,plan.remote,options);
+    bajarRegistroNube.resultado={key:plan.key,token:plan.token,estado:applied?'verificado':'pendiente'};
     toast(applied?'Registro conciliado. Los cambios locales no enviados se conservan.':'Registro remoto verificado; hay cambios locales posteriores pendientes.');return applied;
-  }catch(e){toast(e.message||'No se pudo bajar. Trabajo local conservado.');return false;}})();
+  }catch(e){bajarRegistroNube.resultado={estado:'fallo'};if(!options.automatico)toast(e.message||'No se pudo bajar. Trabajo local conservado.');return false;}})();
   bajarRegistroNube.pending=tarea;try{return await tarea;}finally{bajarRegistroNube.pending=null;}
 }
 
@@ -3020,7 +3021,8 @@ function pintarRegistroConciliado(){
   if(document.getElementById('panelAvance')?.classList.contains('on'))renderAvance();
   if(document.getElementById('panelAsistencia')?.classList.contains('on'))renderAsistencia();
 }
-function confirmarRegistroConciliado(plan,remote){
+function confirmarRegistroConciliado(plan,remote,options){
+  options=options||{};
   if(!registroSoloLectura()){
     const invalidas=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!==''&&(!Number.isFinite(Number(inp.value))||Number(inp.value)<0||Number(inp.value)>20));
     if(invalidas||guardarTodo()===false)throw Error('Hay entradas posteriores sin guardar. Se conserva el borrador; revise antes de conciliar.');
@@ -3029,22 +3031,25 @@ function confirmarRegistroConciliado(plan,remote){
   try{
     if(current===plan.localSignature)aplicarRegistroConciliado(plan.payload);
     b.version=remote.version;b.soportaModeloAcademico=true;b.basePayload=IERegistroReconcile.copy(remote.payload);b.baseline=IERegistroAcademico.canonical(remote.payload);delete b.attempt;
-    saveStore();
+    saveStore();if(options.validarPersistencia&&!options.validarPersistencia())throw Error('No se verificó el guardado local.');
   }catch(e){store=before;throw Error('No se pudo conservar la conciliación localmente. No cierre la pestaña; el respaldo permanece disponible.');}
   dirtyAcademico();if(current===plan.localSignature)pintarRegistroConciliado();return current===plan.localSignature;
 }
-async function prepararVersionAcademica(){
+async function prepararVersionAcademica(options){
+  options=options||{};
   if(typeof IERegistroAcademico==='undefined'||typeof IERegistroReconcile==='undefined')throw Error('No se cargó el módulo de conciliación. El borrador local se conserva.');
   const c=ctxBase(),key=cloudClaveReg(),token=(getLoginSession()||{}).token,local=IERegistroReconcile.copy(sliceRegistroArea()),localSignature=IERegistroReconcile.signature(local);
-  const current=()=>key===cloudClaveReg()&&token===(getLoginSession()||{}).token&&localSignature===IERegistroReconcile.signature(sliceRegistroArea());
+  const current=()=>key===cloudClaveReg()&&token===(getLoginSession()||{}).token&&localSignature===IERegistroReconcile.signature(sliceRegistroArea())&&(!options.validar||options.validar());
   const remote=await leerEstadoRemotoAcademico(c,key,token);
+  if(options.validar&&!current())throw Error('El borrador cambió. Tus notas locales están conservadas.');
   if(!registroSoloLectura()&&guardarTodo()===false)throw Error('No se pudo conservar el borrador actual. No se enviaron notas.');
   if(!current())throw Error('Hay cambios posteriores. Reintente; todo el trabajo local se conserva.');
   const b=baselineAcademica();let base=b.basePayload||null;
   if(b.attempt&&IERegistroAcademico.canonical(remote.payload)===IERegistroAcademico.canonical(b.attempt.payload)&&remote.version>b.attempt.version)base=b.attempt.local;
   const groups=IERegistroReconcile.identityConflicts(local,remote.payload,estudiantes(),typeof IEStudentIdentity==='undefined'?null:IEStudentIdentity);
   const reconciliation=IERegistroReconcile.plan(base,local,remote.payload,groups,{sharedAttendance:true});
-  const choices=await IERegistroReconcile.choose(reconciliation.conflicts,current,{roster:estudiantes(),aliases:local.meta&&local.meta.studentAliases});
+  if(options.automatico&&reconciliation.conflicts.length){bajarRegistroNube.resultado={key,token,estado:'conflicto'};return false;}
+  const choices=options.automatico?{}:await IERegistroReconcile.choose(reconciliation.conflicts,current,{roster:estudiantes(),aliases:local.meta&&local.meta.studentAliases});
   if(!choices){toast('Conflicto pendiente. El trabajo local se conserva; ninguna nota fue enviada.');return false;}
   if(!current())throw Error('El contexto, la sesión o el borrador cambió. Reintente sin cerrar la pestaña.');
   const payload=reconciliation.resolve(choices);
@@ -3053,7 +3058,7 @@ async function prepararVersionAcademica(){
   b.recovery={local,base:b.basePayload||null,remote:IERegistroReconcile.copy(remote.payload)};
   // La lectura no cambia la base causal: un POST rechazado debe poder conciliarlas de nuevo.
   b.soportaModeloAcademico=true;
-  try{saveStore();}catch(e){store.academicSync[key]=previous;throw Error('No se pudo guardar el respaldo local. No cierre la pestaña; no se enviaron notas.');}
+  try{saveStore();if(options.validarPersistencia&&!options.validarPersistencia())throw Error('No se verificó el respaldo local.');}catch(e){store.academicSync[key]=previous;throw Error('No se pudo guardar el respaldo local. No cierre la pestaña; no se enviaron notas.');}
   prepararVersionAcademica.plan={key,token,localSignature,local,payload,remote};return true;
 }
 
@@ -3883,9 +3888,9 @@ if (document.readyState !== 'loading') {
    await d.backup(local,'before-recovery');if(!valid(local))throw Error('Cambió el contexto mientras se verificaba el respaldo.');
    if(!candidate){const check=await d.read();if(check.version!==remote.version||root.IERegistroReconcile.signature(check.payload)!==root.IERegistroReconcile.signature(remote.payload))throw Error('La nube cambió. Compara nuevamente antes de recuperar.');}
    if(!valid(local))throw Error('Cambió el borrador o los permisos.');
-   await d.apply(remote,candidate,local);d.state('Guardado local · pendiente de subir');return true;
+   await d.apply(remote,candidate,local);d.state('Cambios pendientes de subir');return true;
   }catch(e){d.state(e.message);return false;}finally{busy=false;}}
-  async function emergency(periodic=false){if(busy||saving||!d.guard())return false;saving=true;let snapshot;try{snapshot=copy(d.capture());const sig=signature(snapshot);if(!periodic&&sig===lastSignature)return false;if(periodic&&(d.changed?!d.changed():sig===d.baseline()))return false;await d.backup(snapshot,periodic?'periodic':'emergency');if(d.context()!==snapshot.context||!d.guard())return false;lastSignature=sig;d.state(sig===d.baseline()?'Guardado local · sin cambios locales pendientes':'Guardado local · pendiente de subir');return true;}catch(e){if(!snapshot||d.context()===snapshot.context)d.state(e.message);return false;}finally{saving=false;}}
+  async function emergency(periodic=false){if(busy||saving||!d.guard())return false;saving=true;let snapshot;try{snapshot=copy(d.capture());const sig=signature(snapshot);if(!periodic&&sig===lastSignature)return false;if(periodic&&(d.changed?!d.changed():sig===d.baseline()))return false;await d.backup(snapshot,periodic?'periodic':'emergency');if(d.context()!==snapshot.context||!d.guard())return false;lastSignature=sig;d.state(sig===d.baseline()?'Guardado en esta computadora':'Cambios pendientes de subir');return true;}catch(e){if(!snapshot||d.context()===snapshot.context)d.state(e.message);return false;}finally{saving=false;}}
   return {recover,emergency,busy:()=>busy||saving};
  }
  root.IERegistroDrafts={storage,controller,differences,ttl};if(typeof module!=='undefined')module.exports=root.IERegistroDrafts;
@@ -3895,11 +3900,11 @@ if (document.readyState !== 'loading') {
 <script>
 /* Adaptador frontend: operaciones explícitas y timers exclusivamente locales. */
 (function(){
- 'use strict';let service,timer,offerKey='',lastPeriodic=Date.now(),lastDisk;const observed=new Map();try{lastDisk=localStorage.getItem(NOTAS_KEY);}catch(_){}
+ 'use strict';let service,timer,lastPeriodic=Date.now(),lastDisk;const observed=new Map();try{lastDisk=localStorage.getItem(NOTAS_KEY);}catch(_){}
  const copy=x=>IERegistroReconcile.copy(x),context=()=>cloudClaveReg()+'|'+((getLoginSession()||{}).token||'');
  const volatileEntries=new Map();
  function pendingTrans(){const token=(getLoginSession()||{}).token,entry=typeof IERegistroTransversales==='undefined'?null:IERegistroTransversales.current?.();if(entry?.dirty)volatileEntries.set(entry,token);return [...volatileEntries].some(([e,t])=>t===token&&e.dirty);}
- function refreshWarning(){const el=document.getElementById('registroEmergencyWarning');if(el){el.hidden=!pendingTrans();el.textContent=el.hidden?'':'Aportes transversales pendientes SIN respaldo de emergencia. Recuperar Nube y Revisar borradores solo protegen el registro académico. No cierres ni cambies de aula, área o bimestre: conserva esta pestaña y confirma el envío de esos aportes.';}}
+ function refreshWarning(){const pending=pendingTrans(),status=document.getElementById('registroSaveState'),suffix=' · Aporte transversal pendiente: conserva esta pestaña.';if(status?.textContent)status.textContent=status.textContent.replace(suffix,'')+(pending?suffix:'');const el=document.getElementById('registroEmergencyWarning');if(el){el.hidden=!pending;el.textContent=el.hidden?'':'Aportes transversales pendientes SIN respaldo de emergencia. Recuperar Nube y Recuperar borrador solo protegen el registro académico. No cierres ni cambies de aula, área o bimestre: conserva esta pestaña y confirma el envío de esos aportes.';}}
  const state=text=>{const el=document.getElementById('registroSaveState');refreshWarning();if(el)el.textContent=text+(pendingTrans()?' · Aporte transversal pendiente: conserva esta pestaña.':'');};
  function guard(){const ses=getLoginSession();return !!(ses&&ses.token&&['admin','docente'].includes(ses.role)&&nivel&&areaActual&&areas().includes(areaActual)&&bimestreHabilitado(ctxBase().bim)&&!registroSoloLectura()&&!bimCerradoDocente()&&padronBimestre===ctxBase().bim&&!subirRegistroNube.pending&&!bajarRegistroNube.pending&&document.getElementById('registroTutorPanel')?.hidden!==false);}
  function capture(){
@@ -3917,7 +3922,7 @@ if (document.readyState !== 'loading') {
   const dialog=document.createElement('dialog');dialog.style.cssText='max-width:760px;width:calc(100% - 24px);max-height:85vh;border:0;border-radius:14px;padding:16px';
   const title=document.createElement('h2');title.id='registroRecoveryTitle';title.tabIndex=-1;title.textContent=kind==='nube'?'Recuperar Nube':'Recuperar borrador de emergencia';dialog.setAttribute('aria-labelledby',title.id);dialog.append(title);
   const warning=document.createElement('p'),c=ctxBase();warning.textContent='Bimestre '+c.bim+' · '+c.grado+'.º '+c.seccion+' · '+c.area+'. Reemplazo voluntario de notas, evidencias y conclusiones. Se conservará un respaldo verificado. La asistencia local se conserva. No se subirá nada a la nube.';dialog.append(warning);
-  const undo=document.createElement('p');undo.textContent='Para deshacer después, incluso al reabrir: pulsa Revisar borradores y compara el respaldo anterior a esta recuperación. No borres los datos locales; los respaldos duran hasta siete días y pueden caducar antes por cuota o límite de 40 snapshots.';dialog.append(undo);
+  const undo=document.createElement('p');undo.textContent='Para deshacer después, incluso al reabrir: pulsa Recuperar borrador y compara el respaldo anterior a esta recuperación. No borres los datos locales; los respaldos duran hasta siete días y pueden caducar antes por cuota o límite de 40 respaldos.';dialog.append(undo);
   if(pendingTrans()){const alert=document.createElement('p');alert.style.cssText='background:#fef2f2;color:#991b1b;padding:10px;font-weight:bold';alert.textContent='Tus aportes transversales pendientes NO quedan respaldados ni se recuperan aquí. Esta acción solo reemplaza datos académicos. Conserva la pestaña y confirma el envío de esos aportes antes de cambiar contexto o cerrar.';dialog.append(alert);}
   const list=document.createElement('div');list.style.cssText='overflow:auto;max-height:50vh';
   for(const row of diff){const p=document.createElement('p');p.style.cssText='border-bottom:1px solid #ddd;padding:8px;font-size:12px;overflow-wrap:anywhere';
@@ -3939,22 +3944,34 @@ if (document.readyState !== 'loading') {
  }
  function init(){if(!disk)return null;if(!service)service=IERegistroDrafts.controller({context,guard,capture,read:()=>leerEstadoRemotoAcademico(ctxBase(),cloudClaveReg(),(getLoginSession()||{}).token),backup,apply,confirm:compare,state,changed:()=>IERegistroAcademico.canonical(sliceRegistroArea())!==baselineAcademica().baseline,baseline:()=>IERegistroReconcile.signature(baselineAcademica().basePayload||{})});return service;}
  async function recover(){refreshWarning();if(!guard()){state('Recuperación no disponible: revisa sesión, permisos, bimestre y padrón.');return false;}return init()?service.recover():state('Recuperación no disponible. Conserva el borrador.');}
- async function local(){if(!guard())return false;try{capture();if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.capture();state('Guardado local · pendiente de subir');await init()?.emergency();return true;}catch(e){state(e.message);return false;}}
- async function upload(){if(!guard()||init()?.busy())return false;if(registroNubeNoVerificada()){state('Guardado local pendiente: verifica la conexión y el padrón antes de subir.');return false;}const key=context();state('Guardando localmente…');try{if(!await guardarRegistroIntegrado()){state('Guardado local o aporte pendiente: revisa el aviso y conserva esta pestaña.');return false;}state('Guardado local · pendiente de subir');const ok=await subirRegistroNube();if(key===context())state(ok?'Actualizado en nube':'Guardado local · pendiente de subir: revisa el aviso');return ok;}catch(e){state('No se confirmó la subida. Conserva esta pestaña.');return false;}}
- async function drafts(){refreshWarning();if(!guard()||!init())return false;try{const key=await scope(),rows=await disk.list(key);for(const r of rows){if(!guard()||key!==await scope())return false;if(IERegistroDrafts.differences(sliceRegistroArea(),r.snapshot.payload).length){return service.recover(r);}}state('No hay borradores diferentes para este contexto.');return false;}catch(e){state(e.message);return false;}}
+ function diskSafe(){const raw=localStorage.getItem(NOTAS_KEY);return raw===lastDisk||raw===JSON.stringify(store);}
+ function rememberDisk(){const raw=localStorage.getItem(NOTAS_KEY);if(raw===JSON.stringify(store))lastDisk=raw;}
+ function recoverable(payload){return !!payload&&['grades','finales','sessions','competenciasEstado'].some(k=>Object.keys(payload[k]||{}).length)&&IERegistroDrafts.differences(sliceRegistroArea(),payload).length>0;}
+ function pendingAcademic(){return IERegistroAcademico.canonical(sliceRegistroArea())!==baselineAcademica().baseline;}
+ async function local(){if(!guard()||init()?.busy())return false;const binding=context();try{capture();const ok=await guardarRegistroIntegrado();if(binding!==context())return false;rememberDisk();state(ok?(pendingAcademic()?'Cambios pendientes de subir':'Guardado en esta computadora'):'Guardado en esta computadora · aporte transversal pendiente');await init()?.emergency();return ok;}catch(e){state(e.message);return false;}}
+ async function upload(){if(!guard()||init()?.busy())return false;if(registroNubeNoVerificada()){state('Sin conexión. Tus notas locales están conservadas');return false;}const binding=context();try{if(!diskSafe())throw Error('Otro registro cambió en este navegador. Conserva las pestañas y revisa antes de guardar.');const ok=await subirRegistroNube();if(binding===context()){rememberDisk();state(ok&&!pendingAcademic()?'Notas actualizadas':'Cambios pendientes de subir');}return ok;}catch(e){if(binding===context())state('No se confirmó la subida. Tus notas locales están conservadas');return false;}}
+ async function drafts(){refreshWarning();if(!guard()||!init())return false;try{const binding=context(),key=await scope(),rows=await disk.list(key);if(binding!==context()||!guard())return false;const previous=baselineAcademica().recovery;if(previous?.local)rows.push({snapshot:{payload:copy(previous.local),baseline:{version:baselineAcademica().version,basePayload:copy(previous.base),baseline:IERegistroAcademico.canonical(previous.base||{})}}});for(const r of rows){if(!guard()||binding!==context())return false;if(recoverable(r.snapshot.payload))return service.recover(r);}state('No hay borradores diferentes para este contexto.');return false;}catch(e){state(e.message);return false;}}
+ const consulted=new Set();let checking=false,activeBinding='',generation=0;
+ function track(){const binding=context();if(binding!==activeBinding){activeBinding=binding;generation++;consulted.delete(binding);for(const id of ['registroConflictOffer','registroDraftOffer']){const el=document.getElementById(id);if(el)el.hidden=true;}state('Verificando notas…');}return generation;}
+ function readable(){const ses=getLoginSession();return !!(ses?.token&&['admin','docente'].includes(ses.role)&&nivel&&areaActual&&areas().includes(areaActual)&&padronBimestre===ctxBase().bim&&typeof tokenPadron!=='undefined'&&tokenPadron===ses.token&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===ses.token&&IEStudents.peekRoster(ctxBase().bim)&&!(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())&&document.getElementById('registroTutorPanel')?.hidden!==false);}
+ function syncState(ok){const result=bajarRegistroNube.resultado,offer=document.getElementById('registroConflictOffer'),conflict=result?.estado==='conflicto'||(!ok&&!result&&offer?.hidden===false);if(offer)offer.hidden=!conflict;state(conflict?'Hay notas diferentes que necesitan revisión':ok?(pendingAcademic()?'Cambios pendientes de subir':'Notas actualizadas'):'Sin conexión. Tus notas locales están conservadas');}
+ async function automatic(){const epoch=track(),binding=context();if(!readable()||checking||consulted.has(binding)||service?.busy()||subirRegistroNube.pending||bajarRegistroNube.pending)return false;checking=true;consulted.add(binding);try{if(!diskSafe()){state('Hay notas diferentes que necesitan revisión');return false;}const ok=await bajarRegistroNube({automatico:true,validarPersistencia:()=>localStorage.getItem(NOTAS_KEY)===JSON.stringify(store),validar:()=>track()===epoch&&binding===context()&&readable()&&diskSafe()});if(binding===context()&&epoch===track()){rememberDisk();syncState(ok);}return ok;}catch(e){if(binding===context()&&epoch===track())state('Sin conexión. Tus notas locales están conservadas');return false;}finally{checking=false;}}
+ async function resolve(){if(!readable()||checking||service?.busy()||subirRegistroNube.pending||bajarRegistroNube.pending||!diskSafe())return false;const epoch=track(),binding=context();checking=true;try{const ok=await bajarRegistroNube({validarPersistencia:()=>localStorage.getItem(NOTAS_KEY)===JSON.stringify(store),validar:()=>track()===epoch&&binding===context()&&readable()&&diskSafe()});if(binding===context()&&epoch===track()){rememberDisk();syncState(ok);}return ok;}finally{checking=false;}}
+ async function offerDraft(){const el=document.getElementById('registroDraftOffer'),binding=context();if(!guard()||!init()){if(el)el.hidden=true;return;}const key=await scope(),rows=await disk.list(key);if(binding!==context()||!guard())return;const old=baselineAcademica().recovery?.local;if(el)el.hidden=!rows.some(r=>recoverable(r.snapshot.payload))&&!recoverable(old);}
  function schedule(event){refreshWarning();const target=event?.target;if(!target)return;
   const field=target.closest?.('.cal-nota,.fin-nota,.academic-conclusion,.asis-input,#registroAcademicoPanel input,#registroAcademicoPanel textarea'),button=event.type==='click'&&target.closest?.('[data-val],[data-av],[data-adel],.eq-letter,[data-final-toggle],[onclick*="calificarAreaMasiva"],[onclick*="quitarAreaMasiva"],[onclick*="quitarFinalManual"],[onclick*="activarSesion"],[onclick*="borrarSesion"]');
   const rendered=field?.dataset?.registroContexto||field?.closest?.('#finLista')?.dataset?.registroContexto;if(rendered&&rendered!==cloudClaveReg())return;
   if(!field&&!button)return;if(event.type==='click'&&!button)return;if(!guard())return;const key=context(),sig=IERegistroReconcile.signature(sliceRegistroArea());
   if(button&&observed.get(key)===sig)return;observed.set(key,sig);clearTimeout(timer);timer=setTimeout(async()=>{if(key===context()){await init()?.emergency();if(key===context())observed.set(key,IERegistroReconcile.signature(sliceRegistroArea()));}},2500);
  }
- window.IERegistroRecovery={recover,local,upload,drafts};
+ window.IERegistroRecovery={recover,local,upload,drafts,automatic,resolve};
  document.addEventListener('DOMContentLoaded',()=>{
   const footer=document.getElementById('registroAcademicFooter'),fit=()=>{const main=document.querySelector?.('main');if(main&&footer?.getBoundingClientRect)main.style.paddingBottom=(footer.getBoundingClientRect().height+12)+'px';};fit();if(typeof ResizeObserver!=='undefined'&&footer)new ResizeObserver(fit).observe(footer);else window.addEventListener('resize',fit);
-  document.addEventListener('input',schedule);document.addEventListener('change',schedule);document.addEventListener('click',schedule);
+  document.addEventListener('input',schedule);document.addEventListener('change',e=>{schedule(e);Promise.resolve().then(automatic);});document.addEventListener('click',e=>{schedule(e);Promise.resolve().then(automatic);});
   document.addEventListener('click',refreshWarning,true);document.addEventListener('change',refreshWarning,true);window.addEventListener('beforeunload',refreshWarning);
   if(guard())observed.set(context(),IERegistroReconcile.signature(sliceRegistroArea()));refreshWarning();
-  setInterval(async()=>{refreshWarning();if(!guard()||!init())return;const binding=context(),key=await scope();if(binding!==context())return;if(key!==offerKey){try{const rows=await disk.list(key);if(binding!==context()||!guard())return;offerKey=key;if(rows.some(r=>IERegistroDrafts.differences(sliceRegistroArea(),r.snapshot.payload).length))state('Hay borradores de emergencia: pulsa Revisar borradores para comparar.');}catch(e){if(binding===context())state(e.message);}}if(Date.now()-lastPeriodic>=300000){lastPeriodic=Date.now();service.emergency(true);}},5000);
+  const refresh=()=>Promise.resolve().then(automatic);refresh();window.addEventListener('online',()=>{consulted.delete(context());refresh();});
+  setInterval(async()=>{refreshWarning();await automatic();try{await offerDraft();}catch(e){state('No se pudo verificar el respaldo local. Conserva esta pestaña.');}if(!guard()||!init())return;if(Date.now()-lastPeriodic>=300000){lastPeriodic=Date.now();service.emergency(true);}},5000);
  });
 })();
 

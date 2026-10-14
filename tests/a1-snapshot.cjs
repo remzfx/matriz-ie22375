@@ -6,6 +6,6 @@ function oldFunction(n){const start=previous.indexOf('function '+n+'(');return (
 function currentFunction(s,n){const start=s.indexOf('function '+n+'(');return (s.slice(start-6,start)==='async '?'async ':'')+s.slice(start,s.indexOf('\n}',start)+2);}
 module.exports=function withoutA1(s){s=require('./b1-snapshot.cjs')(s).replace(/\r\n/g,'\n');
   for(const n of ['subirRegistroNube','bajarRegistroNube','prepararVersionAcademica'])s=s.replace(currentFunction(s,n),oldFunction(n));
-  for(const n of ['leerEstadoRemotoAcademico','aplicarRegistroConciliado','recuperarBorradorAcademico','pintarRegistroConciliado','confirmarRegistroConciliado'])s=s.replace(extract(n).replace(/\r\n/g,'\n')+'\n','');
+  for(const n of ['leerEstadoRemotoAcademico','aplicarRegistroConciliado','recuperarBorradorAcademico','pintarRegistroConciliado','confirmarRegistroConciliado'])s=s.replace(currentFunction(s,n)+'\n','');
   return s.replace('<script src="registro-reconcile.js" defer></script>','').replace(/  <div class="shell shell-work px-3"><button[^\n]*recuperarBorradorAcademico\(\)[^\n]*\n/,'');
 };

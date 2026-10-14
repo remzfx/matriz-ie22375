@@ -34,9 +34,9 @@
    await d.backup(local,'before-recovery');if(!valid(local))throw Error('Cambió el contexto mientras se verificaba el respaldo.');
    if(!candidate){const check=await d.read();if(check.version!==remote.version||root.IERegistroReconcile.signature(check.payload)!==root.IERegistroReconcile.signature(remote.payload))throw Error('La nube cambió. Compara nuevamente antes de recuperar.');}
    if(!valid(local))throw Error('Cambió el borrador o los permisos.');
-   await d.apply(remote,candidate,local);d.state('Guardado local · pendiente de subir');return true;
+   await d.apply(remote,candidate,local);d.state('Cambios pendientes de subir');return true;
   }catch(e){d.state(e.message);return false;}finally{busy=false;}}
-  async function emergency(periodic=false){if(busy||saving||!d.guard())return false;saving=true;let snapshot;try{snapshot=copy(d.capture());const sig=signature(snapshot);if(!periodic&&sig===lastSignature)return false;if(periodic&&(d.changed?!d.changed():sig===d.baseline()))return false;await d.backup(snapshot,periodic?'periodic':'emergency');if(d.context()!==snapshot.context||!d.guard())return false;lastSignature=sig;d.state(sig===d.baseline()?'Guardado local · sin cambios locales pendientes':'Guardado local · pendiente de subir');return true;}catch(e){if(!snapshot||d.context()===snapshot.context)d.state(e.message);return false;}finally{saving=false;}}
+  async function emergency(periodic=false){if(busy||saving||!d.guard())return false;saving=true;let snapshot;try{snapshot=copy(d.capture());const sig=signature(snapshot);if(!periodic&&sig===lastSignature)return false;if(periodic&&(d.changed?!d.changed():sig===d.baseline()))return false;await d.backup(snapshot,periodic?'periodic':'emergency');if(d.context()!==snapshot.context||!d.guard())return false;lastSignature=sig;d.state(sig===d.baseline()?'Guardado en esta computadora':'Cambios pendientes de subir');return true;}catch(e){if(!snapshot||d.context()===snapshot.context)d.state(e.message);return false;}finally{saving=false;}}
   return {recover,emergency,busy:()=>busy||saving};
  }
  root.IERegistroDrafts={storage,controller,differences,ttl};if(typeof module!=='undefined')module.exports=root.IERegistroDrafts;

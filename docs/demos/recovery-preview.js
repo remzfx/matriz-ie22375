@@ -1,6 +1,7 @@
 /* Solo datos ficticios. No contacta API; persistencia de prueba aislada por viewport. */
 const NOTAS_KEY='synthetic-preview-only';
 let nivel='secundaria',areaActual='Matemática',padronBimestre='III';
+const tokenPadron='synthetic-never-sent',IEStudents={validToken:()=>tokenPadron,peekRoster:()=>({synthetic:true})};
 const contextKey='secundaria||III||1||A||Matemática',gradeKey=contextKey+'||Competencia ficticia||id:synthetic-1';
 const clone=x=>JSON.parse(JSON.stringify(x)),transversal={dirty:true};
 const remote={version:1,payload:{grades:{},finales:{[gradeKey]:{nivel:'B',nota20:12,origen:'numero'}},concComp:{[gradeKey]:{texto:'Conclusión ficticia de nube'}},sessions:[],asistencia:{},asisFechas:{},asisFechasEstado:{},meta:{}}};
@@ -26,9 +27,9 @@ function estudiantes(){return [{idSiagie:'synthetic-1',nombre:'ESTUDIANTE FICTIC
 function pintarRegistroConciliado(){document.getElementById('previewGrade').textContent=store.finales[gradeKey]?.nota20??'—';}
 async function leerEstadoRemotoAcademico(){return {exists:true,...clone(remote)};}
 async function subirRegistroNube(){return false;}
-async function bajarRegistroNube(){return false;}
-async function guardarRegistroIntegrado(){return false;}
-const IERegistroTransversales={current:()=>transversal,capture(){},save:async()=>false};
+async function bajarRegistroNube(options){await leerEstadoRemotoAcademico();if(options?.validar&&!options.validar())return false;bajarRegistroNube.resultado={estado:'verificado'};return true;}
+async function guardarRegistroIntegrado(){guardarTodo();return IERegistroTransversales.save();}
+const IERegistroTransversales={current:()=>transversal,capture(){},save:async()=>!transversal.dirty};
 window.fetch=async()=>{throw Error('La demostración no permite consultas de red.');};
 document.getElementById('previewClearPending').onclick=()=>{transversal.dirty=false;document.dispatchEvent(new Event('change'));};
 document.getElementById('previewTableBody').innerHTML=Array.from({length:25},(_,i)=>'<tr><td>ESTUDIANTE FICTICIO '+(i+1)+'</td><td>'+(i===0?'<span id="previewGrade">15</span>':'A')+'</td><td>Conclusión ficticia completa para revisión de distribución</td></tr>').join('');
