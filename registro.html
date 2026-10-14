@@ -472,6 +472,17 @@
  #finLista .fin-grid > thead > tr > th:nth-child(n+3),
  #finLista .fin-grid > tbody > tr > td:nth-child(n+3) {border-left:1px solid #e2e8f0!important;}
 }
+
+.fin-comparativo-toggle{font-size:10px;font-weight:800;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;border-radius:8px;padding:3px 7px;cursor:pointer}
+.fin-comparativo-toggle.on{background:#dbeafe;color:#1d4ed8}
+#finLista .comp-hist-line{display:flex;align-items:center;justify-content:center;gap:5px;height:12px;line-height:11px;font-size:9px;white-space:nowrap}
+#finLista .comp-hist{display:inline-flex;gap:2px;align-items:center;color:#64748b;font-weight:700}
+#finLista .comp-hist b{font-weight:800;padding:0 2px;border-radius:3px;background:#f1f5f9;color:#64748b}
+#finLista .comp-hist .comp-hist-a{background:#dcfce7;color:#166534}
+#finLista .comp-hist .comp-hist-b{background:#fef3c7;color:#92400e}
+#finLista .comp-hist .comp-hist-c{background:#fee2e2;color:#991b1b}
+#finLista .comp-hist .comp-hist-ad{background:#dbeafe;color:#1d4ed8}
+@media print{.fin-comparativo-toggle,#finLista .comp-hist-line{display:none!important}}
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
@@ -617,7 +628,7 @@
               <div class="text-[10px] font-bold text-slate-500">PROMEDIO POR COMPETENCIA</div>
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
               <div class="fin-header-aux">
-                <div class="fin-mode-info" id="finModeInfo"></div>
+                <button type="button" class="fin-comparativo-toggle" id="btnComparativoBim" aria-pressed="false" onclick="alternarComparativoBim()">Comparativo bimestral</button><div class="fin-mode-info" id="finModeInfo"></div>
                 <div id="finResumen"></div>
               </div>
             </div>
@@ -3086,7 +3097,66 @@ function sincronizarFondoPromedios() {
     window.addEventListener('resize',sincronizarFondoPromedios);
   }
 }
+
+let comparativoBimActivo=false, comparativoBimDatos={}, comparativoBimContexto='', comparativoBimSecuencia=0;
+function comparativoIndice(b){return ({I:1,II:2,III:3,IV:4,1:1,2:2,3:3,4:4})[String(b).toUpperCase()]||0;}
+function comparativoNotaAnterior(payload,c,comp,id){
+ const pref=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');
+ if(payload.competenciasEstado?.[pref]?.trabajada===false)return '';
+ const f=payload.finales?.[pref+'||'+id];
+ if(f&&!f.borrado){
+   const letra=f.nivel||(f.nota20!==''&&f.nota20!=null?numToLetter(f.nota20):'');
+   if(['AD','A','B','C'].includes(letra))return letra;
+ }
+ const nums=[];
+ (payload.sessions||[]).filter(x=>x.nivel===c.nivel&&String(x.bim)===String(c.bim)&&String(x.grado)===String(c.grado)&&x.seccion===c.seccion&&x.area===c.area&&x.comp===comp).forEach(x=>{
+   const k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp,x.capacidad,x.fecha,id].join('||');
+   const g=payload.grades?.[k];if(!g||g.borrado)return;
+   const n=g.nota20!==''&&g.nota20!=null?Number(g.nota20):g.nivel?letterToNum(g.nivel):'';
+   if(n!==''&&Number.isFinite(Number(n)))nums.push(Number(n));
+ });
+ const media=promedioNums(nums);return media==null?'':numToLetter(media);
+}
+function comparativoLinea(comp,id){
+ if(!comparativoBimActivo)return '';
+ const n=comparativoIndice(ctxBase().bim);
+ const linea=Array.from({length:Math.max(0,n-1)},(_,i)=>{
+   const nota=comparativoBimDatos[i+1]?.[comp]?.[id]||'—';
+   return '<span class="comp-hist"><span>'+['I','II','III'][i]+':</span><b class="comp-hist-'+nota.toLowerCase().replace(/[^a-z]/g,'')+'">'+escapeRegistro(nota)+'</b></span>';
+ }).join('');
+ return '<div class="comp-hist-line" title="Notas anteriores: solo lectura">'+linea+'</div>';
+}
+function alternarComparativoBim(){
+ comparativoBimActivo=!comparativoBimActivo;comparativoBimDatos={};comparativoBimSecuencia++;
+ comparativoBimContexto=comparativoBimActivo?cloudClaveReg():'';
+ renderFinales();if(comparativoBimActivo)void cargarComparativoBim();
+}
+async function cargarComparativoBim(){
+ const c=ctxBase(),clave=cloudClaveReg(),numero=comparativoIndice(c.bim),token=(getLoginSession()||{}).token,seq=++comparativoBimSecuencia;
+ if(numero<2)return;
+ const alumnos=estudiantes().map(studentKey),comps=competencias(),datos={};
+ try{
+   for(let i=1;i<numero;i++){
+     const bim=['','I','II','III'][i],q=new URLSearchParams({action:'loadreg',nivel:c.nivel,bimestre:bim,grado:String(c.grado),seccion:c.seccion,area:c.area});
+     const r=await fetchLecturaNube(CLOUD_API_URL+'?'+q),data=JSON.parse(await r.text());
+     if(!comparativoBimActivo||seq!==comparativoBimSecuencia||cloudClaveReg()!==clave||(getLoginSession()||{}).token!==token)return;
+     if(r.status>=400||data.ok!==true||!data.soportaModeloAcademico)throw Error('Lectura no disponible');
+     const key=[c.nivel,bim,c.grado,c.seccion,c.area].join('||'),rows=(data.items||[]).filter(x=>x.clave===key);
+     if(rows.length>1)throw Error('Duplicados');
+     const payload=rows[0]?.payload||{},cAnterior={...c,bim};
+     datos[i]={};
+     comps.forEach(cp=>{datos[i][cp]={};alumnos.forEach(id=>{datos[i][cp][id]=comparativoNotaAnterior(payload,cAnterior,cp,id);});});
+   }
+   if(comparativoBimActivo&&seq===comparativoBimSecuencia&&clave===cloudClaveReg()){comparativoBimDatos=datos;renderFinales();}
+ }catch(e){
+   if(seq===comparativoBimSecuencia){comparativoBimDatos={};toast('Comparativo histórico no disponible; no se modificaron notas.');renderFinales();}
+ }
+}
+
 function renderFinales() {
+  if(comparativoBimContexto&&comparativoBimContexto!==cloudClaveReg()){comparativoBimActivo=false;comparativoBimDatos={};comparativoBimContexto='';comparativoBimSecuencia++;}
+  const comparativoBtn=document.getElementById('btnComparativoBim');
+  if(comparativoBtn){comparativoBtn.textContent=comparativoBimActivo?'Ocultar comparativo':'Comparativo bimestral';comparativoBtn.setAttribute('aria-pressed',String(comparativoBimActivo));comparativoBtn.classList.toggle('on',comparativoBimActivo);}
   loadStore();
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const c = ctxBase();
@@ -3151,6 +3221,7 @@ function renderFinales() {
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+(numeroExactoComp(cp,studentKey(al))?pad2(ev.nota)+' · ':'')+ev.letra+'</div>' : '') +
           '</div>';
       }
+      grade=comparativoLinea(cp,studentKey(al))+grade;
       const required=IERegistroAcademico.requiresConclusion(c.nivel,ofi.letra);
       const conclusion=required?IEConclusionSuggestions.compactHtml(cp,concCompAlumno(cp,studentKey(al)),'data-id="'+encN+'" data-comp="'+encC+'"',lock):'';
       tds+='<td><div class="final-cell-layout'+(required?' has-conclusion':'')+'"><div class="final-grade">'+grade+'</div>'+conclusion+'</div></td>';
