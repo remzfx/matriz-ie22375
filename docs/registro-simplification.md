@@ -27,4 +27,29 @@ Se detectan cambios de almacenamiento de otra pestaña antes de capturar/reempla
 
 `node --test tests/*.test.cjs`: **2174 aprobadas, 0 fallidas, 0 omitidas, 0 TODO**, incluidos 40 casos nuevos del motor y adaptador. Sintaxis: 117 JS/GS, 30 scripts inline; 67 dependencias locales. `git diff --check` sin errores. CI del commit final se registra en el PR en borrador. No se modificaron Apps Script, Service Worker, conciliador A1, matrices, students.js ni módulos transversales existentes.
 
+## Estabilización solicitada por ChatGPT #6179320285
+
+Los resultados anteriores corresponden al HEAD inicial `5d0ee02…`. Esta revisión añade advertencia roja persistente, aviso dentro de ambos diálogos y memoria de las entradas transversales pendientes observadas durante la misma sesión, incluso si se cambia el contexto. No persiste ni modifica esas evidencias: el adaptador transversal conserva su lógica y protección beforeunload. La confirmación nativa al cerrar pertenece al navegador y puede usar un texto genérico; el aviso escolar permanece visible antes de la acción.
+
+Clics inocuos, selección de contexto o impresión no agendan snapshots. Solo entradas académicas y botones de mutación identificados los activan; los botones se contrastan con la firma académica observada. Las capturas de emergencia se serializan y la recuperación espera a que termine la verificación en curso. Si cambia contexto/permiso durante IndexedDB no se aplica reemplazo ni se anuncia éxito en el contexto nuevo. Las comprobaciones de base/local/nube y CAS existentes permanecen intactas.
+
+Pruebas adicionales: lectura verificada fallida/corrupta, escritura fallida, cancelación con estado completo, deshacer desde before-recovery después de reapertura, espera en IndexedDB con cambio de contexto, firma posterior al diálogo, relectura remota, clic inocuo y concurrencia. El diálogo indica qué reemplaza, conserva y cómo deshacer. Su foco inicial queda en el encabezado accesible para evitar que móvil abra desplazado hacia los botones.
+
+**Privacidad:** IndexedDB guarda calificaciones, evidencias y conclusiones **sin cifrado**. El SHA-256 identifica usuario/rol; no cifra las notas ni protege frente a quien controle el perfil del navegador. La retención puede ser menor de siete días por cuota, expulsión o límite de snapshots. En modo privado, tras borrar los datos locales o ante un fallo del dispositivo no existe garantía de recuperación. No limpiar almacenamiento para resolver un conflicto ni confiar en estos respaldos como única copia.
+
+### Inspección real de navegador, separada de las pruebas VM
+
+Se usó el navegador integrado de Codex, a 1280×900 y 390×844, en localhost:8895. La [demostración](demos/recovery-review.html) usa el pie/CSS y los adaptadores actuales con utilidades de distribución equivalentes a las del pie; los contratos académicos se simulan, las notas son ficticias y CSP bloquea conexión a APIs. IndexedDB es real del navegador. La persistencia ficticia de la página usa una clave propia de sessionStorage, sin token/contraseña; no se lee almacenamiento oficial.
+
+- Escritorio: pie 160 px, separación inferior 172 px; última fila a y=727, antes del pie y=740.
+- Móvil 390 px: pie 242 px con aviso largo visible, separación inferior 254 px; última fila a y=574, antes del pie y=602. Ancho de documento 375 px útiles por scrollbar: sin desbordamiento de página, tabla con scroll interno.
+- Recuperar Nube inmediatamente a la izquierda de Subir Nube; diálogo móvil de 351 px, scroll interno y encabezado visible al abrir (scrollTop=0).
+- Cancelar conserva 15; confirmar cambia a 12; recargar conserva 12; Revisar borradores permite devolver 15 y la conclusión previa con el respaldo persistente. Cero llamadas a APIs en la demostración.
+
+Evidencias: [escritorio](demos/recovery-desktop.png), [diálogo móvil](demos/recovery-mobile.png), [última fila y pie móvil](demos/recovery-mobile-footer.png). El generador es `tests/recovery-preview-generator.cjs` y se regenera cuando cambia el pie.
+
+Esto cumple la inspección de la demostración real, **no** prueba una sesión completa autenticada de producción, Safari/iPhone físico, cierre completo del proceso del navegador ni un apagón durante escritura. Esas comprobaciones siguen pendientes de validación autorizada segura. No se han tocado Apps Script/Sheets, transversales ni A1/B1/B2. El PR sigue en borrador y sin autorización de merge/deploy.
+
+Resultado de esta estabilización: **2187 aprobadas, 0 fallidas, 0 omitidas, 0 TODO**; 50 pruebas focalizadas de motor/adaptador y tres pruebas de aislamiento de la demostración. Sintaxis: 120 JS/GS, 30 scripts inline y 73 dependencias locales. `git diff --check` aprobado. CI del HEAD final se consigna en el PR.
+
 Validar solo con datos ficticios: Quitar masivo → Recuperar Nube; cambios pendientes/conflictos A1; nube inexistente/inaccesible; cierre/rol/contexto/token; fallo de cuota/IndexedDB; edición durante diálogo; versión remota cambiada; apagón después de commit confirmado; reapertura/comparación de borradores; alias/IDs, conclusiones y asistencia. Confirmar cero escrituras remotas de timers y recuperación, y CAS en Guardar y subir. Preservar snapshots privados antes de cualquier validación oficial posterior, que requiere autorización separada.

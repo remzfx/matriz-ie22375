@@ -21,10 +21,10 @@
    const l=local[field]||{},r=remote[field]||{};if(Array.isArray(l)||Array.isArray(r)){if(root.IERegistroReconcile.signature({[field]:l})!==root.IERegistroReconcile.signature({[field]:r}))out.push({field,key:'Sesiones',local:l,remote:r});continue;}
    for(const key of [...new Set([...Object.keys(l),...Object.keys(r)])].sort())if(!root.IERegistroReconcile.equal(l[key],r[key]))out.push({field,key,local:l[key],remote:r[key]});
   }return out;}
- function controller(d){let busy=false,lastSignature=null;
+ function controller(d){let busy=false,saving=false,lastSignature=null;
   const signature=x=>root.IERegistroReconcile.signature(x.payload);
   const valid=(initial)=>d.guard()&&d.context()===initial.context&&signature(d.capture())===signature(initial);
-  async function recover(candidate){if(busy||!d.guard())return false;busy=true;try{
+  async function recover(candidate){if(saving){d.state('Espera mientras se verifica el respaldo local.');return false;}if(busy||!d.guard())return false;busy=true;try{
    const local=copy(d.capture()),remote=candidate?{payload:candidate.snapshot.payload,version:null,exists:true}:await d.read();
    if(!valid(local))throw Error('El contexto o borrador cambió. Recuperación cancelada.');
    if(!remote.exists||!remote.payload||!['grades','finales','sessions','competenciasEstado'].some(k=>Object.keys(remote.payload[k]||{}).length))throw Error('No hay notas/evidencias recuperables confirmadas. No se reemplazaron notas.');
@@ -36,8 +36,8 @@
    if(!valid(local))throw Error('Cambió el borrador o los permisos.');
    await d.apply(remote,candidate,local);d.state('Guardado local · pendiente de subir');return true;
   }catch(e){d.state(e.message);return false;}finally{busy=false;}}
-  async function emergency(periodic=false){if(busy||!d.guard())return false;try{const snapshot=copy(d.capture()),sig=signature(snapshot);if(!periodic&&sig===lastSignature)return false;if(periodic&&(d.changed?!d.changed():sig===d.baseline()))return false;await d.backup(snapshot,periodic?'periodic':'emergency');lastSignature=sig;if(d.context()===snapshot.context)d.state(sig===d.baseline()?'Guardado local · sin cambios locales pendientes':'Guardado local · pendiente de subir');return true;}catch(e){d.state(e.message);return false;}}
-  return {recover,emergency,busy:()=>busy};
+  async function emergency(periodic=false){if(busy||saving||!d.guard())return false;saving=true;let snapshot;try{snapshot=copy(d.capture());const sig=signature(snapshot);if(!periodic&&sig===lastSignature)return false;if(periodic&&(d.changed?!d.changed():sig===d.baseline()))return false;await d.backup(snapshot,periodic?'periodic':'emergency');if(d.context()!==snapshot.context||!d.guard())return false;lastSignature=sig;d.state(sig===d.baseline()?'Guardado local · sin cambios locales pendientes':'Guardado local · pendiente de subir');return true;}catch(e){if(!snapshot||d.context()===snapshot.context)d.state(e.message);return false;}finally{saving=false;}}
+  return {recover,emergency,busy:()=>busy||saving};
  }
  root.IERegistroDrafts={storage,controller,differences,ttl};if(typeof module!=='undefined')module.exports=root.IERegistroDrafts;
 })(typeof window==='undefined'?globalThis:window);
