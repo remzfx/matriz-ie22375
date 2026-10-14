@@ -191,12 +191,12 @@ test('Secundaria comparative reads only the exact requested section and shows re
 });
 
 
-test('Registro keeps cloud actions on one mobile row', () => {
+test('Registro keeps cloud actions together in a compact three-column mobile footer', () => {
   const src = read('registro.html');
   assert.match(src, /grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex/);
   const subir = src.indexOf('Subir Nube');
   const bajar = src.indexOf('Bajar Nube');
-  const guardar = src.indexOf(">Guardar</button>", bajar);
+  const guardar = src.indexOf(">Guardar local</button>", bajar);
   assert.ok(subir >= 0 && bajar > subir && guardar > bajar);
 });
 

@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const source=fs.readFileSync(path.join(__dirname,'..','registro.html'),'utf8').replace(/\r\n/g,'\n'),normalize=require('./registro-context-layout-snapshot.cjs');
 const old=execFileSync('git',['show','c0e7d47b27fdbd9abd138963a93427d797d42971:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 test('PR82 context layout normalization allows only approved markup/CSS; all academic scripts stay identical',()=>{
- assert.equal(normalize(source),old);assert.deepEqual([...source.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/g)].map(m=>m[0]),[...old.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/g)].map(m=>m[0]));
+ assert.equal(normalize(source),old);const academic=require('./registro-simplification-snapshot.cjs')(source);assert.deepEqual([...academic.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/g)].map(m=>m[0]),[...old.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/g)].map(m=>m[0]));
 });
 test('PR82 raw context has three independent direct grid columns: Bimestre, Grado and Sección',()=>{
  const start=source.indexOf('        <div class="registro-datos-grid">'),end=source.indexOf('        <div class="registro-datos-meta">',start),fragment=source.slice(start,end),columns=[];let depth=0;

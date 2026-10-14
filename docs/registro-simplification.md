@@ -1,0 +1,30 @@
+# Simplificación docente — propuesta y validación
+
+Base main posterior al PR82: `c6139fd461f7af9ea2c5a3f1268a9c41318acef9`. Frontend únicamente; PR en borrador, sin merge/deploy, Apps Script ni Sheets.
+
+Recuperar Nube es una operación local voluntaria, distinta de Bajar Nube/A1. Lee loadreg protegido, muestra diferencias, exige confirmación, conserva un respaldo persistente con lectura de verificación y vuelve a comprobar versión/contenido remoto, token, permisos, cierre, contexto y firma local. Ante cualquier cambio cancela. Una nube sin registro se rechaza: no equivale a una orden de borrar. La asistencia local compartida entre áreas se conserva durante la recuperación de notas. No hay POST savereg en recuperación.
+
+Guardar local conserva captura/almacenamiento académico y captura transversal sin enviar. Guardar y subir usa las operaciones explícitas existentes, incluidos validación, aportes transversales, conciliación A1 y CAS. Ningún timer sube datos. Los estados distinguen guardado local, pendiente y actualización confirmada; no se anuncia éxito en otro contexto.
+
+Borradores: IndexedDB dedicada; cada registro contiene un snapshot del contexto, base causal y metadatos de recuperación, sin token ni contraseña. Usuario/rol se identifican mediante SHA-256; las notas no se cifran. Se verifica el contenido después de cada transacción. Autoguardado tras 2.5 segundos de inactividad y snapshot periódico cada cinco minutos si hay cambios. Historial hasta siete días y 40 snapshots por usuario/contexto; alta actividad puede reducir el plazo efectivo. La recuperación al reabrir se ofrece mediante comparación y confirmación, nunca se aplica automáticamente. Al restaurar un borrador se recupera su base causal para que A1 siga detectando cambios remotos posteriores. No reemplaza el esquema de almacenamiento existente ni modifica claves oficiales.
+
+Riesgos: almacenamiento del navegador puede fallar, ser expulsado o quedar inaccesible en navegación privada; no se promete protección si el apagón ocurre antes de la escritura confirmada. Los datos locales siguen siendo privados del perfil del navegador, no cifrados frente a quien acceda a ese perfil. Sin almacenamiento verificable no se autoriza reemplazo. La asistencia y los aportes transversales conservan sus reglas y fuentes: los aportes volátiles pendientes no se consideran respaldados por un snapshot académico.
+
+El estado añade una advertencia explícita de conservar la pestaña si existe un aporte transversal pendiente; esos aportes siguen usando su adaptador y CAS actuales. Una caché autorizada permite respaldo local sin red; subir sigue exigiendo verificación del servidor. El cierre institucional bloquea estas nuevas operaciones para Admin y Docente. Una página antigua offline no adquiere funciones nuevas: verificar primero que se recibió el HTML actualizado. Los adaptadores públicos se incluyen inline en HTML (copias comprobadas por tests), sin nuevas dependencias de red ni cambios en Service Worker/CacheStorage privado.
+
+## Guía manual con datos ficticios
+
+1. Entrar con sesión de prueba y seleccionar un área/bimestre abierto. Pulsar Guardar local; verificar estado y que no se realiza savereg ni envío transversal. Crear notas, conclusión C y evidencias ficticias; esperar tres segundos y luego cinco minutos con cambios pendientes.
+2. Guardar una versión ficticia en la nube mediante Guardar y subir. Quitar masivo local y pulsar Recuperar Nube. Comparar estudiante/competencia; cancelar primero y comprobar conservación; repetir y confirmar. Verificar respaldo y asistencia local, cero escrituras remotas de recuperación.
+3. Crear dos modificaciones diferentes desde sesiones ficticias independientes. Guardar y subir debe exigir la resolución A1 o rechazar CAS, conservando pendientes; ninguna elección masiva automática.
+4. Simular cierre después de respaldo confirmado; reabrir sin limpiar almacenamiento. Pulsar Revisar borradores; comparar y cancelar primero, luego confirmar si corresponde. Verificar otras aulas/áreas/bimestres y base causal.
+5. Probar lectura 404/offline, nube vacía, permisos retirados, bimestre cerrado, cuota/IndexedDB bloqueado, cambio de contexto y edición mientras está abierto el diálogo. No debe reemplazar datos ni mostrar éxito falso.
+6. Revisar pie y diálogo a 390 px y escritorio: Recuperar Nube a la izquierda de Subir Nube, dos filas compactas, scroll interno y espacio inferior que se ajusta a la altura del pie. No se afirma una comprobación visual real en navegador en estas pruebas VM; esa comprobación manual forma parte de revisión del borrador.
+
+Se detectan cambios de almacenamiento de otra pestaña antes de capturar/reemplazar, pero clientes antiguos no coordinan escrituras mediante un lock del navegador. Evitar editar el mismo perfil en pestañas paralelas durante la validación; respaldo y CAS remoto siguen siendo necesarios. No se asegura durabilidad física de IndexedDB frente a un corte durante la transacción: las pruebas simulan reapertura después de commit verificado.
+
+## Resultados locales
+
+`node --test tests/*.test.cjs`: **2174 aprobadas, 0 fallidas, 0 omitidas, 0 TODO**, incluidos 40 casos nuevos del motor y adaptador. Sintaxis: 117 JS/GS, 30 scripts inline; 67 dependencias locales. `git diff --check` sin errores. CI del commit final se registra en el PR en borrador. No se modificaron Apps Script, Service Worker, conciliador A1, matrices, students.js ni módulos transversales existentes.
+
+Validar solo con datos ficticios: Quitar masivo → Recuperar Nube; cambios pendientes/conflictos A1; nube inexistente/inaccesible; cierre/rol/contexto/token; fallo de cuota/IndexedDB; edición durante diálogo; versión remota cambiada; apagón después de commit confirmado; reapertura/comparación de borradores; alias/IDs, conclusiones y asistencia. Confirmar cero escrituras remotas de timers y recuperación, y CAS en Guardar y subir. Preservar snapshots privados antes de cualquier validación oficial posterior, que requiere autorización separada.

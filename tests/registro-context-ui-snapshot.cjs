@@ -4,6 +4,7 @@ const {execFileSync}=require('node:child_process');
 const base=execFileSync('git',['show','d5957d038b73022aaeb9e1437a9b690a550782ee:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 const fn=(s,n)=>{const a=s.indexOf('function '+n+'(');return a<0?'':s.slice(a,s.indexOf('\n}',a)+2);};
 module.exports=s=>{
+ s=require('./registro-simplification-snapshot.cjs')(s);
  s=s.replace(/\r\n/g,'\n');
  // Reverse only the approved 0d20b14 presentation changes outside the visual CSS block.
  // Current raw markup/styles are asserted separately in registro-final-audit.test.cjs.
