@@ -14,7 +14,7 @@ El pie presenta tres acciones principales, en este orden:
 
 ## Bajada automática y autorización
 
-Al entrar y cambiar aula, área o bimestre se realiza una lectura protegida mediante la función existente `bajarRegistroNube()`. La página local se pinta antes de esperar a la nube. Se usan el padrón autorizado del mismo token y los permisos de la sesión. Cuando termina de cargar el padrón, la detección periódica permite iniciar la lectura; no consulta la nube cada cinco segundos.
+Al entrar y cambiar aula, área o bimestre se realiza una lectura protegida mediante la función existente `bajarRegistroNube()`. La página local se pinta antes de esperar a la nube. Se usan el padrón autorizado del mismo token y los permisos de la sesión. Cuando termina de cargar el padrón, una notificación DOM habilita la lectura. Los eventos de selección, sesión, conexión y visibilidad se agrupan con un debounce de 180 ms; no existe un sondeo periódico del adaptador. Sin sesión vigente aparece «Inicia sesión para cargar tus notas» y no se inicia trabajo de nube ni de borradores.
 
 Se añade un modo opcional a las funciones de conciliación existentes; su comportamiento manual predeterminado se conserva. El modo automático utiliza exactamente el plan base/local/nube A1:
 
@@ -31,7 +31,7 @@ Ningún timer, bajada, conciliación o recuperación hace una subida académica 
 
 ## Emergencia y límites
 
-Después de 2,5 segundos sin actividad se captura un borrador local; cada cinco minutos con cambios hay respaldo periódico. IndexedDB mantiene hasta siete días y aproximadamente 40 respaldos por usuario/rol/contexto, verificando la transacción y relectura. El alcance de usuario usa SHA-256 y no almacena el token. El hash **no cifra** las notas; quien controle el perfil del navegador puede acceder a datos persistidos.
+Después de 2,5 segundos sin actividad se captura un borrador local. Un temporizador de cinco minutos se arma únicamente tras una edición académica y continúa solo mientras existan cambios; no trabaja durante inactividad sin cambios. La expiración firmada programa una única comprobación al vencer el token, sin alterar su TTL ni autorización. IndexedDB mantiene hasta siete días y aproximadamente 40 respaldos por usuario/rol/contexto, verificando la transacción y relectura. El alcance de usuario usa SHA-256 y no almacena el token. El hash **no cifra** las notas; quien controle el perfil del navegador puede acceder a datos persistidos.
 
 Las notas, evidencias, conclusiones y asistencia académica siguen sus reglas actuales. Los aportes transversales volátiles pendientes **no quedan incluidos** en el respaldo académico: el aviso rojo exige conservar la pestaña. No se elimina su protección de cierre ni se persisten arbitrariamente sus objetos internos.
 
@@ -59,4 +59,37 @@ Las pruebas históricas se ajustan únicamente para los botones autorizados y la
 
 Quedan pendientes una sesión autenticada de prueba completa, Safari/iPhone físico y cortes reales durante escrituras. Estas pruebas visuales no equivalen a validación de producción. Resultados finales y enlace del CI se consignan en el PR.
 
-Resultado final local: **2216 aprobadas, 0 fallidas, 0 omitidas, 0 TODO**. Incluye 29 regresiones nuevas de bajada automática, concurrencia, persistencia y pie estable. Sintaxis: **121 archivos JS/GS, 30 scripts inline y 73 dependencias locales**. Las comprobaciones git diff --check y git diff --cached --check pasan. El CI del HEAD final se enlaza en el PR #83 en borrador.
+Resultado anterior, HEAD d3d4412: **2216 aprobadas, 0 fallidas, 0 omitidas, 0 TODO**. Incluye 29 regresiones nuevas de bajada automática, concurrencia, persistencia y pie estable. Sintaxis: **121 archivos JS/GS, 30 scripts inline y 73 dependencias locales**. Las comprobaciones git diff --check y git diff --cached --check pasan. El CI del HEAD final se enlaza en el PR #83 en borrador.
+
+## Auditoría de rendimiento #6180460999
+
+Se elimina el sondeo de cinco segundos del adaptador. Sin sesión vigente se muestra **Inicia sesión para cargar tus notas**; ninguna tarea de nube/borradores se inicia. Las consultas comienzan solo con sesión y padrón autorizados. La notificación `ie22375:registro-ready` únicamente comunica disponibilidad desde la sincronización visual existente; no cambia permisos, cálculos ni guardados. Los eventos de selección, sesión/storage, online, foco y visibilidad usan un debounce de 180 ms. Una lectura lenta conserva una única operación; al terminar atiende el último contexto pendiente y descarta la respuesta antigua.
+
+La disponibilidad de borradores se memoiza por usuario/contexto/generación/revisión, incluyendo resultados negativos y consultas concurrentes. Se invalida tras cambios académicos, respaldo confirmado, conciliación/recuperación, sesión/contexto o almacenamiento relevante. Los hashes de usuario/rol se reutilizan en memoria; no incluyen el token. El vencimiento de los respaldos limita la vigencia de la revisión almacenada. No hay watchdog periódico nuevo. El timer de cinco minutos se arma solo tras editar; la expiración del token programa una única comprobación, sin cambiar HMAC/TTL.
+
+### Evidencia reproducible antes/después
+
+Ejecutar `node tests/registro-recovery-performance.cjs`. [Resultado JSON](demos/registro-recovery-performance.json), referencia anterior **d3d4412f48d7ef86b0f3deb076d6b591c192c155**, datos ficticios de 30/40 estudiantes y cinco competencias. Reloj simulado y transporte/IndexedDB ficticios; se ejecutan el adaptador y las funciones reales de A1/B1. Cuenta llamadas a JSON.stringify (incluye valores individuales; no equivale a serializar toda la base), requests protegidos, transacciones IndexedDB, hashes, llamados al render conciliado y escrituras del estado visible. El tiempo simulado evita resultados dependientes de red/hardware. No se pretende medir el costo de otros módulos, render completo de producción ni latencia real de Apps Script.
+
+| Escenario / contador | Antes, 30 alumnos | Después, 30 | Antes, 40 alumnos | Después, 40 |
+| --- | ---: | ---: | ---: | ---: |
+| Primera carga: lecturas protegidas | 1 | 1 | 1 | 1 |
+| Primera carga: serializaciones | 8423 | 9025 | 11223 | 12025 |
+| Un minuto inactivo: serializaciones | 7224 | 0 | 9624 | 0 |
+| Un minuto inactivo: transacciones IndexedDB | 12 | 0 | 12 | 0 |
+| Un minuto inactivo: hashes | 12 | 0 | 12 | 0 |
+| Un minuto inactivo: escrituras de estado | 12 | 0 | 12 | 0 |
+| Cambio de aula: lecturas protegidas | 1 | 1 | 1 | 1 |
+| Red lenta durante un minuto: lecturas protegidas | 1 | 1 | 1 | 1 |
+| Sesión vencida: transacciones IndexedDB por minuto | 12 | 0 | 12 | 0 |
+| Escrituras académicas remotas automáticas, todos los casos | 0 | 0 | 0 | 0 |
+
+La primera carga adelanta una revisión de borradores que antes empezaba a los cinco segundos: suma 602/802 serializaciones, una transacción y un hash, sin bloquear la pintura local. Ese costo único sustituye las revisiones repetidas: **el total de serializaciones de la primera carga más un minuto inactivo disminuye aproximadamente 42,3 %**. No se presenta como una reducción de latencia real del backend. Durante un minuto idle/offline, el adaptador nuevo tiene cero requests, transacciones, hashes, serializaciones, renders y escrituras de estado.
+
+Presupuestos automatizados: primera carga/cambio <=1 lectura protegida, <=1 transacción de revisión, <=1 hash, <=1 render conciliado, <=2 escrituras de estado y <=310×alumnos+100 serializaciones. Idle/offline sin cambios: todos los contadores en cero. Sesión ausente/vencida: cero trabajo de nube/borradores y un solo aviso. Red lenta: una lectura, cero renders mientras está pendiente y ninguna consulta periódica. Ediciones conservan respaldo debounced/periodicidad de emergencia y todas las verificaciones A1/CAS.
+
+Las regresiones cubren debounce, recuperación/no pérdida, cierre/permisos, CAS, almacenamiento fallido, memoización invalidada por cambios reales, respuesta lenta con cambio de aula, expiración durante lectura y ausencia de subidas automáticas. La suite anterior que coincidió con una escritura de fuente se repite con archivos estables; no se oculta ni elimina la prueba de recuperación.
+
+En Live Server abrir `docs/demos/recovery-preview.html?session=absent` para comprobar el estado sin autenticación (parámetro de demostración sin credenciales). [Captura móvil sin sesión](demos/recovery-session-absent.png). La demostración con sesión ficticia conserva los tres botones, comparación y cancelación; CSP bloquea las APIs. No usar sesiones oficiales para validar reemplazos. Permanecen pendientes Safari/iPhone físico y el transporte real en un entorno autorizado de prueba.
+
+Resultado de la auditoría de rendimiento: **2228 aprobadas, 0 fallidas, 0 canceladas, 0 omitidas, 0 TODO**. Incluye 12 nuevas regresiones de rendimiento/eventos/expiración, además de todas las protecciones funcionales previas. Sintaxis: **123 JS/GS, 30 scripts inline y 73 dependencias locales**. git diff --check y git diff --cached --check pasan. El CI del nuevo HEAD se enlaza en el PR #83, que permanece en borrador.

@@ -26,5 +26,10 @@ module.exports=s=>{
   if(name==='prepararVersionAcademica')expected=expected.replace('  try{saveStore();}catch(e){store.academicSync[key]=previous;',"  try{saveStore();if(options.validarPersistencia&&!options.validarPersistencia())throw Error('No se verificó el respaldo local.');}catch(e){store.academicSync[key]=previous;");
   assert.equal(extract(s),expected,'Only reviewed automatic-download options differ in '+name);s=s.replace(expected,original);
  }
- return s;
+ const eventLine="  if(typeof document.dispatchEvent==='function'&&typeof Event!=='undefined')document.dispatchEvent(new Event('ie22375:registro-ready'));\n";
+ assert.equal(s.split(eventLine).length,2,'Exactly one presentation readiness event');
+ const sync=x=>{const start=x.indexOf('function sincronizarEdicionRegistro()');return x.slice(start,x.indexOf('\n}',start)+2);};
+ const expected=sync(old).replace("  document.querySelectorAll('.cal-nota,.fin-nota,.academic-conclusion').forEach(el => { if (bloquearLocal) el.readOnly = true; });","  document.querySelectorAll('.cal-nota,.fin-nota,.academic-conclusion').forEach(el => { if (bloquearLocal) el.readOnly = true; });\n"+eventLine.trimEnd());
+ assert.equal(sync(s),expected,'Only presentation readiness event differs in edition synchronization');
+ return s.replace(eventLine,'');
 };
