@@ -376,7 +376,24 @@
     #printArea .bimestral-report .stats-scroll {overflow:visible;max-height:none;}
     #printArea .bimestral-report .competence-stats {break-inside:auto;margin-top:10px;}
   }
-/* Fin Visual Registro 3/6/7/10. */
+/* Ajustes finales PR #81: impresiones, barra de Calificar y separación blanca de Promedios. */
+  @media screen {
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+2) {background:#fff!important;}
+    #finLista .fin-grid > thead > tr > th:nth-child(n+3),
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+3) {border-left:2px solid #cbd5e1!important;}
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+2) {padding-left:10px;padding-right:10px;}
+    #stuList .fin-scroll-body,#stuList.fin-scroll-body {background:#fff;}
+    #stuList .fin-grid thead,#stuList .fin-grid thead tr {background:#0f172a!important;}
+    #stuList .fin-grid thead th {background:#0f172a!important;color:#fff!important;}
+    #stuList .fin-grid {min-width:100%;width:max(100%,calc(var(--cal-student-width) + var(--cal-columns)*var(--cal-competence-width)));}
+  }
+  .bimestral-signatures {display:grid;grid-template-columns:1fr 1fr;gap:12%;margin:55px 7% 0;align-items:end;}
+  .bimestral-signature {text-align:center;border-top:1px solid #334155;padding-top:6px;font-weight:600;font-size:10pt;}
+  @media print {
+    #printArea .bimestral-signatures {break-inside:avoid;page-break-inside:avoid;margin-top:22mm;}
+    #printArea .bimestral-signature {color:#000;border-top:1px solid #000;font-size:9pt;}
+  }
+  /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
@@ -3356,7 +3373,7 @@ function imprimirResumen(){
  html+='<div class="bimestral-meta">'+[['Área',c.area],['Nivel',nivelTexto],['Grado',c.grado+'°'],['Sección',c.seccion],['Bimestre',c.bim],['Año',anio],['Docente',doc],['Fecha',fecha]].map(([label,value])=>'<span><b>'+label+':</b> '+escapeRegistro(value)+'</span>').join('')+'</div>';
  html+='<table class="bimestral-table"><colgroup><col class="bimestral-number-column"><col class="bimestral-name-column">'+comps.map(()=>'<col>').join('')+'</colgroup><thead><tr><th class="bimestral-number">N.º</th><th class="bimestral-name">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'</tr></thead><tbody>';
  alumnos.forEach((al,i)=>{const id=studentKey(al);html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+comps.map(cp=>'<td class="bimestral-grade">'+(competenciaTrabajada(cp)?'<span class="bimestral-result">'+escapeRegistro(notaCompAlumno(cp,id).letra||'—')+'</span>':'<small>No trabajada este bimestre</small>')+'</td>').join('')+'</tr>';});
- html+='</tbody></table>'+estadisticasCompetenciasHTML(comps,alumnos)+'</article>';
+ html+='</tbody></table>'+estadisticasCompetenciasHTML(comps,alumnos)+'<footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente</span></div><div class="bimestral-signature"><span>Dirección</span></div></footer></article>';
  const pa=document.getElementById('printArea');pa.innerHTML=html;
  window.print();
 }
