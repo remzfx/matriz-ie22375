@@ -452,6 +452,20 @@
 #avanceBox .summary-stats table tbody th{text-align:left;}
 @media(max-width:760px){#avanceBox .summary-counts{grid-template-columns:repeat(2,minmax(0,1fr));}}
 }
+/* Presentación general de estadísticas: centrado en pantalla e impresión */
+@media screen {
+  #avanceBox .summary-stats > table {margin-left:auto;margin-right:auto;}
+  #avanceBox .summary-stats > table th,#avanceBox .summary-stats > table td {text-align:center;vertical-align:middle;}
+  #avanceBox .summary-stats > table tbody th {text-align:center;}
+}
+@media print {
+  #printArea .summary-stats {break-inside:avoid;page-break-inside:avoid;margin:7mm 0;padding:3mm;border:1px solid #cbd5e1;}
+  #printArea .summary-stats h3 {font-size:10pt;font-weight:700;text-align:center;margin:0 0 3mm;}
+  #printArea .summary-counts {display:flex;flex-wrap:wrap;justify-content:center;gap:2mm 5mm;margin-bottom:4mm;}
+  #printArea .summary-stats > table {width:80%;max-width:170mm;margin:0 auto 3mm;border-collapse:collapse;table-layout:fixed;}
+  #printArea .summary-stats > table th,#printArea .summary-stats > table td {border:1px solid #94a3b8;padding:2mm;text-align:center!important;vertical-align:middle;}
+  #printArea .summary-stats > small {display:block;text-align:center;font-size:7pt;}
+}
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
@@ -3473,7 +3487,7 @@ function imprimirResumen(){
  html+='<div class="bimestral-meta">'+[['Área',c.area],['Nivel',nivelTexto],['Grado',c.grado+'°'],['Sección',c.seccion],['Bimestre',c.bim],['Año',anio],['Docente',doc],['Fecha',fecha]].map(([label,value])=>'<span><b>'+label+':</b> '+escapeRegistro(value)+'</span>').join('')+'</div>';
  html+='<table class="bimestral-table"><colgroup><col class="bimestral-number-column"><col class="bimestral-name-column">'+comps.map(()=>'<col>').join('')+'</colgroup><thead><tr><th class="bimestral-number">N.º</th><th class="bimestral-name">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'</tr></thead><tbody>';
  alumnos.forEach((al,i)=>{const id=studentKey(al);html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+comps.map(cp=>'<td class="bimestral-grade">'+(competenciaTrabajada(cp)?'<span class="bimestral-result">'+escapeRegistro(notaCompAlumno(cp,id).letra||'—')+'</span>':'<small>No trabajada este bimestre</small>')+'</td>').join('')+'</tr>';});
- html+='</tbody></table>'+estadisticasCompetenciasHTML(comps,alumnos)+'<footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(doc)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
+ html+='</tbody></table>'+estadisticaResumenHTML()+estadisticasCompetenciasHTML(comps,alumnos)+'<footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(doc)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
  const pa=document.getElementById('printArea');pa.innerHTML=html;
  window.print();
 }
