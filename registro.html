@@ -1075,6 +1075,7 @@ async function subirRegistroNube() {
   try { return await tarea; } finally { subirRegistroNube.pending=null; }
 }
 async function bajarRegistroNube() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())return cargarRegistroHistorico();
   if(!nivel||!areaActual){toast('Elija nivel y área');return false;}
   if(subirRegistroNube.pending||bajarRegistroNube.pending){toast('Hay una sincronización en curso. Espere su resultado.');return false;}
   const tarea=(async()=>{try{
@@ -1185,6 +1186,7 @@ function metaRegistro() {
 }
 let padronBimestre = '', solicitudPadron = 0, padronVerificadoServidor = false, tokenPadron = '', vencimientoCachePadron;
 function registroSoloLectura() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())return true;
   // Solo bloquea edición local si ya no existe un padrón autorizado para esta misma sesión/bimestre.
   return !padronBimestre || document.getElementById('selBim').value !== padronBimestre ||
     !tokenPadron || IEStudents.validToken() !== tokenPadron || !IEStudents.peekRoster(padronBimestre);
@@ -1230,7 +1232,7 @@ function pintarPadronInmediato(base, bimestre, desdeCache) {
   // Recolectar antes de cambiar nombres/IDs o reconstruir la grilla; nunca subir automáticamente.
   if (mismoPadron && guardarTodo() === false) throw Object.assign(new Error('No se pudo conservar el trabajo local. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.'),{code:'LOCAL_STORAGE',retryable:true});
   bdEstudiantes = base; padronBimestre = bimestre;
-  try { recordarPadron(base); saveStore(); }
+  try { if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()){recordarPadron(base); saveStore();} }
   catch(e) { throw Object.assign(new Error('No se pudo conservar el padrón local. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.'),{code:'LOCAL_STORAGE',retryable:true}); }
   llenarAulasPadron(nivel);
   onContexto({localOnly:desdeCache, preservar:mismoPadron && contextoAnterior === JSON.stringify(ctxBase())});
@@ -1258,8 +1260,9 @@ async function cargarPadronRegistro(bimestre) {
   }
   tokenPadron = tokenSolicitud; cargandoEstudiantes = true;
   bloquearRegistroMientrasValida(true);
-  recordarPadron(bdEstudiantes);
-  const cache = IEStudents.peekRoster(bimestre);
+  if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica())recordarPadron(bdEstudiantes);
+  const candidata = IEStudents.peekRoster(bimestre);
+  const cache = typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&candidata?.padronInicializado!==true?null:candidata;
   try {
   if (cache) pintarPadronInmediato(cache,bimestre,true);
   else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
@@ -1269,6 +1272,7 @@ async function cargarPadronRegistro(bimestre) {
     const base = await IEStudents.loadRoster(bimestre);
     if (solicitud !== solicitudPadron) return false;
     if (IEStudents.validToken() !== tokenSolicitud) throw Object.assign(new Error('La sesión cambió.'),{code:'SESSION'});
+    if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&base.padronInicializado!==true)throw Object.assign(new Error('El bimestre no tiene padrón histórico confirmado. No se utiliza BASE_ACTUAL para esta consulta.'),{code:'ROSTER_MISSING'});
     cargandoEstudiantes = false;
     bloquearRegistroMientrasValida(!!base.offline);
     pintarPadronInmediato(base,bimestre,!!base.offline);
@@ -1368,10 +1372,10 @@ function pintarBimestresRegistro(cfg) {
   if (!selBim) return false;
 
   const sLogin = getLoginSession();
-  const esAdmin = sLogin && (sLogin.role === 'admin' || sLogin.user === 'admin');
+  const puedeConsultar = sLogin && ['admin','docente'].includes(sLogin.role);
   const anterior = selBim.value || '';
 
-  if (!cfg || !cfg.bimestres) {
+  if (!cfg || !cfg.bimestres || !puedeConsultar) {
     selBim.innerHTML = '<option value="">Cargando bimestres…</option>';
     selBim.disabled = true;
     return anterior !== '';
@@ -1381,14 +1385,13 @@ function pintarBimestresRegistro(cfg) {
   selBim.innerHTML = ['I','II','III','IV'].map(function(b) {
     const st = cfg.bimestres[b] || 'bloqueado';
     const ok = st === 'abierto';
-    if (!esAdmin && !ok) return '';
-    const label = 'Bimestre ' + b + (ok ? '' : ' (' + st + ')');
-    return '<option value="' + b + '"' + (ok ? '' : ' disabled') + '>' + label + '</option>';
+    const label = 'Bimestre ' + b + (ok ? '' : ' 🔒');
+    return '<option value="' + b + '">' + label + '</option>';
   }).join('') || '<option value="">Sin bimestres abiertos</option>';
 
   const valores = Array.from(selBim.options).filter(function(o){ return !o.disabled && o.value; }).map(function(o){ return o.value; });
   if (anterior && valores.indexOf(anterior) >= 0) selBim.value = anterior;
-  else if (valores.length) selBim.value = valores[0];
+  else if (valores.length) selBim.value = valores.find(b=>cfg.bimestres[b]==='abierto')||valores[0];
 
   return anterior !== selBim.value;
 }
@@ -1780,6 +1783,11 @@ function onContexto(options) {
   const c = ctxBase();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
   actualizarDocenteResponsable();
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()){
+    sesionActiva=null;notas={};capsElegidas=[];updateHdr();
+    void cargarRegistroHistorico();sincronizarEdicionRegistro();return;
+  }
+  if(typeof registroHistoricoActual!=='undefined')registroHistoricoActual=null;
   if (!options.preservar) {
     // Al cambiar contexto: limpiar capacidad (fecha la elige el docente)
     fillCaps();
@@ -2118,6 +2126,7 @@ function guardarTodo() {
 }
 
 function renderSesiones() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderSesiones',()=>renderSesiones());
   const c = ctxBase();
   const list = (store.sessions || []).concat(typeof IERegistroTransversales!=='undefined'?IERegistroTransversales.sessions():[]).filter(s =>
     s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
@@ -2164,6 +2173,7 @@ function renderSesiones() {
   sincronizarEdicionRegistro();
 }
 function abrirSesionFecha(fecha) {
+ if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return conRegistroHistorico(()=>abrirSesionFecha(fecha));
   const c = ctxBase();
   const delDia = (store.sessions || []).concat(typeof IERegistroTransversales!=='undefined'?IERegistroTransversales.sessions():[]).filter(s =>
     s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
@@ -2313,6 +2323,7 @@ function upsertSesionCap(comp, cap) {
   else store.sessions[idx] = Object.assign({}, store.sessions[idx], s);
 }
 function renderStudents() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderStudents',()=>renderStudents());
   const contextoCalificar = cloudClaveReg();
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const list = estudiantes();
@@ -2674,6 +2685,7 @@ async function rellenarSiagieExcel() {
   if (sinMatch) console.log('SIAGIE sin match de nombre:', sinMatch);
 }
 function prepararImpresion(opciones) {
+ if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return conRegistroHistorico(()=>prepararImpresion(opciones));
   opciones=opciones||{};
   const c = ctxBase();
   const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
@@ -3098,28 +3110,101 @@ function sincronizarFondoPromedios() {
   }
 }
 
-let comparativoBimActivo=false, comparativoBimDatos={}, comparativoBimContexto='', comparativoBimSecuencia=0;
+let registroHistoricoActual=null, registroHistoricoSecuencia=0, registroHistoricoProyectando=false;
+function registroConsultaHistorica(){
+ const cfg=loadPeriodosAdmin(),b=document.getElementById('selBim').value;
+ return !cfg||!cfg.bimestres||cfg.bimestres[b]!=='abierto';
+}
+function historicoContextoIgual(row,c){
+ return row&&String(row.nivel).toLowerCase()===c.nivel&&String(row.bimestre??row.bim)===c.bim&&String(row.grado)===String(c.grado)&&row.seccion===c.seccion&&row.area===c.area;
+}
+function historicoPayloadAcotado(payload,c){
+ if(!payload||typeof payload!=='object'||Array.isArray(payload))throw Error('Registro histórico inválido.');
+ const clave=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||'),aula=[c.nivel,c.bim,c.grado,c.seccion].join('||'),out={sessions:[],meta:{}};
+ for(const name of ['grades','finales','concComp','competenciasEstado','concArea','capsSel','asistencia','asisFechas','asisFechasEstado']){
+   out[name]={};const map=payload[name];if(map!=null&&(typeof map!=='object'||Array.isArray(map)))throw Error('Mapa histórico inválido.');
+   Object.entries(map||{}).forEach(([key,value])=>{const shared=['asistencia','asisFechas','asisFechasEstado'].includes(name),pref=shared?aula:clave;if(key===pref||key.startsWith(pref+'||'))out[name][key]=JSON.parse(JSON.stringify(value));});
+ }
+ if(payload.sessions!=null&&!Array.isArray(payload.sessions))throw Error('Sesiones históricas inválidas.');
+ out.sessions=(payload.sessions||[]).filter(row=>historicoContextoIgual(row,c)).map(row=>JSON.parse(JSON.stringify(row)));
+ const aliases=payload.meta?.studentAliases||{};out.meta[clave]={studentAliases:JSON.parse(JSON.stringify(aliases))};out.studentAliases={[[c.nivel,c.grado,c.seccion].join('||')]:JSON.parse(JSON.stringify(aliases))};return out;
+}
+async function leerRegistroHistorico(c,token){
+ const actual=()=>IEStudents.validToken()===token&&(getLoginSession()||{}).token===token;
+ if(!token||!actual())throw Error('Sesión histórica no autorizada.');
+ const base=await IEStudents.loadRoster(c.bim);
+ if(!actual())throw Error('La sesión cambió.');
+ if(base.offline||base.bimestre!==c.bim||base.padronInicializado!==true)throw Error('Padrón histórico no confirmado; no se usa BASE_ACTUAL ni caché sin verificación.');
+ const roster=(base[c.nivel]?.estudiantes||[]).filter(al=>String(al.grado)===String(c.grado)&&al.seccion===c.seccion);
+ const data=await IEStudents.fetchJSON(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},cache:'no-store',body:JSON.stringify({action:'loadreg',token,nivel:c.nivel,bimestre:c.bim,grado:String(c.grado),seccion:c.seccion,area:c.area})},10000);
+ if(!actual())throw Error('La sesión cambió.');
+ if(data?.ok!==true){if(['SESSION','DENIED'].includes(data?.code)&&typeof retirarVerificacionNube==='function')retirarVerificacionNube(token,padronBimestre,data);throw Error(data?.error||'Lectura histórica rechazada.');}
+ if(data.soportaModeloAcademico!==true||!Array.isArray(data.items))throw Error('Backend histórico incompatible.');
+ const key=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||');
+ if(data.items.some(row=>row.clave!==key||!historicoContextoIgual(row,c))||data.items.length>1)throw Error('Respuesta histórica ambigua o de otro contexto.');
+ return {key,token,c:{...c},roster,missing:!data.items.length,payload:historicoPayloadAcotado(data.items[0]?.payload||{},c)};
+}
+function conRegistroHistorico(fn){
+ const proof=registroHistoricoActual;
+ if(!proof||proof.key!==cloudClaveReg()||proof.token!==IEStudents.validToken())return false;
+ if(registroHistoricoProyectando)return fn();
+ const original=store,load=loadStore,save=saveStore,lista=estudiantes,trans=typeof IERegistroTransversales==='undefined'?null:IERegistroTransversales;
+ // Proyección síncrona aislada: nunca se mezcla ni persiste en el borrador editable.
+ registroHistoricoProyectando=true;store=JSON.parse(JSON.stringify(proof.payload));loadStore=()=>{};saveStore=()=>{throw Error('El histórico es solo lectura.');};estudiantes=()=>IEStudentIdentity.numbered(proof.roster,proof.c.nivel);if(trans)IERegistroTransversales=undefined;
+ try{return fn();}finally{store=original;loadStore=load;saveStore=save;estudiantes=lista;if(trans)IERegistroTransversales=trans;registroHistoricoProyectando=false;}
+}
+function renderRegistroHistorico(nombre,fn){
+ const ids={renderStudents:'stuList',renderFinales:'finLista',renderAvance:'avanceBox',renderAsistencia:'asisLista',renderSesiones:'listaSesiones'};
+ if(!registroHistoricoActual||registroHistoricoActual.key!==cloudClaveReg()||registroHistoricoActual.token!==IEStudents.validToken()){
+   const box=document.getElementById(ids[nombre]);if(box)box.innerHTML='';return false;
+ }
+ return conRegistroHistorico(fn);
+}
+async function cargarRegistroHistorico(){
+ const c=ctxBase(),key=cloudClaveReg(),token=IEStudents.validToken(),seq=++registroHistoricoSecuencia;
+ registroHistoricoActual=null;['stuList','finLista','avanceBox','asisLista','listaSesiones'].forEach(id=>{const box=document.getElementById(id);if(box)box.innerHTML='';});
+ const actual=()=>registroConsultaHistorica()&&seq===registroHistoricoSecuencia&&key===cloudClaveReg()&&token===IEStudents.validToken();
+ try{
+   const proof=await leerRegistroHistorico(c,token);if(!actual())return false;
+   registroHistoricoActual=proof;sesionActiva=null;notas={};capsElegidas=[];
+   conRegistroHistorico(()=>{updateHdr();fillComps();const fechas=proof.payload.sessions.map(s=>s.fecha).filter(Boolean).sort();if(fechas.length)abrirSesionFecha(fechas[fechas.length-1]);renderSesiones();renderStudents();renderFinales();renderAvance();renderAsistencia();});
+   estadoPadron('Bimestre '+(loadPeriodosAdmin()?.bimestres[c.bim]==='cerrado'?'cerrado':'bloqueado')+' · Solo lectura'+(proof.missing?' · Sin registro remoto.':''),false);return true;
+ }catch(e){if(actual()){registroHistoricoActual=null;estadoPadron('Consulta histórica no disponible: '+e.message,true);}return false;}
+}
+let comparativoBimActivo=false, comparativoBimDatos={}, comparativoBimContexto='', comparativoBimSecuencia=0, comparativoBimToken='';
 function comparativoIndice(b){return ({I:1,II:2,III:3,IV:4,1:1,2:2,3:3,4:4})[String(b).toUpperCase()]||0;}
-function comparativoNotaAnterior(payload,c,comp,id){
+function comparativoNotaAnterior(payload,c,comp,al,roster){
  const pref=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');
  if(payload.competenciasEstado?.[pref]?.trabajada===false)return '';
- const f=payload.finales?.[pref+'||'+id];
- if(f&&!f.borrado){
-   const letra=f.nivel||(f.nota20!==''&&f.nota20!=null?numToLetter(f.nota20):'');
-   if(['AD','A','B','C'].includes(letra))return letra;
- }
+ const aliases=payload.meta?.[[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')]?.studentAliases||{};
+ const unique=(roster||[]).filter(x=>IEStudentIdentity.normalizarNombre(x.nombre)===IEStudentIdentity.normalizarNombre(al.nombre)).length===1;
+ const leer=(map,key)=>IEStudentIdentity.leer(map,key,al,aliases,unique);
+ const f=leer(payload.finales,pref+'||'+studentKey(al));
+ if(f){const letra=f.nivel||(f.nota20!==''&&f.nota20!=null?numToLetter(f.nota20):'');if(['AD','A','B','C'].includes(letra))return letra;}
  const nums=[];
- (payload.sessions||[]).filter(x=>x.nivel===c.nivel&&String(x.bim)===String(c.bim)&&String(x.grado)===String(c.grado)&&x.seccion===c.seccion&&x.area===c.area&&x.comp===comp).forEach(x=>{
-   const k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp,x.capacidad,x.fecha,id].join('||');
-   const g=payload.grades?.[k];if(!g||g.borrado)return;
-   const n=g.nota20!==''&&g.nota20!=null?Number(g.nota20):g.nivel?letterToNum(g.nivel):'';
-   if(n!==''&&Number.isFinite(Number(n)))nums.push(Number(n));
+ (payload.sessions||[]).filter(x=>historicoContextoIgual(x,c)&&x.comp===comp).forEach(x=>{
+  const key=[pref,x.capacidad,x.fecha,studentKey(al)].join('||'),g=leer(payload.grades,key);if(!g)return;
+  const n=g.nota20!==''&&g.nota20!=null?Number(g.nota20):g.nivel?letterToNum(g.nivel):'';
+  if(n!==''&&Number.isFinite(Number(n))&&n>=0&&n<=20)nums.push(Number(n));
  });
  const media=promedioNums(nums);return media==null?'':numToLetter(media);
 }
+function comparativoAlumnoAnterior(al,roster){
+ const normal=IEStudentIdentity.normalizarNombre,ids=roster.filter(x=>al.idSiagie&&x.idSiagie&&String(x.idSiagie)===String(al.idSiagie));
+ if(ids.length===1)return ids[0];if(ids.length>1)return null;
+ const codes=roster.filter(x=>al.codigoEstudiante&&x.codigoEstudiante&&String(x.codigoEstudiante)===String(al.codigoEstudiante)&&(!al.idSiagie||!x.idSiagie));
+ if(codes.length===1)return codes[0];if(codes.length>1)return null;
+ // No identificar un alumno nuevo por nombre contra otra identidad estable ni homónimos.
+ const names=roster.filter(x=>normal(x.nombre)===normal(al.nombre));
+ const actuales=estudiantes().filter(x=>normal(x.nombre)===normal(al.nombre));
+ if(names.length!==1||actuales.length!==1)return null;
+ const prior=names[0];if((al.idSiagie&&prior.idSiagie)||(al.codigoEstudiante&&prior.codigoEstudiante))return null;
+ return prior;
+}
 function comparativoLinea(comp,id){
- if(!comparativoBimActivo)return '';
+ if(!comparativoBimActivo||comparativoBimContexto!==cloudClaveReg()||comparativoBimToken!==IEStudents.validToken())return '';
  const n=comparativoIndice(ctxBase().bim);
+ if(n<2)return '';
  const linea=Array.from({length:Math.max(0,n-1)},(_,i)=>{
    const nota=comparativoBimDatos[i+1]?.[comp]?.[id]||'—';
    return '<span class="comp-hist"><span>'+['I','II','III'][i]+':</span><b class="comp-hist-'+nota.toLowerCase().replace(/[^a-z]/g,'')+'">'+escapeRegistro(nota)+'</b></span>';
@@ -3128,35 +3213,28 @@ function comparativoLinea(comp,id){
 }
 function alternarComparativoBim(){
  comparativoBimActivo=!comparativoBimActivo;comparativoBimDatos={};comparativoBimSecuencia++;
- comparativoBimContexto=comparativoBimActivo?cloudClaveReg():'';
+ comparativoBimContexto=comparativoBimActivo?cloudClaveReg():'';comparativoBimToken=comparativoBimActivo?IEStudents.validToken():'';
  renderFinales();if(comparativoBimActivo)void cargarComparativoBim();
 }
 async function cargarComparativoBim(){
- const c=ctxBase(),clave=cloudClaveReg(),numero=comparativoIndice(c.bim),token=(getLoginSession()||{}).token,seq=++comparativoBimSecuencia;
- if(numero<2)return;
- const alumnos=estudiantes().map(studentKey),comps=competencias(),datos={};
+ const c=ctxBase(),clave=cloudClaveReg(),numero=comparativoIndice(c.bim),token=IEStudents.validToken(),seq=++comparativoBimSecuencia;
+ const actual=()=>comparativoBimActivo&&seq===comparativoBimSecuencia&&cloudClaveReg()===clave&&IEStudents.validToken()===token;
+ if(numero<2||!token)return;
+ const alumnos=estudiantes().slice(),comps=competencias().slice(),datos={};
  try{
-   for(let i=1;i<numero;i++){
-     const bim=['','I','II','III'][i],q=new URLSearchParams({action:'loadreg',nivel:c.nivel,bimestre:bim,grado:String(c.grado),seccion:c.seccion,area:c.area});
-     const r=await fetchLecturaNube(CLOUD_API_URL+'?'+q),data=JSON.parse(await r.text());
-     if(!comparativoBimActivo||seq!==comparativoBimSecuencia||cloudClaveReg()!==clave||(getLoginSession()||{}).token!==token)return;
-     if(r.status>=400||data.ok!==true||!data.soportaModeloAcademico)throw Error('Lectura no disponible');
-     const key=[c.nivel,bim,c.grado,c.seccion,c.area].join('||'),rows=(data.items||[]).filter(x=>x.clave===key);
-     if(rows.length>1)throw Error('Duplicados');
-     const payload=rows[0]?.payload||{},cAnterior={...c,bim};
-     datos[i]={};
-     comps.forEach(cp=>{datos[i][cp]={};alumnos.forEach(id=>{datos[i][cp][id]=comparativoNotaAnterior(payload,cAnterior,cp,id);});});
-   }
-   if(comparativoBimActivo&&seq===comparativoBimSecuencia&&clave===cloudClaveReg()){comparativoBimDatos=datos;renderFinales();}
- }catch(e){
-   if(seq===comparativoBimSecuencia){comparativoBimDatos={};toast('Comparativo histórico no disponible; no se modificaron notas.');renderFinales();}
- }
+  for(let i=1;i<numero;i++){
+   const proof=await leerRegistroHistorico({...c,bim:['','I','II','III'][i]},token);if(!actual())return;
+   datos[i]={};comps.forEach(cp=>{datos[i][cp]={};alumnos.forEach(al=>{const prior=comparativoAlumnoAnterior(al,proof.roster);datos[i][cp][studentKey(al)]=prior?comparativoNotaAnterior(proof.payload,proof.c,cp,prior,proof.roster):'';});});
+  }
+  if(actual()){comparativoBimDatos=datos;renderFinales();}
+ }catch(e){if(actual()){comparativoBimDatos={};toast('Comparativo histórico no disponible: '+e.message+' No se modificaron notas.');renderFinales();}}
 }
 
 function renderFinales() {
-  if(comparativoBimContexto&&comparativoBimContexto!==cloudClaveReg()){comparativoBimActivo=false;comparativoBimDatos={};comparativoBimContexto='';comparativoBimSecuencia++;}
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderFinales',()=>renderFinales());
+  if(typeof comparativoBimContexto!=='undefined'&&comparativoBimContexto&&(comparativoBimContexto!==cloudClaveReg()||comparativoBimToken!==IEStudents.validToken())){comparativoBimActivo=false;comparativoBimDatos={};comparativoBimContexto='';comparativoBimSecuencia++;}
   const comparativoBtn=document.getElementById('btnComparativoBim');
-  if(comparativoBtn){comparativoBtn.textContent=comparativoBimActivo?'Ocultar comparativo':'Comparativo bimestral';comparativoBtn.setAttribute('aria-pressed',String(comparativoBimActivo));comparativoBtn.classList.toggle('on',comparativoBimActivo);}
+  if(comparativoBtn&&typeof comparativoBimActivo!=='undefined'){comparativoBtn.textContent=comparativoBimActivo?'Ocultar comparativo':'Comparativo bimestral';comparativoBtn.setAttribute('aria-pressed',String(comparativoBimActivo));comparativoBtn.classList.toggle('on',comparativoBimActivo);}
   loadStore();
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const c = ctxBase();
@@ -3221,7 +3299,7 @@ function renderFinales() {
           (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400">Cal '+(numeroExactoComp(cp,studentKey(al))?pad2(ev.nota)+' · ':'')+ev.letra+'</div>' : '') +
           '</div>';
       }
-      grade=comparativoLinea(cp,studentKey(al))+grade;
+      grade=(typeof comparativoLinea==='function'?comparativoLinea(cp,studentKey(al)):'')+grade;
       const required=IERegistroAcademico.requiresConclusion(c.nivel,ofi.letra);
       const conclusion=required?IEConclusionSuggestions.compactHtml(cp,concCompAlumno(cp,studentKey(al)),'data-id="'+encN+'" data-comp="'+encC+'"',lock):'';
       tds+='<td><div class="final-cell-layout'+(required?' has-conclusion':'')+'"><div class="final-grade">'+grade+'</div>'+conclusion+'</div></td>';
@@ -3431,6 +3509,7 @@ function borrarFechaAsis(fecha) {
 }
 
 function renderAsistencia() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderAsistencia',()=>renderAsistencia());
   loadStore();
   const c = ctxBase();
   document.getElementById('lblAsisCtx').textContent =
@@ -3536,6 +3615,7 @@ function estadisticasCompetenciasHTML(comps,alumnos) {
 }
 function estadisticaResumenHTML(){const s=IERegistroAcademico.statistics(estudiantes().map(al=>promReferencialAlumno(studentKey(al)).letra));return '<section class="summary-stats"><h3>RESUMEN ESTADÍSTICO</h3><div class="summary-counts">'+[['Matriculados',s.matriculados],['Evaluados',s.evaluados],['No evaluados',s.noEvaluados],['Aprobados',s.aprobados],['Desaprobados',s.desaprobados]].map(([l,n])=>'<span>'+l+': <strong>'+n+'</strong></span>').join('')+'</div><table><thead><tr><th>Nivel</th><th>Frecuencia</th><th>Porcentaje</th></tr></thead><tbody>'+Object.keys(s.niveles).map(l=>'<tr><th>'+l+'</th><td>'+s.niveles[l]+'</td><td>'+s.porcentajes[l].toFixed(1)+' %</td></tr>').join('')+'<tr><th>TOTAL</th><td>'+s.evaluados+'</td><td>'+(s.evaluados?'100':'0')+' %</td></tr></tbody></table><small>Clasificación estadística: AD/A/B aprobados; C desaprobados. Promedio referencial informativo; no determina promoción ni SIAGIE.</small></section>';}
 function renderAvance() {
+  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderAvance',()=>renderAvance());
  const box=document.getElementById('avanceBox'),c=ctxBase(),comps=competencias();document.getElementById('lblAvanceCtx').textContent=c.area+' · Bim '+c.bim;
  let html='<div class="fin-wrap fin-scroll-body"><table class="fin-grid"><thead><tr><th class="fin-nom summary-student-header">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'<th class="summary-reference">Promedio referencial<small style="display:block;font-size:10px;font-weight:600">Dato informativo · no SIAGIE</small></th></tr></thead><tbody>';
  estudiantes().forEach((al,i)=>{const id=studentKey(al);html+='<tr><th class="fin-nom summary-student"><span class="summary-student-order">'+escapeRegistro(al.numeroVisual??i+1)+'</span><span class="summary-student-name">'+escapeRegistro(al.nombre)+'</span></th>';comps.forEach(cp=>{if(!competenciaTrabajada(cp)){html+='<td class="summary-competence">No trabajada este bimestre</td>';return;}const d=notaCompAlumno(cp,id);html+='<td class="summary-competence"><div class="fin-cell">'+(modoCalif==='num'&&d.nota!==''&&numeroExactoComp(cp,id)?'<strong>'+d.nota+' → </strong>':'')+'<span>'+escapeRegistro(d.letra||'Pendiente')+'</span></div></td>';});const r=promReferencialAlumno(id);html+='<td class="summary-reference">'+(modoCalif==='num'&&r.exacto&&r.prom!==''?r.prom+' → ':'')+(r.letra||'—')+'</td></tr>';});box.innerHTML=html+'</tbody></table></div>'+estadisticaResumenHTML();
@@ -3572,6 +3652,7 @@ function abrirSelectorImpresionCalificar(){
  dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
 }
 function imprimirAsistenciaRegistro(){
+ if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return conRegistroHistorico(()=>imprimirAsistenciaRegistro());
  const c=ctxBase(),alumnos=estudiantes(),fechas=(store.asisFechas?.[asisCtxKey()]||[]).filter(f=>/^\d{4}-\d{2}-\d{2}$/.test(f)&&!store.asisFechasEstado?.[asisCtxKey()+'||'+f]?.borrado).slice().sort();
  if(!fechas.length){alert('No hay fechas de asistencia registradas en este bimestre.');return;}
  const docente=document.getElementById('inpDocente')?.value||'No registrado';
@@ -3589,6 +3670,7 @@ function imprimirAsistenciaRegistro(){
  document.getElementById('printArea').innerHTML=html;window.print();
 }
 function imprimirResumen(opciones){
+ if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return conRegistroHistorico(()=>imprimirResumen(opciones));
  const esPromedios=!!(opciones&&opciones.promedios);
  const c=ctxBase(),alumnos=estudiantes(),comps=competencias();
  const doc=(document.getElementById('inpDocente').value||'').trim()||'No registrado';
