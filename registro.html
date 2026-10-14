@@ -244,7 +244,7 @@
   #panelFinales .fin-mode-info > span {padding:2px 0;background:transparent;font-size:10px;}
   #panelFinales .fin-header-controls {flex:0 1 auto;gap:4px 8px;margin-left:auto;}
   #panelFinales .fin-bulk-actions {gap:4px;}
-  #panelFinales .fin-bulk-actions .chip {border-radius:8px;min-width:44px;min-height:44px;padding:4px;font-size:12px;}
+  #panelFinales .fin-bulk-actions .chip {border-radius:10px;min-width:40px;min-height:40px;padding:4px;font-size:12px;}
   #panelFinales .fin-remove-bulk {min-height:44px;padding:4px 8px;}
   #panelFinales .mode-toggle {gap:2px;padding:3px;}
   #panelFinales .mode-toggle button {min-height:44px;padding:4px 8px;}
@@ -257,11 +257,8 @@
   #finLista .final-cell-layout {grid-template-columns:188px minmax(0,1fr);gap:6px;}
   #finLista .final-grade {width:188px;min-width:188px;}
   #finLista .final-grade > .fin-cell:has(> button[data-val]) {gap:3px 4px;}
-  #finLista .final-grade > .fin-cell > .chip[data-val] {width:44px;min-width:44px;min-height:44px;border-radius:8px;font-size:12px;padding:4px;}
-  #finLista .chip[data-val].on {box-shadow:inset 0 0 0 2px #0f172a;outline:1px solid #fff;outline-offset:-4px;}
-  #finLista .nivel-a.on {background:#4d7c0f;border-color:#4d7c0f;}
-  #finLista .nivel-b.on {background:#c2410c;border-color:#c2410c;}
-  #finLista .nivel-ad.on {background:#15803d;border-color:#15803d;}
+  #finLista .final-grade > .fin-cell > .chip[data-val] {width:40px;min-width:40px;min-height:40px;height:40px;justify-self:center;border-radius:10px;font-size:12px;padding:4px;}
+  #finLista .chip[data-val].on {box-shadow:none;outline:none;font-weight:800;}
   #finLista .chip[data-val]:focus-visible {outline:3px solid #0369a1;outline-offset:2px;}
   #finLista .chip[data-val]:disabled {cursor:default;}
   #avanceBox .fin-grid {width:100%;}
@@ -319,9 +316,9 @@
   #stuList .fin-grid .fin-nom {width:auto;min-width:230px;max-width:none;text-align:left;}
   #stuList .fin-grid .fin-nom .font-bold {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
   #stuList .fin-grid th:not(.fin-nom),#stuList .fin-grid td:not(.fin-nom) {min-width:200px;}
-  #stuList .fin-cell:has(> button[data-val]) {display:grid;grid-template-columns:repeat(4,44px);gap:4px;width:188px;min-width:188px;align-items:center;}
-  #stuList .fin-cell > .chip[data-val] {box-sizing:border-box;width:44px;min-width:44px;min-height:44px;margin:0;padding:4px;border-radius:8px;font-size:12px;white-space:nowrap;}
-  #stuList .chip[data-val].on {box-shadow:inset 0 0 0 2px #0f172a;outline:1px solid #fff;outline-offset:-4px;}
+  #stuList .fin-cell:has(> button[data-val]) {display:grid;grid-template-columns:repeat(4,40px);gap:4px;width:172px;min-width:172px;align-items:center;}
+  #stuList .fin-cell > .chip[data-val] {box-sizing:border-box;width:40px;min-width:40px;min-height:40px;height:40px;margin:0;padding:4px;border-radius:10px;font-size:12px;white-space:nowrap;}
+  #stuList .chip[data-val].on {box-shadow:none;outline:none;font-weight:800;}
   #stuList .chip[data-val]:focus-visible {outline:3px solid #0369a1;outline-offset:2px;}
   #stuList .chip[data-val]:disabled {cursor:default;}
   #asisLista .stu-row > .flex {display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;}
@@ -331,6 +328,13 @@
   @media(max-width:640px) {
     #stuList .fin-grid .fin-nom {width:120px;min-width:120px;max-width:120px;}
   }
+  /* Paleta suave compartida por las decisiones académicas, sin alterar indicadores numéricos. */
+  :is(#stuList,#finLista) .chip[data-val],#panelFinales .fin-bulk-actions .chip {background:#f8fafc;color:#475569;border:1px solid #cbd5e1;box-shadow:none;touch-action:manipulation;}
+  :is(#stuList,#finLista) .chip[data-val]:hover:not(:disabled):not(.on),#panelFinales .fin-bulk-actions .chip:hover:not(:disabled) {background:#f1f5f9;border-color:#94a3b8;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-c.on {background:#fee2e2;color:#991b1b;border-color:#fca5a5;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-b.on {background:#fef3c7;color:#92400e;border-color:#fcd34d;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-a.on {background:#dcfce7;color:#166534;border-color:#86efac;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-ad.on {background:#e0f2fe;color:#075985;border-color:#7dd3fc;}
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>

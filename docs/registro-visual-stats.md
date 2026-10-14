@@ -69,3 +69,13 @@ La fixture incorpora utilidades CSS mínimas para inspección aislada; no equiva
 **Validación visual real pendiente:** Edge/Playwright no inicia por Crashpad (`TransactNamedPipe`, 0x6D). El navegador integrado no pudo abrir el servidor local aislado (ERR_CONNECTION_TIMED_OUT); además rechazó navegación `data:` por su política de URLs. No se eludió esa política. No se obtuvieron capturas nuevas ni se certifican ausencia de solapamientos/desbordamiento real, altura real de filas, sticky ni impresión paginada. Antes de aprobar la revisión visual integral, comprobar las fixtures y el Registro aislado en navegador real a 1366 y 390 px, incluyendo navegación/pie fijo y Tailwind vigente. No se usaron datos oficiales.
 
 Apps Script, A1, B1, B2, cálculos, almacenamiento, permisos y cierres permanecen byte a byte intactos; la única modificación productiva es CSS en registro.html.
+
+## Pulido de botones de calificación
+
+Calificar y Promedios usan botones de 40 × 40 px, esquinas de 10 px y bordes de 1 px. Se retiró el anillo oscuro/sombra interior de selección: la opción activa se distingue por fondo suave, texto oscuro y borde cromático. C rojo claro, B ámbar, A verde claro y AD azul claro; los no seleccionados son neutros. Los cuatro pares de texto/fondo seleccionados superan contraste 4,5:1. El foco de teclado visible permanece intacto.
+
+La cuadrícula de Calificar conserva cuatro decisiones horizontales con gaps de 4 px; Promedios mantiene su zona fija de nota y ubicación de conclusiones. No se cambian selectores, handlers, notas, cálculos, A1/B1/B2 ni almacenamiento. Los controles P/F/T/J y el pie conservan 44 px.
+
+Se ajustaron las pruebas de tamaño y se añadieron cinco regresiones de paleta, contraste, neutralidad y ausencia de estilos saturados antiguos. Validación: 1867 aprobadas, 0 fallidas/omitidas; sintaxis 93 JS/GS, 28 scripts inline, 67 dependencias; diff limpio.
+
+Las fixtures estáticas se regeneraron con datos ficticios y el CSS nuevo para Primaria (5 competencias) y Secundaria (4). La revisión física a 1366/390 px continúa pendiente por los bloqueos de navegador documentados arriba. Las pruebas de estructura, contraste y geometría CSS no certifican solapamientos reales ni sustituyen capturas de navegador.

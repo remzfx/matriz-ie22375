@@ -10,11 +10,11 @@ for(const [level,area,n]of cases)for(const viewport of [1366,390])for(const clos
  assert.equal((asis.match(/data-av="/g)||[]).length,160);assert.match(asis,/07:30/);assert.deepEqual(['aP','aF','aT','aJ'].map(id=>f.el(id).textContent),[10,10,10,10]);
  if(closed){assert.equal((cal.match(/ disabled>/g)||[]).length,40*n*4);f.el('asisLista').onclick({target:{closest:()=>({dataset:{an:encodeURIComponent(f.c.studentKey(f.alumnos[0])),av:'F'}})}});}
  assert.equal(JSON.stringify(f.c.store),before);assert.equal(f.calls.length,calls);
- assert.match(css,/#stuList \.fin-cell:has\(> button\[data-val\]\) \{display:grid;grid-template-columns:repeat\(4,44px\);gap:4px;width:188px/);
+ assert.match(css,/#stuList \.fin-cell:has\(> button\[data-val\]\) \{display:grid;grid-template-columns:repeat\(4,40px\);gap:4px;width:172px/);
  if(viewport===390)assert.match(css,/@media\(max-width:640px\) \{\s*#stuList \.fin-grid \.fin-nom \{width:120px;min-width:120px;max-width:120px;/);
 });
 test('Calificar has scoped horizontal touch controls, complete names and internal table scrolling',()=>{
- assert.match(css,/#stuList \.fin-cell > \.chip\[data-val\] \{[^}]*width:44px;min-width:44px;min-height:44px;[^}]*border-radius:8px/);assert.match(css,/#stuList \.chip\[data-val\]\.on \{box-shadow:inset/);assert.match(css,/#stuList \.chip\[data-val\]:focus-visible \{outline:3px/);assert.match(css,/\.fin-wrap \{ overflow-x:auto/);assert.match(css,/#stuList \{min-width:0;max-width:100%;/);assert.match(css,/#stuList \.fin-grid \.fin-nom \.font-bold \{white-space:normal;overflow-wrap:anywhere/);assert.ok(44*4+4*3===188);assert.ok(188+6*2===200);
+ assert.match(css,/#stuList \.fin-cell > \.chip\[data-val\] \{[^}]*width:40px;min-width:40px;min-height:40px;[^}]*border-radius:10px/);assert.match(css,/#stuList \.chip\[data-val\]\.on \{box-shadow:none/);assert.match(css,/#stuList \.chip\[data-val\]:focus-visible \{outline:3px/);assert.match(css,/\.fin-wrap \{ overflow-x:auto/);assert.match(css,/#stuList \{min-width:0;max-width:100%;/);assert.match(css,/#stuList \.fin-grid \.fin-nom \.font-bold \{white-space:normal;overflow-wrap:anywhere/);assert.ok(40*4+4*3===172);assert.ok(172+6*2<=200);
 });
 test('Attendance names cannot be ellipsized, its mark controls and footer keep 44px targets',()=>{
  assert.match(css,/#asisLista \.truncate \{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;/);assert.match(css,/#asisLista \.stu-row > \.flex \{display:grid;grid-template-columns:24px minmax\(0,1fr\) auto;/);assert.match(css,/#asisLista \.asis-chip \{box-sizing:border-box;min-width:44px;height:44px;/);assert.match(css,/#registroAcademicFooter button \{min-height:44px;/);
@@ -28,4 +28,12 @@ test('Fixture contains real data/form/footer and all four actual renderers, rema
 
 test('Standalone fixture generator accepts its output path without confusing it with backend source',()=>{
  const os=require('node:os'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'pr81-ficticio-')),file=path.join(dir,'fixture.html');try{execFileSync(process.execPath,[path.join(__dirname,'registro-full-visual-fixture.cjs'),file,'secundaria','Comunicación','closed']);const html=fs.readFileSync(file,'utf8');assert.match(html,/3 competencias · cerrado/);assert.match(html,/data-val="C" disabled/);assert.match(html,/ESTUDIANTE FICTICIO/);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+function contrast(a,b){const lum=h=>{const rgb=h.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]};const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);}
+for(const [level,bg,fg,border]of [['c','#fee2e2','#991b1b','#fca5a5'],['b','#fef3c7','#92400e','#fcd34d'],['a','#dcfce7','#166534','#86efac'],['ad','#e0f2fe','#075985','#7dd3fc']])test('Soft selected '+level.toUpperCase()+' is scoped to academic controls with legible contrast',()=>{
+ assert.ok(src.includes(':is(#stuList,#finLista) .chip[data-val].nivel-'+level+'.on {background:'+bg+';color:'+fg+';border-color:'+border+';}'));assert.ok(contrast(bg,fg)>=4.5);if(level==='ad')assert.notEqual(bg,'#dcfce7');
+});
+test('Unselected academic decisions are neutral without heavy borders/shadows and keep compact touch targets',()=>{
+ assert.match(css,/:is\(#stuList,#finLista\) \.chip\[data-val\],#panelFinales \.fin-bulk-actions \.chip \{background:#f8fafc;color:#475569;border:1px solid #cbd5e1;box-shadow:none;touch-action:manipulation;/);assert.match(css,/#finLista \.final-grade > \.fin-cell > \.chip\[data-val\] \{width:40px;min-width:40px;min-height:40px;height:40px;justify-self:center;border-radius:10px;/);assert.match(css,/#stuList \.fin-cell > \.chip\[data-val\] \{box-sizing:border-box;width:40px;min-width:40px;min-height:40px;height:40px;/);assert.match(css,/#finLista \.final-grade \{width:188px;min-width:188px;/);assert.match(css,/#finLista \.final-grade \{width:182px;min-width:182px;/);assert.doesNotMatch(css,/#finLista \.nivel-(a|b|ad)\.on \{background:#(4d7c0f|c2410c|15803d)/);
 });
