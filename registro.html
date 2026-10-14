@@ -389,6 +389,7 @@
   }
   .bimestral-signatures {display:grid;grid-template-columns:1fr 1fr;gap:12%;margin:55px 7% 0;align-items:end;}
   .bimestral-signature {text-align:center;border-top:1px solid #334155;padding-top:6px;font-weight:600;font-size:10pt;}
+  .bimestral-signature small {display:block;font-size:8pt;font-weight:400;margin-top:3px;line-height:1.35;overflow-wrap:anywhere;}
   @media print {
     #printArea .bimestral-signatures {break-inside:avoid;page-break-inside:avoid;margin-top:22mm;}
     #printArea .bimestral-signature {color:#000;border-top:1px solid #000;font-size:9pt;}
@@ -3445,7 +3446,7 @@ function imprimirAsistenciaRegistro(){
  html+='<div class="bimestral-meta"><span><b>Área:</b> '+escapeRegistro(c.area)+'</span><span><b>Nivel:</b> '+escapeRegistro(c.nivel)+'</span><span><b>Aula:</b> '+escapeRegistro(c.grado+'° '+c.seccion)+'</span><span><b>Bimestre:</b> '+escapeRegistro(c.bim)+'</span><span><b>Docente:</b> '+escapeRegistro(docente)+'</span><span><b>Impresión:</b> '+new Date().toLocaleDateString('es-PE')+'</span></div>';
  html+='<table class="bimestral-table"><thead><tr><th>N.º</th><th>Estudiante</th>'+fechas.map(f=>'<th>'+escapeRegistro(f.slice(5))+'</th>').join('')+'</tr></thead><tbody>';
  alumnos.forEach((al,i)=>{html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+fechas.map(f=>{const rec=asisGet(leerNota(store.asistencia,asisMarkKey(f,studentKey(al))));return '<td class="bimestral-grade">'+escapeRegistro(rec.marca||'—')+'</td>';}).join('')+'</tr>';});
- html+='</tbody></table><p style="margin-top:12px;font-size:9pt">P = Presente · F = Falta · T = Tardanza · J = Justificado · — = Sin registro</p><footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente</span></div><div class="bimestral-signature"><span>Dirección</span></div></footer></article>';
+ html+='</tbody></table><p style="margin-top:12px;font-size:9pt">P = Presente · F = Falta · T = Tardanza · J = Justificado · — = Sin registro</p><footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(docente)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
  document.getElementById('printArea').innerHTML=html;window.print();
 }
 function imprimirResumen(){
@@ -3459,7 +3460,7 @@ function imprimirResumen(){
  html+='<div class="bimestral-meta">'+[['Área',c.area],['Nivel',nivelTexto],['Grado',c.grado+'°'],['Sección',c.seccion],['Bimestre',c.bim],['Año',anio],['Docente',doc],['Fecha',fecha]].map(([label,value])=>'<span><b>'+label+':</b> '+escapeRegistro(value)+'</span>').join('')+'</div>';
  html+='<table class="bimestral-table"><colgroup><col class="bimestral-number-column"><col class="bimestral-name-column">'+comps.map(()=>'<col>').join('')+'</colgroup><thead><tr><th class="bimestral-number">N.º</th><th class="bimestral-name">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'</tr></thead><tbody>';
  alumnos.forEach((al,i)=>{const id=studentKey(al);html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+comps.map(cp=>'<td class="bimestral-grade">'+(competenciaTrabajada(cp)?'<span class="bimestral-result">'+escapeRegistro(notaCompAlumno(cp,id).letra||'—')+'</span>':'<small>No trabajada este bimestre</small>')+'</td>').join('')+'</tr>';});
- html+='</tbody></table>'+estadisticasCompetenciasHTML(comps,alumnos)+'<footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente</span></div><div class="bimestral-signature"><span>Dirección</span></div></footer></article>';
+ html+='</tbody></table>'+estadisticasCompetenciasHTML(comps,alumnos)+'<footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(doc)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
  const pa=document.getElementById('printArea');pa.innerHTML=html;
  window.print();
 }
