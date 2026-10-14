@@ -312,6 +312,25 @@
   #printArea .competence-stats progress {display:none;}
 }
 @page registro-resumen {size:A4 landscape;margin:10mm;}
+  /* Calificar: cuatro decisiones táctiles en una fila, dentro del scroll de la tabla. */
+  #stuList {min-width:0;max-width:100%;}
+  #stuList .fin-grid {width:100%;min-width:0;}
+  #stuList .fin-grid th,#stuList .fin-grid td {padding:6px;}
+  #stuList .fin-grid .fin-nom {width:auto;min-width:230px;max-width:none;text-align:left;}
+  #stuList .fin-grid .fin-nom .font-bold {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
+  #stuList .fin-grid th:not(.fin-nom),#stuList .fin-grid td:not(.fin-nom) {min-width:200px;}
+  #stuList .fin-cell:has(> button[data-val]) {display:grid;grid-template-columns:repeat(4,44px);gap:4px;width:188px;min-width:188px;align-items:center;}
+  #stuList .fin-cell > .chip[data-val] {box-sizing:border-box;width:44px;min-width:44px;min-height:44px;margin:0;padding:4px;border-radius:8px;font-size:12px;white-space:nowrap;}
+  #stuList .chip[data-val].on {box-shadow:inset 0 0 0 2px #0f172a;outline:1px solid #fff;outline-offset:-4px;}
+  #stuList .chip[data-val]:focus-visible {outline:3px solid #0369a1;outline-offset:2px;}
+  #stuList .chip[data-val]:disabled {cursor:default;}
+  #asisLista .stu-row > .flex {display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;}
+  #asisLista .truncate {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+  #asisLista .asis-chip {box-sizing:border-box;min-width:44px;height:44px;margin:0;}
+  #registroAcademicFooter button {min-height:44px;}
+  @media(max-width:640px) {
+    #stuList .fin-grid .fin-nom {width:120px;min-width:120px;max-width:120px;}
+  }
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>

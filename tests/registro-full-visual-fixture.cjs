@@ -1,0 +1,25 @@
+/* Synthetic render fixture: actual Registro renderers, memory-only stores, no requests. */
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8').replace(/\r\n/g,'\n'),src=read('registro.html'),{extract}=require('./registro-visual-demo.cjs');
+// Existing backend fixture optionally reads CLI arguments; this demo must not treat its output path as backend source.
+const argv=process.argv;let ui;
+try{process.argv=argv.slice(0,2);ui=new Function('require','__dirname',read('tests/registro-academic-model.test.cjs').split('\nfor(const level')[0]+'\nreturn ui;')(require,__dirname);}finally{process.argv=argv;}
+function fixture(level,area,closed=false,mode='letra'){
+ const f=ui(level),c=f.c,comps=Array.from(c.IERegistroAcademico.catalog[level][area]);c.areaActual=area;c.ctxBase=()=>({nivel:level,bim:'III',grado:level==='primaria'?6:2,seccion:'A',area});c.cloudClaveReg=()=>[level,'III',c.ctxBase().grado,'A',area].join('||');c.competencias=()=>comps;c.baselineAcademica=()=>{};c.modoCalif=mode;c.bimCerradoDocente=c.registroSoloLectura=()=>closed;c.sincronizarEdicionRegistro=()=>{};
+ const alumnos=Array.from({length:40},(_,i)=>({idSiagie:'full-visual-'+i,nombre:'ESTUDIANTE FICTICIO '+(i+1)+' ÁLVAREZ DE LA CRUZ NOMBRES Y APELLIDOS COMPLETOS',numeroVisual:i+1}));c.estudiantes=()=>alumnos;c.colsCalificar=()=>comps.map(cp=>({comp:cp,cap:'Capacidad sintética de '+cp}));c.capKeyHoy=(cp,cap,id)=>c.cloudClaveReg()+'||'+cp+'||'+cap+'||2026-10-14||'+id;c.store.finales={};c.store.grades={};c.store.sessions=[];c.store.concComp={};c.store.asistencia={};c.store.asisFechas={};c.asisFechaActiva='2026-10-14';f.el('inpFecha').value=c.asisFechaActiva;
+ for(const n of ['asisCtxKey','asisMarkKey','asisGet','getAsisFechas','renderAsistencia','renderStudents','datosEstadisticasCompetencias','estadisticasCompetenciasHTML','renderAvance','renderFinales'])vm.runInContext(extract(src,n),c);
+ c.store.asisFechas[c.asisCtxKey()]=[c.asisFechaActiva];
+ for(const [i,al]of alumnos.entries()){const id=c.studentKey(al),L=['C','B','A','AD'][i%4];c.store.asistencia[c.asisMarkKey(c.asisFechaActiva,id)]={marca:['P','F','T','J'][i%4],hora:i%2?'07:30':'',ts:7};for(const cp of comps){const k=c.finalKey(cp,id);c.store.finales[k]={nota20:c.letterToNum(L),nivel:L,origen:'letra',ts:7};c.store.grades[c.capKeyHoy(cp,'Capacidad sintética de '+cp,id)]={nota20:c.letterToNum(L),nivel:L,origen:'letra',ts:7};if(c.IERegistroAcademico.requiresConclusion(level,L))c.store.concComp[k]={texto:'Conclusión ficticia extensa, con palabras completas para revisar ajuste y edición sin cambiar notas.',ts:8};}}
+ return {...f,c,comps,alumnos};
+}
+function build(level='primaria',area='Personal Social',closed=false){
+ const f=fixture(level,area,closed);f.c.renderStudents();f.c.renderFinales();f.c.renderAvance();f.c.renderAsistencia();const styles=src.match(/<style>([\s\S]*?)<\/style>/)[1];
+
+ let app=src.slice(src.indexOf('<div id="viewApp"'),src.indexOf('<div id="modalSiagie"')).replace('id="viewApp" class="hidden"','id="viewApp"');
+ for(const id of ['stuList','finLista','finEstadisticas','avanceBox','asisLista','asisFechas'])app=app.replace(new RegExp('(<div id="'+id+'"[^>]*>)(</div>)'),'$1'+f.el(id).innerHTML+'$2');
+ app=app.replace('<select id="selBim" onchange="cambiarBimestreRegistro()"></select>','<select id="selBim" onchange="cambiarBimestreRegistro()"><option value="III">III Bimestre</option></select>');
+ if(closed)app=app.replace(/<button([^>]*data-reg-write[^>]*)>/g,'<button$1 disabled>');
+ return '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src \'none\';style-src \'unsafe-inline\'"><title>Registro completo · fixture ficticia</title><style>'+styles+read('layout-shells.css')+'\n*,::before,::after{box-sizing:border-box}body{padding-bottom:140px}main{min-width:0;padding:12px}.hidden,[hidden]{display:none!important}.flex{display:flex}.flex-wrap{flex-wrap:wrap}.flex-col{flex-direction:column}.flex-1{flex:1 1 0%}.min-w-0{min-width:0}.shrink-0{flex-shrink:0}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-1{gap:4px}.gap-2{gap:8px}.font-bold{font-weight:700}.text-xs{font-size:12px}.text-sm{font-size:14px}.truncate{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.card{padding:12px;margin:8px 0}h1,h2{margin:8px 0}#registroAcademicFooter{position:static!important}.grid{display:grid}.grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.w-full{width:100%}.panel-fin,.panel-cal,.panel-av,.panel-as{display:block!important}#studentsStatus,#registroTransAviso{display:none}header{background:#0f172a;color:#fff;padding:8px}@media(min-width:640px){#registroAcademicFooter>.shell{flex-direction:row}}</style><h1>Datos ficticios · '+level+' · '+f.comps.length+' competencias · '+(closed?'cerrado':'abierto')+'</h1>'+app+'</html>';
+
+}
+module.exports={fixture,build};if(require.main===module)fs.writeFileSync(process.argv[2],build(process.argv[3],process.argv[4],process.argv[5]==='closed'));

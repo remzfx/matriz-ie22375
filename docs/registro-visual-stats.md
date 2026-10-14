@@ -48,3 +48,24 @@ Revisión visual realizada en PC 1280×900 y móvil 390×844: EPT (1), Arte y Cu
 No merge ni deploy sin autorización expresa.
 
 Validación local final: 1825 pruebas aprobadas, 0 fallidas/omitidas. Sintaxis: 91 JS/GS y 28 scripts inline. Dependencias locales: 67. git diff --check correcto.
+
+## Revisión integral adicional de Registro (Calificar y secciones relacionadas)
+
+Se reprodujo la causa estructural del apilamiento: `.fin-cell` es vertical por defecto y la cuadrícula de cuatro botones estaba acotada a `#finLista`. La corrección aplica una cuadrícula de cuatro columnas de 44 px únicamente a las decisiones de Calificar en `#stuList`, conservando controles numéricos, indicadores, eventos y claves. El ancho interno es 188 px; las celdas reservan 200 px con padding. Los nombres completos se ajustan y la tabla conserva su scroll interno. Selección y foco quedan visibles; los botones rectangulares mantienen objetivos táctiles de 44 px.
+
+La revisión del HTML/CSS detectó también nombres de Asistencia con `truncate` y controles P/F/T/J de 32 px. Se corrigieron mediante reglas específicas: nombre sin ellipsis, columna flexible para texto y marcas de 44 px. Guardar/Subir Nube/Bajar Nube mantienen sus handlers y tienen altura mínima de 44 px. No se cambió código funcional ni markup de producción.
+
+Se añadieron 37 regresiones: renderizadores reales con 40 estudiantes ficticios, nombres largos, conclusiones, áreas oficiales de una a cinco competencias, Primaria/Secundaria, abierto/cerrado, reglas responsive de 1366/390 px, estructura de Datos/formulario/navegación/Asistencia/pie, ausencia de escrituras y comparación de toda la fuente fuera de CSS. Primaria no tiene áreas oficiales de una competencia; Secundaria no tiene áreas de cinco. Se probaron los catálogos reales, sin inventar competencias. Los escenarios etiquetados 1366/390 verifican estructura y reglas CSS, NO geometría calculada en navegador.
+
+Fixture estática completa, sin scripts/red, generada desde markup y renderizadores actuales:
+
+```powershell
+node tests/registro-full-visual-fixture.cjs registro-ficticio-primaria.html primaria "Personal Social"
+node tests/registro-full-visual-fixture.cjs registro-ficticio-secundaria.html secundaria "Matemática" closed
+```
+
+La fixture incorpora utilidades CSS mínimas para inspección aislada; no equivale a una sesión productiva ni certifica el CSS de Tailwind completo. Las secciones se muestran juntas para revisar su contenido; las pruebas de handlers y cambios de pestaña siguen en la suite existente.
+
+**Validación visual real pendiente:** Edge/Playwright no inicia por Crashpad (`TransactNamedPipe`, 0x6D). El navegador integrado no pudo abrir el servidor local aislado (ERR_CONNECTION_TIMED_OUT); además rechazó navegación `data:` por su política de URLs. No se eludió esa política. No se obtuvieron capturas nuevas ni se certifican ausencia de solapamientos/desbordamiento real, altura real de filas, sticky ni impresión paginada. Antes de aprobar la revisión visual integral, comprobar las fixtures y el Registro aislado en navegador real a 1366 y 390 px, incluyendo navegación/pie fijo y Tailwind vigente. No se usaron datos oficiales.
+
+Apps Script, A1, B1, B2, cálculos, almacenamiento, permisos y cierres permanecen byte a byte intactos; la única modificación productiva es CSS en registro.html.
