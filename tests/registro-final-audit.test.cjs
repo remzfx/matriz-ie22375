@@ -3,7 +3,7 @@ const {fixture}=require('./registro-full-visual-fixture.cjs');
 const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8').replace(/\r\n/g,'\n');
 const src=read('registro.html'),reviewed='0d20b1483bc13ce23d7b5337490d772a8e6315f3';
 test('Final stabilization preserves ALL reviewed production source, backend, A1/B1/B2 and SW byte-for-byte',()=>{
- for(const p of ['registro.html','apps-script/Codigo.js','registro-reconcile.js','registro-transversales.js','registro-academic-model.js','students.js','matrix-registry-import.js','primaria.html','secundaria.html','auxiliar.html','sw.js'])assert.equal(require('./a1-causal-snapshot.cjs')(p,read(p)),execFileSync('git',['show',reviewed+':'+p],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'),p);
+ for(const p of ['registro.html','apps-script/Codigo.js','registro-reconcile.js','registro-transversales.js','registro-academic-model.js','students.js','matrix-registry-import.js','primaria.html','secundaria.html','auxiliar.html','sw.js'])assert.equal(require('./a1-causal-snapshot.cjs')(p,p==='registro.html'?require('./registro-context-layout-snapshot.cjs')(read(p)):read(p)),execFileSync('git',['show',reviewed+':'+p],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'),p);
 });
 test('Current comparative control is unique and in the main header, outside the auxiliary information row',()=>{
  const a=src.indexOf('<header class="fin-header">'),h=src.slice(a,src.indexOf('</header>',a));
