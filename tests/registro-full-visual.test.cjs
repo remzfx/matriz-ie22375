@@ -11,7 +11,7 @@ for(const [level,area,n]of cases)for(const viewport of [1366,390])for(const clos
  if(closed){assert.equal((cal.match(/ disabled>/g)||[]).length,40*n*4);f.el('asisLista').onclick({target:{closest:()=>({dataset:{an:encodeURIComponent(f.c.studentKey(f.alumnos[0])),av:'F'}})}});}
  assert.equal(JSON.stringify(f.c.store),before);assert.equal(f.calls.length,calls);
  assert.match(css,/#stuList \.fin-cell:has\(> button\[data-val\]\) \{display:grid;grid-template-columns:repeat\(4,40px\);gap:4px;width:172px/);
- if(viewport===390)assert.match(css,/@media\(max-width:640px\) \{\s*#stuList \.fin-grid \.fin-nom \{width:120px;min-width:120px;max-width:120px;/);
+ if(viewport===390)assert.match(css,/@media\(max-width:640px\) \{\s*#stuList \{--cal-student-width:120px;\}\s*#stuList \.fin-grid \.fin-nom \{width:120px;min-width:120px;max-width:120px;/);
 });
 test('Calificar has scoped horizontal touch controls, complete names and internal table scrolling',()=>{
  assert.match(css,/#stuList \.fin-cell > \.chip\[data-val\] \{[^}]*width:40px;min-width:40px;min-height:40px;[^}]*border-radius:10px/);assert.match(css,/#stuList \.chip\[data-val\]\.on \{box-shadow:none/);assert.match(css,/#stuList \.chip\[data-val\]:focus-visible \{outline:3px/);assert.match(css,/\.fin-wrap \{ overflow-x:auto/);assert.match(css,/#stuList \{min-width:0;max-width:100%;/);assert.match(css,/#stuList \.fin-grid \.fin-nom \.font-bold \{white-space:normal;overflow-wrap:anywhere/);assert.ok(40*4+4*3===172);assert.ok(172+6*2<=200);

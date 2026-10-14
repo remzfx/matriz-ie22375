@@ -306,12 +306,12 @@
 }
 @page registro-resumen {size:A4 landscape;margin:10mm;}
   /* Calificar: cuatro decisiones táctiles en una fila, dentro del scroll de la tabla. */
-  #stuList {min-width:0;max-width:100%;}
-  #stuList .fin-grid {width:100%;min-width:0;}
+  #stuList {min-width:0;max-width:100%;--cal-student-width:230px;--cal-competence-width:220px;}
+  #stuList .fin-grid {width:calc(var(--cal-student-width) + var(--cal-columns)*var(--cal-competence-width));min-width:0;table-layout:fixed;}
   #stuList .fin-grid th,#stuList .fin-grid td {padding:6px;}
   #stuList .fin-grid .fin-nom {width:auto;min-width:230px;max-width:none;text-align:left;}
   #stuList .fin-grid .fin-nom .font-bold {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
-  #stuList .fin-grid th:not(.fin-nom),#stuList .fin-grid td:not(.fin-nom) {min-width:200px;}
+  #stuList .fin-grid th:not(.fin-nom),#stuList .fin-grid td:not(.fin-nom) {width:var(--cal-competence-width);min-width:0;text-align:center;}
   #stuList .fin-cell:has(> button[data-val]) {display:grid;grid-template-columns:repeat(4,40px);gap:4px;width:172px;min-width:172px;align-items:center;}
   #stuList .fin-cell > .chip[data-val] {box-sizing:border-box;width:40px;min-width:40px;min-height:40px;height:40px;margin:0;padding:4px;border-radius:10px;font-size:12px;white-space:nowrap;}
   #stuList .chip[data-val].on {box-shadow:none;outline:none;font-weight:800;}
@@ -322,6 +322,7 @@
   #asisLista .asis-chip {box-sizing:border-box;min-width:44px;height:44px;margin:0;}
   #registroAcademicFooter button {min-height:44px;}
   @media(max-width:640px) {
+    #stuList {--cal-student-width:120px;}
     #stuList .fin-grid .fin-nom {width:120px;min-width:120px;max-width:120px;}
   }
   /* Paleta suave compartida por las decisiones académicas, sin alterar indicadores numéricos. */
@@ -348,6 +349,10 @@
     #finLista .fin-grid > tbody > tr > td:nth-child(odd):not(.fin-nom),
     #avanceBox .fin-grid > tbody > tr > td.summary-competence:nth-child(odd) {background:#f4faf6;}
   }
+  #stuList .cal-student-column {width:var(--cal-student-width);}
+  #stuList .cal-competence-column {width:var(--cal-competence-width);}
+  #stuList .fin-cell {margin-inline:auto;}
+  #stuList .cal-competence-header .fin-caps {white-space:normal;overflow-wrap:anywhere;word-break:normal;}
 /* Fin Visual Registro 3/6/7/10. */
 </style>
   <script src="login-bridge.js"></script>
@@ -2191,7 +2196,7 @@ function renderStudents() {
 
   let head = '<th class="fin-nom">Estudiante</th>';
   cols.forEach((col, i) => {
-    head += '<th>C'+(i+1)+
+    head += '<th class="cal-competence-header">C'+(i+1)+
       ' <button type="button" title="Borrar esta capacidad" data-reg-write onclick="quitarCapGrilla('+i+')" style="border:0;background:#fecaca;color:#991b1b;border-radius:999px;width:18px;height:18px;line-height:18px;font-size:11px;font-weight:900;cursor:pointer;padding:0;margin-left:4px">×</button>'+
       '<div class="fin-caps">'+escapeRegistro(col.comp||'')+'<br>'+escapeRegistro(col.cap||'')+'</div></th>';
   });
@@ -2223,7 +2228,7 @@ function renderStudents() {
     return '<tr>'+tds+'</tr>';
   }).join('');
 
-  box.innerHTML = '<div class="fin-wrap"><table class="fin-grid"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  box.innerHTML = '<div class="fin-wrap"><table class="fin-grid" style="--cal-columns:'+cols.length+'"><colgroup><col class="cal-student-column">'+cols.map(()=>'<col class="cal-competence-column">').join('')+'</colgroup><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.bind(box);
   const cc = document.getElementById('cC'), cb = document.getElementById('cB'), ca = document.getElementById('cA'), cad = document.getElementById('cAD');
   if (cc) cc.textContent = cC;
