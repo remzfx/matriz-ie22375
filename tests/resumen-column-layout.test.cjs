@@ -31,7 +31,7 @@ test('Summary remains readonly and does not disclose or edit competence conclusi
  assert.doesNotMatch(f.el('avanceBox').innerHTML,/Synthetic hidden conclusion|<textarea|<select|<input|academic-conclusion/);
 });
 test('Printed bimestral report has a separate numbered name column; screen reference styling remains intact',()=>{
- const f=view();let prints=0;f.c.print=()=>prints++;const src=html.slice(html.indexOf('function imprimirResumen()'),html.indexOf('\n}',html.indexOf('function imprimirResumen()'))+2);vm.runInContext(src,f.c);f.c.imprimirResumen();
+ const f=view();let prints=0;f.c.print=()=>prints++;const src=html.slice(html.indexOf('function imprimirResumen('),html.indexOf('\n}',html.indexOf('function imprimirResumen('))+2);vm.runInContext(src,f.c);f.c.imprimirResumen();
  assert.equal(prints,1);assert.match(f.el('printArea').innerHTML,/bimestral-number|bimestral-name/);
  assert.match(css('#printArea .fin-grid .summary-student,'),/text-align:left/);
  const rule=css('#printArea .fin-grid .summary-reference');assert.match(rule,/text-align:center;vertical-align:middle/);assert.match(rule,/background:#f4f8fc!important/);assert.match(rule,/border-left:2px solid #94a3b8!important/);assert.match(rule,/print-color-adjust:exact/);
@@ -45,7 +45,7 @@ for(const mode of ['letra','num'])for(const [note,level] of [[18,'AD'],[15,'A'],
 });
 test('Not-worked and pending results share middle/center alignment with reference, without widening rows',()=>{const f=ui();f.c.setCompetenciaTrabajada(f.comps[0],false);const before=JSON.stringify(f.c.store);f.c.renderAvance();assert.match(f.el('avanceBox').innerHTML,/<td class="summary-competence">No trabajada este bimestre<\/td>/);assert.match(css('.fin-grid td.summary-competence'),/vertical-align:middle;text-align:center/);assert.doesNotMatch(css('.fin-grid td.summary-competence'),/width|height|padding|font-size|overflow/);assert.equal(JSON.stringify(f.c.store),before);});
 test('Print copies centered competence classes, preserving A4 print function and all other presentation',()=>{
- const f=ui();f.grade(f.comps[0],15);f.c.print=()=>{};const start=html.indexOf('function imprimirResumen()');vm.runInContext(html.slice(start,html.indexOf('\n}',start)+2),f.c);f.c.imprimirResumen();assert.match(f.el('printArea').innerHTML,/<td class="bimestral-grade">/);
+ const f=ui();f.grade(f.comps[0],15);f.c.print=()=>{};const start=html.indexOf('function imprimirResumen(');vm.runInContext(html.slice(start,html.indexOf('\n}',start)+2),f.c);f.c.imprimirResumen();assert.match(f.el('printArea').innerHTML,/<td class="bimestral-grade">/);
  const old=require('node:child_process').execFileSync('git',['show','8726757011c8c259667741791b60644b20247053:registro.html'],{encoding:'utf8',maxBuffer:4*1024*1024});
  const normalized=x=>x.replace(/\r\n/g,'\n');const restored=require('./registro-visual-snapshot.cjs')(normalized(html)).replace('  .fin-grid td.summary-competence{vertical-align:middle;text-align:center;}\n','').replaceAll('<td class="summary-competence">','<td>');const summary=x=>x.slice(x.indexOf('function renderAvance()'),x.indexOf('const MOBILE_APP_STORES')).replace('al.numeroVisual??i+1','al.orden??i+1');assert.equal(summary(restored),summary(normalized(old)));const styles=x=>x.slice(x.indexOf('.fin-grid th.summary-student,'),x.indexOf('.asis-chip'));assert.equal(styles(restored),styles(normalized(old)));
 });

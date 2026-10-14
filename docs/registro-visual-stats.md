@@ -146,3 +146,21 @@ node tests/registro-bimestral-print-fixture.cjs reporte-secundaria30.html secund
 Abrir la fixture con Live Server y pulsar Abrir impresión/PDF. Comprobar A4 horizontal, márgenes de 10 mm, escala 100 %, encabezados repetidos, numeración continua, nombres completos, notas centradas, estadísticas al final y ausencia de filas partidas. Repetir 30/40 alumnos y áreas de 1–5 competencias. El preview de pantalla es orientativo. La paginación y geometría reales no están verificadas: el navegador automatizado disponible no pudo generar un PDF nativo. No se presenta una simulación como evidencia de paginación.
 
 Reversión: revertir el commit de este ajuste restaura las dos acciones de impresión anteriores; no requiere migraciones ni cambios en Sheets.
+
+## Estabilización final desde 3effb867
+
+CI #162: 1932 aprobadas y 44 fallidas, reproducidas localmente. Clasificación: 32 expectativas del reporte bimestral que prohibían la nueva leyenda del resumen general y esperaban dos tablas en vez de tres; una expectativa del botón general/detalle anterior; un render aislado sin mock de confirmación; diez comparaciones históricas de fuente que no contemplaban las nuevas funciones autorizadas. No se eliminaron ni omitieron tests. Las fixtures cargan las dependencias reales nuevas; los contratos de impresión se actualizan a las modalidades solicitadas. El normalizador histórico acota funciones explícitas de confirmación/impresión, mientras 44 regresiones nuevas ejecutan el source actual sin normalizar. Los módulos protegidos y funciones de cálculo/sincronización se comparan byte a byte con 3effb867.
+
+Defectos funcionales adicionales: los cambios numéricos y el indicador de nivel podían quitar/reemplazar una nota sin confirmación; Guardar podía capturar un cambio sin el evento change; los mensajes de letras contenían saltos escapados literalmente; el detalle fijaba 2026 y truncaba capacidades. Se completaron confirmaciones con alumno, competencia, capacidad/fecha cuando corresponda. Cancelar restaura el campo y no modifica ni persiste el registro; primero vacío y mismo número no piden confirmación. Se conserva la advertencia existente de conclusiones al imprimir el detalle bimestral. No hay envíos automáticos ni cambios a calificación masiva, A1, guardado integrado B1, B2, cálculos, permisos, cierres o backend. El collector conserva también la conclusión histórica de capacidad al reemplazar/eliminar su evidencia.
+
+Impresión por pestaña: Calificar ofrece día, semana lunes–viernes o bimestre; incluye únicamente sesiones registradas del contexto y rango. Promedios imprime resultados finales por competencia y firmas. Resumen incluye relación numerada, resumen general, estadísticas por competencia y firmas. Asistencia lee marcas P/F/T/J y fechas del aula/bimestre, excluye fechas eliminadas y divide tablas de más de 12 fechas para mantener espacio para nombres. Imprimir no recarga el store y no descarta borradores. Los estilos de pantalla aprobados permanecen idénticos.
+
+La fixture admite una modalidad opcional: resumen, promedios, dia, semana, bimestre o asistencia. Por ejemplo:
+
+```powershell
+node tests/registro-bimestral-print-fixture.cjs reporte.html secundaria "Arte y Cultura" 30 semana
+```
+
+Se generaron seis ejemplos sin red y con datos ficticios. Verificar en Live Server impresión nativa A4 horizontal/márgenes, repeticiones de encabezado, filas completas, nombres y firmas; con 30/40 alumnos y hasta cinco competencias. El entorno sigue sin poder generar PDF nativo: no se certifican paginación o geometría física. Las pruebas de HTML/CSS no reemplazan esa comprobación.
+
+Validación: 2020 pruebas aprobadas, 0 fallidas, 0 omitidas (1976 conservadas + 44 nuevas). Reversión: revertir este commit desde 3effb867; no hay migración de almacenamiento, datos o Sheets. No merge ni deploy.

@@ -2024,9 +2024,21 @@ function activarSesion() {
   toast('Capacidad agregada');
 }
 
+function confirmarEdicionNumerica(inp,comp,id,previo,n,cap) {
+  if(!previo)return true;
+  const alumno=estudiantes().find(al=>studentKey(al)===id);
+  const anterior=previo.origen==='letra'?previo.nivel:previo.nota20;
+  const mensaje=(n===''?'¿Quitar '+(cap?'esta evidencia':'la nota directa')+'?':'¿Cambiar '+anterior+' a '+n+'?')+
+    '\nEstudiante: '+(alumno?.nombre||id)+'\nCompetencia: '+comp+
+    (cap?'\nCapacidad: '+cap+'\nFecha: '+document.getElementById('inpFecha').value:'')+
+    '\nLas demás evidencias y conclusiones se conservarán.';
+  if(confirm(mensaje))return true;
+  inp.value=previo.origen==='letra'?'':pad2(previo.nota20);
+  return false;
+}
 function recolectarPantalla() {
   document.querySelectorAll(".academic-conclusion").forEach(el=>{const root=el.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return;setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value);});
-  if (registroSoloLectura()) return false;
+  if (registroSoloLectura() || bimCerradoDocente()) return false;
   try { const active=document.activeElement,root=active?.closest?.('#finLista');if(active&&active.blur&&(!active.dataset?.registroContexto||active.dataset.registroContexto===cloudClaveReg())&&(!root?.dataset?.registroContexto||root.dataset.registroContexto===cloudClaveReg()))active.blur(); } catch (e) {}
   document.querySelectorAll('.cal-nota').forEach(inp => {
     if (inp.dataset.registroContexto && inp.dataset.registroContexto !== cloudClaveReg()) return;
@@ -2038,13 +2050,14 @@ function recolectarPantalla() {
     let n = inp.value === '' ? '' : Number(inp.value);
     if (n !== '' && (isNaN(n) || n < 0 || n > 20)) return;
     if (n !== '') n = Math.round(n);
-    upsertSesionCap(comp, cap);
     const k = capKeyHoy(comp, cap, nombre);
     const previo = leerNota(store.grades, k);
     if (n === '' && previo && previo.origen==='letra') return;
     if (previo && previo.origen!=='letra' && n!=='' && Number(previo.nota20)===n) return;
-    if (n === '') store.grades[k] = {borrado:true,ts:Date.now()};
-    else store.grades[k] = { nota20: n, nivel: numToLetter(n), origen:'numero', ts: Date.now() };
+    if (!confirmarEdicionNumerica(inp,comp,nombre,previo,n,cap)) return;
+    upsertSesionCap(comp, cap);
+    if (n === '') store.grades[k] = Object.assign({},store.grades[k]||{},{borrado:true,ts:Date.now()});
+    else {store.grades[k] = Object.assign({},store.grades[k]||{},{nota20:n,nivel:numToLetter(n),origen:'numero',ts:Date.now()});delete store.grades[k].borrado;}
   });
   document.querySelectorAll('#finLista [data-fin][data-comp]').forEach(cell => {
     const root=document.getElementById('finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return;
@@ -2058,6 +2071,7 @@ function recolectarPantalla() {
     const previo = leerNota(store.finales, k);
     if (nraw === '' && previo && previo.origen==='letra') return;
     if (previo && previo.origen!=='letra' && nraw!=='' && Number(previo.nota20)===Math.round(nraw)) return;
+    if (!confirmarEdicionNumerica(inp,cp,nombre,previo,nraw)) return;
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
     store.finales[k] = { nota20: n, nivel: numToLetter(n), origen: 'numero', ts: Date.now() };
@@ -2369,6 +2383,10 @@ function renderStudents() {
       let n = inp.value === '' ? '' : Number(inp.value);
       if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); return; }
       if (n !== '') n = Math.round(n);
+      const k = capKeyHoy(cp, cap, nombre);
+      const previo=leerNota(store.grades,k);
+      if((n===''&&!previo)||(n!==''&&previo&&previo.origen!=='letra'&&Number(previo.nota20)===n))return;
+      if (!confirmarEdicionNumerica(inp,cp,nombre,previo,n,cap)) return;
       const letra = n === '' ? '' : numToLetter(n);
       const badge = inp.parentElement.querySelector('.eq-letter');
       if (badge) {
@@ -2376,9 +2394,6 @@ function renderStudents() {
         badge.className = 'eq-letter ' + (letra ? eqClass(letra) : 'eq-none');
       }
       if (n !== '') inp.value = pad2(n);
-      const k = capKeyHoy(cp, cap, nombre);
-      const previo=leerNota(store.grades,k);
-      if((n===''&&!previo)||(n!==''&&previo&&previo.origen!=='letra'&&Number(previo.nota20)===n))return;
       upsertSesionCap(cp, cap);
       if (n === '') store.grades[k] = Object.assign({},store.grades[k]||{},{borrado:true,ts:Date.now()});
       else {store.grades[k] = Object.assign({},store.grades[k]||{},{nota20:n,nivel:letra,origen:'numero',ts:Date.now()});delete store.grades[k].borrado;}
@@ -2404,7 +2419,7 @@ function renderStudents() {
       if (letraPrevia) {
         const alumno=estudiantes().find(al=>studentKey(al)===nombre);
         const accion=letraPrevia===val?'quitar la evidencia '+letraPrevia:'cambiar la evidencia de '+letraPrevia+' a '+val;
-        if (!confirm('¿Confirmas '+accion+'?\\nEstudiante: '+(alumno?.nombre||nombre)+'\\nCompetencia: '+cp+'\\nCapacidad: '+cap+'\\nFecha: '+fecha+'\\nLas otras evidencias se conservarán.')) return;
+        if (!confirm('¿Confirmas '+accion+'?\nEstudiante: '+(alumno?.nombre||nombre)+'\nCompetencia: '+cp+'\nCapacidad: '+cap+'\nFecha: '+fecha+'\nLas otras evidencias se conservarán.')) return;
       }
       // Repetir la selección quita únicamente la evidencia de esta celda.
       if (letraPrevia === val) {
@@ -2648,9 +2663,10 @@ async function rellenarSiagieExcel() {
   if (sinMatch) console.log('SIAGIE sin match de nombre:', sinMatch);
 }
 function prepararImpresion(opciones) {
-  loadStore();
   opciones=opciones||{};
   const c = ctxBase();
+  const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
+  const anio=cfg&&Number.isInteger(Number(cfg.anio))&&Number(cfg.anio)>=2000&&Number(cfg.anio)<=2100?String(cfg.anio):'No configurado';
   const alumnos = estudiantes();
   const docente = document.getElementById('inpDocente').value.trim() || '________________';
   const sess = (store.sessions || []).filter(s =>
@@ -2659,7 +2675,7 @@ function prepararImpresion(opciones) {
     (!opciones.desde || s.fecha >= opciones.desde) && (!opciones.hasta || s.fecha <= opciones.hasta)
   ).sort((a,b) => (a.fecha||'').localeCompare(b.fecha||'') || (a.comp||'').localeCompare(b.comp||''));
 
-  if (!sess.length && (opciones.desde || opciones.hasta || !alumnos.some(al=>competencias().some(cp=>notaCompAlumno(cp,studentKey(al)).letra)))) {
+  if (!sess.length) {
     alert('No hay resultados guardados en este bimestre/área para imprimir.');
     return;
   }
@@ -2695,27 +2711,22 @@ function prepararImpresion(opciones) {
   html += `<div class="print-hdr">
     <div style="font-size:9pt">IE 22375 SANTA ROSA DE LOS MOLINOS</div>
     <h1>REGISTRO AUXILIAR DE EVALUACIÓN</h1>
-    <h2>${(c.area||'').toUpperCase()} · BIMESTRE ${c.bim} · ${nivelTxt}${opciones.desde?' · '+opciones.desde+' al '+opciones.hasta:''}</h2>
+    <h2>${escapeRegistro((c.area||'').toUpperCase())} · BIMESTRE ${c.bim} · ${nivelTxt}${opciones.desde?' · '+opciones.desde+' al '+opciones.hasta:''}</h2>
   </div>
   <table class="print-meta"><tr>
-    <td><b>Grado / Sección:</b> ${c.grado}° ${c.seccion}</td>
-    <td><b>Año:</b> 2026</td>
+    <td><b>Grado / Sección:</b> ${escapeRegistro(c.grado)}° ${escapeRegistro(c.seccion)}</td>
+    <td><b>Año:</b> ${escapeRegistro(anio)}</td>
   </tr><tr>
-    <td><b>Docente:</b> ${docente}</td>
+    <td><b>Docente:</b> ${escapeRegistro(docente)}</td>
     <td><b>Fecha de impresión:</b> ${new Date().toLocaleDateString('es-PE')}</td>
   </tr></table>`;
-
-  const escImpresion=v=>String(v||'').replace(/[&<>"]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
-  if (!opciones.desde) html+='<h2>Resultados bimestrales por competencia</h2><table class="print-tbl"><thead><tr><th>Estudiante</th>'+competencias().map(cp=>'<th>'+escImpresion(cp)+'</th>').join('')+'</tr></thead><tbody>';
-  if (!opciones.desde) alumnos.forEach(al=>{html+='<tr><td>'+escImpresion(al.nombre)+'</td>'+competencias().map(cp=>{if(!competenciaTrabajada(cp))return '<td>No trabajada este bimestre</td>';const r=notaCompAlumno(cp,studentKey(al));return '<td>'+escImpresion(r.letra||'Pendiente')+(IERegistroAcademico.requiresConclusion(c.nivel,r.letra)?'<p>'+escImpresion(concCompAlumno(cp,studentKey(al)))+'</p>':'')+'</td>';}).join('')+'</tr>';});
-  if (!opciones.desde) html+='</tbody></table>';
 
   // Detail per competencia
   comps.forEach((comp, idx) => {
     const evidencias = byComp[comp].slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
     html += `<div class="${idx===0?'':'print-break'}"></div>`;
     html += `<div class="print-hdr" style="margin-top:10px">
-      <h2 style="font-size:11pt;font-weight:bold">Competencia: ${comp}</h2>
+      <h2 style="font-size:11pt;font-weight:bold">Competencia: ${escapeRegistro(comp)}</h2>
     </div>`;
 
     // header row: # | Alumno | ev1 | ev2 | ... | PROM | LETRA
@@ -2723,7 +2734,7 @@ function prepararImpresion(opciones) {
       <th style="width:28px">N°</th>
       <th style="text-align:left">Estudiante</th>`;
     evidencias.forEach(e => {
-      html += `<th style="font-size:7.5pt;max-width:70px">${(e.fecha||'').slice(5)}<br>${(e.capacidad||'').slice(0,18)}</th>`;
+      html += `<th style="font-size:7.5pt;max-width:70px">${(e.fecha||'').slice(5)}<br>${escapeRegistro(e.capacidad||'')}</th>`;
     });
     html += `<th>PROM</th><th>NL</th></tr></thead><tbody>`;
 
@@ -2744,13 +2755,13 @@ function prepararImpresion(opciones) {
             if (m !== '') vals.push(Number(m));
           }
         }
-        cells += `<td style="text-align:center">${show}</td>`;
+        cells += `<td style="text-align:center;vertical-align:middle;font-weight:bold">${escapeRegistro(show)}</td>`;
       });
       const prom = promedioNums(vals);
       const letra = prom != null ? numToLetter(prom) : '';
       html += `<tr>
         <td style="text-align:center">${i+1}</td>
-        <td style="text-align:left;font-size:8pt">${al.nombre}</td>
+        <td style="text-align:left;font-size:8pt">${escapeRegistro(al.nombre)}</td>
         ${cells}
         <td style="text-align:center;font-weight:bold">${prom != null && exacto ? pad2(prom) : ''}</td>
         <td style="text-align:center;font-weight:bold">${letra}</td>
@@ -2761,7 +2772,7 @@ function prepararImpresion(opciones) {
   });
 
   html += `<div class="print-sign">
-    <div>Docente responsable<br><span style="font-size:8pt">${docente}</span></div>
+    <div>Docente responsable<br><span style="font-size:8pt">${escapeRegistro(docente)}</span></div>
     <div>V° B° Dirección / Coordinación</div>
   </div>
   <div class="print-foot">IE 22375 Santa Rosa de los Molinos · Registro auxiliar digital · Uso supervisiones UGEL / DRE · Generado para impresión</div>`;
@@ -3011,14 +3022,15 @@ function aplicarFinalManual(comp, nombre, val, posponerRender) {
   return true;
 }
 function seleccionarFinalReversible(comp, nombre, val) {
+  if(registroSoloLectura()||bimCerradoDocente()||!competenciaTrabajada(comp)||!estudiantes().some(al=>studentKey(al)===nombre)||!competencias().includes(comp))return false;
   const original=leerNota(store.finales,finalKey(comp,nombre));
   const letra=original&&(original.nivel||((original.nota20!==''&&original.nota20!=null)?numToLetter(original.nota20):''));
   if (letra) {
     const alumno=estudiantes().find(al=>studentKey(al)===nombre);
     const quitar=letra===val;
     const mensaje=(quitar?'¿Quitar la nota directa '+letra+'?':'¿Cambiar la nota directa de '+letra+' a '+val+'?')+
-      '\\nEstudiante: '+(alumno?.nombre||nombre)+'\\nCompetencia: '+comp+
-      '\\nLas evidencias y conclusiones se conservarán.';
+      '\nEstudiante: '+(alumno?.nombre||nombre)+'\nCompetencia: '+comp+
+      '\nLas evidencias y conclusiones se conservarán.';
     if(!confirm(mensaje))return false;
   }
   if(original && letra===val)return quitarFinalManual(comp,nombre);
@@ -3160,6 +3172,10 @@ function renderFinales() {
       let n = inp.value === '' ? '' : Number(inp.value);
       if (n !== '' && (isNaN(n) || n < 0 || n > 20)) { toast('Solo 0 a 20'); return; }
       if (n !== '') n = Math.round(n);
+      const k = finalKey(comp, nombre);
+      const previo=leerNota(store.finales,k);
+      if((n===''&&!previo)||(n!==''&&previo&&previo.origen!=='letra'&&Number(previo.nota20)===n))return;
+      if (!confirmarEdicionNumerica(inp,comp,nombre,previo,n)) return;
       const letra = n === '' ? '' : numToLetter(n);
       const badge = cell.querySelector('.eq-letter');
       if (badge) {
@@ -3167,9 +3183,6 @@ function renderFinales() {
         badge.className = 'eq-letter ' + (letra ? eqClass(letra) : 'eq-none');
       }
       if (n !== '') inp.value = pad2(n);
-      const k = finalKey(comp, nombre);
-      const previo=leerNota(store.finales,k);
-      if((n===''&&!previo)||(n!==''&&previo&&previo.origen!=='letra'&&Number(previo.nota20)===n))return;
       if (n === '') store.finales[k] = {borrado: true, ts: Date.now()};
       else store.finales[k] = { nota20: n, nivel: letra, origen: 'numero', ts: Date.now() };
       saveStore();
@@ -3190,7 +3203,7 @@ function renderFinales() {
       seleccionarFinalReversible(comp,nombre,val);
     });
   });
-  box.querySelectorAll('[data-final-toggle]').forEach(el=>el.onclick=()=>{if(el.disabled||[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')!==cloudClaveReg())return;quitarFinalManual(decodeURIComponent(el.dataset.finalToggle),decodeURIComponent(el.dataset.alumno));});
+  box.querySelectorAll('[data-final-toggle]').forEach(el=>el.onclick=()=>{if(el.disabled||[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')!==cloudClaveReg())return;const comp=decodeURIComponent(el.dataset.finalToggle),id=decodeURIComponent(el.dataset.alumno),previo=leerNota(store.finales,finalKey(comp,id));if(previo)seleccionarFinalReversible(comp,id,previo.nivel||numToLetter(previo.nota20));});
   box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
   IEConclusionSuggestions.bindCompact(box,(el,text)=>{const changed=setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),text);if(changed && estadisticas && typeof estadisticasCompetenciasHTML==='function')estadisticas.innerHTML=estadisticasCompetenciasHTML(comps,alumnos);return changed;});
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);
@@ -3212,6 +3225,7 @@ function guardarFinales() {
     const previo = leerNota(store.finales, k);
     if (nraw === '' && previo && previo.origen==='letra') return;
     if (previo && previo.origen!=='letra' && nraw!=='' && Number(previo.nota20)===Math.round(nraw)) return;
+    if (!confirmarEdicionNumerica(inp,comp,nombre,previo,nraw)) return;
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
     const n = Math.round(nraw);
     store.finales[k] = { nota20: n, nivel: numToLetter(n), origen:'numero', ts: Date.now() };
@@ -3461,7 +3475,9 @@ function imprimirPestanaActiva(){
  const active=['panelCalificar','panelFinales','panelAvance','panelAsistencia'].find(id=>document.getElementById(id)?.classList.contains('on'));
  if(active==='panelCalificar') {abrirSelectorImpresionCalificar();return;}
  if(active==='panelAsistencia') {imprimirAsistenciaRegistro();return;}
- // Promedios y Resumen comparten resultados oficiales por competencia, con estadísticas y firmas.
+ if(active==='panelFinales') {imprimirResumen({promedios:true});return;}
+ if(active!=='panelAvance'){toast('Selecciona una pestaña académica para imprimir.');return;}
+ // Resumen conserva sus estadísticas generales y por competencia, además de firmas.
  imprimirResumen();
 }
 function abrirSelectorImpresionCalificar(){
@@ -3485,29 +3501,35 @@ function abrirSelectorImpresionCalificar(){
  dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
 }
 function imprimirAsistenciaRegistro(){
- loadStore();
  const c=ctxBase(),alumnos=estudiantes(),fechas=(store.asisFechas?.[asisCtxKey()]||[]).filter(f=>/^\d{4}-\d{2}-\d{2}$/.test(f)&&!store.asisFechasEstado?.[asisCtxKey()+'||'+f]?.borrado).slice().sort();
  if(!fechas.length){alert('No hay fechas de asistencia registradas en este bimestre.');return;}
  const docente=document.getElementById('inpDocente')?.value||'No registrado';
  let html='<article class="bimestral-report"><header class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>REGISTRO DE ASISTENCIA</h2></header>';
  html+='<div class="bimestral-meta"><span><b>Área:</b> '+escapeRegistro(c.area)+'</span><span><b>Nivel:</b> '+escapeRegistro(c.nivel)+'</span><span><b>Aula:</b> '+escapeRegistro(c.grado+'° '+c.seccion)+'</span><span><b>Bimestre:</b> '+escapeRegistro(c.bim)+'</span><span><b>Docente:</b> '+escapeRegistro(docente)+'</span><span><b>Impresión:</b> '+new Date().toLocaleDateString('es-PE')+'</span></div>';
- html+='<table class="bimestral-table"><thead><tr><th>N.º</th><th>Estudiante</th>'+fechas.map(f=>'<th>'+escapeRegistro(f.slice(5))+'</th>').join('')+'</tr></thead><tbody>';
+ const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
+ html+='<p>Año: '+escapeRegistro(cfg?.anio||'No configurado')+'</p>';
+ const todasFechas=fechas.slice();
+ for(let offset=0;offset<todasFechas.length;offset+=12){const fechas=todasFechas.slice(offset,offset+12);
+ html+='<table class="bimestral-table"><colgroup><col class="bimestral-number-column"><col class="bimestral-name-column">'+fechas.map(()=>'<col>').join('')+'</colgroup><thead><tr><th>N.º</th><th>Estudiante</th>'+fechas.map(f=>'<th>'+escapeRegistro(f.slice(5))+'</th>').join('')+'</tr></thead><tbody>';
  alumnos.forEach((al,i)=>{html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+fechas.map(f=>{const rec=asisGet(leerNota(store.asistencia,asisMarkKey(f,studentKey(al))));return '<td class="bimestral-grade">'+escapeRegistro(rec.marca||'—')+'</td>';}).join('')+'</tr>';});
- html+='</tbody></table><p style="margin-top:12px;font-size:9pt">P = Presente · F = Falta · T = Tardanza · J = Justificado · — = Sin registro</p><footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(docente)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
+ html+='</tbody></table>';
+ }
+ html+='<p style="margin-top:12px;font-size:9pt">P = Presente · F = Falta · T = Tardanza · J = Justificado · — = Sin registro</p><footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(docente)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
  document.getElementById('printArea').innerHTML=html;window.print();
 }
-function imprimirResumen(){
+function imprimirResumen(opciones){
+ const esPromedios=!!(opciones&&opciones.promedios);
  const c=ctxBase(),alumnos=estudiantes(),comps=competencias();
  const doc=(document.getElementById('inpDocente').value||'').trim()||'No registrado';
  const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
  const anio=cfg&&Number.isInteger(Number(cfg.anio))&&Number(cfg.anio)>=2000&&Number(cfg.anio)<=2100?String(cfg.anio):'No configurado';
  const fecha=new Date().toLocaleDateString('es-PE');
  const nivelTexto=c.nivel==='primaria'?'Primaria':'Secundaria';
- let html='<article class="bimestral-report"><header class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>REGISTRO AUXILIAR BIMESTRAL</h2></header>';
+ let html='<article class="bimestral-report"><header class="print-hdr"><h1>I.E. 22375 Santa Rosa de los Molinos</h1><h2>'+ (esPromedios?'RESULTADOS FINALES POR COMPETENCIA':'REGISTRO AUXILIAR BIMESTRAL')+'</h2></header>';
  html+='<div class="bimestral-meta">'+[['Área',c.area],['Nivel',nivelTexto],['Grado',c.grado+'°'],['Sección',c.seccion],['Bimestre',c.bim],['Año',anio],['Docente',doc],['Fecha',fecha]].map(([label,value])=>'<span><b>'+label+':</b> '+escapeRegistro(value)+'</span>').join('')+'</div>';
  html+='<table class="bimestral-table"><colgroup><col class="bimestral-number-column"><col class="bimestral-name-column">'+comps.map(()=>'<col>').join('')+'</colgroup><thead><tr><th class="bimestral-number">N.º</th><th class="bimestral-name">Estudiante</th>'+comps.map(cp=>'<th>'+escapeRegistro(cp)+'</th>').join('')+'</tr></thead><tbody>';
  alumnos.forEach((al,i)=>{const id=studentKey(al);html+='<tr><td class="bimestral-number">'+(i+1)+'</td><td class="bimestral-name">'+escapeRegistro(al.nombre)+'</td>'+comps.map(cp=>'<td class="bimestral-grade">'+(competenciaTrabajada(cp)?'<span class="bimestral-result">'+escapeRegistro(notaCompAlumno(cp,id).letra||'—')+'</span>':'<small>No trabajada este bimestre</small>')+'</td>').join('')+'</tr>';});
- html+='</tbody></table>'+estadisticaResumenHTML()+estadisticasCompetenciasHTML(comps,alumnos)+'<footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(doc)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
+ html+='</tbody></table>'+(esPromedios?'':estadisticaResumenHTML()+estadisticasCompetenciasHTML(comps,alumnos))+'<footer class="bimestral-signatures"><div class="bimestral-signature"><span>Docente responsable</span><small>'+escapeRegistro(doc)+'</small></div><div class="bimestral-signature"><span>V.º B.º Dirección / Coordinación</span></div></footer></article>';
  const pa=document.getElementById('printArea');pa.innerHTML=html;
  window.print();
 }

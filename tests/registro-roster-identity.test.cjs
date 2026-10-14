@@ -105,7 +105,7 @@ test('Real grade collection writes a stable key while retaining the historical n
  const s=fixture();s.c.base=s.roster([{idSiagie:'42',nombre:'Synthetic Student'}]);s.run('bdEstudiantes=base');
  s.run("store.grades[cloudClaveReg()+'||Resuelve||Capacidad||2026-10-03||Synthetic Student']={nota20:12}");
  s.c.document.querySelectorAll=selector=>selector==='.cal-nota'?[{value:'18',readOnly:false,dataset:{nom:'id%3A42',cap:'Capacidad',comp:'Resuelve'}}]:[];
- s.run('function upsertSesionCap(){}');s.run(extract('registro.html','capKeyHoy'));s.run(extract('registro.html','recolectarPantalla'));s.run('function numToLetter(n){return n>=17?\'AD\':\'A\'}');
+ s.run('function upsertSesionCap(){}');s.run(extract('registro.html','capKeyHoy'));s.c.confirm=()=>true;s.run(extract('registro.html','confirmarEdicionNumerica'));s.run(extract('registro.html','recolectarPantalla'));s.run('function numToLetter(n){return n>=17?\'AD\':\'A\'}');
  s.c.recolectarPantalla();assert.equal(s.run("store.grades[cloudClaveReg()+'||Resuelve||Capacidad||2026-10-03||id:42'].nota20"),18);
  assert.equal(s.run("store.grades[cloudClaveReg()+'||Resuelve||Capacidad||2026-10-03||Synthetic Student'].nota20"),12);
 });

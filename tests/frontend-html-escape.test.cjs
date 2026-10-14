@@ -64,10 +64,10 @@ test('Auxiliar section option preserves the original value rather than decoding 
 
 function finals(mode){
  const student={nombre:sample,idSiagie:sample},store={finales:{}},writes=[];
- const p=page('registro.html',['escapeRegistro','aplicarFinalManual','seleccionarFinalReversible','renderFinales'],{cloudClaveReg:()=> 'secundaria||III||1||A||Matemática',modoCalif:mode,store,loadStore(){},ctxBase:()=>({nivel:'secundaria',grado:1,seccion:'A',bim:'III',area:'Matemática'}),competencias:()=>[sample],capsDeComp:()=>[],bimCerradoDocente:()=>false,
+ const p=page('registro.html',['confirmarEdicionNumerica','escapeRegistro','aplicarFinalManual','seleccionarFinalReversible','renderFinales'],{cloudClaveReg:()=> 'secundaria||III||1||A||Matemática',modoCalif:mode,store,loadStore(){},ctxBase:()=>({nivel:'secundaria',grado:1,seccion:'A',bim:'III',area:'Matemática'}),competencias:()=>[sample],capsDeComp:()=>[],bimCerradoDocente:()=>false,
  estudiantes:()=>[student],competenciaTrabajada:()=>true,studentKey:a=>'id:'+a.idSiagie,notaDirectaAlumno:()=>({nota:15,letra:'A'}),notaDesdeSesiones:()=>({nota:15,letra:'A'}),notaCompAlumno:()=>({nota:15,letra:'A'}),leerNota:()=>({nota20:15,nivel:'A',origen:'numero'}),finalKey:(cp,id)=>cp+'||'+id,
  registroSoloLectura:()=>false,IERegistroAcademico:{requiresConclusion:()=>false},baselineAcademica(){},IEConclusionSuggestions:{bindCompact(){}},setConclusionAcademica(){},sincronizarEdicionRegistro(){},pad2:n=>String(n),eqClass:()=> 'eq-a',numeroExactoComp:()=>true,
- toast(){},letterToNum:()=>12,numToLetter:()=> 'B',saveStore:()=>writes.push(true)});
+ confirm:()=>true,toast(){},letterToNum:()=>12,numToLetter:()=> 'B',saveStore:()=>writes.push(true)});
  return {...p,store,writes,student};
 }
 for(const mode of ['letra','num'])test('Promedios '+mode+' encodes real names/competence headers and retains editable note handlers',()=>{
