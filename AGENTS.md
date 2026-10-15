@@ -291,6 +291,43 @@ Usar terminología escolar:
 - Matriz consolidada
 - Solo lectura
 
+
+## Flujo operativo con Codex y control de cambios (vigente desde PR #85)
+
+Estas instrucciones complementan las reglas anteriores y prevalecen en cuestiones de proceso.
+
+### Responsabilidades y autorizaciones
+
+- **Usuario:** aporta evidencia de producción, realiza solo pruebas manuales que no puedan automatizarse, autoriza expresamente **cada merge por separado** y ejecuta personalmente el deploy.
+- **ChatGPT:** clasifica incidentes y riesgos, revisa los cambios/PR y CI, solicita la autorización individual para fusionar, y realiza el merge únicamente después de recibirla. No despliega.
+- **Codex:** implementa cambios complejos y pruebas ficticias automatizadas, crea/actualiza un PR **DRAFT** y documenta resultados. **Nunca hace merge ni deploy** por iniciativa propia.
+- Secuencia obligatoria: evidencia → diagnóstico focalizado → autorización de cambios → implementación de Codex en PR DRAFT → revisión/CI/pruebas → autorización expresa de merge → merge por ChatGPT → deploy por usuario → observación de producción.
+- Una autorización para investigar, editar archivos, preparar un PR o actualizar estas instrucciones **no autoriza un merge**. Nunca activar auto-merge.
+
+### Optimización de investigación y pruebas
+
+1. Revisar primero documentos de continuidad, issues, PR y pruebas anteriores relacionados. **No volver a auditar** objetivos ya aprobados sin indicio nuevo o dependencia directa.
+2. Leer y modificar solo archivos/funciones relevantes; evitar barridos completos, reescrituras y refactors ajenos.
+3. Reutilizar pruebas/utilidades existentes; añadir reproducciones sintéticas focalizadas solo donde falte cobertura. No duplicar comprobaciones.
+4. Agrupar correcciones relacionadas en un único PR; si ya hay PR abierto, ampliarlo en lugar de crear otro para detalles menores.
+5. Ejecutar primero pruebas focalizadas; tras cambios relevantes, ejecutar suite completa aplicable y CI. Si algo no puede automatizarse, pedir la **mínima** prueba manual necesaria.
+6. Documentar causa raíz, archivos, riesgo sobre datos, pruebas/resultados, HEAD y riesgo residual, de forma breve y verificable.
+7. Ahorrar créditos nunca justifica omitir comprobaciones necesarias para seguridad o integridad académica.
+
+### Protección absoluta de datos reales
+
+- Nunca modificar, borrar, resetear, migrar ni restaurar notas reales como parte de pruebas. Solo utilizar datos y transportes ficticios.
+- No ejecutar escrituras académicas de producción, subidas a nube, recuperación de borradores, limpieza de localStorage/IndexedDB o invalidación de respaldos sin consentimiento específico y una revisión de riesgo.
+- Mantener intactos control de concurrencia/baseline CAS, conciliación A1/B1, separación de cuentas, permisos, cierres y prioridad de nota directa en **Promedios** sobre resultado calculado desde **Calificar**.
+- Una descarga puede actualizar resultados calculados mostrados a partir de evidencias, pero nunca debe sobrescribir una nota directa, ni desencadenar subida automática.
+- CI y pruebas sintéticas no sustituyen validación prudente en producción. Si una profesora detecta notas ausentes o aviso de fallo local, no pedirle que limpie caché ni que reemplace datos: detener operaciones de escritura y recopilar evidencia.
+
+### Entregables de Codex
+
+- PR en estado **DRAFT**, referido al issue correspondiente, sin fusión ni despliegue.
+- Resumen de cambios puntuales, HEAD, resultados de pruebas focalizadas y suite/CI, riesgos residuales y pasos mínimos para una comprobación segura.
+- No declarar un cambio «en producción» ni «fusionado» hasta disponer de evidencia de cada etapa.
+
 ## Filosofía
 
 Preferir:
