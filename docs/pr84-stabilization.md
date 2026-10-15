@@ -25,3 +25,17 @@ Las copias inline evitan introducir una dependencia de red nueva. Apps Script, S
 - Cuota/almacenamiento bloqueado cancela recuperación y advierte; no eliminar datos para liberar espacio automáticamente.
 - Los aportes transversales pendientes continúan fuera del respaldo académico de emergencia y mantienen su advertencia existente.
 - No hay merge, deploy, subida académica automática ni uso de datos oficiales.
+
+## Revisión focalizada #6198461418 — ciclo de sesión
+
+Comprobado en navegador real mediante `node tests/registro-session-lifecycle-fixture.cjs` y `http://127.0.0.1:18985/registro.html`. La fixture reutiliza exactamente el gate de Registro, `getLoginSession`, `setSession`, `clearSession`, `cerrarSesion`, `irModulo` y los adaptadores actuales. Solo perfiles/notas/nube ficticios; CSP `connect-src 'none'`. No ejecuta el login remoto ni reproduce todas las pantallas de producción.
+
+| Caso | Evidencia observada | ¿Documento nuevo? |
+| --- | --- | --- |
+| Registro sin sesión → login A → Registro | Redirección a `index.html`; al abrir Registro: `propietario válido true`, notas `null`. | Sí, al abrir Registro. |
+| Cerrar/iniciar B sin recargar index | El identificador del documento de index no cambia. Al abrir Registro B: propietario válido y notas `null`, sin adoptar la nota 15 de A. | Index: no. Registro: sí. |
+| Cambiar cuenta dentro de un Registro ya abierto | El adaptador de A rechaza escribir como B. Mensaje de bloqueo en el mismo documento. | Debe reabrirse Registro. |
+| A y B en pestañas distintas | `/tab-a.html` guarda 15 y `/tab-b.html` guarda 18; ambas mantienen propietario válido y su propia nota, compartiendo localStorage y separando sessionStorage. | Instancias independientes. |
+| Nube ficticia tras separación y legacy | Controller real: lectura simulada → respaldo IndexedDB verificado → nota 18. Docente no puede leer legacy; Admin puede revisarlo sin adoptarlo; original intacto. | No para recuperar; el cambio de cuenta bloquea la instancia anterior. |
+
+Conclusión: no se reproduce un fallo en el ciclo soportado. Registro no tiene login embebido: su gate redirige al login y `irModulo()` navega mediante `window.location.href`. No se añade rebinding automático porque podría adoptar memoria de otra cuenta. Se agregan cuatro regresiones focalizadas; las pruebas existentes de recuperación/migración cubren las operaciones académicas reales con transporte ficticio.
