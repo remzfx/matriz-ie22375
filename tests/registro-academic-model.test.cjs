@@ -7,7 +7,8 @@ const {academicUi,extract}=new Function('require','__dirname',integ.split('\ntes
 const backend=new Function('require','__dirname',read('tests/backend-write-auth.test.cjs').split('\nfor (const action')[0]+'\nreturn setup;')(require,__dirname);
 const identity=new Function('require','__dirname',read('tests/registro-roster-identity.test.cjs').split('\ntest(')[0]+'\nreturn {fixture,extract};')(require,__dirname);
 function ui(level='secundaria'){
- const f=academicUi(),c=f.c;c.nivel=level;c.areaActual='Matemática';c.identidadAlumno=String;c.cloudClaveReg=()=>[level,'I',2,'A','Matemática'].join('||');
+ const printBuilder=require('../registro-calificar-print.js');
+ const f=academicUi(),c=f.c;c.IECalificarPrint=printBuilder;c.nivel=level;c.areaActual='Matemática';c.identidadAlumno=String;c.cloudClaveReg=()=>[level,'I',2,'A','Matemática'].join('||');
  vm.runInContext(read('registro-academic-model.js'),c);vm.runInContext(read('conclusion-suggestions.js'),c);const comps=c.IERegistroAcademico.catalog[level]['Matemática'];c.competencias=()=>comps;
  c.prefijoReg=()=>c.cloudClaveReg()+'||';c.tsDe=x=>x&&x.ts||0;c.guardarTodo=()=>true;c.dirty=false;c.studentKey=a=>typeof a==='object'?'id:'+a.idSiagie:String(a);c.store.concComp={};c.store.competenciasEstado={};
  c.loadStore=()=>{};c.fillComps=c.renderStudents=c.renderFinales=()=>{};

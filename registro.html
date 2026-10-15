@@ -535,6 +535,32 @@
     #printArea .promedios-print .print-conclusion-level {text-align:center;vertical-align:middle;font-weight:700;}
   }
 /* Fin Visual Registro 3/6/7/10. */
+/* Calificar integral Issue86 */
+ @page calificar-integral {size:A4 landscape;margin:8mm;}
+ @page calificar-integral-amplio {size:A3 landscape;margin:8mm;}
+ @media print {
+  #printArea:has(> .calificar-print) {page:calificar-integral;padding:0!important;}
+  #printArea:has(> .calificar-print.wide) {page:calificar-integral-amplio;}
+  .calificar-print {font:8pt Arial,Helvetica,sans-serif;line-height:1.15;}
+  .calificar-print table {width:100%;border-collapse:collapse;table-layout:fixed;}
+  .calificar-print th,.calificar-print td {border:0.25mm solid #64748b;padding:1mm 0.5mm;text-align:center;vertical-align:middle;overflow-wrap:anywhere;}
+  .calificar-print thead {display:table-header-group;break-inside:avoid;}
+  .calificar-print tr {break-inside:avoid;page-break-inside:avoid;}
+  .calificar-print th {background:#edf2f7!important;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+  .calificar-print .student-number {width:7mm;}
+  .calificar-print .student-name {width:47mm;text-align:left;white-space:normal;}
+  .calificar-print .evidence-title {height:18mm;font-size:6pt;line-height:1.1;}
+  .calificar-print .grade {font-size:7pt;white-space:nowrap;}
+  .calificar-print.dense .grade {font-size:6pt;padding-left:0;padding-right:0;}
+  .calificar-print .result {background:#f1f5f9!important;border-left:0.5mm solid #475569;font-weight:bold;}
+  .calificar-print th.result {font-size:6pt;}
+  .calificar-print .result small {display:block;font-size:5.5pt;white-space:normal;font-weight:normal;}
+  .calificar-print .legend {font-size:7pt;margin:4mm 0;}
+  .calificar-print .legend p {margin:1mm 0;break-inside:avoid;}
+  .calificar-print .print-hdr h1 {font-size:12pt;}
+  .calificar-print .print-hdr h2 {font-size:9pt;}
+ }
+ /* Fin Calificar integral Issue86 */
 </style>
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
@@ -792,7 +818,6 @@
       <p class="text-[11px] text-slate-500 mb-1">Un chip por día. Tócalo para abrir esa fecha.</p>
       <div id="listaSesiones" class="flex flex-wrap gap-1"></div>
       <p class="text-[11px] text-slate-400 mt-1" id="lblSinSesiones">Aún no hay sesiones guardadas.</p>
-      <button type="button" class="btn btn-ghost no-print text-sm" onclick="prepararImpresion()">Imprimir detalle de evidencias</button>
     </div>
 
     <!-- Calificar -->
@@ -860,6 +885,69 @@
 
 <div id="printArea"></div>
 
+<script>
+/* Vista integral de Calificar: solo lectura; no convierte ni persiste calificaciones. */
+(function(root){
+ 'use strict';
+ const escape=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const css=`/* Calificar integral Issue86 */
+ @page calificar-integral {size:A4 landscape;margin:8mm;}
+ @page calificar-integral-amplio {size:A3 landscape;margin:8mm;}
+ @media print {
+  #printArea:has(> .calificar-print) {page:calificar-integral;padding:0!important;}
+  #printArea:has(> .calificar-print.wide) {page:calificar-integral-amplio;}
+  .calificar-print {font:8pt Arial,Helvetica,sans-serif;line-height:1.15;}
+  .calificar-print table {width:100%;border-collapse:collapse;table-layout:fixed;}
+  .calificar-print th,.calificar-print td {border:0.25mm solid #64748b;padding:1mm 0.5mm;text-align:center;vertical-align:middle;overflow-wrap:anywhere;}
+  .calificar-print thead {display:table-header-group;break-inside:avoid;}
+  .calificar-print tr {break-inside:avoid;page-break-inside:avoid;}
+  .calificar-print th {background:#edf2f7!important;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+  .calificar-print .student-number {width:7mm;}
+  .calificar-print .student-name {width:47mm;text-align:left;white-space:normal;}
+  .calificar-print .evidence-title {height:18mm;font-size:6pt;line-height:1.1;}
+  .calificar-print .grade {font-size:7pt;white-space:nowrap;}
+  .calificar-print.dense .grade {font-size:6pt;padding-left:0;padding-right:0;}
+  .calificar-print .result {background:#f1f5f9!important;border-left:0.5mm solid #475569;font-weight:bold;}
+  .calificar-print th.result {font-size:6pt;}
+  .calificar-print .result small {display:block;font-size:5.5pt;white-space:normal;font-weight:normal;}
+  .calificar-print .legend {font-size:7pt;margin:4mm 0;}
+  .calificar-print .legend p {margin:1mm 0;break-inside:avoid;}
+  .calificar-print .print-hdr h1 {font-size:12pt;}
+  .calificar-print .print-hdr h2 {font-size:9pt;}
+ }
+ /* Fin Calificar integral Issue86 */`;
+ function build(o){
+  const c=o.context,mode=o.mode==='num'?'num':'letra',unique=new Map();
+  for(const s of o.sessions||[])if(s.nivel===c.nivel&&s.bim===c.bim&&String(s.grado)===String(c.grado)&&s.seccion===c.seccion&&s.area===c.area&&s.comp&&(!o.from||s.fecha>=o.from)&&(!o.to||s.fecha<=o.to))unique.set(JSON.stringify([s.comp,s.fecha,s.capacidad]),s);
+  const sessions=[...unique.values()].sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||''))||String(a.capacidad||'').localeCompare(String(b.capacidad||'')));
+  if((o.from||o.to)&&!sessions.length)return '';
+  const comps=[...new Set([...(o.competences||[]),...sessions.map(s=>s.comp)])];
+  if(!comps.length)return '';
+  const groups=comps.map((name,i)=>({name,code:'C'+(i+1),sessions:sessions.filter(s=>s.comp===name)})),columns=groups.reduce((n,g)=>n+g.sessions.length+1,0);
+  const grade=g=>{if(!g||g.borrado)return '—';if(mode==='letra')return g.nivel||(g.nota20!==''&&g.nota20!=null?o.toLetter(g.nota20):'—');return g.origen!=='letra'&&g.nota20!==''&&g.nota20!=null&&Number.isFinite(Number(g.nota20))?String(g.nota20).padStart(2,'0'):g.nivel||'—';};
+  const short=text=>{const s=String(text||'Sin capacidad').trim();return s.length>36?s.slice(0,33)+'…':s;};
+  let html='<article class="calificar-print'+(columns>28?' wide':'')+(columns>18?' dense':'')+'"><header class="print-hdr"><h1>REGISTRO AUXILIAR INTEGRAL DE EVALUACIÓN</h1><h2>I.E. 22375 Santa Rosa de los Molinos · '+escape(c.area)+'</h2></header>';
+  html+='<p>'+escape(c.nivel)+' · '+escape(c.grado)+'° '+escape(c.seccion)+' · Bimestre '+escape(c.bim)+' · Año '+escape(o.year)+' · Docente: '+escape(o.teacher)+' · Escala: '+(mode==='num'?'0–20':'Letras AD/A/B/C')+(o.from?' · Evidencias: '+escape(o.from)+' al '+escape(o.to):' · Evidencias del bimestre')+'</p>';
+  if(columns>28)html+='<p>Grilla amplia: formato A3 horizontal. Puede seleccionar día o semana para imprimir menos columnas sin omitir datos del periodo elegido.</p>';
+  html+='<table><colgroup><col class="student-number"><col class="student-name">'+Array.from({length:columns},()=>'<col>').join('')+'</colgroup><thead><tr><th rowspan="3" scope="col">N.º</th><th class="student-name" rowspan="3" scope="col">Estudiante</th>'+groups.map(g=>'<th scope="colgroup" colspan="'+(g.sessions.length+1)+'">'+g.code+'</th>').join('')+'</tr><tr>';
+  for(const g of groups){const dates=[...new Set(g.sessions.map(s=>s.fecha))];html+=dates.map(date=>'<th scope="colgroup" title="'+escape(date)+'" colspan="'+g.sessions.filter(s=>s.fecha===date).length+'">'+escape(/^\d{4}-\d{2}-\d{2}$/.test(date)?date.slice(8)+'/'+date.slice(5,7):date||'Sin fecha')+'</th>').join('')+'<th class="result" rowspan="2" scope="col">Resultado<small>Bimestre '+escape(c.bim)+'</small></th>';}
+  html+='</tr><tr>'+groups.map(g=>g.sessions.map((s,i)=>'<th class="evidence-title" scope="col" title="'+escape(s.capacidad)+'">E'+(i+1)+' · '+escape(short(s.capacidad))+'</th>').join('')).join('')+'</tr></thead><tbody>';
+  for(const [i,student]of (o.students||[]).entries()){
+   const id=o.studentKey(student);html+='<tr data-student="'+escape(id)+'"><th scope="row">'+(i+1)+'</th><td class="student-name">'+escape(student.nombre)+'</td>';
+   for(const g of groups){
+    for(const s of g.sessions){const key=[c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,id].join('||');html+='<td class="grade" data-evidence="'+escape(key)+'">'+escape(grade(o.readGrade(key)))+'</td>';}
+    const r=o.result(g.name,id),worked=o.worked(g.name),text=worked?(mode==='num'&&o.exact(g.name,id)&&r.nota!==''&&r.nota!=null?String(r.nota).padStart(2,'0'):r.letra||'—'):'No trabajada';
+    html+='<td class="grade result" data-result="'+escape(g.name)+'">'+escape(text)+(worked&&r.letra?'<small>'+(r.src==='P'?'Directa':'Calculada')+'</small>':'')+'</td>';
+   }
+   html+='</tr>';
+  }
+  html+='</tbody></table><section class="legend"><p>Resultado = calificación efectiva bimestral; la nota directa de Promedios tiene prioridad. No es un cálculo nuevo del periodo filtrado. — = sin nota. En 0–20 las letras originales se conservan como letras; no se inventan números.</p>';
+  for(const g of groups){html+='<p><b>'+g.code+':</b> '+escape(g.name)+'</p>';for(const [i,s]of g.sessions.entries())html+='<p>'+g.code+' / E'+(i+1)+' · '+escape(s.fecha)+' · '+escape(s.capacidad)+'</p>';}
+  return html+'</section><footer class="print-sign"><div>Docente responsable<br>'+escape(o.teacher)+'</div><div>V.º B.º Dirección / Coordinación</div></footer></article>';
+ }
+ root.IECalificarPrint={build,css};if(typeof module!=='undefined')module.exports=root.IECalificarPrint;
+})(typeof window==='undefined'?globalThis:window);
+</script>
 <script>
 /* Persistencia por cuenta. Los datos anteriores sin propietario nunca se adoptan automáticamente. */
 (function(root){
@@ -2817,127 +2905,14 @@ async function rellenarSiagieExcel() {
 }
 function prepararImpresion(opciones) {
  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return conRegistroHistorico(()=>prepararImpresion(opciones));
-  opciones=opciones||{};
-  const c = ctxBase();
-  const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
-  const anio=cfg&&Number.isInteger(Number(cfg.anio))&&Number(cfg.anio)>=2000&&Number(cfg.anio)<=2100?String(cfg.anio):'No configurado';
-  const alumnos = estudiantes();
-  const docente = document.getElementById('inpDocente').value.trim() || '________________';
-  const sess = (store.sessions || []).filter(s =>
-    s.nivel === c.nivel && s.bim === c.bim && String(s.grado) === String(c.grado) &&
-    s.seccion === c.seccion && s.area === c.area &&
-    (!opciones.desde || s.fecha >= opciones.desde) && (!opciones.hasta || s.fecha <= opciones.hasta)
-  ).sort((a,b) => (a.fecha||'').localeCompare(b.fecha||'') || (a.comp||'').localeCompare(b.comp||''));
-
-  if (!sess.length) {
-    alert('No hay resultados guardados en este bimestre/área para imprimir.');
-    return;
-  }
-
-  // Cada resultado C requiere su propia conclusión; el promedio es solo referencial.
-  const faltanConc = opciones.desde ? [] : validarConclusionesOficial(c, alumnos, sess);
-  if (faltanConc.length) {
-    const lista = faltanConc.slice(0, 12).map(x => '• ' + x).join('\n');
-    const extra = faltanConc.length > 12 ? '\n… y ' + (faltanConc.length-12) + ' más' : '';
-    const ok = confirm(
-      'AVISO — Registro oficial (SIAGIE)\n\n' +
-      'Falta conclusión descriptiva por competencia:\n\n' +
-      lista + extra +
-      '\n\nRegla: Primaria B/C y Secundaria C, por competencia.\n' +
-      'Escríbala en Promedios.\n\n' +
-      '¿Desea imprimir de todas formas?'
-    );
-    if (!ok) return;
-  }
-
-  // group by competencia
-  const byComp = {};
-  sess.forEach(s => {
-    if (!byComp[s.comp]) byComp[s.comp] = [];
-    byComp[s.comp].push(s);
-  });
-  const comps = Object.keys(byComp);
-
-  const nivelTxt = c.nivel === 'primaria' ? 'PRIMARIA' : 'SECUNDARIA';
-  let html = '';
-
-  // Cover / header page summary
-  html += `<div class="print-hdr">
-    <div style="font-size:9pt">IE 22375 SANTA ROSA DE LOS MOLINOS</div>
-    <h1>REGISTRO AUXILIAR DE EVALUACIÓN</h1>
-    <h2>${escapeRegistro((c.area||'').toUpperCase())} · BIMESTRE ${c.bim} · ${nivelTxt}${opciones.desde?' · '+opciones.desde+' al '+opciones.hasta:''}</h2>
-  </div>
-  <table class="print-meta"><tr>
-    <td><b>Grado / Sección:</b> ${escapeRegistro(c.grado)}° ${escapeRegistro(c.seccion)}</td>
-    <td><b>Año:</b> ${escapeRegistro(anio)}</td>
-  </tr><tr>
-    <td><b>Docente:</b> ${escapeRegistro(docente)}</td>
-    <td><b>Fecha de impresión:</b> ${new Date().toLocaleDateString('es-PE')}</td>
-  </tr></table>`;
-
-  // Detail per competencia
-  comps.forEach((comp, idx) => {
-    const evidencias = byComp[comp].slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
-    html += `<div class="${idx===0?'':'print-break'}"></div>`;
-    html += `<div class="print-hdr" style="margin-top:10px">
-      <h2 style="font-size:11pt;font-weight:bold">Competencia: ${escapeRegistro(comp)}</h2>
-    </div>`;
-
-    // header row: # | Alumno | ev1 | ev2 | ... | PROM | LETRA
-    html += `<table class="print-tbl"><thead><tr>
-      <th style="width:28px">N°</th>
-      <th style="text-align:left">Estudiante</th>`;
-    evidencias.forEach(e => {
-      html += `<th style="font-size:7.5pt;max-width:70px">${(e.fecha||'').slice(5)}<br>${escapeRegistro(e.capacidad||'')}</th>`;
-    });
-    html += `<th>PROM</th><th>NL</th></tr></thead><tbody>`;
-
-    alumnos.forEach((al, i) => {
-      const vals = [];let exacto=true;
-      let cells = '';
-      evidencias.forEach(s => {
-        const k = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha, studentKey(al)].join('||');
-        const g = leerNota(store.grades, k);
-        let show = '';
-        if (g) {
-          if (g.origen!=='letra' && g.nota20 !== '' && g.nota20 != null && !isNaN(Number(g.nota20))) {
-            show = pad2(g.nota20);
-            vals.push(Number(g.nota20));
-          } else if (g.nivel) {
-            show = g.nivel;exacto=false;
-            const m = letterToNum(g.nivel);
-            if (m !== '') vals.push(Number(m));
-          }
-        }
-        cells += `<td style="text-align:center;vertical-align:middle;font-weight:bold">${escapeRegistro(show)}</td>`;
-      });
-      const prom = promedioNums(vals);
-      const letra = prom != null ? numToLetter(prom) : '';
-      html += `<tr>
-        <td style="text-align:center">${i+1}</td>
-        <td style="text-align:left;font-size:8pt">${escapeRegistro(al.nombre)}</td>
-        ${cells}
-        <td style="text-align:center;font-weight:bold">${prom != null && exacto ? pad2(prom) : ''}</td>
-        <td style="text-align:center;font-weight:bold">${letra}</td>
-      </tr>`;
-    });
-    html += `</tbody></table>`;
-    html += `<div class="print-meta" style="margin-top:6px;font-size:8pt">NL = Nivel de logro (AD / A / B / C) · PROM = promedio de evidencias · Escala: 18–20 AD · 14–17 A · 11–13 B · 0–10 C</div>`;
-  });
-
-  html += `<div class="print-sign">
-    <div>Docente responsable<br><span style="font-size:8pt">${escapeRegistro(docente)}</span></div>
-    <div>V° B° Dirección / Coordinación</div>
-  </div>
-  <div class="print-foot">IE 22375 Santa Rosa de los Molinos · Registro auxiliar digital · Uso supervisiones UGEL / DRE · Generado para impresión</div>`;
-
-  const pa = document.getElementById('printArea');
-  pa.innerHTML = html;
-  pa.style.display = 'block';
-  setTimeout(() => {
-    window.print();
-    setTimeout(() => { pa.style.display = 'none'; }, 500);
-  }, 200);
+ const c=ctxBase(),alumnos=estudiantes();opciones=opciones||{};
+ if((typeof registroLocal!=='undefined'&&!registroLocal.matches())||(typeof areas==='function'&&!areas().includes(c.area))){toast('No se puede imprimir un contexto sin autorización vigente.');return;}
+ const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
+ const year=cfg&&Number.isInteger(Number(cfg.anio))&&Number(cfg.anio)>=2000&&Number(cfg.anio)<=2100?String(cfg.anio):'No configurado';
+ const html=IECalificarPrint.build({context:c,students:alumnos,competences:competencias(),sessions:store.sessions,from:opciones.desde,to:opciones.hasta,mode:modoCalif,year,teacher:document.getElementById('inpDocente').value.trim()||'No registrado',studentKey,readGrade:key=>leerNota(store.grades,key),toLetter:numToLetter,result:notaCompAlumno,worked:competenciaTrabajada,exact:numeroExactoComp});
+ if(!html){alert(opciones.desde||opciones.hasta?'No hay sesiones guardadas en el periodo elegido.':'No hay competencias disponibles para imprimir.');return;}
+ document.getElementById('printArea').innerHTML=html;
+ window.print();
 }
 
 function esVistaAdmin() {
@@ -3777,7 +3752,7 @@ function abrirSelectorImpresionCalificar(){
  const previo=document.getElementById('selectorImpresionCalificar');if(previo)previo.remove();
  const dialog=document.createElement('dialog');dialog.id='selectorImpresionCalificar';
  dialog.style.cssText='border:1px solid #cbd5e1;border-radius:14px;max-width:min(92vw,480px);width:100%;padding:20px;box-shadow:0 14px 50px #0f172a33';
- dialog.innerHTML='<form method="dialog" style="display:grid;gap:12px"><h2 style="font-size:18px;font-weight:800">Imprimir Calificar</h2><label for="impModo">Periodo</label><select id="impModo"><option value="dia">Sesión diaria</option><option value="semana">Sesiones semanales (lunes a viernes)</option><option value="bimestre">Todas las sesiones del bimestre</option></select><label for="impFecha">Fecha de referencia</label><input id="impFecha" type="date" required><p style="font-size:12px;color:#475569">La semana comprende lunes a viernes. Solo se incluyen sesiones registradas.</p><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" id="impCancelar" class="btn btn-ghost">Cancelar</button><button type="button" id="impConfirmar" class="btn btn-primary">Imprimir / PDF</button></div></form>';
+ dialog.innerHTML='<form method="dialog" style="display:grid;gap:12px"><h2 style="font-size:18px;font-weight:800">Imprimir general · Calificar</h2><label for="impModo">Periodo</label><select id="impModo"><option value="bimestre">Registro integral del bimestre</option><option value="dia">Sesión diaria</option><option value="semana">Sesiones semanales (lunes a viernes)</option></select><label for="impFecha">Fecha de referencia</label><input id="impFecha" type="date" required><p style="font-size:12px;color:#475569">Todas las competencias en una sola grilla. La semana comprende lunes a viernes. Resultado efectivo del bimestre, con prioridad de la nota directa de Promedios.</p><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" id="impCancelar" class="btn btn-ghost">Cancelar</button><button type="button" id="impConfirmar" class="btn btn-primary">Imprimir general</button></div></form>';
  document.body.appendChild(dialog);
  const fecha=dialog.querySelector('#impFecha'),modo=dialog.querySelector('#impModo');
  fecha.value=(document.getElementById('inpFecha')?.value||new Date().toISOString().slice(0,10));
