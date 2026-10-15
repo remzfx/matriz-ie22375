@@ -30,6 +30,8 @@ Evidencia de contadores antes/después contra ca2db13: `docs/demos/registro-read
 
 Los snapshots históricos permiten exclusivamente las cinco funciones de lectura/instrumentación nuevas mediante expectativas literales completas; una mutación académica artificial continúa siendo rechazada. La fixture de pie fue regenerada desde el HTML actual. No se presentan las capturas previas como evidencia del nuevo reintento; la comprobación nueva es estructural y automatizada.
 
+El primer CI correctivo (#189) detectó una carrera en la prueba previa de recuperación: tras 40 ciclos `setImmediate`, el hash de scope aún podía seguir pendiente bajo carga Linux, por lo que IndexedDB todavía no había encolado su lectura de verificación. La fixture ahora ofrece una señal `waitForRead()` y las dos pruebas de cambio de contexto esperan ese punto exacto antes de actuar. Se mantienen las aserciones de respaldo, contexto, cancelación y cero escrituras; no se añade una espera arbitraria ni se cambia código de producción por este fallo.
+
 ## Límites y reversión
 
 El timeout puede interrumpir una lectura legítima lenta; los datos locales se conservan y el reintento es explícito. JavaScript síncrono y una decisión humana en el diálogo no pueden interrumpirse mediante el timer de red. Las lecturas históricas y la recuperación voluntaria mantienen sus flujos existentes; no se altera autorización ni se permite escribir con una sesión no verificada. El transporte de lectura sigue siendo POST protegido `loadreg`; «cero escrituras» se refiere a cero envíos académicos automáticos, no a ausencia de POST de lectura.
