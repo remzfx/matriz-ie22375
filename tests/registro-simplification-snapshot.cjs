@@ -1,7 +1,8 @@
 // Historical guards allow only the new footer and the two tested local adapters.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
 const old=execFileSync('git',['show','c6139fd461f7af9ea2c5a3f1268a9c41318acef9:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
-const block=s=>{const a=s.indexOf('      <div class="grid grid-cols-'),b=s.indexOf('      </div>',a)+12;return s.slice(a,b);};
+const block=s=>{const a=s.indexOf('  <div id="registroAcademicFooter"'),b=s.indexOf('\n</div>\n',a);return s.slice(a,b);};
+const footerCSS="  /* Recovery footer: compact opaque actions, no additional scroll container. */\n  #registroAcademicFooter {background:#fff;}\n  #registroAcademicFooter > .shell {display:block;box-sizing:border-box;width:100%;padding-top:6px;padding-bottom:6px;}\n  #registroRecoveryControls {min-width:0;}\n  #registroRecoveryControls .registro-recovery-actions {display:flex;flex-wrap:nowrap;align-items:center;gap:6px;}\n  #registroRecoveryControls .registro-recovery-actions button {flex:0 0 auto;min-height:44px;padding:6px 9px;font-size:11px;white-space:nowrap;}\n  #registroRecoveryControls button[hidden],#registroEmergencyWarning[hidden] {display:none!important;}\n  #registroSaveState {display:block;margin-top:3px;font-size:10px;line-height:1.25;color:#64748b;overflow-wrap:anywhere;}\n  #registroEmergencyWarning {margin:4px 0 0;padding:6px 8px;border-radius:8px;background:#fef2f2;color:#991b1b;font-size:11px;line-height:1.3;overflow-wrap:anywhere;}\n  @media(max-width:640px){#registroRecoveryControls .registro-recovery-actions {flex-wrap:wrap;gap:4px;}#registroRecoveryControls .registro-recovery-actions button {max-width:100%;}}\n  /* End recovery footer. */\n";
 const modules=['registro-drafts.js','registro-recovery-ui.js'].map(f=>'<script>\n'+fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/\r\n/g,'\n')+'\n</script>').join('\n');
 const added='<!-- Inicio simplificación docente: dependencia separada, sin cambiar handlers académicos. -->\n'+modules+'\n<!-- Fin simplificación docente. -->\n';
 module.exports=s=>{
@@ -10,8 +11,9 @@ module.exports=s=>{
  // Historical comparison only: the obsolete Classroom callback was removed from production.
  s=s.replace('  aplicarRestriccionNivel();\n  configurarAccesosAppsMoviles();','  aplicarRestriccionNivel();\n  restaurarCursos();\n  configurarAccesosAppsMoviles();');
  assert.equal(s.split(added).length,2,'Exact tested adapter code embedded once');
- const footer=block(s);for(const name of ['recover','local','upload','drafts','resolve'])assert.ok(footer.includes('IERegistroRecovery.'+name+'()'));
- assert.equal((footer.match(/<button/g)||[]).length,6,'Three primary actions, two conditional offers and explicit read retry');
+ assert.equal(s.split(footerCSS).length,2,'Exact compact footer CSS');s=s.replace(footerCSS,'');
+ const footer=block(s);for(const name of ['recover','local','upload','drafts','resolve','undo'])assert.ok(footer.includes('IERegistroRecovery.'+name+'()'));
+ assert.equal((footer.match(/<button/g)||[]).length,7,'Three primary actions plus contextual conflict, retry, draft and undo');
  const recovery=old.split('\n').find(l=>l.includes('onclick="recuperarBorradorAcademico()"'))+'\n';
  s=s.replace(added,'').replace(footer,block(old));s=s.replace('  <div id="registroAcademicFooter"',recovery+'  <div id="registroAcademicFooter"');
  for(const name of ['bajarRegistroNube','prepararVersionAcademica','confirmarRegistroConciliado']){

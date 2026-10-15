@@ -16,12 +16,12 @@ function bimestreHabilitado(){return true;}
 function registroSoloLectura(){return false;}
 function bimCerradoDocente(){return false;}
 function registroNubeNoVerificada(){return false;}
-function sliceRegistroArea(){return clone(store);}
-const baseline={version:1,basePayload:clone(remote.payload),baseline:IERegistroAcademico.canonical(remote.payload)};
-function baselineAcademica(){return baseline;}
+function sliceRegistroArea(){const payload=clone(store);delete payload.academicSync;return payload;}
+store.academicSync=store.academicSync||{};store.academicSync[contextKey]=store.academicSync[contextKey]||{version:1,basePayload:clone(remote.payload),baseline:IERegistroAcademico.canonical(remote.payload)};
+function baselineAcademica(){return store.academicSync[contextKey];}
 function guardarTodo(){saveStore();return true;}
 function saveStore(){localStorage.setItem(NOTAS_KEY,JSON.stringify(store));}
-function aplicarRegistroConciliado(payload){store=clone(payload);}
+function aplicarRegistroConciliado(payload){store={...clone(payload),academicSync:store.academicSync};}
 function dirtyAcademico(){}
 function estudiantes(){return [{idSiagie:'synthetic-1',nombre:'ESTUDIANTE FICTICIO UNO',orden:1}];}
 function pintarRegistroConciliado(){if(previewAbsent)return;document.getElementById('previewGrade').textContent=store.finales[gradeKey]?.nota20??'—';}
@@ -32,5 +32,5 @@ async function guardarRegistroIntegrado(){guardarTodo();return IERegistroTransve
 const IERegistroTransversales={current:()=>transversal,capture(){},save:async()=>!transversal.dirty};
 window.fetch=async()=>{throw Error('La demostración no permite consultas de red.');};
 document.getElementById('previewClearPending').onclick=()=>{transversal.dirty=false;document.dispatchEvent(new Event('change'));};
-document.getElementById('previewTableBody').innerHTML=Array.from({length:previewAbsent?0:25},(_,i)=>'<tr><td>ESTUDIANTE FICTICIO '+(i+1)+'</td><td>'+(i===0?'<span id="previewGrade">15</span>':'A')+'</td><td>Conclusión ficticia completa para revisión de distribución</td></tr>').join('');
+document.getElementById('previewTableBody').innerHTML=Array.from({length:previewAbsent?0:30},(_,i)=>'<tr><td>ESTUDIANTE FICTICIO '+(i+1)+'</td><td>'+(i===0?'<span id="previewGrade">15</span>':'A')+'</td><td>Conclusión ficticia completa para revisión de distribución</td></tr>').join('');
 saveStore();pintarRegistroConciliado();

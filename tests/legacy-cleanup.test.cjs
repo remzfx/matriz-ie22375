@@ -191,9 +191,9 @@ test('Secundaria comparative reads only the exact requested section and shows re
 });
 
 
-test('Registro keeps cloud actions together in a compact three-column mobile footer', () => {
+test('Registro keeps cloud actions together with mobile wrap and contextual recovery', () => {
   const src = read('registro.html');
-  assert.match(src, /grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex/);
+  assert.match(src, /class="registro-recovery-actions"/);assert.match(src,/display:flex;flex-wrap:nowrap/);assert.match(src,/@media\(max-width:640px\).*flex-wrap:wrap/);
   const subir = src.indexOf('>Subir Nube</button>');
   const recuperar = src.indexOf('>Recuperar Nube</button>');
   const guardar = src.indexOf('>Guardar</button>', recuperar);
