@@ -16,6 +16,27 @@ for(const level of ['primaria','secundaria']){
 test('Save does not refresh spent opportunities; reload or replacement loses provenance and never recreates it',()=>{const f=setup();f.c.store.finales={};f.bulk('A');f.c.saveStore();f.choose('AD');assert.equal(f.messages.length,1);f.c.saveStore();f.choose('B');assert.equal(f.messages.length,2);f.bulk('A');f.c.store=clone(f.c.store);f.choose('AD');assert.equal(f.messages.length,4);f.bulk('A');delete f.c.primeraCorreccionMasiva.memoria;f.choose('AD');assert.equal(f.messages.length,6);});
 test('Account, context, student, competence and tampered/in-place records cannot borrow an opportunity',()=>{const f=setup();f.c.store.finales={};f.bulk('A');f.token('other-account');f.choose('AD');assert.equal(f.messages.length,2);f.token('fictitious-account-A');f.choose('B');assert.equal(f.messages.length,3);f.bulk('A');const scope=f.c.cloudClaveReg;f.c.cloudClaveReg=()=> 'secundaria||IV||3||B||Otra área';assert.equal(f.c.primeraCorreccionMasiva(f.cp,f.id),false);f.c.cloudClaveReg=scope;f.choose('AD');assert.equal(f.messages.length,5);f.bulk('A');f.c.store.finales[f.keys.direct].ts++;f.choose('AD');assert.equal(f.messages.length,7);assert.equal(f.choose('C','Unauthorized',f.id),false);assert.equal(f.choose('C',f.cp,'id:unknown'),false);});
 test('Closed/inactive scopes and absent session cannot acquire or use an exception',()=>{for(const flag of ['registroSoloLectura','bimCerradoDocente']){const f=setup();const before=clone(f.c.store);f.c[flag]=()=>true;assert.equal(f.bulk('A'),false);assert.equal(f.choose('AD'),false);assert.deepEqual(clone(f.c.store),before);assert.equal(f.messages.length,0);}const f=setup();f.c.store.finales={};f.c.getLoginSession=()=>null;f.bulk('A');f.choose('AD');assert.equal(f.messages.length,2);});
-test('Entire source outside three warning/bulk hooks and isolated helper is unchanged from merged PR88',()=>{const expected=require('node:child_process').execFileSync('git',['show','ab40925e4687e90ad99c63a1285b732d492dca97:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');assert.equal(require('./registro-bulk-correction-snapshot.cjs')(src),expected);});
+test('Entire source outside warning/bulk/render hooks and isolated helper is unchanged from merged PR88',()=>{const expected=require('node:child_process').execFileSync('git',['show','ab40925e4687e90ad99c63a1285b732d492dca97:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');assert.equal(require('./registro-bulk-correction-snapshot.cjs')(src),expected);});
 
 test('Merely checking an allowed numeric replacement does not consume it; rejected/unchanged bulk never grants it',()=>{const f=setup('secundaria','num');f.c.store.finales={};f.bulk('A');const before=JSON.stringify(f.c.store),prev=f.c.store.finales[f.keys.direct];assert.equal(f.c.confirmarEdicionNumerica(f.input,f.cp,f.id,prev,18),true);assert.equal(JSON.stringify(f.c.store),before);assert.equal(f.c.primeraCorreccionMasiva(f.cp,f.id),true);f.input.value='18';f.events.number();assert.equal(f.messages.length,1);assert.equal(f.c.primeraCorreccionMasiva(f.cp,f.id),false);});
+
+function realPersistence(f){
+ const c=f.c,memory=new Map(),session=c.getLoginSession;c.getLoginSession=()=>({...session(),role:'docente'});
+ c.localStorage={getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,v)};
+ vm.runInContext(read('registro-local-store.js'),c);
+ vm.runInContext('const registroLocal=IERegistroLocalStore.create(localStorage,getLoginSession);const NOTAS_KEY=registroLocal.key;',c);
+ for(const n of ['loadStore','saveStore'])vm.runInContext(extract(src,n),c);
+ c.store.finales={};c.saveStore();return f;
+}
+for(const level of ['primaria','secundaria'])test(level+' actual save/load/render JSON cycle keeps 30-student opportunities independent through two bulks',()=>{
+ const f=realPersistence(setup(level));f.c.estudiantes=()=>f.alumnos.slice(0,30);f.bulk('A');const first=f.c.store.finales[f.keys.direct];f.c.renderFinales();assert.notEqual(f.c.store.finales[f.keys.direct],first);assert.equal(f.c.primeraCorreccionMasiva(f.cp,f.id),true);
+ f.choose('AD');f.choose('B',f.cp,f.c.studentKey(f.alumnos[1]));f.choose('B',f.comps[1]);assert.equal(f.messages.length,1);f.choose('B');assert.equal(f.messages.length,2);
+ f.bulk('C');f.choose('AD');f.choose('A',f.cp,f.c.studentKey(f.alumnos[1]));f.choose('AD',f.comps[1]);assert.equal(f.messages.length,3);f.choose('B');assert.equal(f.messages.length,4);assert.equal(f.posts(),0);
+});
+test('Verified render rejects changed storage records and never revives a spent opportunity restored from disk',()=>{
+ const f=realPersistence(setup());f.bulk('A');const original=clone(f.c.store);const changed=clone(original);changed.finales[f.keys.direct]={nota20:12,nivel:'B',origen:'letra',ts:999};f.c.diskForTest=JSON.stringify(changed);vm.runInContext('registroLocal.write(diskForTest)',f.c);f.c.renderFinales();f.choose('AD');assert.equal(f.messages.length,2);
+ f.bulk('A');const prior=clone(f.c.store);f.choose('AD');assert.equal(f.messages.length,3);f.c.diskForTest=JSON.stringify(prior);vm.runInContext('registroLocal.write(diskForTest)',f.c);f.c.renderFinales();f.choose('B');assert.equal(f.messages.length,4);
+});
+test('Session change across load and unknown object reconstruction cannot be rebound by render',()=>{
+ const f=realPersistence(setup());f.bulk('A');const load=f.c.loadStore;f.c.loadStore=()=>{load();f.token('changed-during-load');};f.c.renderFinales();f.choose('AD');assert.equal(f.messages.length,2);f.c.loadStore=load;f.bulk('A');f.c.store=clone(f.c.store);f.c.renderFinales();f.choose('AD');assert.equal(f.messages.length,4);
+});

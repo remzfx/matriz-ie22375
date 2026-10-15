@@ -2319,6 +2319,24 @@ function primeraCorreccionMasiva(comp, id, registrar) {
   let memoria=primeraCorreccionMasiva.memoria;
   if(!memoria||memoria.scope!==scope)memoria=primeraCorreccionMasiva.memoria={scope,celdas:new Map()};
   if(!scope)return false;
+  // loadStore reconstruye objetos al renderizar; conservar solo esa transición verificada.
+  if(registrar==='prepararRender'){
+    const celdas=[];
+    memoria.celdas.forEach((o,k)=>{
+      if(o.nota===store.finales[k]&&o.firma===JSON.stringify(store.finales[k]))celdas.push([k,o]);
+      else memoria.celdas.delete(k);
+    });
+    return {memoria,celdas};
+  }
+  if(registrar&&typeof registrar==='object'){
+    if(registrar.memoria!==memoria)return false;
+    registrar.celdas.forEach(([k,o])=>{
+      if(memoria.celdas.get(k)!==o)return;
+      if(o.firma===JSON.stringify(store.finales[k]))o.nota=store.finales[k];
+      else memoria.celdas.delete(k);
+    });
+    return false;
+  }
   const k=finalKey(comp,id),nota=store.finales[k];
   if(registrar){
     if(nota&&!nota.borrado)memoria.celdas.set(k,{nota,firma:JSON.stringify(nota)});
@@ -3422,7 +3440,9 @@ function renderFinales() {
   if(typeof comparativoBimContexto!=='undefined'&&comparativoBimContexto&&(comparativoBimContexto!==cloudClaveReg()||comparativoBimToken!==IEStudents.validToken())){comparativoBimActivo=false;comparativoBimDatos={};comparativoBimContexto='';comparativoBimSecuencia++;}
   const comparativoBtn=document.getElementById('btnComparativoBim');
   if(comparativoBtn&&typeof comparativoBimActivo!=='undefined'){comparativoBtn.textContent=comparativoBimActivo?'Ocultar comparativo':'Comparativo bimestral';comparativoBtn.setAttribute('aria-pressed',String(comparativoBimActivo));comparativoBtn.classList.toggle('on',comparativoBimActivo);}
+  const correccionesMasivas=typeof primeraCorreccionMasiva==='function'?primeraCorreccionMasiva(null,null,'prepararRender'):null;
   loadStore();
+  if(correccionesMasivas)primeraCorreccionMasiva(null,null,correccionesMasivas);
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const c = ctxBase();
   document.getElementById('lblFinCtx').textContent =
