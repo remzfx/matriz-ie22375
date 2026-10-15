@@ -191,12 +191,12 @@ test('Secundaria comparative reads only the exact requested section and shows re
 });
 
 
-test('Registro keeps cloud actions together with mobile wrap and contextual recovery', () => {
+test('Registro keeps cloud actions together with horizontal mobile scroll and contextual recovery', () => {
   const src = read('registro.html');
-  assert.match(src, /class="registro-recovery-actions"/);assert.match(src,/display:flex;flex-wrap:nowrap/);assert.match(src,/@media\(max-width:640px\).*flex-wrap:wrap/);
-  const subir = src.indexOf('>Subir Nube</button>');
-  const recuperar = src.indexOf('>Recuperar Nube</button>');
-  const guardar = src.indexOf('>Guardar</button>', recuperar);
+  assert.match(src, /class="registro-recovery-actions"/);assert.match(src,/display:flex;flex-wrap:nowrap/);assert.match(src,/@media\(max-width:640px\).*flex-wrap:nowrap/);assert.match(src,/overflow-x:auto;overflow-y:hidden/);
+  const subir = src.indexOf('<span>Subir Nube</span></button>');
+  const recuperar = src.indexOf('<span>Recuperar Nube</span></button>');
+  const guardar = src.indexOf('<span>Guardar</span></button>', recuperar);
   assert.ok(recuperar >= 0 && guardar > recuperar && subir > guardar);
 });
 

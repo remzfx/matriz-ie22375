@@ -449,16 +449,20 @@
   /* Ocultar contadores redundantes del pie: siguen presentes para los scripts existentes. */
   #registroAcademicFooter > .shell > div:first-child {display:none!important;}
   #registroAcademicFooter > .shell {justify-content:flex-end!important;}
-  /* Recovery footer: compact opaque actions, no additional scroll container. */
+  /* Recovery footer: compact opaque actions, horizontal scrolling only in the action bar. */
   #registroAcademicFooter {background:#fff;}
   #registroAcademicFooter > .shell {display:block;box-sizing:border-box;width:100%;padding-top:6px;padding-bottom:6px;}
-  #registroRecoveryControls {min-width:0;}
-  #registroRecoveryControls .registro-recovery-actions {display:flex;flex-wrap:nowrap;align-items:center;gap:6px;}
-  #registroRecoveryControls .registro-recovery-actions button {flex:0 0 auto;min-height:44px;padding:6px 9px;font-size:11px;white-space:nowrap;}
+  #registroRecoveryControls {min-width:0;max-width:100%;}
+  #registroRecoveryControls .registro-recovery-actions {display:flex;flex-wrap:nowrap;align-items:center;gap:6px;box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;padding:4px 2px;scrollbar-width:thin;scrollbar-color:#94a3b8 #f1f5f9;}
+  #registroRecoveryControls .registro-recovery-actions::-webkit-scrollbar {height:6px;}
+  #registroRecoveryControls .registro-recovery-actions::-webkit-scrollbar-thumb {background:#94a3b8;border-radius:6px;}
+  #registroRecoveryControls .registro-recovery-actions:focus-visible {outline:2px solid #0284c7;outline-offset:-2px;}
+  #registroRecoveryControls .registro-recovery-actions button {display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:0 0 auto;min-height:44px;padding:6px 9px;font-size:11px;white-space:nowrap;}
+  #registroRecoveryControls .registro-action-icon {width:18px;height:18px;flex:0 0 18px;pointer-events:none;}
   #registroRecoveryControls button[hidden],#registroEmergencyWarning[hidden] {display:none!important;}
   #registroSaveState {display:block;margin-top:3px;font-size:10px;line-height:1.25;color:#64748b;overflow-wrap:anywhere;}
   #registroEmergencyWarning {margin:4px 0 0;padding:6px 8px;border-radius:8px;background:#fef2f2;color:#991b1b;font-size:11px;line-height:1.3;overflow-wrap:anywhere;}
-  @media(max-width:640px){#registroRecoveryControls .registro-recovery-actions {flex-wrap:wrap;gap:4px;}#registroRecoveryControls .registro-recovery-actions button {max-width:100%;}}
+  @media(max-width:640px){#registroRecoveryControls .registro-recovery-actions {flex-wrap:nowrap;gap:4px;}}
   /* End recovery footer. */
   /* Resumen: destacar visualmente Promedio referencial sin cambiar su carácter informativo. */
   @media screen {
@@ -820,14 +824,14 @@
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
       <div id="registroRecoveryControls">
-        <div class="registro-recovery-actions">
-          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#fee2e2;color:#991b1b" data-reg-write onclick="IERegistroRecovery.recover()">Recuperar Nube</button>
-          <button id="registroConflictOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.resolve()">Revisar diferencias</button>
-          <button type="button" class="btn btn-primary text-[11px] !py-2 !px-2 whitespace-nowrap" data-reg-write onclick="IERegistroRecovery.local()">Guardar</button>
-          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="IERegistroRecovery.upload()">Subir Nube</button>
-          <button id="registroUndoOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.undo()">Deshacer recuperación</button>
-          <button id="registroDraftOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.drafts()">Recuperar borrador</button>
-          <button id="registroRetryOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.refresh(true)">Reintentar notas</button>
+        <div class="registro-recovery-actions" role="group" aria-label="Acciones de notas · desplázate horizontalmente para ver más" tabindex="0">
+          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#fee2e2;color:#991b1b" data-reg-write onclick="IERegistroRecovery.recover()"><svg class="registro-action-icon" data-icon="cloud-download" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 13v8m-4-4 4 4 4-4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Recuperar Nube</span></button>
+          <button id="registroConflictOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.resolve()"><svg class="registro-action-icon" data-icon="git-compare" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="18" cy="6" r="3"/><path d="M18 9v9m-12-3V6m-3 3 3-3 3 3m6 6 3 3 3-3"/><circle cx="6" cy="18" r="3"/></svg><span>Revisar diferencias</span></button>
+          <button type="button" class="btn btn-primary text-[11px] !py-2 !px-2 whitespace-nowrap" data-reg-write onclick="IERegistroRecovery.local()"><svg class="registro-action-icon" data-icon="save" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.2 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.8a2 2 0 0 0-.6-1.4l-3.8-3.8a2 2 0 0 0-1.4-.6Z"/><path d="M17 21v-7H7v7M7 3v5h8"/></svg><span>Guardar</span></button>
+          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="IERegistroRecovery.upload()"><svg class="registro-action-icon" data-icon="cloud-upload" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21v-8m-4 4 4-4 4 4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Subir Nube</span></button>
+          <button id="registroUndoOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.undo()"><svg class="registro-action-icon" data-icon="undo-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></svg><span>Deshacer recuperación</span></button>
+          <button id="registroDraftOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.drafts()"><svg class="registro-action-icon" data-icon="history" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 2.5-6.2L3 8M3 3v5h5m4-1v5l4 2"/></svg><span>Recuperar borrador</span></button>
+          <button id="registroRetryOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.refresh(true)"><svg class="registro-action-icon" data-icon="refresh-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 0 1 15.4-6.4L21 8m0-5v5h-5m5 4a9 9 0 0 1-15.4 6.4L3 16m5 0H3v5"/></svg><span>Reintentar notas</span></button>
         </div>
         <span id="registroSaveState" role="status" aria-live="polite">Inicia sesión para cargar tus notas</span>
         <p id="registroEmergencyWarning" role="alert" hidden></p>
