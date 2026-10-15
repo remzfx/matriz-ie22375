@@ -2312,8 +2312,28 @@ function activarSesion() {
   toast('Capacidad agregada');
 }
 
+// Oportunidades efímeras: nunca se serializan ni se reconstruyen desde notas.
+function primeraCorreccionMasiva(comp, id, registrar) {
+  const ses=typeof getLoginSession==='function'?getLoginSession():null;
+  const scope=ses&&ses.token?JSON.stringify([ses.token,ses.user||'',cloudClaveReg()]):'';
+  let memoria=primeraCorreccionMasiva.memoria;
+  if(!memoria||memoria.scope!==scope)memoria=primeraCorreccionMasiva.memoria={scope,celdas:new Map()};
+  if(!scope)return false;
+  const k=finalKey(comp,id),nota=store.finales[k];
+  if(registrar){
+    if(nota&&!nota.borrado)memoria.celdas.set(k,{nota,firma:JSON.stringify(nota)});
+    return false;
+  }
+  const oportunidad=memoria.celdas.get(k);
+  if(!oportunidad)return false;
+  if(oportunidad.nota!==nota||oportunidad.firma!==JSON.stringify(nota)){
+    memoria.celdas.delete(k);return false;
+  }
+  return true;
+}
 function confirmarEdicionNumerica(inp,comp,id,previo,n,cap) {
   if(!previo)return true;
+  if(!cap&&n!==''&&Number.isFinite(Number(n))&&Number(n)>=0&&Number(n)<=20&&Math.round(Number(n))!==Number(previo.nota20)&&typeof primeraCorreccionMasiva==='function'&&primeraCorreccionMasiva(comp,id))return true;
   const alumno=estudiantes().find(al=>studentKey(al)===id);
   const anterior=previo.origen==='letra'?previo.nivel:previo.nota20;
   const mensaje=(n===''?'¿Quitar '+(cap?'esta evidencia':'la nota directa')+'?':'¿Cambiar '+anterior+' a '+n+'?')+
@@ -3221,7 +3241,7 @@ function seleccionarFinalReversible(comp, nombre, val) {
     const mensaje=(quitar?'¿Quitar la nota directa '+letra+'?':'¿Cambiar la nota directa de '+letra+' a '+val+'?')+
       '\nEstudiante: '+(alumno?.nombre||nombre)+'\nCompetencia: '+comp+
       '\nLas evidencias y conclusiones se conservarán.';
-    if(!confirm(mensaje))return false;
+    if((quitar||typeof primeraCorreccionMasiva!=='function'||!primeraCorreccionMasiva(comp,nombre))&&!confirm(mensaje))return false;
   }
   if(original && letra===val)return quitarFinalManual(comp,nombre);
   return aplicarFinalManual(comp,nombre,val);
@@ -3233,7 +3253,7 @@ function calificarAreaMasiva(val) {
   const c=ctxBase();
   if (!confirm('Asignar '+val+' a todas las competencias trabajadas del área '+c.area+' · '+c.grado+'° '+c.seccion+' · Bim '+c.bim+' ('+alumnos.length+' estudiantes). Se reemplazarán las notas existentes, conservando las conclusiones. ¿Continuar?')) return false;
   let cambios=0;
-  alumnos.forEach(al=>comps.forEach(cp=>{if(aplicarFinalManual(cp,studentKey(al),val,true))cambios++;}));
+  alumnos.forEach(al=>comps.forEach(cp=>{if(aplicarFinalManual(cp,studentKey(al),val,true)){cambios++;if(typeof primeraCorreccionMasiva==='function')primeraCorreccionMasiva(cp,studentKey(al),true);}}));
   renderFinales();
   toast(cambios+' calificaciones actualizadas localmente');
   return true;

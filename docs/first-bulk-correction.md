@@ -1,0 +1,11 @@
+# Primera corrección individual posterior a Masivo
+
+Decisión previa a implementación: usar memoria exclusivamente, sin esquema académico, almacenamiento o transporte nuevo. Registrar solo escrituras efectivas de un Masivo confirmado. Una oportunidad se vincula al token/cuenta, clave de contexto, competencia/identidad y referencia más firma del objeto exacto escrito. La primera sustitución individual puede omitir únicamente su aviso; eliminar conserva confirmación. La nueva escritura cambia el objeto y hace imposible reutilizar la oportunidad. Validaciones, cálculo, persistencia y sincronización no cambian.
+
+Sin token, al recargar, en otro equipo, al reconstruir/reemplazar el objeto, o al detectar otra sesión/contexto, se vuelve al aviso normal. Es deliberado perder oportunidades ante trazabilidad incierta. No se reconstruyen desde notas locales o nube. Guardar sin sustituir objetos no renueva ni duplica oportunidades. Un nuevo Masivo concede oportunidades solo a sus celdas realmente modificadas.
+
+Los avisos existentes están en seleccionarFinalReversible() y confirmarEdicionNumerica(); calificarAreaMasiva() solo registra después del retorno exitoso de aplicarFinalManual(). La vía numérica exige valor válido diferente y ausencia de capacidad (solo nota directa). Pulsar la letra actual, quitar una nota y Quitar masivo mantienen sus confirmaciones.
+
+Regresiones sintéticas: primera/segunda edición por estudiante y competencia en ambos niveles, manual/cancelado, nuevo masivo y celdas sin cambio, Letras/0–20, evidencia que mantiene aviso, cero POST, guardado, pérdida de memoria, objetos reconstruidos, cuenta/contexto distinto, permisos y cierres. Comparación exacta contra main posterior al PR88: todos los demás estilos, controles, impresión, cálculos, guardado, recuperación y sincronización permanecen idénticos. Los snapshots históricos permiten exclusivamente los tres hooks y el helper revisados mediante hashes exactos.
+
+Riesgo residual deliberado: la oportunidad puede perderse cuando un flujo reconstruye los objetos o cambia el contexto/sesión observado; no se intenta recuperarla. El docente recibe entonces el aviso normal y conserva la posibilidad de confirmar su cambio. No se conceden oportunidades en otro equipo o al recargar.
