@@ -449,6 +449,21 @@
   /* Ocultar contadores redundantes del pie: siguen presentes para los scripts existentes. */
   #registroAcademicFooter > .shell > div:first-child {display:none!important;}
   #registroAcademicFooter > .shell {justify-content:flex-end!important;}
+  /* Recovery footer: compact opaque actions, horizontal scrolling only in the action bar. */
+  #registroAcademicFooter {background:#fff;}
+  #registroAcademicFooter > .shell {display:block;box-sizing:border-box;width:100%;padding-top:6px;padding-bottom:6px;}
+  #registroRecoveryControls {min-width:0;max-width:100%;}
+  #registroRecoveryControls .registro-recovery-actions {display:flex;flex-wrap:nowrap;align-items:center;gap:6px;box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;padding:4px 2px;scrollbar-width:thin;scrollbar-color:#94a3b8 #f1f5f9;}
+  #registroRecoveryControls .registro-recovery-actions::-webkit-scrollbar {height:6px;}
+  #registroRecoveryControls .registro-recovery-actions::-webkit-scrollbar-thumb {background:#94a3b8;border-radius:6px;}
+  #registroRecoveryControls .registro-recovery-actions:focus-visible {outline:2px solid #0284c7;outline-offset:-2px;}
+  #registroRecoveryControls .registro-recovery-actions button {display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:0 0 auto;min-height:44px;padding:6px 9px;font-size:11px;white-space:nowrap;}
+  #registroRecoveryControls .registro-action-icon {width:18px;height:18px;flex:0 0 18px;pointer-events:none;}
+  #registroRecoveryControls button[hidden],#registroEmergencyWarning[hidden] {display:none!important;}
+  #registroSaveState {display:block;margin-top:3px;font-size:10px;line-height:1.25;color:#64748b;overflow-wrap:anywhere;}
+  #registroEmergencyWarning {margin:4px 0 0;padding:6px 8px;border-radius:8px;background:#fef2f2;color:#991b1b;font-size:11px;line-height:1.3;overflow-wrap:anywhere;}
+  @media(max-width:640px){#registroRecoveryControls .registro-recovery-actions {flex-wrap:nowrap;gap:4px;}}
+  /* End recovery footer. */
   /* Resumen: destacar visualmente Promedio referencial sin cambiar su carácter informativo. */
   @media screen {
     #avanceBox .fin-grid thead th.summary-reference {
@@ -800,19 +815,26 @@
   </div><!-- /registroAcademicoPanel -->
 </main>
 
-  <div class="shell shell-work px-3"><button type="button" class="btn btn-ghost text-xs" data-reg-write onclick="recuperarBorradorAcademico()">Recuperar borrador anterior a conciliación</button></div>
-  <div id="registroAcademicFooter" class="fixed bottom-0 inset-x-0 bg-white/95 border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
-    <div class="shell shell-work max-w-3xl mx-auto px-3 py-2 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between text-xs font-bold">
+  <div id="registroAcademicFooter" class="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
+    <div class="shell shell-work max-w-3xl mx-auto px-3 py-2">
       <div class="flex gap-1.5 flex-wrap">
         <span class="px-2 py-1 rounded-lg bg-red-50 text-red-700">C <span id="cC">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-700">B <span id="cB">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-lime-50 text-lime-700">A <span id="cA">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
-      <div class="grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex">
-        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="subirRegistroNube()">Subir Nube</button>
-        <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" style="background:#0284c7;color:#fff" onclick="bajarRegistroNube()">Bajar Nube</button>
-        <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 w-full sm:w-auto whitespace-nowrap" data-reg-write onclick="guardarRegistroIntegrado()">Guardar</button>
+      <div id="registroRecoveryControls">
+        <div class="registro-recovery-actions" role="group" aria-label="Acciones de notas · desplázate horizontalmente para ver más" tabindex="0">
+          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#fee2e2;color:#991b1b" data-reg-write onclick="IERegistroRecovery.recover()"><svg class="registro-action-icon" data-icon="cloud-download" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 13v8m-4-4 4 4 4-4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Recuperar Nube</span></button>
+          <button id="registroConflictOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.resolve()"><svg class="registro-action-icon" data-icon="git-compare" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="18" cy="6" r="3"/><path d="M18 9v9m-12-3V6m-3 3 3-3 3 3m6 6 3 3 3-3"/><circle cx="6" cy="18" r="3"/></svg><span>Revisar diferencias</span></button>
+          <button type="button" class="btn btn-primary text-[11px] !py-2 !px-2 whitespace-nowrap" data-reg-write onclick="IERegistroRecovery.local()"><svg class="registro-action-icon" data-icon="save" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.2 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.8a2 2 0 0 0-.6-1.4l-3.8-3.8a2 2 0 0 0-1.4-.6Z"/><path d="M17 21v-7H7v7M7 3v5h8"/></svg><span>Guardar</span></button>
+          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="IERegistroRecovery.upload()"><svg class="registro-action-icon" data-icon="cloud-upload" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21v-8m-4 4 4-4 4 4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Subir Nube</span></button>
+          <button id="registroUndoOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.undo()"><svg class="registro-action-icon" data-icon="undo-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></svg><span>Deshacer recuperación</span></button>
+          <button id="registroDraftOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.drafts()"><svg class="registro-action-icon" data-icon="history" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 2.5-6.2L3 8M3 3v5h5m4-1v5l4 2"/></svg><span>Recuperar borrador</span></button>
+          <button id="registroRetryOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.refresh(true)"><svg class="registro-action-icon" data-icon="refresh-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 0 1 15.4-6.4L21 8m0-5v5h-5m5 4a9 9 0 0 1-15.4 6.4L3 16m5 0H3v5"/></svg><span>Reintentar notas</span></button>
+        </div>
+        <span id="registroSaveState" role="status" aria-live="polite">Inicia sesión para cargar tus notas</span>
+        <p id="registroEmergencyWarning" role="alert" hidden></p>
       </div>
     </div>
   </div>
@@ -928,14 +950,14 @@ function saveStore() {
 }
 
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec';
-function fetchLecturaNube(url) {
+function fetchLecturaNube(url, options) {
   const params = new URLSearchParams(url.slice(url.indexOf('?') + 1));
   const body = {};
   params.forEach(function (value, key) { body[key] = value; });
   body.token = (getLoginSession() || {}).token || '';
   return fetch(CLOUD_API_URL, {
     method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    cache: 'no-store', body: JSON.stringify(body)
+    cache: 'no-store', body: JSON.stringify(body), signal: options&&options.signal
   });
 }
 function cloudClaveReg() {
@@ -1116,19 +1138,22 @@ async function subirRegistroNube() {
   subirRegistroNube.pending=tarea;
   try { return await tarea; } finally { subirRegistroNube.pending=null; }
 }
-async function bajarRegistroNube() {
+async function bajarRegistroNube(options) {
+  options=options||{};bajarRegistroNube.resultado=null;
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())return cargarRegistroHistorico();
   if(!nivel||!areaActual){toast('Elija nivel y área');return false;}
   if(subirRegistroNube.pending||bajarRegistroNube.pending){toast('Hay una sincronización en curso. Espere su resultado.');return false;}
   const tarea=(async()=>{try{
-    if(!registroSoloLectura()&&guardarTodo()===false)return false;
+    options.fase?.('guardadoLocal');if(!registroSoloLectura()&&guardarTodo()===false)return false;
     toast('Verificando el registro remoto…');
-    if(!await prepararVersionAcademica())return false;
+    if(!await prepararVersionAcademica(options))return false;
     const plan=prepararVersionAcademica.plan;
     if(plan.key!==cloudClaveReg()||plan.token!==(getLoginSession()||{}).token)return false;
-    const applied=confirmarRegistroConciliado(plan,plan.remote);
+    if(options.validar&&!options.validar())return false;
+    const applied=confirmarRegistroConciliado(plan,plan.remote,options);
+    bajarRegistroNube.resultado={key:plan.key,token:plan.token,estado:applied?'verificado':'pendiente'};
     toast(applied?'Registro conciliado. Los cambios locales no enviados se conservan.':'Registro remoto verificado; hay cambios locales posteriores pendientes.');return applied;
-  }catch(e){toast(e.message||'No se pudo bajar. Trabajo local conservado.');return false;}})();
+  }catch(e){bajarRegistroNube.resultado={estado:'fallo',code:e.code};if(!options.automatico)toast(e.message||'No se pudo bajar. Trabajo local conservado.');return false;}})();
   bajarRegistroNube.pending=tarea;try{return await tarea;}finally{bajarRegistroNube.pending=null;}
 }
 
@@ -1258,6 +1283,7 @@ function sincronizarEdicionRegistro() {
   document.querySelectorAll('[data-reg-cloud]').forEach(el => { el.disabled = registroNubeNoVerificada(); });
   // Los controles recién renderizados conservan sus restricciones académicas propias.
   document.querySelectorAll('.cal-nota,.fin-nota,.academic-conclusion').forEach(el => { if (bloquearLocal) el.readOnly = true; });
+  if(typeof document.dispatchEvent==='function'&&typeof Event!=='undefined')document.dispatchEvent(new Event('ie22375:registro-ready'));
 }
 function estadoPadron(message, retry) {
   const st = document.getElementById('studentsStatus'); if (st) st.textContent = message;
@@ -2974,9 +3000,16 @@ function promReferencialAlumno(id){
   const comps=competencias().filter(cp=>competenciaTrabajada(cp));
   return {...promGeneralAlumno(id,comps),exacto:comps.every(cp=>numeroExactoComp(cp,id))};
 }
-async function leerEstadoRemotoAcademico(c,key,token){
+async function leerEstadoRemotoAcademico(c,key,token,options){
+  options=options||{};
   const query=new URLSearchParams({action:'loadreg',nivel:c.nivel,bimestre:c.bim,grado:String(c.grado),seccion:c.seccion,area:c.area});
-  const r=await fetchLecturaNube(CLOUD_API_URL+'?'+query),data=JSON.parse(await r.text());
+  const controller=options.timeoutMs&&typeof AbortController!=='undefined'?new AbortController():null;let deadline;
+  const read=(async()=>{options.fase?.('lectura');const r=await fetchLecturaNube(CLOUD_API_URL+'?'+query,{signal:controller?.signal});options.fase?.('cuerpo');return {r,data:JSON.parse(await r.text())};})();
+  let response;
+  try{response=options.timeoutMs?await Promise.race([read,new Promise((_,reject)=>{deadline=setTimeout(()=>{controller?.abort();const e=Error('La verificación tardó demasiado. Tus notas locales están conservadas.');e.code='TIMEOUT';reject(e);},options.timeoutMs);})]):await read;}finally{if(deadline)clearTimeout(deadline);}
+  const {r,data}=response;
+  // The detached transport never applies data. Validate generation before even revoking a session.
+  if(options.validar&&!options.validar())throw Error('La verificación anterior ya no corresponde. Trabajo local conservado.');
   if(r.status>=400||data.ok!==true)data.ok=false;
   if(key!==cloudClaveReg()||token!==(getLoginSession()||{}).token||areaActual!==c.area||nivel!==c.nivel)throw Error('El contexto o la sesión cambió. Trabajo local conservado.');
   if(!data.ok){retirarVerificacionNube(token,c.bim,data);throw Error(data.error||'No se pudo verificar el registro académico.');}
@@ -3015,7 +3048,8 @@ function pintarRegistroConciliado(){
   if(document.getElementById('panelAvance')?.classList.contains('on'))renderAvance();
   if(document.getElementById('panelAsistencia')?.classList.contains('on'))renderAsistencia();
 }
-function confirmarRegistroConciliado(plan,remote){
+function confirmarRegistroConciliado(plan,remote,options){
+  options=options||{};
   if(!registroSoloLectura()){
     const invalidas=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>inp.value!==''&&(!Number.isFinite(Number(inp.value))||Number(inp.value)<0||Number(inp.value)>20));
     if(invalidas||guardarTodo()===false)throw Error('Hay entradas posteriores sin guardar. Se conserva el borrador; revise antes de conciliar.');
@@ -3024,23 +3058,26 @@ function confirmarRegistroConciliado(plan,remote){
   try{
     if(current===plan.localSignature)aplicarRegistroConciliado(plan.payload);
     b.version=remote.version;b.soportaModeloAcademico=true;b.basePayload=IERegistroReconcile.copy(remote.payload);b.baseline=IERegistroAcademico.canonical(remote.payload);delete b.attempt;
-    saveStore();
+    options.fase?.('persistencia');saveStore();if(options.validarPersistencia&&!options.validarPersistencia())throw Error('No se verificó el guardado local.');
   }catch(e){store=before;throw Error('No se pudo conservar la conciliación localmente. No cierre la pestaña; el respaldo permanece disponible.');}
-  dirtyAcademico();if(current===plan.localSignature)pintarRegistroConciliado();return current===plan.localSignature;
+  dirtyAcademico();if(current===plan.localSignature){options.fase?.('pintura');pintarRegistroConciliado();}return current===plan.localSignature;
 }
-async function prepararVersionAcademica(){
+async function prepararVersionAcademica(options){
+  options=options||{};
   if(typeof IERegistroAcademico==='undefined'||typeof IERegistroReconcile==='undefined')throw Error('No se cargó el módulo de conciliación. El borrador local se conserva.');
   const c=ctxBase(),key=cloudClaveReg(),token=(getLoginSession()||{}).token,local=IERegistroReconcile.copy(sliceRegistroArea()),localSignature=IERegistroReconcile.signature(local);
-  const current=()=>key===cloudClaveReg()&&token===(getLoginSession()||{}).token&&localSignature===IERegistroReconcile.signature(sliceRegistroArea());
-  const remote=await leerEstadoRemotoAcademico(c,key,token);
+  const current=()=>key===cloudClaveReg()&&token===(getLoginSession()||{}).token&&localSignature===IERegistroReconcile.signature(sliceRegistroArea())&&(!options.validar||options.validar());
+  const remote=await leerEstadoRemotoAcademico(c,key,token,options);
+  if(options.validar&&!current())throw Error('El borrador cambió. Tus notas locales están conservadas.');
   if(!registroSoloLectura()&&guardarTodo()===false)throw Error('No se pudo conservar el borrador actual. No se enviaron notas.');
   if(!current())throw Error('Hay cambios posteriores. Reintente; todo el trabajo local se conserva.');
   const b=baselineAcademica();let base=b.basePayload||null;
   if(b.attempt&&IERegistroAcademico.canonical(remote.payload)===IERegistroAcademico.canonical(b.attempt.payload)&&remote.version>b.attempt.version)base=b.attempt.local;
   const groups=IERegistroReconcile.identityConflicts(local,remote.payload,estudiantes(),typeof IEStudentIdentity==='undefined'?null:IEStudentIdentity);
-  const reconciliation=IERegistroReconcile.plan(base,local,remote.payload,groups,{sharedAttendance:true});
-  const choices=await IERegistroReconcile.choose(reconciliation.conflicts,current,{roster:estudiantes(),aliases:local.meta&&local.meta.studentAliases});
-  if(!choices){toast('Conflicto pendiente. El trabajo local se conserva; ninguna nota fue enviada.');return false;}
+  options.fase?.('conciliacion');const reconciliation=IERegistroReconcile.plan(base,local,remote.payload,groups,{sharedAttendance:true});
+  if(options.automatico&&reconciliation.conflicts.length){bajarRegistroNube.resultado={key,token,estado:'conflicto',conflictos:reconciliation.conflicts.length};return false;}
+  const choices=options.automatico?{}:await IERegistroReconcile.choose(reconciliation.conflicts,current,{roster:estudiantes(),aliases:local.meta&&local.meta.studentAliases});
+  if(!choices){bajarRegistroNube.resultado={key,token,estado:current()?'conflicto':'pendiente',conflictos:reconciliation.conflicts.length};toast('Conflicto pendiente. El trabajo local se conserva; ninguna nota fue enviada.');return false;}
   if(!current())throw Error('El contexto, la sesión o el borrador cambió. Reintente sin cerrar la pestaña.');
   const payload=reconciliation.resolve(choices);
   // Un único respaldo acotado por contexto. Si falla su persistencia no se envía nada.
@@ -3048,7 +3085,7 @@ async function prepararVersionAcademica(){
   b.recovery={local,base:b.basePayload||null,remote:IERegistroReconcile.copy(remote.payload)};
   // La lectura no cambia la base causal: un POST rechazado debe poder conciliarlas de nuevo.
   b.soportaModeloAcademico=true;
-  try{saveStore();}catch(e){store.academicSync[key]=previous;throw Error('No se pudo guardar el respaldo local. No cierre la pestaña; no se enviaron notas.');}
+  options.fase?.('respaldo');try{saveStore();if(options.validarPersistencia&&!options.validarPersistencia())throw Error('No se verificó el respaldo local.');}catch(e){store.academicSync[key]=previous;throw Error('No se pudo guardar el respaldo local. No cierre la pestaña; no se enviaron notas.');}
   prepararVersionAcademica.plan={key,token,localSignature,local,payload,remote};return true;
 }
 
@@ -3832,7 +3869,6 @@ window.addEventListener('resize', fixHdrHeight);
 // Al cargar: separar primaria / secundaria según sesión de login
 document.addEventListener('DOMContentLoaded', function() {
   aplicarRestriccionNivel();
-  restaurarCursos();
   configurarAccesosAppsMoviles();
 });
 // Por si el script corre después de DOMContentLoaded
@@ -3840,5 +3876,172 @@ if (document.readyState !== 'loading') {
   setTimeout(aplicarRestriccionNivel, 0);
 }
 </script>
+<!-- Inicio simplificación docente: dependencia separada, sin cambiar handlers académicos. -->
+<script>
+/* Borradores locales y recuperación voluntaria; no contiene transporte de escritura. */
+(function(root){
+ 'use strict';
+ const copy=x=>JSON.parse(JSON.stringify(x)),ttl=7*86400000;
+ function storage(indexedDB,now=Date.now){
+  let connection;
+  async function db(){if(!indexedDB)throw Error('IndexedDB no disponible. Conserva esta pestaña.');if(!connection)connection=new Promise((resolve,reject)=>{const r=indexedDB.open('ie22375_emergency_v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('drafts',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(Error('No se pudo abrir el respaldo local.'));r.onblocked=()=>reject(Error('Respaldo local bloqueado.'));});return connection;}
+  async function run(mode,fn){const d=await db();return new Promise((resolve,reject)=>{const t=d.transaction('drafts',mode);let result;const r=fn(t.objectStore('drafts'));r.onsuccess=()=>result=r.result;r.onerror=()=>reject(Error('No se pudo leer/escribir el respaldo.'));t.oncomplete=()=>resolve(result);t.onabort=t.onerror=()=>reject(Error('No se confirmó el respaldo persistente.'));});}
+  async function list(scope){return (await run('readonly',s=>s.getAll())).filter(r=>r.scope===scope&&now()-r.created<ttl).sort((a,b)=>b.created-a.created);}
+  async function put(scope,snapshot,kind='emergency'){
+   const created=now(),record={id:scope+'|'+created+'|'+Math.random().toString(36).slice(2),scope,created,kind,snapshot:copy(snapshot)};
+   await run('readwrite',s=>s.put(record));const read=await run('readonly',s=>s.get(record.id));if(JSON.stringify(read)!==JSON.stringify(record))throw Error('No se verificó el respaldo persistente.');
+   const all=await run('readonly',s=>s.getAll()),own=all.filter(r=>r.scope===scope).sort((a,b)=>b.created-a.created);
+   // Solo borra snapshots de esta base dedicada, nunca notas oficiales/localStorage.
+   for(const r of own.filter((r,i)=>r.id!==record.id&&(now()-r.created>=ttl||i>=39)))await run('readwrite',s=>s.delete(r.id));
+   return record;
+  }
+  return {put,list};
+ }
+ function differences(local,remote){const out=[];for(const field of ['grades','finales','concComp','concArea','competenciasEstado','sessions','capsSel']){
+   const l=local[field]||{},r=remote[field]||{};if(Array.isArray(l)||Array.isArray(r)){if(root.IERegistroReconcile.signature({[field]:l})!==root.IERegistroReconcile.signature({[field]:r}))out.push({field,key:'Sesiones',local:l,remote:r});continue;}
+   for(const key of [...new Set([...Object.keys(l),...Object.keys(r)])].sort())if(!root.IERegistroReconcile.equal(l[key],r[key]))out.push({field,key,local:l[key],remote:r[key]});
+  }return out;}
+ function controller(d){let busy=false,saving=false,lastSignature=null;
+  const signature=x=>root.IERegistroReconcile.signature(x.payload);
+  const valid=(initial)=>d.guard()&&d.context()===initial.context&&signature(d.capture())===signature(initial);
+  async function recover(candidate){if(saving){d.state('Espera mientras se verifica el respaldo local.');return false;}if(busy||!d.guard())return false;busy=true;try{
+   const local=copy(d.capture()),remote=candidate?{payload:candidate.snapshot.payload,version:null,exists:true}:await d.read();
+   if(!valid(local))throw Error('El contexto o borrador cambió. Recuperación cancelada.');
+   const undo=!!(candidate?.undo&&candidate.kind==='before-recovery');
+   if(!remote.exists||!remote.payload||(!undo&&!['grades','finales','concComp','concArea','sessions','competenciasEstado','capsSel'].some(k=>Object.keys(remote.payload[k]||{}).length)))throw Error('No hay notas/evidencias recuperables confirmadas. No se reemplazaron notas.');
+   const diff=differences(local.payload,remote.payload);if(!diff.length){d.state('Sin diferencias de notas.');return true;}
+   if(!await d.confirm(diff,undo?'undo':candidate?'borrador':'nube'))return false;
+   if(!valid(local))throw Error('El borrador cambió durante la comparación.');
+   const backup=await d.backup(local,'before-recovery');if(!valid(local))throw Error('Cambió el contexto mientras se verificaba el respaldo.');
+   if(!candidate){const check=await d.read();if(check.version!==remote.version||root.IERegistroReconcile.signature(check.payload)!==root.IERegistroReconcile.signature(remote.payload))throw Error('La nube cambió. Compara nuevamente antes de recuperar.');}
+   if(!valid(local))throw Error('Cambió el borrador o los permisos.');
+   await d.apply(remote,candidate,local,backup);d.state('Cambios pendientes de subir');return true;
+  }catch(e){d.state(e.message);return false;}finally{busy=false;}}
+  async function emergency(periodic=false){if(busy||saving||!d.guard())return false;saving=true;let snapshot;try{snapshot=copy(d.capture());const sig=signature(snapshot);if(!periodic&&sig===lastSignature)return false;if(periodic&&(d.changed?!d.changed():sig===d.baseline()))return false;await d.backup(snapshot,periodic?'periodic':'emergency');if(d.context()!==snapshot.context||!d.guard())return false;lastSignature=sig;d.state((d.changed?!d.changed():sig===d.baseline())?'Guardado en esta computadora':'Cambios pendientes de subir');return true;}catch(e){if(!snapshot||d.context()===snapshot.context)d.state(e.message);return false;}finally{saving=false;}}
+  return {recover,emergency,busy:()=>busy||saving};
+ }
+ root.IERegistroDrafts={storage,controller,differences,ttl};if(typeof module!=='undefined')module.exports=root.IERegistroDrafts;
+})(typeof window==='undefined'?globalThis:window);
+
+</script>
+<script>
+/* Adaptador frontend: operaciones explícitas y timers exclusivamente locales. */
+(function(){
+ 'use strict';let service,timer,lastDisk,refreshTimer,periodicTimer,expiryTimer,expiryToken='';const observed=new Map();try{lastDisk=localStorage.getItem(NOTAS_KEY);}catch(_){}
+ const copy=x=>IERegistroReconcile.copy(x),context=()=>{const s=getLoginSession()||{};return cloudClaveReg()+'|'+(s.token||'')+'|'+(s.user||'')+'|'+(s.role||'');};
+ function authenticated(){const s=getLoginSession();return !!(s?.token&&['admin','docente'].includes(s.role)&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token);}
+ function text(el,value){if(el&&el.textContent!==value)el.textContent=value;}
+ const volatileEntries=new Map();
+ function pendingTrans(){const token=(getLoginSession()||{}).token,entry=typeof IERegistroTransversales==='undefined'?null:IERegistroTransversales.current?.();if(entry?.dirty)volatileEntries.set(entry,token);return [...volatileEntries].some(([e,t])=>t===token&&e.dirty);}
+ function refreshWarning(){const pending=pendingTrans(),status=document.getElementById('registroSaveState'),suffix=' · Aporte transversal pendiente: conserva esta pestaña.';if(status?.textContent)text(status,status.textContent.replace(suffix,'')+(pending?suffix:''));const el=document.getElementById('registroEmergencyWarning');if(el){el.hidden=!pending;text(el,el.hidden?'':'Aportes transversales pendientes SIN respaldo de emergencia. Recuperar Nube, Deshacer recuperación y Recuperar borrador solo protegen el registro académico. No cierres ni cambies de aula, área o bimestre: conserva esta pestaña y confirma el envío de esos aportes.');}}
+ const state=text=>{if(text==='Cambios pendientes de subir'&&pendingAcademic())text=pendingLabel();const el=document.getElementById('registroSaveState');refreshWarning();if(el){const value=text+(pendingTrans()?' · Aporte transversal pendiente: conserva esta pestaña.':'');if(el.textContent!==value)el.textContent=value;}};
+ function guard(){const ses=getLoginSession();return !!(authenticated()&&ses&&ses.token&&['admin','docente'].includes(ses.role)&&nivel&&areaActual&&areas().includes(areaActual)&&bimestreHabilitado(ctxBase().bim)&&!registroSoloLectura()&&!bimCerradoDocente()&&padronBimestre===ctxBase().bim&&!subirRegistroNube.pending&&!bajarRegistroNube.pending&&document.getElementById('registroTutorPanel')?.hidden!==false);}
+ function capture(){
+  const persisted=localStorage.getItem(NOTAS_KEY);if(persisted!==lastDisk&&persisted!==JSON.stringify(store))throw Error('Otro registro cambió en este navegador. Conserva las pestañas y revisa antes de guardar.');lastDisk=persisted;
+  const invalid=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(el=>{const rendered=el.dataset?.registroContexto||el.closest?.('#finLista')?.dataset?.registroContexto;if(rendered&&rendered!==cloudClaveReg()||el.readOnly)return false;return el.value!==''&&(!Number.isFinite(Number(el.value))||Number(el.value)<0||Number(el.value)>20);});
+  if(invalid)throw Error('Nota inválida: conserva esta pestaña y corrige antes de guardar.');
+  if(guardarTodo()===false)throw Error('No se confirmó el guardado local. Conserva esta pestaña.');
+  lastDisk=localStorage.getItem(NOTAS_KEY);
+  const ses=getLoginSession();return {context:context(),key:cloudClaveReg(),owner:ses.user,role:ses.role,payload:copy(sliceRegistroArea()),baseline:copy(baselineAcademica())};
+ }
+ const ownerHashes=new Map(),draftMemo=new Map();let draftRevision=0;
+ function invalidateDraft(){draftRevision++;draftMemo.clear();}
+ async function scope(snapshot){const ses=getLoginSession()||{},user=snapshot?snapshot.owner:ses.user,role=snapshot?snapshot.role:ses.role,key=snapshot?snapshot.key:cloudClaveReg();if(!user)throw Error('No se identificó al usuario del respaldo.');const owner=user+'|'+role;if(!ownerHashes.has(owner)){const result=crypto.subtle.digest('SHA-256',new TextEncoder().encode(owner)).then(hash=>[...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,'0')).join(''));ownerHashes.set(owner,result);result.catch(()=>ownerHashes.delete(owner));}return await ownerHashes.get(owner)+'|'+key;}
+ const disk=typeof IERegistroDrafts==='undefined'?null:IERegistroDrafts.storage(window.indexedDB);
+ async function backup(snapshot,kind){const key=await scope(snapshot),safe=copy(snapshot);safe.context=snapshot.key;delete safe.owner;delete safe.role;const result=await disk.put(key,safe,kind);invalidateDraft();return result;}
+ function compare(diff,kind){return new Promise(resolve=>{
+  const dialog=document.createElement('dialog');dialog.style.cssText='max-width:760px;width:calc(100% - 24px);max-height:85vh;border:0;border-radius:14px;padding:16px';
+  const title=document.createElement('h2');title.id='registroRecoveryTitle';title.tabIndex=-1;title.textContent=kind==='nube'?'Recuperar Nube':kind==='undo'?'Deshacer recuperación':'Recuperar borrador de emergencia';dialog.setAttribute('aria-labelledby',title.id);dialog.append(title);
+  const warning=document.createElement('p'),c=ctxBase();warning.textContent='Bimestre '+c.bim+' · '+c.grado+'.º '+c.seccion+' · '+c.area+'. Reemplazo voluntario de notas, evidencias y conclusiones. Se conservará un respaldo verificado. La asistencia local se conserva. No se subirá nada a la nube.';dialog.append(warning);
+  const undo=document.createElement('p');undo.textContent='Para deshacer después, incluso al reabrir: pulsa Deshacer recuperación y compara el respaldo anterior a este reemplazo. No borres los datos locales; los respaldos duran hasta siete días y pueden caducar antes por cuota o límite de 40 respaldos.';dialog.append(undo);
+  if(pendingTrans()){const alert=document.createElement('p');alert.style.cssText='background:#fef2f2;color:#991b1b;padding:10px;font-weight:bold';alert.textContent='Tus aportes transversales pendientes NO quedan respaldados ni se recuperan aquí. Esta acción solo reemplaza datos académicos. Conserva la pestaña y confirma el envío de esos aportes antes de cambiar contexto o cerrar.';dialog.append(alert);}
+  const list=document.createElement('div');list.style.cssText='overflow:auto;max-height:50vh';
+  for(const row of diff){const p=document.createElement('p');p.style.cssText='border-bottom:1px solid #ddd;padding:8px;font-size:12px;overflow-wrap:anywhere';
+   const view=['sessions','capsSel'].includes(row.field)?{title:row.field==='sessions'?'Sesiones de evaluación':'Capacidades seleccionadas',local:JSON.stringify(row.local),remote:JSON.stringify(row.remote)}:IERegistroReconcile.conflictView({path:JSON.stringify([row.field,row.key]),local:row.local,remote:row.remote},{roster:estudiantes(),aliases:sliceRegistroArea().meta?.studentAliases});
+   p.textContent=view.title+'\nLocal: '+view.local+'\n'+(kind==='nube'?'Nube: ':kind==='undo'?'Antes de recuperar: ':'Borrador: ')+view.remote;p.style.whiteSpace='pre-wrap';list.append(p);}dialog.append(list);
+  const cancel=document.createElement('button'),accept=document.createElement('button');cancel.textContent='Cancelar';accept.textContent=kind==='undo'?'Confirmar deshacer':'Confirmar reemplazo local';for(const b of [cancel,accept]){b.type='button';b.style.cssText='min-height:44px;margin:6px;padding:8px';dialog.append(b);}
+  let done=false;const finish=value=>{if(done)return;done=true;dialog.close();dialog.remove();resolve(value);};cancel.onclick=()=>finish(false);accept.onclick=()=>finish(true);dialog.oncancel=e=>{e.preventDefault();finish(false);};document.body.append(dialog);dialog.showModal();title.focus();
+ });}
+ async function apply(remote,candidate,local,backupRecord){
+  const previous=copy(store),raw=localStorage.getItem(NOTAS_KEY),payload=copy(remote.payload);
+  for(const field of ['asistencia','asisFechas','asisFechasEstado'])payload[field]=copy(local.payload[field]||{});
+  try{
+   aplicarRegistroConciliado(payload,true);const b=baselineAcademica();
+   if(!candidate){b.version=remote.version;b.basePayload=copy(remote.payload);b.baseline=IERegistroAcademico.canonical(remote.payload);delete b.attempt;}
+   else{const original=candidate.undo?local.baseline:candidate.snapshot.baseline||{};b.version=original.version??null;if(original.basePayload)b.basePayload=copy(original.basePayload);else delete b.basePayload;b.baseline=original.baseline||IERegistroAcademico.canonical(local.payload);delete b.attempt;}
+   b.recovery={local:copy(local.payload),base:local.baseline.basePayload||null,remote:copy(remote.payload)};
+   if(candidate?.undo)b.voluntaryRecovery={undone:true,created:backupRecord?.created??Date.now()};else if(backupRecord?.id)b.voluntaryRecovery={id:backupRecord.id,created:backupRecord.created};saveStore();
+   if(localStorage.getItem(NOTAS_KEY)!==JSON.stringify(store))throw Error('No se verificó el reemplazo local.');lastDisk=localStorage.getItem(NOTAS_KEY);invalidateDraft();dirtyAcademico();pintarRegistroConciliado();
+  }catch(e){store=previous;try{if(raw!==null)localStorage.setItem(NOTAS_KEY,raw);}catch(_){}throw Error('Recuperación no confirmada. Borrador conservado; no cierres la pestaña.');}
+ }
+ function init(){if(!disk)return null;if(!service)service=IERegistroDrafts.controller({context,guard,capture,read:()=>leerEstadoRemotoAcademico(ctxBase(),cloudClaveReg(),(getLoginSession()||{}).token),backup,apply,confirm:compare,state,changed:()=>pendingAcademic(),baseline:()=>IERegistroReconcile.signature(baselineAcademica().basePayload||{})});return service;}
+ async function recover(){refreshWarning();if(!guard()){state('Recuperación no disponible: revisa sesión, permisos, bimestre y padrón.');return false;}if(!init())return state('Recuperación no disponible. Conserva el borrador.');const ok=await service.recover();invalidateDraft();await offerDraft();queueRefresh();return ok;}
+ function diskSafe(){const raw=localStorage.getItem(NOTAS_KEY);return raw===lastDisk||raw===JSON.stringify(store);}
+ function rememberDisk(){const raw=localStorage.getItem(NOTAS_KEY);if(raw===JSON.stringify(store))lastDisk=raw;}
+ function material(payload){const p=JSON.parse(IERegistroAcademico.canonical(payload||{}));for(const field of ['grades','finales','concComp','concArea','competenciasEstado','capsSel']){p[field]=p[field]||{};for(const [key,v]of Object.entries(payload?.[field]||{}))if(v?.borrado)p[field][key]={borrado:true};}for(const [key,v]of Object.entries(p.capsSel||{})){if(Array.isArray(v)&&!v.length)delete p.capsSel[key];else if(Array.isArray(v))for(const item of v)if(item?.comp&&item.cap&&item.origen==='academica')delete item.origen;}return p;}
+ function different(a,b){return IERegistroDrafts.differences(material(a),material(b)).length>0;}
+ function recoverable(payload,local=sliceRegistroArea()){return !!payload&&different({},payload)&&different(local,payload);}
+ function selectBackups(rows,local){
+  const b=baselineAcademica(),pointer=b.voluntaryRecovery;let undo=pointer?rows.find(r=>r.id===pointer.id&&r.kind==='before-recovery'):null;
+  // Older voluntary recoveries can be matched only to their verified persisted before/after pair.
+  if(!pointer&&rows.some(r=>r.kind==='before-recovery')&&b.recovery?.local&&b.recovery?.remote&&!different(local,b.recovery.remote))undo=rows.find(r=>r.kind==='before-recovery'&&!different(r.snapshot.payload,b.recovery.local));
+  const threshold=pointer?.created??undo?.created??-Infinity;
+  const latest=rows.filter(r=>['emergency','periodic'].includes(r.kind)&&r.created>threshold).sort((a,b)=>b.created-a.created)[0];
+  return {undo:undo&&different(local,undo.snapshot.payload)?{...undo,undo:true}:null,draft:latest&&recoverable(latest.snapshot.payload,local)?latest:null};
+ }
+ let pendingFields=[];
+ function pendingLabel(){return pendingFields.length===1&&pendingFields[0]==='capsSel'?'Configuración de capacidades pendiente de subir':'Cambios pendientes de subir';}
+ function pendingAcademic(payload=sliceRegistroArea()){
+  const b=baselineAcademica(),canonical=IERegistroAcademico.canonical(payload),deleted=['grades','finales','concComp','concArea','competenciasEstado','capsSel'].some(f=>Object.values(payload[f]||{}).some(v=>v?.borrado));pendingFields=[];
+  if(canonical===b.baseline&&!deleted)return false;
+  let base;try{base=b.basePayload||JSON.parse(b.baseline);}catch(_){pendingFields=['base no verificada'];return true;}
+  const normalize=p=>{const c=JSON.parse(IERegistroAcademico.canonical(p));delete c.meta;for(const field of ['asisFechas','capsSel'])for(const k of Object.keys(c[field]||{}))if(Array.isArray(c[field][k])&&!c[field][k].length)delete c[field][k];for(const selection of Object.values(c.capsSel||{}))if(Array.isArray(selection))for(const item of selection)if(item&&typeof item==='object'&&item.comp&&item.cap&&item.origen==='academica')delete item.origen;return c;},local=normalize(payload),remote=normalize(base);
+  pendingFields=[...new Set([...Object.keys(local),...Object.keys(remote)])].filter(f=>!IERegistroReconcile.equal(local[f],remote[f]));
+  for(const f of ['grades','finales','concComp','concArea','competenciasEstado','capsSel']){const tombstones=p=>Object.fromEntries(Object.entries(p[f]||{}).filter(([,v])=>v?.borrado).map(([k])=>[k,true]));if(!IERegistroReconcile.equal(tombstones(payload),tombstones(base))&&!pendingFields.includes(f))pendingFields.push(f);}
+  return pendingFields.length>0;
+ }
+ async function local(){if(!guard()||init()?.busy())return false;const binding=context();try{invalidateDraft();capture();const ok=await guardarRegistroIntegrado();if(binding!==context())return false;rememberDisk();state(ok?(pendingAcademic()?'Cambios pendientes de subir':'Guardado en esta computadora'):'Guardado en esta computadora · aporte transversal pendiente');await init()?.emergency();queueRefresh();return ok;}catch(e){state(e.message);return false;}finally{queueRefresh();}}
+ async function upload(){if(!guard()||init()?.busy())return false;if(registroNubeNoVerificada()){state('Sin conexión. Tus notas locales están conservadas');return false;}const binding=context();try{if(!diskSafe())throw Error('Otro registro cambió en este navegador. Conserva las pestañas y revisa antes de guardar.');const ok=await subirRegistroNube();if(binding===context()){rememberDisk();invalidateDraft();queueRefresh();state(ok&&!pendingAcademic()?'Notas actualizadas':'Cambios pendientes de subir');}return ok;}catch(e){if(binding===context())state('No se confirmó la subida. Tus notas locales están conservadas');return false;}finally{queueRefresh();}}
+ async function restore(kind){refreshWarning();if(!guard()||!init()||service.busy())return false;try{const binding=context(),key=await scope(),rows=await disk.list(key);if(binding!==context()||!guard())return false;let candidate=selectBackups(rows,sliceRegistroArea())[kind];const legacy=baselineAcademica().recovery;if(!candidate&&kind==='draft'&&!baselineAcademica().voluntaryRecovery&&recoverable(legacy?.local))candidate={snapshot:{payload:copy(legacy.local),baseline:{version:baselineAcademica().version,basePayload:copy(legacy.base),baseline:IERegistroAcademico.canonical(legacy.base||{})}}};if(!candidate){state(kind==='undo'?'No hay un respaldo anterior recuperable.':'No hay borradores diferentes recientes para este contexto.');await offerDraft();return false;}const ok=await service.recover(candidate);invalidateDraft();await offerDraft();queueRefresh();return ok;}catch(e){state(e.message);return false;}}
+ async function drafts(){return restore('draft');}
+ async function undo(){return restore('undo');}
+ const consulted=new Set();let checking=false,activeBinding='',generation=0;
+ function track(){const binding=context();if(binding!==activeBinding){if(checking)state('Notas locales conservadas · verificación del contexto actual pendiente');activeBinding=binding;generation++;diagnostic=null;pendingFields=[];consulted.delete(binding);for(const id of ['registroConflictOffer','registroDraftOffer','registroUndoOffer']){const el=document.getElementById(id);if(el)el.hidden=true;}invalidateDraft();clearTimeout(periodicTimer);periodicTimer=null;}return generation;}
+ function readable(){const ses=getLoginSession();return !!(authenticated()&&ses?.token&&['admin','docente'].includes(ses.role)&&nivel&&areaActual&&areas().includes(areaActual)&&padronBimestre===ctxBase().bim&&typeof tokenPadron!=='undefined'&&tokenPadron===ses.token&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===ses.token&&IEStudents.peekRoster(ctxBase().bim)&&!(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())&&document.getElementById('registroTutorPanel')?.hidden!==false);}
+ function academicEmpty(payload){return !(payload.sessions||[]).length&&['grades','finales','concComp','concArea','competenciasEstado'].every(field=>Object.keys(payload[field]||{}).length===0)&&Object.values(payload.capsSel||{}).every(v=>Array.isArray(v)&&v.length===0);}
+ function retryOffer(show){const el=document.getElementById('registroRetryOffer');if(el)el.hidden=!show;}
+ function hideConflict(){const offer=document.getElementById('registroConflictOffer');if(offer)offer.hidden=true;}
+ function storageBlocked(){hideConflict();state('No se pudo verificar el guardado local. Tus notas están conservadas; no cierres esta pestaña.');}
+ function syncState(ok){retryOffer(!ok&&bajarRegistroNube.resultado?.estado==='fallo');const result=bajarRegistroNube.resultado,offer=document.getElementById('registroConflictOffer'),current=result?.key===cloudClaveReg()&&result?.token===(getLoginSession()||{}).token,conflict=current&&result?.estado==='conflicto'&&Number.isInteger(result.conflictos)&&result.conflictos>0;if(offer)offer.hidden=!conflict;if(conflict){state('Hay notas diferentes que necesitan revisión');return;}if(ok&&current&&result.estado==='verificado'){const payload=sliceRegistroArea(),pending=pendingAcademic(payload),plan=typeof prepararVersionAcademica==='undefined'?null:prepararVersionAcademica.plan,empty=academicEmpty(payload)&&plan?.key===result.key&&plan?.token===result.token&&plan.remote?.payload&&academicEmpty(plan.remote.payload);state(empty?'Sin notas registradas'+(pending?' · '+pendingLabel():''):pending?'Cambios pendientes de subir':'Notas actualizadas');return;}state(current&&result?.estado==='pendiente'?'Cambios pendientes de subir':result?.estado==='fallo'?(result.code==='TIMEOUT'?'La verificación tardó demasiado. Tus notas locales están conservadas; reintenta.':'Sin conexión. Tus notas locales están conservadas'):'No se pudo verificar el registro actual. Tus notas locales están conservadas');}
+
+ let diagnostic=null;
+ async function automatic(){const epoch=track(),binding=context();if(!authenticated()){inactive();return false;}if(!readable()||checking||consulted.has(binding)||service?.busy()||subirRegistroNube.pending||bajarRegistroNube.pending)return false;checking=true;consulted.add(binding);pendingFields=[];const started=Date.now(),timings={};let phase='preparacion',phaseAt=started,finished=false;const fase=next=>{if(finished)return;const now=Date.now();timings[phase]=(timings[phase]||0)+now-phaseAt;phase=next;phaseAt=now;};try{if(!diskSafe()){storageBlocked();return false;}retryOffer(false);state('Verificando notas…');const ok=await bajarRegistroNube({automatico:true,timeoutMs:15000,fase,validarPersistencia:()=>localStorage.getItem(NOTAS_KEY)===JSON.stringify(store),validar:()=>track()===epoch&&binding===context()&&readable()&&diskSafe()});if(binding===context()&&epoch===track()&&authenticated()){rememberDisk();invalidateDraft();syncState(ok);}else if(!authenticated())inactive();return ok;}catch(e){if(!authenticated())inactive();else if(binding===context()&&epoch===track())state('Sin conexión. Tus notas locales están conservadas');return false;}finally{const stoppedAt=phase;fase('terminado');finished=true;if(binding===context()&&epoch===generation)diagnostic={elapsedMs:Date.now()-started,phase:stoppedAt,phases:timings,outcome:bajarRegistroNube.resultado?.code||bajarRegistroNube.resultado?.estado||'sin resultado',pendingFields:pendingFields.slice()};checking=false;if(binding!==context()||epoch!==generation||!consulted.has(binding))queueRefresh();}}
+ async function resolve(){if(!readable()||checking||service?.busy()||subirRegistroNube.pending||bajarRegistroNube.pending)return false;const epoch=track(),binding=context();if(!diskSafe()){storageBlocked();return false;}checking=true;try{const ok=await bajarRegistroNube({timeoutMs:15000,validarPersistencia:()=>localStorage.getItem(NOTAS_KEY)===JSON.stringify(store),validar:()=>track()===epoch&&binding===context()&&readable()&&diskSafe()});if(binding===context()&&epoch===track()&&authenticated()){rememberDisk();invalidateDraft();syncState(ok);}else if(!authenticated())inactive();return ok;}finally{checking=false;if(binding!==context()||epoch!==generation||!consulted.has(binding))queueRefresh();}}
+ async function offerDraft(){const draft=document.getElementById('registroDraftOffer'),undo=document.getElementById('registroUndoOffer'),binding=context();if(!guard()||!init()){if(draft)draft.hidden=true;if(undo)undo.hidden=true;return false;}const revision=draftRevision,stamp=binding+'|'+generation+'|'+revision;let memo=draftMemo.get(stamp);if(!memo||memo.until<=Date.now()){
+  memo={until:Infinity,pending:(async()=>{const key=await scope(),rows=await disk.list(key);if(binding!==context()||revision!==draftRevision||!guard())return null;memo.until=rows.length?Math.min(...rows.map(r=>r.created+IERegistroDrafts.ttl)):Infinity;return selectBackups(rows,sliceRegistroArea());})()};draftMemo.set(stamp,memo);memo.pending.catch(()=>draftMemo.delete(stamp));
+ }const candidates=await memo.pending;if(!candidates||binding!==context()||revision!==draftRevision||!guard())return false;if(draft)draft.hidden=!candidates.draft;if(undo)undo.hidden=!candidates.undo;return !!(candidates.draft||candidates.undo);}
+ function inactive(){retryOffer(false);clearTimeout(refreshTimer);clearTimeout(timer);clearTimeout(periodicTimer);clearTimeout(expiryTimer);refreshTimer=timer=periodicTimer=expiryTimer=null;expiryToken='';for(const id of ['registroDraftOffer','registroConflictOffer','registroUndoOffer']){const el=document.getElementById(id);if(el)el.hidden=true;}state('Inicia sesión para cargar tus notas');}
+ function armExpiry(){const token=(getLoginSession()||{}).token;if(token===expiryToken)return;expiryToken=token;clearTimeout(expiryTimer);try{const claims=JSON.parse(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'))),ms=Number(claims.exp)-Date.now();if(ms>0)expiryTimer=setTimeout(()=>{track();if(!authenticated())inactive();else queueRefresh();},Math.min(ms+1,2147483647));}catch(_){} }
+ function queueRefresh(force=false){track();if(!authenticated()){inactive();return;}armExpiry();if(force)consulted.delete(context());if(!readable()){state(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()?'Solo lectura':'Esperando el padrón autorizado para cargar tus notas');return;}clearTimeout(refreshTimer);const binding=context(),epoch=generation;refreshTimer=setTimeout(async()=>{refreshTimer=null;if(binding!==context()||epoch!==track())return;await automatic();if(binding!==context()||epoch!==track()||bajarRegistroNube.resultado?.estado==='fallo')return;try{await offerDraft();}catch(_){state('No se pudo verificar el respaldo local. Conserva esta pestaña.');}},180);}
+ function armPeriodic(){if(periodicTimer||!guard())return;const binding=context();periodicTimer=setTimeout(async()=>{periodicTimer=null;if(binding!==context()||!guard())return;await init()?.emergency(true);if(binding===context()&&guard()&&pendingAcademic())armPeriodic();queueRefresh();},300000);}
+ function schedule(event){refreshWarning();const target=event?.target;if(!target)return;
+  const field=target.closest?.('.cal-nota,.fin-nota,.academic-conclusion,.asis-input,#registroAcademicoPanel input,#registroAcademicoPanel textarea'),button=event.type==='click'&&target.closest?.('[data-val],[data-av],[data-adel],.eq-letter,[data-final-toggle],[onclick*="calificarAreaMasiva"],[onclick*="quitarAreaMasiva"],[onclick*="quitarFinalManual"],[onclick*="activarSesion"],[onclick*="borrarSesion"]');
+  const rendered=field?.dataset?.registroContexto||field?.closest?.('#finLista')?.dataset?.registroContexto;if(rendered&&rendered!==cloudClaveReg())return;
+  if(!field&&!button)return;if(event.type==='click'&&!button)return;if(!guard())return;const key=context(),sig=button?IERegistroReconcile.signature(sliceRegistroArea()):null;
+  if(button&&observed.get(key)===sig)return;observed.set(key,sig);invalidateDraft();armPeriodic();clearTimeout(timer);timer=setTimeout(async()=>{if(key===context()){await init()?.emergency();if(key===context()){observed.set(key,IERegistroReconcile.signature(sliceRegistroArea()));queueRefresh();}}},2500);
+ }
+ window.IERegistroRecovery={recover,local,upload,drafts,undo,automatic,resolve,refresh:queueRefresh,review:offerDraft,diagnostic:()=>diagnostic&&copy(diagnostic)};
+ document.addEventListener('DOMContentLoaded',()=>{
+  const footer=document.getElementById('registroAcademicFooter'),fit=()=>{const main=document.querySelector?.('main');if(main&&footer?.getBoundingClientRect){const space=footer.hidden?0:footer.getBoundingClientRect().height+12;main.style.paddingBottom=space+'px';if(document.documentElement?.style)document.documentElement.style.scrollPaddingBottom=space+'px';}};fit();if(typeof ResizeObserver!=='undefined'&&footer)new ResizeObserver(fit).observe(footer);else{window.addEventListener('resize',fit);if(typeof MutationObserver!=='undefined'&&footer)new MutationObserver(fit).observe(footer,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden']});}
+  document.addEventListener('input',schedule);const selected=e=>{const before=activeBinding;schedule(e);if(before!==context())queueRefresh();};document.addEventListener('change',selected);document.addEventListener('click',selected);
+  document.addEventListener('click',refreshWarning,true);document.addEventListener('change',refreshWarning,true);window.addEventListener('beforeunload',refreshWarning);
+  document.addEventListener('ie22375:registro-ready',()=>queueRefresh());document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='hidden')queueRefresh();});window.addEventListener('focus',()=>queueRefresh());window.addEventListener('online',()=>queueRefresh(true));window.addEventListener('storage',e=>{if(['ie22375_session_v1','ie22375_students_session_v1',NOTAS_KEY].includes(e.key)){invalidateDraft();queueRefresh();}});
+  if(guard())observed.set(context(),IERegistroReconcile.signature(sliceRegistroArea()));refreshWarning();queueRefresh();
+
+ });
+})();
+
+</script>
+<!-- Fin simplificación docente. -->
 </body>
 </html>

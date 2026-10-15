@@ -1,0 +1,570 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'none'"><title>PR83 · demostración ficticia de recuperación</title><style>
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
+  .session-evaluation-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);column-gap:12px;row-gap:10px;align-items:start;}
+  .session-evaluation-grid>div{min-width:0;}
+  .session-evaluation-grid label{display:block;margin:0 0 4px;font-size:12px;line-height:1.4;}
+  .session-evaluation-grid select,.session-evaluation-grid input[type="date"]{width:100%;min-width:0;box-sizing:border-box;height:50px;min-height:50px;margin:0;padding:8px 10px;border:1px solid #cbd5e1;border-radius:10px;}
+  @media(max-width:640px){.session-evaluation-grid{grid-template-columns:minmax(0,1fr);}}
+  .worked-label{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;}
+  .final-cell-layout{display:grid;grid-template-columns:144px minmax(0,1fr);gap:8px;align-items:start;min-width:0;}
+  .final-grade{grid-column:1;width:144px;min-width:144px;display:flex;flex-direction:column;align-items:center;}
+  .final-grade > .fin-cell{width:100%;min-width:0;}
+  .final-grade button{max-width:100%;overflow-wrap:anywhere;}
+  .final-conclusion{text-align:left;min-width:0;width:100%;max-width:100%;font-size:11px;}
+  .final-conclusion label{display:block;font-size:10px;font-weight:600;}
+  .final-conclusion select,.final-conclusion textarea{width:100%;min-width:0;box-sizing:border-box;font-size:11px;line-height:1.25;padding:4px;}
+  .final-conclusion select{min-height:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .final-conclusion textarea{min-height:54px;resize:vertical;margin-top:4px;}
+  @media(max-width:640px){.final-conclusion{grid-column:1 / -1;grid-row:2;}}
+  .summary-stats{margin:14px 0;padding:12px;border:1px solid #cbd5e1;border-radius:12px;}
+  .summary-counts{display:flex;flex-wrap:wrap;gap:12px;}
+  .worked-label input[type=checkbox]{width:17px;height:17px;min-height:17px;padding:0;flex:0 0 17px;}
+  .card { background:#fff; border-radius:16px; box-shadow:0 6px 24px rgba(15,23,42,.08); }
+  .btn { border-radius:12px; font-weight:700; padding:.55rem 1rem; transition:.15s; border:0; cursor:pointer; }
+  .btn-primary { background:#0284c7; color:#fff; }
+  .btn-ghost { background:#e2e8f0; color:#0f172a; }
+  .btn-danger { background:#fee2e2; color:#b91c1c; }
+  .chip { display:inline-flex; align-items:center; justify-content:center; min-width:2.4rem; padding:.4rem .65rem; border-radius:999px; font-size:13px; font-weight:800; border:2px solid transparent; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .fin-cell .chip { min-width:1.7rem; padding:.2rem .32rem; font-size:11px; margin:1px; }
+  #finLista .final-grade > .fin-cell:has(> button[data-val]) { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px 1px; align-items:center; }
+  #finLista .final-grade > .fin-cell > .chip[data-val] { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:2px 1px; margin:0; font-size:11px; white-space:nowrap; overflow-wrap:normal; }
+  #finLista .final-grade > .fin-cell:has(> button[data-val]) > :not([data-val]) { grid-column:1 / -1; justify-self:start; }
+  .nivel-c, .nivel-b, .nivel-a, .nivel-ad {
+    background:#f1f5f9; color:#64748b; border-color:#cbd5e1;
+  }
+  .nivel-c.on { background:#dc2626; color:#fff; border-color:#dc2626; }
+  .nivel-b.on { background:#f97316; color:#fff; border-color:#f97316; }
+  .nivel-a.on { background:#84cc16; color:#fff; border-color:#84cc16; }
+  .nivel-ad.on { background:#16a34a; color:#fff; border-color:#16a34a; }
+  .stu-row { border-bottom:1px solid #f1f5f9; padding:12px 0; }
+  .stu-row:last-child { border-bottom:0; }
+  select, input, textarea {
+    border:1.5px solid #cbd5e1; border-radius:12px; padding:.65rem .75rem;
+    width:100%; font-size:16px; background:#fff; color:#0f172a; min-height:44px;
+  }
+  select { appearance:auto; -webkit-appearance:menulist; }
+  .area-btn { transition:background .15s,color .15s; font-size:12px; padding:.45rem .7rem; border-radius:10px; font-weight:800; background:#f1f5f9; color:#475569; border:0; cursor:pointer; }
+  .area-btn.on { background:#0ea5e9; color:#fff; }
+  .sticky-top { position:sticky; top:0; z-index:40; }
+  .mobile-safe-header { padding-top: env(safe-area-inset-top, 0px); }
+  .mobile-header-actions { -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .mobile-header-actions::-webkit-scrollbar { display:none; }
+  .mobile-header-actions > a, .mobile-header-actions > button {
+    min-height:44px; flex:0 0 auto; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18);
+    display:inline-flex; align-items:center; justify-content:center; text-align:center; line-height:1.15;
+  }
+  #registroAccionesAcademicas .btn {
+    display:flex; align-items:center; justify-content:center; text-align:center; min-height:54px; line-height:1.15;
+  }
+  @media (max-width:640px) {
+    #appHdr { position:static !important; top:auto !important; }
+    #appHdr > div { flex-direction:column; align-items:stretch; gap:8px; }
+    #appHdr .mobile-header-actions {
+      width:100%; display:flex; flex-wrap:nowrap !important; overflow-x:auto;
+      justify-content:flex-start !important; padding-bottom:2px;
+    }
+    /* En móvil el panel de contexto debe desplazarse con la página para liberar espacio. */
+    .ctx-bar { position:static !important; top:auto !important; z-index:auto !important; padding-top:8px; }
+  }
+  .ctx-bar { position:sticky; top:var(--hdr,56px); z-index:35; background:#f1f5f9; padding:8px 0; border-bottom:1px solid #e2e8f0; }
+  .mode-toggle { display:flex; gap:6px; background:#e2e8f0; border-radius:12px; padding:4px; }
+  .mode-toggle button { flex:1; border:0; border-radius:10px; padding:.45rem .5rem; font-size:12px; font-weight:800; background:transparent; color:#64748b; cursor:pointer; }
+  .mode-toggle button.on { background:#fff; color:#0f172a; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .num-wrap { display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .num-wrap input[type=number] {
+    width:72px; min-height:40px; text-align:center; font-size:18px; font-weight:900;
+    border:2px solid #cbd5e1; border-radius:12px; padding:.35rem;
+  }
+  .eq-letter { font-size:12px; font-weight:900; padding:.25rem .55rem; border-radius:999px; }
+  .eq-c { background:#fee2e2; color:#b91c1c; }
+  .eq-b { background:#fef3c7; color:#a16207; }
+  .eq-a { background:#ecfccb; color:#4d7c0f; }
+  .eq-ad { background:#d1fae5; color:#047857; }
+  .eq-none { background:#f1f5f9; color:#94a3b8; }
+  .sess-chip { display:inline-block; font-size:11px; font-weight:700; padding:.35rem .65rem; border-radius:999px; background:#f1f5f9; color:#334155; margin:2px; border:1px solid #e2e8f0; cursor:pointer; }
+  .sess-chip.on { background:#e0f2fe; color:#0369a1; border-color:#7dd3fc; }
+  .scale-hint { font-size:10px; color:#64748b; margin-top:4px; }
+  .av-card { border:1px solid #e2e8f0; border-radius:14px; padding:12px; margin-bottom:10px; background:#fff; }
+  .av-comp { font-weight:900; font-size:14px; color:#0f172a; }
+  .av-meta { font-size:11px; color:#64748b; margin-top:2px; }
+  .av-badge { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:900; padding:.3rem .65rem; border-radius:999px; }
+  .av-ev { font-size:11px; color:#475569; background:#f8fafc; border-radius:8px; padding:6px 8px; margin-top:6px; }
+  .av-stu { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f1f5f9; font-size:12px; }
+  .av-stu:last-child { border-bottom:0; }
+  .panel-av { display:none; }
+  .panel-av.on { display:block; }
+  .panel-cal.on { display:block; }
+  .panel-cal { display:none; }
+  #printArea { display:none; }
+  .panel-as { display:none; }
+  .panel-as.on { display:block; }
+  .panel-fin { display:none; }
+  .panel-fin.on { display:block; }
+  .fin-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  @media screen {
+    .fin-panel-card { padding:10px 12px; }
+    .fin-header { margin-bottom:4px; }
+    .fin-header-main { display:flex; align-items:center; gap:6px 10px; }
+    .fin-header-context { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+    .fin-mode-info { flex:0 1 auto; min-width:0; max-width:100%; }
+    .fin-mode-info > span { display:block; padding:4px 8px; font-size:11px; line-height:1.2; border-radius:8px; overflow-wrap:anywhere; }
+    .fin-header-main .mode-toggle { flex:0 0 180px; max-width:100%; }
+    .fin-header-aux { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:3px; font-size:10px; font-weight:700; color:#64748b; }
+    @media (max-width:1023px) { .fin-header-main { flex-wrap:wrap; } }
+    @media (max-width:640px) { .fin-header-context { flex-basis:100%; } }
+    .fin-panel-card > button { margin-top:8px; }
+    .registro-datos-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); column-gap:24px;row-gap:10px;align-items:start; }
+    .registro-datos-grid > div { min-width:0; }
+    /* Botones compactos: el select original conserva los eventos y la autorización académica. */
+    .registro-datos-grid .registro-select-con-botones > select {position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none;}
+    /* Ocultar los selectores nativos desde el primer render, incluso mientras carga el padrón. */
+    .registro-datos-grid #selGrado,.registro-datos-grid #selSeccion {position:absolute;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none;}
+    .registro-opciones {display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:3px;}
+    .registro-opcion {min-width:34px;min-height:33px;padding:4px 9px;border:1px solid #cbd5e1;border-radius:8px;background:#f1f5f9;color:#334155;font-size:12px;font-weight:750;cursor:pointer;line-height:1.2;}
+    .registro-opcion[aria-pressed="true"] {background:#0284c7;border-color:#0284c7;color:white;}
+    .registro-opcion:focus-visible {outline:2px solid #0369a1;outline-offset:2px;}
+    .registro-opcion:disabled {opacity:.55;cursor:default;}
+    .registro-opcion-candado {font-size:10px;margin-left:3px;}
+    .registro-aulas-grupo {display:flex;flex-wrap:wrap;align-items:center;gap:4px;}
+    .registro-aulas-grupo #wrapSeccion {display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:0;}
+    .registro-aulas-grupo #wrapSeccion > label {font-size:10px;color:#64748b;}
+    .registro-aulas-grupo #wrapSeccion .registro-opciones {margin:0;}
+    .registro-datos-meta { display:flex; flex-wrap:wrap; gap:4px 20px; margin-top:8px; font-size:12px; overflow-wrap:anywhere; }
+    #registroDatosPanel[hidden] { display:none; }
+    #btnRegistroDatos[aria-expanded="true"] { box-shadow:inset 0 0 0 2px #0284c7; }
+    .fin-scroll-body { max-height:60vh; max-height:60dvh; overflow-x:auto; overflow-y:auto; max-width:100%; }
+    .fin-scroll-body .fin-grid thead { position:sticky; top:0; z-index:4; background:#0f172a; }
+    .fin-scroll-body .fin-grid thead th { position:static; }
+    .fin-scroll-body .fin-grid thead th.fin-nom { position:sticky; top:auto; left:0; z-index:5; }
+    @media (max-width:600px) { .registro-datos-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width:360px) { .registro-datos-grid { grid-template-columns:minmax(0,1fr); } }
+  }
+  /* Solo Promedios: cada columna se amplía si alguna fila necesita conclusión. */
+  #finLista .fin-grid { width:auto; min-width:0; table-layout:auto; }
+  #finLista .fin-grid .fin-nom { width:180px; min-width:180px; max-width:180px; text-align:left; }
+  #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) { width:160px; min-width:160px; overflow-wrap:anywhere; }
+  #finLista .fin-grid td:has(.final-conclusion) { width:350px; min-width:350px; }
+  #finLista { min-width:0; max-width:100%; }
+  @media(max-width:640px){#finLista .fin-grid td:has(.final-conclusion){width:220px;min-width:220px;}}
+  .fin-header-controls { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; max-width:100%; }
+  .fin-remove-bulk { padding:6px 8px; min-height:36px; font-size:11px; }
+  #finLista::before { content:""; display:block; position:sticky; top:0; left:0; width:100%; height:var(--fin-head-height,0px); margin-bottom:calc(-1 * var(--fin-head-height,0px)); background:#0f172a; z-index:3; pointer-events:none; }
+  .fin-bulk-actions { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:11px; }
+  .fin-bulk-actions .chip { min-height:36px; font-size:12px; }
+  .fin-grid { width:100%; border-collapse:separate; border-spacing:0; min-width:640px; }
+  .fin-grid th, .fin-grid td { border-bottom:1px solid #e2e8f0; padding:8px 6px; vertical-align:top; }
+  .fin-grid thead th { background:#0f172a; color:#fff; font-size:11px; font-weight:800; position:sticky; top:0; z-index:2; }
+  .fin-grid th.fin-nom, .fin-grid td.fin-nom { position:sticky; left:0; background:#fff; z-index:1; min-width:160px; max-width:200px; }
+  .fin-grid thead th.fin-nom { background:#0f172a; z-index:3; }
+  .fin-grid .fin-caps { font-size:10px; font-weight:600; color:#cbd5e1; margin-top:4px; line-height:1.3; }
+  /* Resumen: resultados por competencia y promedio referencial informativo. */
+  .fin-grid td .fin-caps { color:#64748b; }
+  .fin-cell { display:flex; flex-direction:column; align-items:center; gap:4px; min-width:92px; }
+  @media (max-width:640px) {
+    .fin-grid { min-width:540px; }
+    .fin-grid th.fin-nom, .fin-grid td.fin-nom {
+      min-width:104px; width:104px; max-width:104px;
+      padding-left:4px; padding-right:4px;
+    }
+    .fin-grid td.fin-nom .font-bold { font-size:10px; line-height:1.15; overflow-wrap:anywhere; }
+    .fin-cell { min-width:80px; }
+  }
+  .fin-cell input { width:3.6rem; text-align:center; font-weight:800; border:1.5px solid #cbd5e1; border-radius:10px; padding:6px 4px; font-size:16px; }
+  .fin-cell input[readonly] { background:#f1f5f9; color:#334155; }
+  .fin-grid th.summary-student,.fin-grid th.summary-student-header{text-align:left;padding-left:12px;padding-right:12px;width:200px;min-width:180px;max-width:240px;white-space:normal;overflow-wrap:anywhere;}
+  .summary-student-order,.summary-student-name{display:block;text-align:left;white-space:normal;}
+  .summary-student-order{font-size:10px;font-weight:400;color:#64748b;}
+  .fin-grid td.summary-competence{vertical-align:middle;text-align:center;}
+  .fin-grid .summary-reference{text-align:center;vertical-align:middle;width:160px;min-width:150px;max-width:180px;background:#f0f7ff;color:#334155;border-left:2px solid #cbd5e1;overflow-wrap:anywhere;}
+  .asis-chip {
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:2rem; height:2rem; border-radius:8px; font-size:12px; font-weight:900;
+    border:2px solid #e2e8f0; background:#fff; cursor:pointer; margin:1px;
+  }
+  .asis-chip.P { background:#dcfce7; border-color:#86efac; color:#166534; }
+  .asis-chip.F { background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
+  .asis-chip.T { background:#fef3c7; border-color:#fcd34d; color:#92400e; }
+  .asis-chip.J { background:#e0e7ff; border-color:#a5b4fc; color:#3730a3; }
+  .asis-date-btn {
+    font-size:11px; font-weight:800; padding:.35rem .55rem; border-radius:999px;
+    border:1px solid #e2e8f0; background:#f8fafc; cursor:pointer; margin:2px;
+  }
+  .asis-date-btn.on { background:#0ea5e9; color:#fff; border-color:#0ea5e9; }
+
+  @media print {
+    body * { visibility: hidden !important; }
+    #printArea, #printArea * { visibility: visible !important; }
+    #printArea {
+      display: block !important;
+      position: absolute; left: 0; top: 0; width: 100%;
+      padding: 12mm; color: #000; background: #fff;
+      font-size: 10pt; font-family: Arial, Helvetica, sans-serif;
+    }
+    .no-print { display: none !important; }
+    #printArea button,#printArea input,#printArea select,#printArea textarea{display:none!important;}
+    #printArea .fin-scroll-body{max-height:none!important;overflow:visible!important;}
+    #printArea .fin-grid{min-width:0!important;width:100%;font-size:8pt;}
+    #printArea .fin-grid thead,#printArea .fin-grid th{position:static!important;background:white!important;color:black!important;}
+    #printArea .fin-grid th,#printArea .fin-grid td{padding:3px;border:1px solid #777;overflow-wrap:anywhere;}
+    #printArea .fin-grid .summary-student,#printArea .fin-grid .summary-student-header{text-align:left;padding-left:6px!important;padding-right:6px!important;}
+    #printArea .fin-grid .summary-reference{text-align:center;vertical-align:middle;background:#f4f8fc!important;color:black!important;border-left:2px solid #94a3b8!important;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+    #printArea tr{break-inside:avoid;}
+    #printArea .summary-stats{break-inside:avoid;}
+    .print-break { page-break-before: always; }
+    table.print-tbl { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    table.print-tbl th, table.print-tbl td {
+      border: 1px solid #333; padding: 3px 4px; font-size: 8.5pt; vertical-align: middle;
+    }
+    table.print-tbl th { background: #e5e7eb; font-weight: bold; text-align: center; }
+    .print-hdr { text-align: center; margin-bottom: 8px; }
+    .print-hdr h1 { font-size: 13pt; margin: 2px 0; }
+    .print-hdr h2 { font-size: 11pt; margin: 2px 0; font-weight: normal; }
+    .print-meta { font-size: 9pt; margin: 6px 0 10px; }
+    .print-meta td { border: none !important; padding: 1px 6px 1px 0; text-align: left; }
+    .print-foot { margin-top: 18px; font-size: 9pt; }
+    .print-sign { display: flex; justify-content: space-between; margin-top: 28px; }
+    .print-sign div { width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 4px; }
+  }
+.trans-grid-wrap{overflow-x:auto;max-width:100%;margin:1rem 0}.trans-grid{border-collapse:collapse;min-width:900px;width:100%}.trans-grid th,.trans-grid td{padding:.65rem;border:1px solid #cbd5e1;vertical-align:top}.trans-grid td textarea{width:180px;max-width:100%;min-height:80px;box-sizing:border-box;}.trans-grid td select,.trans-grid td input{max-width:180px;min-height:44px;}.trans-grid td{min-width:80px;}.trans-grid .trans-student{position:sticky;left:0;background:#fff;min-width:220px;max-width:260px;z-index:1;text-align:left}.trans-detail>summary{min-height:44px;cursor:pointer;padding:.3rem;max-width:280px}.trans-detail[open]{min-width:290px;max-width:390px}.trans-detail textarea{display:block;width:100%;min-height:88px}.trans-detail input,.trans-detail select{min-height:44px}@media(max-width:640px){.trans-grid .trans-student{min-width:170px;max-width:180px}.trans-detail>summary{min-width:170px}}.trans-grid th.trans-area-header,.trans-grid td.trans-area-cell{width:56px;min-width:48px;padding:6px;text-align:center;vertical-align:middle;font-size:11px}.trans-grid .trans-area-cell>.trans-detail>summary{display:flex;align-items:center;justify-content:center;list-style:none;min-width:0;max-width:none;min-height:44px;padding:0}.trans-grid .trans-area-cell>.trans-detail>summary::-webkit-details-marker{display:none}
+
+
+/* Compact Tutor controls: table geometry remains unchanged. */
+.trans-tutor-header h2{margin:0;font-size:18px;font-weight:700;color:#16324a}.trans-tutor-header p{margin:3px 0;font-size:13px;color:#64748b}.trans-tutor-header .trans-flow{font-size:12px}
+.trans-context{display:grid;grid-template-columns:minmax(0,240px) minmax(0,200px) auto;gap:12px;align-items:end;margin:12px 0}.trans-context label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#475569;min-width:0}.trans-context select{box-sizing:border-box;width:100%;min-width:0;margin:0;min-height:44px;padding:8px 10px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:14px}.trans-context button{justify-self:start;margin:0;min-height:44px;padding:8px 14px}
+.trans-toolbar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:12px;margin:8px 0}.trans-toolbar-left{display:flex;flex:1 1 280px;flex-wrap:wrap;align-items:end;gap:12px;min-width:0}.trans-mode-group{margin-left:auto;flex:0 0 auto;max-width:100%}.trans-control-group{display:flex;flex-direction:column;gap:4px;min-width:0}.trans-control-group>span{font-size:12px;color:#64748b;font-weight:600}.trans-segment{display:flex;flex-wrap:wrap;gap:4px}.trans-segment button{margin:0;padding:8px 12px;border:1px solid #dbe3ed;border-radius:8px;background:#f1f5f9;color:#334155;font-size:13px;transition:background .15s,color .15s}.trans-segment button[aria-pressed="true"],.trans-segment button[aria-selected="true"]{background:#075985;border-color:#075985;color:#fff;font-weight:600}.trans-segment button:hover:not(:disabled){border-color:#075985}.trans-segment button:focus-visible,.trans-context button:focus-visible{outline:2px solid #0ea5e9;outline-offset:2px}.trans-apply{margin:0;padding:8px 12px;background:#fff;color:#075985;border:1px solid #94a3b8;border-radius:8px;font-size:13px}
+.trans-progress{margin:8px 0;font-size:12px;color:#475569}.trans-notice{margin:6px 0;font-size:13px;line-height:1.4;padding:8px 10px;border-left:3px solid #0ea5e9;background:#f0f7ff}.trans-notice:empty{display:none}#transStatus{margin:6px 0;font-size:13px;color:#475569}.trans-heading-row{display:flex;flex-wrap:wrap;align-items:start;gap:8px 16px;margin:8px 0}.trans-competence-title{flex:1 1 280px;margin:0;font-size:14px;line-height:1.4;font-weight:600;color:#16324a}.trans-help{font-size:12px;max-width:100%;min-width:0}.trans-help>summary{cursor:pointer;min-height:32px;color:#075985}.trans-help p{max-width:640px;margin:4px 0;line-height:1.5}.trans-actions{display:flex;flex-wrap:wrap;gap:8px}.trans-actions button{margin:0}
+@media(max-width:640px){.trans-context{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.trans-context button{grid-column:1/-1}.trans-toolbar{gap:10px}.trans-toolbar-left{flex-basis:100%;gap:10px}.trans-mode-group{margin-left:0}.trans-heading-row{gap:6px}.trans-tutor-header h2{font-size:16px}}
+/* Visual Registro 3/6/7/10: solo presentación y estadísticas de lectura. */
+@media screen {
+  #panelFinales .fin-panel-card {padding:10px;}
+  #panelFinales .fin-header-main {display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;}
+  #panelFinales .fin-header-context {flex:1 1 250px;min-width:0;}
+  #panelFinales .fin-header-aux {gap:4px 8px;margin-top:2px;}
+  #panelFinales .fin-mode-info > span {padding:2px 0;background:transparent;font-size:10px;}
+  #panelFinales .fin-header-controls {flex:0 1 auto;gap:4px 8px;margin-left:auto;}
+  #panelFinales .fin-bulk-actions {gap:4px;}
+  #panelFinales .fin-bulk-actions .chip {border-radius:10px;min-width:38px;min-height:38px;padding:4px;font-size:12px;}
+  #panelFinales .fin-remove-bulk {min-height:44px;padding:4px 8px;}
+  #panelFinales .mode-toggle {gap:2px;padding:3px;}
+  #panelFinales .mode-toggle button {min-height:44px;padding:4px 8px;}
+  /* No expandir Estudiante cuando hay pocas competencias: columnas desde la izquierda. */
+  #finLista .fin-grid {width:max-content;min-width:0;max-width:none;}
+  /* Promedios: numeración lateral compacta y nombre en dos líneas sin crecer filas. */
+  #finLista .fin-grid .fin-nom {width:202px;min-width:202px;max-width:202px;}
+  #finLista .fin-grid td.fin-nom {position:sticky;padding:5px 6px 5px 25px;vertical-align:middle;}
+  #finLista .fin-grid td.fin-nom > div:first-child {position:absolute;left:6px;top:50%;transform:translateY(-50%);width:16px;text-align:left;}
+  #panelFinales .fin-header-main > .fin-comparativo-toggle {flex:0 0 auto;align-self:center;white-space:nowrap;margin:0 4px;}
+  #finLista .fin-grid td.fin-nom > .font-bold {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;white-space:normal;font-size:11px;line-height:1.25;max-height:2.5em;}
+  #finLista .fin-grid th.fin-nom {text-align:left;}
+  #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:212px;min-width:212px;padding:6px 10px;}
+  #finLista .fin-grid td:has(.final-conclusion) {width:340px;min-width:340px;}
+  #finLista .fin-grid th,#finLista .fin-grid td {padding:6px;}
+  #finLista .final-cell-layout {grid-template-columns:188px minmax(0,1fr);gap:6px;}
+  #finLista .final-grade {width:188px;min-width:188px;}
+  #finLista .final-conclusion {max-width:132px;}
+  #finLista .final-conclusion select {height:32px;min-height:32px;max-width:132px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;}
+  #finLista .final-grade > .fin-cell:has(> button[data-val]) {grid-template-columns:repeat(4,34px);width:max-content;max-width:100%;gap:3px 2px;margin-left:0;margin-right:auto;}
+  #finLista .final-grade > .fin-cell > .chip[data-val] {width:34px;min-width:34px;min-height:34px;height:34px;justify-self:center;border-radius:9px;font-size:12px;padding:3px;}
+  #finLista .chip[data-val].on {box-shadow:none;outline:none;font-weight:800;}
+  #finLista .chip[data-val]:focus-visible {outline:3px solid #0369a1;outline-offset:2px;}
+  #finLista .chip[data-val]:disabled {cursor:default;}
+  #avanceBox .fin-grid {width:100%;}
+  #avanceBox .summary-student,#avanceBox .summary-student-header {width:auto;min-width:230px;max-width:none;padding:6px 8px;}
+  #avanceBox .summary-student-name {white-space:nowrap;font-size:12px;line-height:1.35;}
+  #avanceBox .summary-competence,#avanceBox .fin-grid thead th:not(.fin-nom):not(.summary-reference) {min-width:150px;max-width:240px;padding:6px;overflow-wrap:normal;}
+  #avanceBox .summary-competence .fin-cell {font-weight:800;font-size:15px;}
+  @media(max-width:640px) {
+    #panelFinales .fin-header-context {flex-basis:100%;}
+    #panelFinales .fin-header-controls {width:100%;margin-left:0;justify-content:space-between;}
+    #panelFinales .fin-bulk-actions > span {display:none;}
+    #panelFinales .fin-bulk-actions {width:100%;justify-content:flex-start;}
+    #panelFinales .fin-header-controls .mode-toggle {flex-basis:180px;}
+    #finLista .fin-grid .fin-nom {width:150px;min-width:150px;max-width:150px;}
+    #avanceBox .summary-student,#avanceBox .summary-student-header {width:120px;min-width:120px;max-width:120px;}
+    #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:204px;min-width:204px;}
+    #finLista .final-grade {width:182px;min-width:182px;}
+    #finLista .final-cell-layout {grid-template-columns:182px minmax(0,1fr);}
+    #finLista .final-grade > .fin-cell:has(> button[data-val]) {column-gap:2px;}
+    #finLista .fin-grid td.fin-nom > .font-bold {font-size:10px;line-height:1.2;max-height:2.4em;}
+    #avanceBox .summary-student-name {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
+    #finLista .fin-grid td:has(.final-conclusion) {width:252px;min-width:252px;}
+    #finLista .final-conclusion {grid-column:1 / -1;grid-row:2;}
+  }
+}
+.competence-stats {margin:10px 0 0;padding:8px;border:1px solid #cbd5e1;border-radius:10px;font-size:12px;min-width:0;}
+.competence-stats h3 {margin:0 0 4px;font-size:13px;font-weight:800;}
+.competence-stats p {margin:4px 0;color:#475569;font-size:11px;}
+.competence-stats .stats-scroll {overflow-x:auto;max-width:100%;}
+.competence-stats table {border-collapse:collapse;width:100%;min-width:760px;}
+.competence-stats th,.competence-stats td {padding:6px;border-bottom:1px solid #e2e8f0;text-align:center;}
+.competence-stats th:first-child {text-align:left;min-width:200px;max-width:320px;font-weight:600;}
+.competence-stats td {white-space:nowrap;}
+.competence-stats thead {background:#f1f5f9;color:#0f172a;}
+.competence-stats progress {display:block;width:70px;height:6px;margin:3px auto;accent-color:#0284c7;}
+@media print {
+  body > :not(#printArea) {display:none!important;}
+  #printArea {position:static!important;background:#fff;}
+  #printArea:has(.summary-stats) {page:registro-resumen;padding:0;}
+  #printArea .fin-grid {table-layout:fixed;}
+  #printArea .fin-grid th,#printArea .fin-grid td {min-width:0!important;width:auto;max-width:none;white-space:normal;overflow-wrap:anywhere;}
+  #printArea .fin-grid .summary-student,#printArea .fin-grid .summary-student-header {width:24%;min-width:0!important;max-width:none;}
+  #printArea .fin-grid .summary-student-name {white-space:normal;overflow-wrap:anywhere;font-size:8pt;}
+  #printArea .fin-grid .summary-reference {width:12%;min-width:0!important;max-width:none;}
+  #printArea .competence-stats {font-size:8pt;break-inside:auto;}
+  #printArea .competence-stats table {min-width:0;width:100%;table-layout:fixed;}
+  #printArea .competence-stats th,#printArea .competence-stats td {min-width:0;max-width:none;white-space:normal;overflow-wrap:anywhere;border:1px solid #777;padding:3px;}
+  #printArea .competence-stats th:first-child {width:30%;}
+  #printArea thead {display:table-header-group;}
+  #printArea .competence-stats progress {display:none;}
+}
+@page registro-resumen {size:A4 landscape;margin:10mm;}
+  /* Calificar: cuatro decisiones táctiles en una fila, dentro del scroll de la tabla. */
+  #stuList {min-width:0;max-width:100%;--cal-student-width:230px;--cal-competence-width:220px;}
+  #stuList .fin-grid {width:calc(var(--cal-student-width) + var(--cal-columns)*var(--cal-competence-width));min-width:0;table-layout:fixed;}
+  #stuList .fin-grid th,#stuList .fin-grid td {padding:6px;}
+  #stuList .fin-grid .fin-nom {width:auto;min-width:230px;max-width:none;text-align:left;}
+  #stuList .fin-grid .fin-nom .font-bold {white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35;}
+  #stuList .fin-grid th:not(.fin-nom),#stuList .fin-grid td:not(.fin-nom) {width:var(--cal-competence-width);min-width:0;text-align:center;}
+  #stuList .fin-cell:has(> button[data-val]) {display:grid;grid-template-columns:repeat(4,40px);gap:4px;width:172px;min-width:172px;align-items:center;}
+  #stuList .fin-cell > .chip[data-val] {box-sizing:border-box;width:40px;min-width:40px;min-height:40px;height:40px;margin:0;padding:4px;border-radius:10px;font-size:12px;white-space:nowrap;}
+  #stuList .chip[data-val].on {box-shadow:none;outline:none;font-weight:800;}
+  #stuList .chip[data-val]:focus-visible {outline:3px solid #0369a1;outline-offset:2px;}
+  #stuList .chip[data-val]:disabled {cursor:default;}
+  #asisLista .stu-row > .flex {display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;}
+  #asisLista .truncate {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+  #asisLista .asis-chip {box-sizing:border-box;min-width:44px;height:44px;margin:0;}
+  #registroAcademicFooter button {min-height:44px;}
+  @media(max-width:640px) {
+    #stuList {--cal-student-width:120px;}
+    #stuList .fin-grid .fin-nom {width:120px;min-width:120px;max-width:120px;}
+  }
+  /* Paleta suave compartida por las decisiones académicas, sin alterar indicadores numéricos. */
+  :is(#stuList,#finLista) .chip[data-val],#panelFinales .fin-bulk-actions .chip {background:#f8fafc;color:#475569;border:1px solid #cbd5e1;box-shadow:none;touch-action:manipulation;}
+  :is(#stuList,#finLista) .chip[data-val]:hover:not(:disabled):not(.on),#panelFinales .fin-bulk-actions .chip:hover:not(:disabled) {background:#f1f5f9;border-color:#94a3b8;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-c.on {background:#fee2e2;color:#991b1b;border-color:#fca5a5;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-b.on {background:#fef3c7;color:#92400e;border-color:#fcd34d;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-a.on {background:#dcfce7;color:#166534;border-color:#86efac;}
+  :is(#stuList,#finLista) .chip[data-val].nivel-ad.on {background:#e0f2fe;color:#075985;border-color:#7dd3fc;}
+  #finLista .final-level-toggle {border:0;cursor:pointer;font:inherit;}
+  #finLista .final-level-toggle:disabled {cursor:default;}
+  #finLista .final-level-toggle:focus-visible {outline:2px solid #0369a1;outline-offset:2px;}
+  /* Separación tenue entre competencias; encabezado y celdas comparten columna. */
+  @media screen {
+    #finLista .fin-grid > thead > tr > th:nth-child(n+3),
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+3),
+    #avanceBox .fin-grid > thead > tr > th:nth-child(n+3):not(.summary-reference),
+    #avanceBox .fin-grid > tbody > tr > td:nth-child(n+3):not(.summary-reference) {border-left:1px solid rgba(148,163,184,.28);}
+  }
+  /* Fondos alternos casi blancos; la cabecera oscura y los colores de nota se conservan. */
+  @media screen {
+    #finLista .fin-grid > tbody > tr > td:nth-child(even):not(.fin-nom),
+    #avanceBox .fin-grid > tbody > tr > td.summary-competence:nth-child(even) {background:#f3f9fd;}
+    #finLista .fin-grid > tbody > tr > td:nth-child(odd):not(.fin-nom),
+    #avanceBox .fin-grid > tbody > tr > td.summary-competence:nth-child(odd) {background:#f4faf6;}
+  }
+  #stuList .cal-student-column {width:var(--cal-student-width);}
+  #stuList .cal-competence-column {width:var(--cal-competence-width);}
+  #stuList .fin-cell {margin-inline:auto;}
+  #stuList .cal-competence-header .fin-caps {white-space:normal;overflow-wrap:anywhere;word-break:normal;}
+  /* Promedios: selección algo más definida sobre fondos casi blancos. */
+  #finLista .chip[data-val].nivel-c.on {background:#fecaca;color:#991b1b;border-color:#f87171;}
+  #finLista .chip[data-val].nivel-b.on {background:#fde68a;color:#78350f;border-color:#fbbf24;}
+  #finLista .chip[data-val].nivel-a.on {background:#bbf7d0;color:#14532d;border-color:#4ade80;}
+  #finLista .chip[data-val].nivel-ad.on {background:#bae6fd;color:#0c4a6e;border-color:#38bdf8;}
+  /* Reporte bimestral independiente; no copia grillas de evidencias ni controles. */
+  @media print {
+    #printArea:has(> .bimestral-report) {page:registro-resumen;padding:0!important;}
+    #printArea .bimestral-report {font-family:Arial,Helvetica,sans-serif;font-size:8pt;line-height:1.25;}
+    #printArea .bimestral-meta {display:flex;flex-wrap:wrap;gap:4px 16px;margin:6px 0 10px;font-size:8pt;}
+    #printArea .bimestral-table {width:100%;border-collapse:collapse;table-layout:fixed;}
+    #printArea .bimestral-number-column {width:9mm;}
+    #printArea .bimestral-name-column {width:30%;}
+    #printArea .bimestral-table th,#printArea .bimestral-table td {border:1px solid #94a3b8;padding:4px 5px;white-space:normal;overflow-wrap:anywhere;}
+    #printArea .bimestral-table th {text-align:center;vertical-align:middle;background:#f1f5f9;font-size:7.5pt;}
+    #printArea .bimestral-table .bimestral-name {text-align:left;white-space:normal;overflow-wrap:anywhere;}
+    #printArea .bimestral-table .bimestral-number,#printArea .bimestral-table .bimestral-grade {text-align:center;vertical-align:middle;}
+    #printArea .bimestral-result {font-size:10pt;font-weight:700;}
+    #printArea .bimestral-table thead {display:table-header-group;}
+    #printArea .bimestral-table tr,#printArea .competence-stats tr {break-inside:avoid;page-break-inside:avoid;}
+    #printArea .bimestral-report .stats-scroll {overflow:visible;max-height:none;}
+    #printArea .bimestral-report .competence-stats {break-inside:auto;margin-top:10px;}
+  }
+/* Ajustes finales PR #81: impresiones, barra de Calificar y separación blanca de Promedios. */
+  @media screen {
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+2) {background:#fff!important;}
+    #finLista .fin-grid > thead > tr > th:nth-child(n+3),
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+3) {border-left:2px solid #cbd5e1!important;}
+    #finLista .fin-grid > tbody > tr > td:nth-child(n+2) {padding-left:10px;padding-right:10px;}
+    #stuList .fin-scroll-body,#stuList.fin-scroll-body {background:#fff;}
+    #stuList .fin-grid thead,#stuList .fin-grid thead tr {background:#0f172a!important;}
+    #stuList .fin-grid thead th {background:#0f172a!important;color:#fff!important;}
+    #stuList .fin-grid {min-width:100%;width:max(100%,calc(var(--cal-student-width) + var(--cal-columns)*var(--cal-competence-width)));}
+  }
+  .bimestral-signatures {display:grid;grid-template-columns:1fr 1fr;gap:12%;margin:55px 7% 0;align-items:end;}
+  .bimestral-signature {text-align:center;border-top:1px solid #334155;padding-top:6px;font-weight:600;font-size:10pt;}
+  .bimestral-signature small {display:block;font-size:8pt;font-weight:400;margin-top:3px;line-height:1.35;overflow-wrap:anywhere;}
+  @media print {
+    #printArea .bimestral-signatures {break-inside:avoid;page-break-inside:avoid;margin-top:22mm;}
+    #printArea .bimestral-signature {color:#000;border-top:1px solid #000;font-size:9pt;}
+  }
+  /* Pulido: controles compactos y reporte bimestral institucional. */
+  @media screen and (min-width:641px) {
+    #stuList .fin-cell:has(> button[data-val]) {grid-template-columns:repeat(4,36px);width:156px;min-width:156px;gap:4px;}
+    #stuList .fin-cell > .chip[data-val] {width:36px;min-width:36px;height:36px;min-height:36px;border-radius:9px;font-size:12px;}
+  }
+  @media screen and (max-width:640px) {
+    #stuList .fin-cell:has(> button[data-val]) {grid-template-columns:repeat(4,40px);width:172px;min-width:172px;gap:4px;}
+    #stuList .fin-cell > .chip[data-val] {width:40px;min-width:40px;height:40px;min-height:40px;}
+  }
+  @media print {
+    #printArea .bimestral-report {color:#172033;font-family:Arial,Helvetica,sans-serif;font-size:8.5pt;line-height:1.35;}
+    #printArea .bimestral-report .print-hdr {text-align:center;margin:0 0 10mm;padding-bottom:5mm;border-bottom:1px solid #94a3b8;}
+    #printArea .bimestral-report .print-hdr h1 {font-size:10pt;font-weight:700;letter-spacing:.4px;margin:0 0 3mm;text-transform:uppercase;}
+    #printArea .bimestral-report .print-hdr h2 {font-size:15pt;font-weight:700;letter-spacing:.3px;margin:0;}
+    #printArea .bimestral-meta {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3mm 5mm;padding:4mm;background:#f8fafc;border:1px solid #cbd5e1;border-radius:3mm;margin:0 0 6mm;}
+    #printArea .bimestral-meta span {font-size:8.5pt;min-width:0;overflow-wrap:anywhere;}
+    #printArea .bimestral-table {border:1px solid #475569;}
+    #printArea .bimestral-table thead th {font-size:8pt;line-height:1.3;background:#e9eff6!important;color:#172033!important;border-color:#64748b;padding:5px;}
+    #printArea .bimestral-table tbody td {font-size:8.5pt;border-color:#94a3b8;padding:4px 6px;line-height:1.35;}
+    #printArea .bimestral-table tbody tr:nth-child(even) {background:#f8fafc!important;}
+    #printArea .bimestral-table .bimestral-grade,#printArea .bimestral-table .bimestral-number {text-align:center!important;vertical-align:middle!important;}
+    #printArea .bimestral-result {font-size:10pt;font-weight:700;}
+    #printArea .competence-stats {margin-top:7mm;border:0;padding:0;}
+    #printArea .competence-stats h3 {font-size:11pt;color:#172033;margin-bottom:3mm;}
+    #printArea .competence-stats th {background:#e9eff6!important;font-weight:700;}
+    #printArea .bimestral-signatures {margin-top:20mm;gap:15%;}
+    #printArea .bimestral-signature {padding-top:3mm;font-size:9pt;}
+  }
+  /* Ocultar contadores redundantes del pie: siguen presentes para los scripts existentes. */
+  #registroAcademicFooter > .shell > div:first-child {display:none!important;}
+  #registroAcademicFooter > .shell {justify-content:flex-end!important;}
+  /* Recovery footer: compact opaque actions, horizontal scrolling only in the action bar. */
+  #registroAcademicFooter {background:#fff;}
+  #registroAcademicFooter > .shell {display:block;box-sizing:border-box;width:100%;padding-top:6px;padding-bottom:6px;}
+  #registroRecoveryControls {min-width:0;max-width:100%;}
+  #registroRecoveryControls .registro-recovery-actions {display:flex;flex-wrap:nowrap;align-items:center;gap:6px;box-sizing:border-box;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;padding:4px 2px;scrollbar-width:thin;scrollbar-color:#94a3b8 #f1f5f9;}
+  #registroRecoveryControls .registro-recovery-actions::-webkit-scrollbar {height:6px;}
+  #registroRecoveryControls .registro-recovery-actions::-webkit-scrollbar-thumb {background:#94a3b8;border-radius:6px;}
+  #registroRecoveryControls .registro-recovery-actions:focus-visible {outline:2px solid #0284c7;outline-offset:-2px;}
+  #registroRecoveryControls .registro-recovery-actions button {display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:0 0 auto;min-height:44px;padding:6px 9px;font-size:11px;white-space:nowrap;}
+  #registroRecoveryControls .registro-action-icon {width:18px;height:18px;flex:0 0 18px;pointer-events:none;}
+  #registroRecoveryControls button[hidden],#registroEmergencyWarning[hidden] {display:none!important;}
+  #registroSaveState {display:block;margin-top:3px;font-size:10px;line-height:1.25;color:#64748b;overflow-wrap:anywhere;}
+  #registroEmergencyWarning {margin:4px 0 0;padding:6px 8px;border-radius:8px;background:#fef2f2;color:#991b1b;font-size:11px;line-height:1.3;overflow-wrap:anywhere;}
+  @media(max-width:640px){#registroRecoveryControls .registro-recovery-actions {flex-wrap:nowrap;gap:4px;}}
+  /* End recovery footer. */
+  /* Resumen: destacar visualmente Promedio referencial sin cambiar su carácter informativo. */
+  @media screen {
+    #avanceBox .fin-grid thead th.summary-reference {
+      background:#16365a!important;color:#fff!important;
+      border-left:2px solid #6886a7!important;
+      font-weight:800!important;
+    }
+    #avanceBox .fin-grid thead th.summary-reference small {
+      color:#e2eaf6!important;opacity:1!important;font-weight:500!important;
+    }
+    #avanceBox .fin-grid tbody td.summary-reference {
+      font-weight:800!important;color:#172b4d!important;font-size:15px;
+    }
+  }
+  /* Resumen estadistico: presentacion compacta */
+@media screen {
+#avanceBox .summary-stats{padding:16px;border-radius:14px;background:#fff;}
+#avanceBox .summary-stats h3{font-size:15px;font-weight:800;color:#173454;margin-bottom:12px;}
+#avanceBox .summary-counts{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:14px;}
+#avanceBox .summary-counts span{display:flex;flex-direction:column;padding:10px;border:1px solid #dbe5ef;border-radius:10px;background:#f8fafc;font-size:12px;}
+#avanceBox .summary-counts strong{font-size:20px;color:#173454;}
+#avanceBox .summary-stats table{border-collapse:collapse;width:100%;max-width:650px;margin-bottom:12px;}
+#avanceBox .summary-stats table th,#avanceBox .summary-stats table td{padding:8px 12px;border:1px solid #dbe5ef;text-align:center;}
+#avanceBox .summary-stats table thead,#avanceBox .summary-stats table tbody tr:last-child{background:#e9f0f8;font-weight:800;}
+#avanceBox .summary-stats table tbody th{text-align:left;}
+@media(max-width:760px){#avanceBox .summary-counts{grid-template-columns:repeat(2,minmax(0,1fr));}}
+}
+/* Presentación general de estadísticas: centrado en pantalla e impresión */
+@media screen {
+  #avanceBox .summary-stats > table {margin-left:auto;margin-right:auto;}
+  #avanceBox .summary-stats > table th,#avanceBox .summary-stats > table td {text-align:center;vertical-align:middle;}
+  #avanceBox .summary-stats > table tbody th {text-align:center;}
+}
+@media print {
+  #printArea .summary-stats {break-inside:avoid;page-break-inside:avoid;margin:7mm 0;padding:3mm;border:1px solid #cbd5e1;}
+  #printArea .summary-stats h3 {font-size:10pt;font-weight:700;text-align:center;margin:0 0 3mm;}
+  #printArea .summary-counts {display:flex;flex-wrap:wrap;justify-content:center;gap:2mm 5mm;margin-bottom:4mm;}
+  #printArea .summary-stats > table {width:80%;max-width:170mm;margin:0 auto 3mm;border-collapse:collapse;table-layout:fixed;}
+  #printArea .summary-stats > table th,#printArea .summary-stats > table td {border:1px solid #94a3b8;padding:2mm;text-align:center!important;vertical-align:middle;}
+  #printArea .summary-stats > small {display:block;text-align:center;font-size:7pt;}
+}
+/* Ultimos ajustes de lectura: leyenda centrada y divisores discretos. */
+@media screen {
+ #avanceBox .summary-stats > small {display:block;text-align:center;margin:10px auto 0;max-width:950px;line-height:1.5;}
+ #finLista .fin-grid > thead > tr > th:nth-child(n+3),
+ #finLista .fin-grid > tbody > tr > td:nth-child(n+3) {border-left:1px solid #e2e8f0!important;}
+}
+
+.fin-comparativo-toggle{font-size:10px;font-weight:800;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;border-radius:8px;padding:3px 7px;cursor:pointer}
+.fin-comparativo-toggle.on{background:#dbeafe;color:#1d4ed8}
+#finLista .comp-hist-line{display:flex;align-self:flex-start;align-items:center;justify-content:flex-start;gap:5px;width:142px;max-width:100%;height:12px;line-height:11px;font-size:9px;white-space:nowrap;text-align:left}
+#finLista .comp-hist{display:inline-flex;gap:2px;align-items:center;color:#64748b;font-weight:700}
+#finLista .comp-hist b{font-weight:800;padding:0 2px;border-radius:3px;background:#f1f5f9;color:#64748b}
+#finLista .comp-hist .comp-hist-a{background:#dcfce7;color:#166534}
+#finLista .comp-hist .comp-hist-b{background:#fef3c7;color:#92400e}
+#finLista .comp-hist .comp-hist-c{background:#fee2e2;color:#991b1b}
+#finLista .comp-hist .comp-hist-ad{background:#dbeafe;color:#1d4ed8}
+@media print{.fin-comparativo-toggle,#finLista .comp-hist-line{display:none!important}}
+  /* Solo impresión Promedios: textos completos, sin afectar otros reportes. */
+  @media print {
+    #printArea .promedios-print .print-conclusions {margin:5mm 0;}
+    #printArea .promedios-print .print-conclusions h3 {font-size:9pt;margin:0 0 2mm;break-after:avoid;}
+    #printArea .promedios-print .print-conclusions table {width:100%;border-collapse:collapse;table-layout:fixed;font-size:7.5pt;line-height:1.3;}
+    #printArea .promedios-print .print-conclusions th,#printArea .promedios-print .print-conclusions td {padding:2mm;border:1px solid #94a3b8;text-align:left;vertical-align:top;white-space:normal;overflow-wrap:anywhere;font-weight:400;}
+    #printArea .promedios-print .print-conclusions thead {display:table-header-group;}
+    #printArea .promedios-print .print-conclusions thead th {font-weight:700;background:#f1f5f9;}
+    #printArea .promedios-print .print-conclusions tr {break-inside:avoid;page-break-inside:avoid;}
+    #printArea .promedios-print .print-conclusion-text {white-space:pre-wrap;}
+    #printArea .promedios-print .print-conclusion-level {text-align:center;vertical-align:middle;font-weight:700;}
+  }
+/* Fin Visual Registro 3/6/7/10. */
+
+/* Contenedores principales por función. Las utilidades anteriores siguen rigiendo la impresión. */
+@media screen {
+  .shell.shell-auth,
+  .shell.shell-ops,
+  .shell.shell-work,
+  .shell.shell-wide {
+    width: 100%;
+    min-width: 0;
+    margin-inline: auto;
+    box-sizing: border-box;
+    padding-inline: clamp(12px, 2vw, 24px);
+  }
+
+  /* Dos clases prevalecen sobre las utilidades de Tailwind, incluso si se generan después. */
+  .shell.shell-auth { max-width: 560px; }
+  .shell.shell-ops { max-width: 820px; }
+  .shell.shell-work { max-width: 1400px; }
+  .shell.shell-wide { max-width: 1400px; }
+}
+
+body{font-family:system-ui;margin:0;background:#f8fafc}*{box-sizing:border-box}.shell{max-width:768px;margin:auto}.px-3{padding-left:12px;padding-right:12px}.py-2{padding-top:8px;padding-bottom:8px}.flex{display:flex}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.grid{display:grid}.grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.col-span-3{grid-column:span 3}.gap-2{gap:8px}.w-full{width:100%}.items-stretch{align-items:stretch}.justify-between{justify-content:space-between}.fixed{position:fixed}.bottom-0{bottom:0}.inset-x-0{left:0;right:0}.z-30{z-index:30}.whitespace-nowrap{white-space:nowrap}.text-xs{font-size:12px}.text-\[11px\]{font-size:11px}.font-bold{font-weight:700}#registroAcademicFooter{background:white;border-top:1px solid #cbd5e1}main{padding:12px}table{width:100%;min-width:650px;border-collapse:collapse}td,th{border:1px solid #cbd5e1;padding:10px}.table-scroll{overflow:auto}button{cursor:pointer}#previewClearPending{min-height:44px;margin-bottom:12px}dialog h2{font-size:18px;font-weight:800}@media(min-width:641px){.sm\:flex{display:flex}.sm\:flex-row{flex-direction:row}.sm\:flex-wrap{flex-wrap:wrap}.sm\:w-auto{width:auto}.sm\:basis-full{flex-basis:100%}}</style></head><body><main><h1>Recuperación · datos ficticios</h1><p>Adaptador/pie reales; contratos académicos simulados. Sin acceso a datos oficiales.</p><button id="previewClearPending">Simular aportes ya enviados</button><div id="registroTutorPanel" hidden></div><div class="table-scroll"><table><thead><tr><th>Estudiante</th><th>Nota</th><th>Conclusión descriptiva</th></tr></thead><tbody id="previewTableBody"></tbody></table></div></main>  <div id="registroAcademicFooter" class="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 z-30" style="padding-bottom:env(safe-area-inset-bottom)">
+    <div class="shell shell-work max-w-3xl mx-auto px-3 py-2">
+      <div class="flex gap-1.5 flex-wrap">
+        <span class="px-2 py-1 rounded-lg bg-red-50 text-red-700">C <span id="cC">0</span></span>
+        <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-700">B <span id="cB">0</span></span>
+        <span class="px-2 py-1 rounded-lg bg-lime-50 text-lime-700">A <span id="cA">0</span></span>
+        <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
+      </div>
+      <div id="registroRecoveryControls">
+        <div class="registro-recovery-actions" role="group" aria-label="Acciones de notas · desplázate horizontalmente para ver más" tabindex="0">
+          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#fee2e2;color:#991b1b" data-reg-write onclick="IERegistroRecovery.recover()"><svg class="registro-action-icon" data-icon="cloud-download" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 13v8m-4-4 4 4 4-4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Recuperar Nube</span></button>
+          <button id="registroConflictOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.resolve()"><svg class="registro-action-icon" data-icon="git-compare" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="18" cy="6" r="3"/><path d="M18 9v9m-12-3V6m-3 3 3-3 3 3m6 6 3 3 3-3"/><circle cx="6" cy="18" r="3"/></svg><span>Revisar diferencias</span></button>
+          <button type="button" class="btn btn-primary text-[11px] !py-2 !px-2 whitespace-nowrap" data-reg-write onclick="IERegistroRecovery.local()"><svg class="registro-action-icon" data-icon="save" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.2 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.8a2 2 0 0 0-.6-1.4l-3.8-3.8a2 2 0 0 0-1.4-.6Z"/><path d="M17 21v-7H7v7M7 3v5h8"/></svg><span>Guardar</span></button>
+          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="IERegistroRecovery.upload()"><svg class="registro-action-icon" data-icon="cloud-upload" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21v-8m-4 4 4-4 4 4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Subir Nube</span></button>
+          <button id="registroUndoOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.undo()"><svg class="registro-action-icon" data-icon="undo-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></svg><span>Deshacer recuperación</span></button>
+          <button id="registroDraftOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.drafts()"><svg class="registro-action-icon" data-icon="history" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 2.5-6.2L3 8M3 3v5h5m4-1v5l4 2"/></svg><span>Recuperar borrador</span></button>
+          <button id="registroRetryOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.refresh(true)"><svg class="registro-action-icon" data-icon="refresh-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 0 1 15.4-6.4L21 8m0-5v5h-5m5 4a9 9 0 0 1-15.4 6.4L3 16m5 0H3v5"/></svg><span>Reintentar notas</span></button>
+        </div>
+        <span id="registroSaveState" role="status" aria-live="polite">Inicia sesión para cargar tus notas</span>
+        <p id="registroEmergencyWarning" role="alert" hidden></p>
+      </div>
+    </div>
+  </div><script src="../../student-identity.js"></script><script src="../../registro-reconcile.js"></script><script src="../../registro-academic-model.js"></script><script src="recovery-preview.js"></script><script src="../../registro-drafts.js"></script><script src="../../registro-recovery-ui.js"></script></body></html>

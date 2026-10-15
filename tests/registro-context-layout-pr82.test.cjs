@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const source=fs.readFileSync(path.join(__dirname,'..','registro.html'),'utf8').replace(/\r\n/g,'\n'),normalize=require('./registro-context-layout-snapshot.cjs');
 const old=execFileSync('git',['show','c0e7d47b27fdbd9abd138963a93427d797d42971:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 test('PR82 context layout normalization allows only approved markup/CSS; all academic scripts stay identical',()=>{
- assert.equal(normalize(source),old);assert.deepEqual([...source.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/g)].map(m=>m[0]),[...old.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/g)].map(m=>m[0]));
+ assert.equal(normalize(source),old);const academic=require('./registro-simplification-snapshot.cjs')(source);assert.deepEqual([...academic.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/g)].map(m=>m[0]),[...old.matchAll(/<script\b[^>]*>[\s\S]*?<\/script>/g)].map(m=>m[0]));
 });
 test('PR82 raw context has three independent direct grid columns: Bimestre, Grado and Sección',()=>{
  const start=source.indexOf('        <div class="registro-datos-grid">'),end=source.indexOf('        <div class="registro-datos-meta">',start),fragment=source.slice(start,end),columns=[];let depth=0;
@@ -19,5 +19,5 @@ test('PR82 snapshot guard rejects unapproved context events, spacing and duplica
  assert.throws(()=>normalize(source.replace('onchange="onGrado()"','onchange="onContexto()"')),/approved context/);
  assert.throws(()=>normalize(source.replace('column-gap:24px;row-gap:10px;align-items:start;','column-gap:2px;row-gap:10px;align-items:start;')),/approved context grid/);
  const line=source.split('\n').find(l=>l.startsWith('    .registro-datos-grid #selGrado,'));assert.throws(()=>normalize(source.replace(line,line+'\n'+line)),/native-select hiding/);
- const changed=source.replace('async function prepararVersionAcademica(){','async function prepararVersionAcademica(){\n  throw Error("Synthetic mutation");');assert.notEqual(normalize(changed),old);
+ const changed=source.replace('async function prepararVersionAcademica(options){','async function prepararVersionAcademica(options){\n  throw Error("Synthetic mutation");');assert.throws(()=>normalize(changed),/Only bounded read\/instrumentation changes in prepararVersionAcademica/);
 });

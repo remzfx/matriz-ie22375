@@ -162,7 +162,7 @@ test('No embedded-data initialization control reappears; initial SIAGIE review s
 test('UI refinements keep Registro Promedios compact and cloud actions explicit', () => {
   const src = read('registro.html');
   assert.match(src, /Subir Nube/);
-  assert.match(src, /Bajar Nube/);
+  assert.match(src, /async function bajarRegistroNube\(options\)/);
   assert.doesNotMatch(src, />Nube [↑↓]</);
   assert.match(src, /max-width:104px/);
   assert.match(src, /fin-grid \.summary-reference/);
@@ -191,13 +191,13 @@ test('Secundaria comparative reads only the exact requested section and shows re
 });
 
 
-test('Registro keeps cloud actions on one mobile row', () => {
+test('Registro keeps cloud actions together with horizontal mobile scroll and contextual recovery', () => {
   const src = read('registro.html');
-  assert.match(src, /grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex/);
-  const subir = src.indexOf('Subir Nube');
-  const bajar = src.indexOf('Bajar Nube');
-  const guardar = src.indexOf(">Guardar</button>", bajar);
-  assert.ok(subir >= 0 && bajar > subir && guardar > bajar);
+  assert.match(src, /class="registro-recovery-actions"/);assert.match(src,/display:flex;flex-wrap:nowrap/);assert.match(src,/@media\(max-width:640px\).*flex-wrap:nowrap/);assert.match(src,/overflow-x:auto;overflow-y:hidden/);
+  const subir = src.indexOf('<span>Subir Nube</span></button>');
+  const recuperar = src.indexOf('<span>Recuperar Nube</span></button>');
+  const guardar = src.indexOf('<span>Guardar</span></button>', recuperar);
+  assert.ok(recuperar >= 0 && guardar > recuperar && subir > guardar);
 });
 
 

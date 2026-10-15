@@ -8,6 +8,7 @@ const oldContext=context(before),newContext=context(approved);
 const rule=s=>s.split('\n').find(l=>l.startsWith('    .registro-datos-grid {'));
 const hidden=approved.split('\n').filter(l=>l.includes('/* Ocultar los selectores nativos desde el primer render')||l.startsWith('    .registro-datos-grid #selGrado,')).join('\n')+'\n';
 module.exports=s=>{
+ s=require('./registro-simplification-snapshot.cjs')(s);
  s=s.replace(/\r\n/g,'\n');assert.equal(context(s),newContext,'Only approved context structure and events');assert.equal(s.split(newContext).length,2);
  assert.equal(rule(s),rule(approved),'Only approved context grid spacing');assert.equal(s.split(hidden).length,2,'Exactly one approved initial native-select hiding rule');
  assert.equal(s.split(hidden.trimEnd().split('\n').at(-1)).length,2,'Exactly one approved native-select hiding selector');
