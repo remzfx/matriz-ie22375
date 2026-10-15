@@ -519,12 +519,15 @@ body{font-family:system-ui;margin:0;background:#f8fafc}*{box-sizing:border-box}.
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
       <div class="grid grid-cols-3 gap-2 w-full sm:w-auto sm:flex sm:flex-wrap">
+        <span class="flex flex-wrap gap-1.5 min-w-0">
         <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#fee2e2;color:#991b1b;min-height:44px" data-reg-write onclick="IERegistroRecovery.recover()">Recuperar Nube</button>
+        <button id="registroConflictOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.resolve()">Revisar diferencias</button>
+        <button id="registroRetryOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.refresh(true)">Reintentar notas</button>
+        </span>
         <button type="button" class="btn btn-primary text-[11px] sm:text-xs !py-2 !px-2 whitespace-nowrap" data-reg-write onclick="IERegistroRecovery.local()">Guardar</button>
         <button type="button" class="btn text-[11px] sm:text-xs !py-2 !px-2 whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="IERegistroRecovery.upload()">Subir Nube</button>
         <span id="registroSaveState" role="status" aria-live="polite" class="text-[11px] font-normal col-span-3 sm:basis-full">Inicia sesión para cargar tus notas</span>
         <button id="registroDraftOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2 col-span-3" data-reg-write onclick="IERegistroRecovery.drafts()">Recuperar borrador</button>
-        <button id="registroConflictOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2 col-span-3" onclick="IERegistroRecovery.resolve()">Revisar diferencias</button>
         <p id="registroEmergencyWarning" role="alert" hidden class="col-span-3 sm:basis-full text-[11px]" style="background:#fef2f2;color:#991b1b;padding:8px;border-radius:8px"></p>
       </div>
     </div>

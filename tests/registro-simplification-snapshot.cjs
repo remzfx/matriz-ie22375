@@ -6,9 +6,10 @@ const modules=['registro-drafts.js','registro-recovery-ui.js'].map(f=>'<script>\
 const added='<!-- Inicio simplificación docente: dependencia separada, sin cambiar handlers académicos. -->\n'+modules+'\n<!-- Fin simplificación docente. -->\n';
 module.exports=s=>{
  s=s.replace(/\r\n/g,'\n');if(!s.includes('<!-- Inicio simplificación docente:')){assert.ok(!s.includes('onclick="IERegistroRecovery.'),'No partial removal of recovery additions');return s;}
+ s=require('./registro-read-deadline-snapshot.cjs')(s);
  assert.equal(s.split(added).length,2,'Exact tested adapter code embedded once');
  const footer=block(s);for(const name of ['recover','local','upload','drafts','resolve'])assert.ok(footer.includes('IERegistroRecovery.'+name+'()'));
- assert.equal((footer.match(/<button/g)||[]).length,5,'Three primary actions plus two conditional offers');
+ assert.equal((footer.match(/<button/g)||[]).length,6,'Three primary actions, two conditional offers and explicit read retry');
  const recovery=old.split('\n').find(l=>l.includes('onclick="recuperarBorradorAcademico()"'))+'\n';
  s=s.replace(added,'').replace(footer,block(old));s=s.replace('  <div id="registroAcademicFooter"',recovery+'  <div id="registroAcademicFooter"');
  for(const name of ['bajarRegistroNube','prepararVersionAcademica','confirmarRegistroConciliado']){

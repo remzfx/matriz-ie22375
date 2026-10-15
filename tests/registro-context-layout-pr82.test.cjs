@@ -19,5 +19,5 @@ test('PR82 snapshot guard rejects unapproved context events, spacing and duplica
  assert.throws(()=>normalize(source.replace('onchange="onGrado()"','onchange="onContexto()"')),/approved context/);
  assert.throws(()=>normalize(source.replace('column-gap:24px;row-gap:10px;align-items:start;','column-gap:2px;row-gap:10px;align-items:start;')),/approved context grid/);
  const line=source.split('\n').find(l=>l.startsWith('    .registro-datos-grid #selGrado,'));assert.throws(()=>normalize(source.replace(line,line+'\n'+line)),/native-select hiding/);
- const changed=source.replace('async function prepararVersionAcademica(options){','async function prepararVersionAcademica(options){\n  throw Error("Synthetic mutation");');assert.throws(()=>normalize(changed),/Only reviewed automatic-download options/);
+ const changed=source.replace('async function prepararVersionAcademica(options){','async function prepararVersionAcademica(options){\n  throw Error("Synthetic mutation");');assert.throws(()=>normalize(changed),/Only bounded read\/instrumentation changes in prepararVersionAcademica/);
 });
