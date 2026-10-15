@@ -41,7 +41,7 @@
   try{
    aplicarRegistroConciliado(payload,true);const b=baselineAcademica();
    if(!candidate){b.version=remote.version;b.basePayload=copy(remote.payload);b.baseline=IERegistroAcademico.canonical(remote.payload);delete b.attempt;}
-   else{const original=candidate.snapshot.baseline||{};b.version=original.version??null;if(original.basePayload)b.basePayload=copy(original.basePayload);else delete b.basePayload;b.baseline=original.baseline||IERegistroAcademico.canonical(local.payload);delete b.attempt;}
+   else{const original=candidate.undo?local.baseline:candidate.snapshot.baseline||{};b.version=original.version??null;if(original.basePayload)b.basePayload=copy(original.basePayload);else delete b.basePayload;b.baseline=original.baseline||IERegistroAcademico.canonical(local.payload);delete b.attempt;}
    b.recovery={local:copy(local.payload),base:local.baseline.basePayload||null,remote:copy(remote.payload)};
    if(candidate?.undo)b.voluntaryRecovery={undone:true,created:backupRecord?.created??Date.now()};else if(backupRecord?.id)b.voluntaryRecovery={id:backupRecord.id,created:backupRecord.created};saveStore();
    if(localStorage.getItem(NOTAS_KEY)!==JSON.stringify(store))throw Error('No se verificó el reemplazo local.');lastDisk=localStorage.getItem(NOTAS_KEY);invalidateDraft();dirtyAcademico();pintarRegistroConciliado();
