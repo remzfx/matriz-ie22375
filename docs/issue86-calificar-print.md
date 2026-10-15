@@ -33,3 +33,13 @@ Fixtures autocontenidas sin APIs: [Letras](demos/calificar-integral-letras.html)
 La previsualización nativa de impresión no es inspeccionable desde el navegador integrado. Abrir únicamente las fixtures ficticias en el navegador habitual y exportar a PDF: confirmar A4 horizontal, filas completas, encabezados repetidos desde página 2 y continuidad de los bloques. El controlador puede sustituir tamaño o escala. No usar notas reales ni confirmar impresión física.
 
 No merge. No deploy. Revisión y autorización individual del usuario pendientes.
+
+## Ampliación visual: Promedios y controles
+
+Solo CSS adicional: Promedios usa una página con `size:auto` para respetar la orientación elegida y flujo normal de documento. Se oculta la interfaz ajena al informe durante esa impresión para que sus cajas invisibles no consuman páginas; se reducen márgenes internos y separación de firmas. Se conservan íntegros títulos, nómina, resultados, conclusiones y validaciones. Resumen y Calificar mantienen sus formatos.
+
+La barra principal conserva cinco acciones en una fila, alturas de 44 px, anchos proporcionales y desplazamiento interno en anchos mínimos. Los grupos secundarios pueden redistribuirse; la tira masiva permanece horizontal y desplazable. Eventos y clases de selección sin cambios.
+
+Pruebas: 86 focalizadas; comparación exacta frente al HEAD anterior demuestra que la única modificación de registro.html es el bloque CSS aprobado. Geometría real en Edge/Chromium: 15 combinaciones (390/1024/1280/1366/1920 y ancho equivalente a zoom 100/125/150%). PDF ficticio con 40 estudiantes y conclusiones completas: 11 páginas antes, 10 después; se comprueba tamaño vertical y horizontal real del PDF. El informe anterior imponía horizontal en ambos casos. Las páginas de conclusiones no se eliminan ni se recorta texto.
+
+Ejecutar geometría con Playwright disponible: `node tests/issue86-layout-browser.cjs` (acepta IE_PLAYWRIGHT_MODULE). No abre el sistema ni ejecuta sus scripts: usa exclusivamente HTML generado con datos ficticios, red bloqueada. Zoom equivalente reduce viewport CSS; no sustituye una comprobación del controlador nativo de Firefox. Sigue pendiente la prueba mínima de exportación PDF en ese navegador: encabezados repetidos, conclusiones completas y firmas al final en ambas orientaciones. Una fila excepcionalmente más alta que una página puede dividirse por decisión del navegador.

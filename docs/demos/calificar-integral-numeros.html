@@ -511,6 +511,39 @@
 #finLista .comp-hist .comp-hist-c{background:#fee2e2;color:#991b1b}
 #finLista .comp-hist .comp-hist-ad{background:#dbeafe;color:#1d4ed8}
 @media print{.fin-comparativo-toggle,#finLista .comp-hist-line{display:none!important}}
+  /* Issue86: presentación adaptable; sin cambios de lógica. */
+  @media screen {
+    #registroAccionesAcademicas {display:flex;flex-wrap:nowrap;gap:clamp(4px,.6vw,8px);width:100%;min-width:0;max-width:100%;overflow-x:auto;padding-block:3px;}
+    #registroAccionesAcademicas > button {display:inline-flex;align-items:center;justify-content:center;flex:1 0 100px;min-height:44px;padding:6px clamp(6px,1vw,14px);font-size:clamp(11px,1.2vw,14px);line-height:1.2;white-space:nowrap;}
+    #registroAccionesAcademicas > button:last-child {flex-grow:1.25;}
+    #panelFinales .fin-header-main {gap:6px 8px;}
+    #panelFinales .fin-header-controls {flex:0 1 auto;min-width:0;max-width:100%;flex-wrap:wrap;gap:4px 8px;}
+    #panelFinales .fin-bulk-actions {width:auto;max-width:100%;flex-wrap:nowrap;overflow-x:auto;align-items:center;gap:4px;padding-block:2px;}
+    #panelFinales .fin-bulk-actions > * {flex-shrink:0;white-space:nowrap;}
+    #panelFinales .fin-bulk-actions .chip,#panelFinales .fin-remove-bulk,#panelFinales .mode-toggle button,#panelFinales .fin-comparativo-toggle {min-height:44px;display:inline-flex;align-items:center;justify-content:center;}
+    #panelFinales .fin-header-controls .mode-toggle {flex:0 0 150px;}
+  }
+  @page registro-promedios {size:auto;margin:8mm;}
+  @media print {
+    #printArea:has(> .promedios-print) {page:registro-promedios;position:static!important;width:auto!important;padding:0!important;}
+    body:has(#printArea > .promedios-print) > :not(#printArea) {display:none!important;}
+    #printArea .promedios-print {font-size:8pt;line-height:1.2;}
+    #printArea .promedios-print .print-hdr {margin:0 0 3mm;padding-bottom:2mm;}
+    #printArea .promedios-print .print-hdr h1 {margin:0 0 1mm;font-size:10pt;}
+    #printArea .promedios-print .print-hdr h2 {font-size:12pt;}
+    #printArea .promedios-print .bimestral-meta {gap:1mm 3mm;padding:2mm;margin:0 0 3mm;}
+    #printArea .promedios-print .bimestral-meta span {font-size:7.5pt;}
+    #printArea .promedios-print .bimestral-number-column {width:7mm;}
+    #printArea .promedios-print .bimestral-table thead {display:table-header-group;}
+    #printArea .promedios-print .bimestral-table th,#printArea .promedios-print .bimestral-table td {padding:1mm;font-size:7.5pt;line-height:1.2;white-space:normal;overflow-wrap:anywhere;}
+    #printArea .promedios-print .bimestral-table tr {break-inside:avoid;page-break-inside:avoid;}
+    #printArea .promedios-print .bimestral-result {font-size:9pt;}
+    #printArea .promedios-print .print-conclusions {break-inside:auto;margin:3mm 0;}
+    #printArea .promedios-print .bimestral-signatures {margin-top:7mm;gap:10%;break-inside:avoid;page-break-inside:avoid;}
+    #printArea .promedios-print .bimestral-signature {padding-top:2mm;font-size:8pt;}
+    #printArea .promedios-print .summary-stats {break-inside:auto;margin:3mm 0;padding:2mm;}
+  }
+  /* Fin Issue86 adaptable. */
   /* Solo impresión Promedios: textos completos, sin afectar otros reportes. */
   @media print {
     #printArea .promedios-print .print-conclusions {margin:5mm 0;}
