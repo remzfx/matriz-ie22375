@@ -7,6 +7,8 @@ const added='<!-- Inicio simplificación docente: dependencia separada, sin camb
 module.exports=s=>{
  s=s.replace(/\r\n/g,'\n');if(!s.includes('<!-- Inicio simplificación docente:')){assert.ok(!s.includes('onclick="IERegistroRecovery.'),'No partial removal of recovery additions');return s;}
  s=require('./registro-read-deadline-snapshot.cjs')(s);
+ // Historical comparison only: the obsolete Classroom callback was removed from production.
+ s=s.replace('  aplicarRestriccionNivel();\n  configurarAccesosAppsMoviles();','  aplicarRestriccionNivel();\n  restaurarCursos();\n  configurarAccesosAppsMoviles();');
  assert.equal(s.split(added).length,2,'Exact tested adapter code embedded once');
  const footer=block(s);for(const name of ['recover','local','upload','drafts','resolve'])assert.ok(footer.includes('IERegistroRecovery.'+name+'()'));
  assert.equal((footer.match(/<button/g)||[]).length,6,'Three primary actions, two conditional offers and explicit read retry');
