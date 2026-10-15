@@ -7,7 +7,7 @@ module.exports=source=>{
  const file=fs.readFileSync(path.join(__dirname,'..','registro-calificar-print.js'),'utf8').trim().replace(/\r\n/g,'\n'),script='<script>\n'+file+'\n</script>\n';
  assert.equal(s.split(script).length,2,'Exact tested print builder embedded once');s=s.replace(script,'');
  const css=require('../registro-calificar-print.js').css+'\n';assert.equal(s.split(css).length,2);s=s.replace(css,'');
- for(const [name,hash]of Object.entries({prepararImpresion:'3bc442c7449dd33a2420313038a808a7214ef14b8cd532a8783a0c1b525fa4fc',abrirSelectorImpresionCalificar:'18f2cbb71344f5b1e82f928f1b3268fc4976ed879cdd899890cf044ce22b5046'})){
+ for(const [name,hash]of Object.entries({prepararImpresion:'7a3b83eee7dfa96068f3631a67dec0d03e866ee63bf4b0a161b21662421d855a',abrirSelectorImpresionCalificar:'874d47b5e329aa8ce0f089125f062acc6077d1fa08a85a8e735258bf0b60a791'})){
   const current=fn(s,name);assert.equal(crypto.createHash('sha256').update(current).digest('hex'),hash,'Only approved print wrapper/selector: '+name);s=s.replace(current,fn(base,name));
  }
  const anchor=base.split('\n').find(l=>l.includes('id="lblSinSesiones"')),button=base.split('\n').find(l=>l.includes('>Imprimir detalle de evidencias</button>'));

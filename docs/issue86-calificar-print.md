@@ -1,30 +1,35 @@
-# Issue86 — impresión integral de Calificar
+# Issue86 — Registro Auxiliar Integral de CALIFICAR
 
-Base: main posterior al PR85 (`8d2c1dbf8254f3c9757f7ae97a0479eb4fa5c794`). Diagnóstico limitado a impresión y sus consumidores directos.
+Base actualizada a main posterior al PR87: 4d9d3ab226d4cf34a14bcdb3d140271ae438feb7. Se amplía el mismo PR88 en borrador.
 
-## Causas y corrección
+## Diagnóstico reutilizado y cambios nuevos
 
-- `prepararImpresion()` reutilizaba `validarConclusionesOficial()` para el bimestre completo: provocaba una advertencia SIAGIE desde Calificar. La impresión auxiliar ya no la llama. Las reglas oficiales siguen intactas.
-- Generaba una tabla, nómina y salto de página por competencia. Ahora produce una sola grilla con C1/C2/... → fecha → evidencia abreviada, más resultado por competencia. La leyenda conserva nombres completos y correspondencia C/E/fecha.
-- Las celdas se elegían por `origen`, ignorando `modoCalif`. Ahora Letras usa el nivel existente y 0–20 el número original cuando existe. Una nota originalmente en letras sigue representada por su letra en modo numérico, como en pantalla, sin inventar equivalencias exactas.
+Las causas ya verificadas eran: validación SIAGIE dentro de Calificar, tabla/nómina separada por competencia y escala elegida por origen en lugar de la modalidad activa. Esas correcciones se conservan; no se repite la auditoría.
 
-El botón independiente «Imprimir detalle de evidencias» desaparece. La acción general Imprimir/PDF abre «Imprimir general · Calificar», por defecto para todo el bimestre; conserva filtros diario/semanal. Otras pestañas conservan sus botones y rutas.
+La orden ampliada cambia el diseño a **fecha → competencia → capacidad/evidencia**. Se utilizan solo sesiones existentes, ordenadas por fecha y competencia del área. N.º y apellidos/nombres completos permanecen a la izquierda. Los tres niveles de encabezado usan agrupación y tonos sobrios distintos; los nombres completos de competencias/evidencias quedan en una leyenda trazable C/E/fecha.
 
-Resultado significa resultado efectivo **bimestral**, con prioridad de la nota directa de Promedios. El filtro de fechas limita evidencias, no recalcula ni reemplaza resultados del bimestre. Se identifica si el resultado es directo o calculado. Falta de nota se imprime como `—`.
+## Resumen sin confundir Calificar con Promedios
 
-## Protección y validación
+El resumen C1/C2/... aparece al final de la grilla, únicamente en el último bloque. Su dato principal **Cal** se obtiene de notaDesdeSesiones(), sin calcular con un algoritmo nuevo. Si hay una nota directa, se muestra aparte como **Prom: ... · directa** usando notaDirectaAlumno(). La prioridad de esa nota en Promedios y en notaCompAlumno() no cambia. Los resultados son bimestrales, aunque el filtro reduzca las evidencias visibles.
 
-`IECalificarPrint.build()` es un generador de HTML de solo lectura. El wrapper lee contexto/padrón/notas actuales y llama a `window.print()`: no recolecta controles, no recarga store, no guarda, no toca baseline/CAS ni solicita nube. Conserva proyección histórica y autorización del contexto. No modifica Apps Script, Service Worker, matrices, asistencia, roles ni cierres.
+Letras muestra AD/A/B/C. En 0–20 se presenta el número original/resultado existente cuando procede; una letra originalmente guardada como letra se conserva sin inventar un valor exacto. Esta es la misma distinción de presentación de la pantalla. No se modifica ninguna nota.
 
-Las regresiones usan exclusivamente datos ficticios: 1/3/4/5 competencias, 30/40 alumnos, ambas escalas, múltiples fechas/capacidades, sesiones duplicadas, faltantes, prioridad directa, bimestres cerrados y autorización. Comparan todo el estado antes/después y mantienen los guards de las funciones académicas/otras impresiones. El normalizador histórico admite solo hashes exactos de los dos wrappers de impresión autorizados y el módulo/CSS probado; no ignora cambios académicos arbitrarios.
+## Papel y continuación
 
-Vistas autocontenidas sin APIs: [Letras](demos/calificar-integral-letras.html) y [0–20](demos/calificar-integral-numeros.html). Regenerar con `node tests/calificar-integral-preview.cjs`. Inspeccionadas en navegador con datos ficticios.
+A4 horizontal con 8 mm de margen. Se eliminó el cambio automático a A3. Si hay demasiadas evidencias, se distribuyen en bloques consecutivos de columnas, cada uno en una página nueva; una tabla puede continuar verticalmente. No se omite ni repite una clave estudiante/fecha/competencia/capacidad. La nómina se repite **solo para identificar las filas en las continuaciones**, no como registros independientes por competencia. El resumen aparece una sola vez al final. No hay bloque vacío final.
 
-## Papel, paginación y límite pendiente
+Cada bloque repite título institucional y contexto; thead repite fechas/competencias/capacidades en continuaciones verticales. Las filas evitan división. Las evidencias no inventan sesiones: se conservan filtros de día, semana y bimestre.
 
-- A4 horizontal, márgenes de 8 mm; A3 horizontal cuando hay más de 28 columnas de evidencia/resultado. Fuentes de 6–8 puntos y nombres completos con ajuste de línea.
-- `thead` repetible; filas sin división; ninguna competencia provoca un salto ni una nómina nueva. No se descartan columnas.
-- La previsualización nativa no pudo inspeccionarse mediante el navegador integrado. Comprobación manual mínima: abrir las dos fixtures, imprimir a PDF con el navegador habitual y confirmar tamaño horizontal, filas completas y repetición de encabezados desde la segunda página. No usar notas reales ni confirmar una impresión física.
-- Un bimestre excepcionalmente ancho puede requerir papel A3 o filtro diario/semanal para mantener legibilidad. El navegador/controlador puede sustituir el papel o reducir escala; revisar antes de imprimir.
+## Protección y evidencia
 
-Sin merge ni deploy. Un único PR en borrador para revisión del Issue86.
+Solo cambian generación de impresión, selector, CSS y fixtures. No hay recolectar/guardar/recargar store, solicitudes de nube, cambios en baseline/CAS, A1/B1, roles, cierres, historial, asistencia, recuperación, Apps Script, SIAGIE ni Service Worker. Calificar no exige conclusiones; las validaciones oficiales de Primaria B/C y Secundaria C permanecen intactas.
+
+Las pruebas reutilizadas y ampliadas comprueban ambas escalas, Primaria/Secundaria, registros incompletos, múltiples fechas/capacidades, bloqueos, cero mutaciones y cada clave de evidencia exactamente una vez, además de Cal B + Prom A sin sobrescribir A.
+
+Fixtures autocontenidas sin APIs: [Letras](demos/calificar-integral-letras.html) y [0–20](demos/calificar-integral-numeros.html). Regenerar con node tests/calificar-integral-preview.cjs.
+
+## Comprobación manual mínima pendiente
+
+La previsualización nativa de impresión no es inspeccionable desde el navegador integrado. Abrir únicamente las fixtures ficticias en el navegador habitual y exportar a PDF: confirmar A4 horizontal, filas completas, encabezados repetidos desde página 2 y continuidad de los bloques. El controlador puede sustituir tamaño o escala. No usar notas reales ni confirmar impresión física.
+
+No merge. No deploy. Revisión y autorización individual del usuario pendientes.
