@@ -25,16 +25,17 @@
   const signature=x=>root.IERegistroReconcile.signature(x.payload);
   const valid=(initial)=>d.guard()&&d.context()===initial.context&&signature(d.capture())===signature(initial);
   async function recover(candidate){if(saving){d.state('Espera mientras se verifica el respaldo local.');return false;}if(busy||!d.guard())return false;busy=true;try{
+   const validSource=()=>!candidate?.validate||candidate.validate();
    const local=copy(d.capture()),remote=candidate?{payload:candidate.snapshot.payload,version:null,exists:true}:await d.read();
-   if(!valid(local))throw Error('El contexto o borrador cambió. Recuperación cancelada.');
+   if(!valid(local)||!validSource())throw Error('El contexto o borrador cambió. Recuperación cancelada.');
    const undo=!!(candidate?.undo&&candidate.kind==='before-recovery');
    if(!remote.exists||!remote.payload||(!undo&&!['grades','finales','concComp','concArea','sessions','competenciasEstado','capsSel'].some(k=>Object.keys(remote.payload[k]||{}).length)))throw Error('No hay notas/evidencias recuperables confirmadas. No se reemplazaron notas.');
    const diff=differences(local.payload,remote.payload);if(!diff.length){d.state('Sin diferencias de notas.');return true;}
-   if(!await d.confirm(diff,undo?'undo':candidate?'borrador':'nube'))return false;
-   if(!valid(local))throw Error('El borrador cambió durante la comparación.');
-   const backup=await d.backup(local,'before-recovery');if(!valid(local))throw Error('Cambió el contexto mientras se verificaba el respaldo.');
+   if(!await d.confirm(diff,undo?'undo':candidate?.kind==='legacy'?'legacy':candidate?'borrador':'nube'))return false;
+   if(!valid(local)||!validSource())throw Error('El borrador cambió durante la comparación.');
+   const backup=await d.backup(local,'before-recovery');if(!valid(local)||!validSource())throw Error('Cambió el contexto mientras se verificaba el respaldo.');
    if(!candidate){const check=await d.read();if(check.version!==remote.version||root.IERegistroReconcile.signature(check.payload)!==root.IERegistroReconcile.signature(remote.payload))throw Error('La nube cambió. Compara nuevamente antes de recuperar.');}
-   if(!valid(local))throw Error('Cambió el borrador o los permisos.');
+   if(!valid(local)||!validSource())throw Error('Cambió el borrador o los permisos.');
    await d.apply(remote,candidate,local,backup);d.state('Cambios pendientes de subir');return true;
   }catch(e){d.state(e.message);return false;}finally{busy=false;}}
   async function emergency(periodic=false){if(busy||saving||!d.guard())return false;saving=true;let snapshot;try{snapshot=copy(d.capture());const sig=signature(snapshot);if(!periodic&&sig===lastSignature)return false;if(periodic&&(d.changed?!d.changed():sig===d.baseline()))return false;await d.backup(snapshot,periodic?'periodic':'emergency');if(d.context()!==snapshot.context||!d.guard())return false;lastSignature=sig;d.state((d.changed?!d.changed():sig===d.baseline())?'Guardado en esta computadora':'Cambios pendientes de subir');return true;}catch(e){if(!snapshot||d.context()===snapshot.context)d.state(e.message);return false;}finally{saving=false;}}

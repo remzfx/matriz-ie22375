@@ -2,15 +2,15 @@
 (function(){
  'use strict';let service,timer,lastDisk,refreshTimer,periodicTimer,expiryTimer,expiryToken='';const observed=new Map();try{lastDisk=localStorage.getItem(NOTAS_KEY);}catch(_){}
  const copy=x=>IERegistroReconcile.copy(x),context=()=>{const s=getLoginSession()||{};return cloudClaveReg()+'|'+(s.token||'')+'|'+(s.user||'')+'|'+(s.role||'');};
- function authenticated(){const s=getLoginSession();return !!(s?.token&&['admin','docente'].includes(s.role)&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token);}
+ function authenticated(){const s=getLoginSession();return !!(s?.token&&['admin','docente'].includes(s.role)&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&(typeof registroLocal==='undefined'||registroLocal.matches()));}
  function text(el,value){if(el&&el.textContent!==value)el.textContent=value;}
  const volatileEntries=new Map();
  function pendingTrans(){const token=(getLoginSession()||{}).token,entry=typeof IERegistroTransversales==='undefined'?null:IERegistroTransversales.current?.();if(entry?.dirty)volatileEntries.set(entry,token);return [...volatileEntries].some(([e,t])=>t===token&&e.dirty);}
  function refreshWarning(){const pending=pendingTrans(),status=document.getElementById('registroSaveState'),suffix=' · Aporte transversal pendiente: conserva esta pestaña.';if(status?.textContent)text(status,status.textContent.replace(suffix,'')+(pending?suffix:''));const el=document.getElementById('registroEmergencyWarning');if(el){el.hidden=!pending;text(el,el.hidden?'':'Aportes transversales pendientes SIN respaldo de emergencia. Recuperar Nube, Deshacer recuperación y Recuperar borrador solo protegen el registro académico. No cierres ni cambies de aula, área o bimestre: conserva esta pestaña y confirma el envío de esos aportes.');}}
- const state=text=>{if(text==='Cambios pendientes de subir'&&pendingAcademic())text=pendingLabel();const el=document.getElementById('registroSaveState');refreshWarning();if(el){const value=text+(pendingTrans()?' · Aporte transversal pendiente: conserva esta pestaña.':'');if(el.textContent!==value)el.textContent=value;}};
+ const state=text=>{if(text==='Cambios pendientes de subir')text=pendingAcademic()?pendingLabel():'Notas actualizadas';const el=document.getElementById('registroSaveState');refreshWarning();if(el){const value=text+(pendingTrans()?' · Aporte transversal pendiente: conserva esta pestaña.':'');if(el.textContent!==value)el.textContent=value;}};
  function guard(){const ses=getLoginSession();return !!(authenticated()&&ses&&ses.token&&['admin','docente'].includes(ses.role)&&nivel&&areaActual&&areas().includes(areaActual)&&bimestreHabilitado(ctxBase().bim)&&!registroSoloLectura()&&!bimCerradoDocente()&&padronBimestre===ctxBase().bim&&!subirRegistroNube.pending&&!bajarRegistroNube.pending&&document.getElementById('registroTutorPanel')?.hidden!==false);}
  function capture(){
-  const persisted=localStorage.getItem(NOTAS_KEY);if(persisted!==lastDisk&&persisted!==JSON.stringify(store))throw Error('Otro registro cambió en este navegador. Conserva las pestañas y revisa antes de guardar.');lastDisk=persisted;
+  const persisted=localStorage.getItem(NOTAS_KEY);if(!diskSafe())throw Error('Otro registro cambió en este navegador. Conserva las pestañas y revisa antes de guardar.');lastDisk=persisted;
   const invalid=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(el=>{const rendered=el.dataset?.registroContexto||el.closest?.('#finLista')?.dataset?.registroContexto;if(rendered&&rendered!==cloudClaveReg()||el.readOnly)return false;return el.value!==''&&(!Number.isFinite(Number(el.value))||Number(el.value)<0||Number(el.value)>20);});
   if(invalid)throw Error('Nota inválida: conserva esta pestaña y corrige antes de guardar.');
   if(guardarTodo()===false)throw Error('No se confirmó el guardado local. Conserva esta pestaña.');
@@ -24,7 +24,7 @@
  async function backup(snapshot,kind){const key=await scope(snapshot),safe=copy(snapshot);safe.context=snapshot.key;delete safe.owner;delete safe.role;const result=await disk.put(key,safe,kind);invalidateDraft();return result;}
  function compare(diff,kind){return new Promise(resolve=>{
   const dialog=document.createElement('dialog');dialog.style.cssText='max-width:760px;width:calc(100% - 24px);max-height:85vh;border:0;border-radius:14px;padding:16px';
-  const title=document.createElement('h2');title.id='registroRecoveryTitle';title.tabIndex=-1;title.textContent=kind==='nube'?'Recuperar Nube':kind==='undo'?'Deshacer recuperación':'Recuperar borrador de emergencia';dialog.setAttribute('aria-labelledby',title.id);dialog.append(title);
+  const title=document.createElement('h2');title.id='registroRecoveryTitle';title.tabIndex=-1;title.textContent=kind==='nube'?'Recuperar Nube':kind==='undo'?'Deshacer recuperación':kind==='legacy'?'Revisar datos anteriores sin propietario':'Recuperar borrador de emergencia';dialog.setAttribute('aria-labelledby',title.id);dialog.append(title);
   const warning=document.createElement('p'),c=ctxBase();warning.textContent='Bimestre '+c.bim+' · '+c.grado+'.º '+c.seccion+' · '+c.area+'. Reemplazo voluntario de notas, evidencias y conclusiones. Se conservará un respaldo verificado. La asistencia local se conserva. No se subirá nada a la nube.';dialog.append(warning);
   const undo=document.createElement('p');undo.textContent='Para deshacer después, incluso al reabrir: pulsa Deshacer recuperación y compara el respaldo anterior a este reemplazo. No borres los datos locales; los respaldos duran hasta siete días y pueden caducar antes por cuota o límite de 40 respaldos.';dialog.append(undo);
   if(pendingTrans()){const alert=document.createElement('p');alert.style.cssText='background:#fef2f2;color:#991b1b;padding:10px;font-weight:bold';alert.textContent='Tus aportes transversales pendientes NO quedan respaldados ni se recuperan aquí. Esta acción solo reemplaza datos académicos. Conserva la pestaña y confirma el envío de esos aportes antes de cambiar contexto o cerrar.';dialog.append(alert);}
@@ -45,22 +45,55 @@
    b.recovery={local:copy(local.payload),base:local.baseline.basePayload||null,remote:copy(remote.payload)};
    if(candidate?.undo)b.voluntaryRecovery={undone:true,created:backupRecord?.created??Date.now()};else if(backupRecord?.id)b.voluntaryRecovery={id:backupRecord.id,created:backupRecord.created};saveStore();
    if(localStorage.getItem(NOTAS_KEY)!==JSON.stringify(store))throw Error('No se verificó el reemplazo local.');lastDisk=localStorage.getItem(NOTAS_KEY);invalidateDraft();dirtyAcademico();pintarRegistroConciliado();
-  }catch(e){store=previous;try{if(raw!==null)localStorage.setItem(NOTAS_KEY,raw);}catch(_){}throw Error('Recuperación no confirmada. Borrador conservado; no cierres la pestaña.');}
+  }catch(e){store=previous;try{if(typeof registroLocal!=='undefined')registroLocal.write(raw===null?JSON.stringify(previous):raw);else if(raw!==null)localStorage.setItem(NOTAS_KEY,raw);}catch(_){}throw Error('Recuperación no confirmada. Borrador conservado; no cierres la pestaña.');}
  }
  function init(){if(!disk)return null;if(!service)service=IERegistroDrafts.controller({context,guard,capture,read:()=>leerEstadoRemotoAcademico(ctxBase(),cloudClaveReg(),(getLoginSession()||{}).token),backup,apply,confirm:compare,state,changed:()=>pendingAcademic(),baseline:()=>IERegistroReconcile.signature(baselineAcademica().basePayload||{})});return service;}
  async function recover(){refreshWarning();if(!guard()){state('Recuperación no disponible: revisa sesión, permisos, bimestre y padrón.');return false;}if(!init())return state('Recuperación no disponible. Conserva el borrador.');const ok=await service.recover();invalidateDraft();await offerDraft();queueRefresh();return ok;}
- function diskSafe(){const raw=localStorage.getItem(NOTAS_KEY);return raw===lastDisk||raw===JSON.stringify(store);}
+ function diskSafe(){const raw=localStorage.getItem(NOTAS_KEY);return typeof registroLocal!=='undefined'?registroLocal.verified(raw):raw===lastDisk||raw===JSON.stringify(store);}
  function rememberDisk(){const raw=localStorage.getItem(NOTAS_KEY);if(raw===JSON.stringify(store))lastDisk=raw;}
  function material(payload){const p=JSON.parse(IERegistroAcademico.canonical(payload||{}));for(const field of ['grades','finales','concComp','concArea','competenciasEstado','capsSel']){p[field]=p[field]||{};for(const [key,v]of Object.entries(payload?.[field]||{}))if(v?.borrado)p[field][key]={borrado:true};}for(const [key,v]of Object.entries(p.capsSel||{})){if(Array.isArray(v)&&!v.length)delete p.capsSel[key];else if(Array.isArray(v))for(const item of v)if(item?.comp&&item.cap&&item.origen==='academica')delete item.origen;}return p;}
  function different(a,b){return IERegistroDrafts.differences(material(a),material(b)).length>0;}
- function recoverable(payload,local=sliceRegistroArea()){return !!payload&&different({},payload)&&different(local,payload);}
+ function recoverable(payload,local=sliceRegistroArea()){
+  if(!payload)return false;const candidate=material(payload),current=material(local);
+  // A subset offers nothing to recover. Divergent values remain available for explicit comparison.
+  return ['grades','finales','concComp','concArea','competenciasEstado','sessions','capsSel'].some(field=>{
+   const a=candidate[field]||{},b=current[field]||{};
+   if(Array.isArray(a))return a.some(value=>!(Array.isArray(b)&&b.some(existing=>IERegistroReconcile.equal(existing,value))));
+   return Object.entries(a).some(([key,value])=>Array.isArray(value)?value.some(item=>!(Array.isArray(b[key])&&b[key].some(existing=>IERegistroReconcile.equal(existing,item)))):!IERegistroReconcile.equal(value,b[key]));
+  });
+ }
  function selectBackups(rows,local){
   const b=baselineAcademica(),pointer=b.voluntaryRecovery;let undo=pointer?rows.find(r=>r.id===pointer.id&&r.kind==='before-recovery'):null;
   // Older voluntary recoveries can be matched only to their verified persisted before/after pair.
   if(!pointer&&rows.some(r=>r.kind==='before-recovery')&&b.recovery?.local&&b.recovery?.remote&&!different(local,b.recovery.remote))undo=rows.find(r=>r.kind==='before-recovery'&&!different(r.snapshot.payload,b.recovery.local));
   const threshold=pointer?.created??undo?.created??-Infinity;
-  const latest=rows.filter(r=>['emergency','periodic'].includes(r.kind)&&r.created>threshold).sort((a,b)=>b.created-a.created)[0];
-  return {undo:undo&&different(local,undo.snapshot.payload)?{...undo,undo:true}:null,draft:latest&&recoverable(latest.snapshot.payload,local)?latest:null};
+  const covered={},ordered=rows.filter(r=>['emergency','periodic'].includes(r.kind)&&r.created>threshold).sort((a,b)=>b.created-a.created);let draft=null;
+  for(const row of ordered){
+   const candidate=material(row.snapshot.payload),available=copy(candidate);
+   for(const field of ['grades','finales','concComp','concArea','competenciasEstado','sessions','capsSel']){
+    const values=candidate[field]||{};covered[field]=covered[field]||(Array.isArray(values)?[]:{});
+    if(Array.isArray(values)){available[field]=values.filter(v=>!covered[field].some(x=>IERegistroReconcile.equal(x,v)));covered[field].push(...values);}
+    else for(const [key,value]of Object.entries(values)){
+     if(Array.isArray(value)){const newer=covered[field][key]||[];available[field][key]=value.filter(v=>!newer.some(x=>IERegistroReconcile.equal(x,v)));covered[field][key]=[...newer,...value];}
+     else{if(Object.hasOwn(covered[field],key))delete available[field][key];covered[field][key]=true;}
+    }
+   }
+   if(recoverable(available,local)){draft=row;break;}
+  }
+  // A voluntary recovery supersedes old values, but must not hide unique missing data.
+  if(!draft&&Number.isFinite(threshold)){
+   const current=material(local),before=material(undo?.snapshot.payload||{});
+   draft=rows.filter(r=>['emergency','periodic'].includes(r.kind)&&r.created<=threshold).sort((a,b)=>b.created-a.created).find(row=>{
+    const available=material(row.snapshot.payload);
+    for(const field of ['grades','finales','concComp','concArea','competenciasEstado','sessions','capsSel']){
+     const a=available[field]||{},b=current[field]||{},c=before[field]||{};
+     if(Array.isArray(a))available[field]=a.filter(v=>![...(Array.isArray(b)?b:[]),...(Array.isArray(c)?c:[])].some(x=>IERegistroReconcile.equal(x,v)));
+     else for(const [key,value]of Object.entries(a))if(Array.isArray(value))a[key]=value.filter(v=>[...(b[key]||[]),...(c[key]||[])].every(x=>!IERegistroReconcile.equal(x,v)));else if(Object.hasOwn(b,key)||Object.hasOwn(c,key))delete a[key];
+    }
+    return recoverable(available,local);
+   })||null;
+  }
+  return {undo:undo&&different(local,undo.snapshot.payload)?{...undo,undo:true}:null,draft:draft||null};
  }
  let pendingFields=[];
  function pendingLabel(){return pendingFields.length===1&&pendingFields[0]==='capsSel'?'Configuración de capacidades pendiente de subir':'Cambios pendientes de subir';}
@@ -78,6 +111,22 @@
  async function restore(kind){refreshWarning();if(!guard()||!init()||service.busy())return false;try{const binding=context(),key=await scope(),rows=await disk.list(key);if(binding!==context()||!guard())return false;let candidate=selectBackups(rows,sliceRegistroArea())[kind];const legacy=baselineAcademica().recovery;if(!candidate&&kind==='draft'&&!baselineAcademica().voluntaryRecovery&&recoverable(legacy?.local))candidate={snapshot:{payload:copy(legacy.local),baseline:{version:baselineAcademica().version,basePayload:copy(legacy.base),baseline:IERegistroAcademico.canonical(legacy.base||{})}}};if(!candidate){state(kind==='undo'?'No hay un respaldo anterior recuperable.':'No hay borradores diferentes recientes para este contexto.');await offerDraft();return false;}const ok=await service.recover(candidate);invalidateDraft();await offerDraft();queueRefresh();return ok;}catch(e){state(e.message);return false;}}
  async function drafts(){return restore('draft');}
  async function undo(){return restore('undo');}
+ async function legacy(){
+  if(!guard()||!init()||service.busy()||typeof registroLocal==='undefined'||getLoginSession()?.role!=='admin')return false;
+  try{
+   const original=registroLocal.legacy();if(!original)return false;
+   if(!confirm('Estos datos antiguos no tienen propietario verificable. Solo continúa si corresponden al contexto seleccionado. Se compararán y respaldarán antes de reemplazar notas locales. No se subirá nada. ¿Revisarlos?'))return false;
+   const c=ctxBase(),prefix=cloudClaveReg()+'||',payload=copy(sliceRegistroArea());
+   for(const field of ['grades','finales','concComp','concArea','competenciasEstado','capsSel'])payload[field]=Object.fromEntries(Object.entries(original.store[field]||{}).filter(([key])=>key.startsWith(prefix)));
+   payload.sessions=(original.store.sessions||[]).filter(s=>s.nivel===c.nivel&&s.bim===c.bim&&String(s.grado)===String(c.grado)&&s.seccion===c.seccion&&s.area===c.area);
+   payload.meta=payload.meta||{};payload.meta.studentAliases=payload.meta.studentAliases||{};
+   const aula=[c.nivel,c.grado,c.seccion].join('||');
+   for(const aliases of [original.store.meta?.[cloudClaveReg()]?.studentAliases,original.store.studentAliases?.[aula]])for(const [id,names]of Object.entries(aliases||{}))if(Array.isArray(names))payload.meta.studentAliases[id]=[...new Set([...(payload.meta.studentAliases[id]||[]),...names.filter(n=>typeof n==='string')])];
+   if(!recoverable(payload)){state('No hay datos anteriores recuperables para este contexto.');return false;}
+   const candidate={kind:'legacy',snapshot:{payload,baseline:copy(baselineAcademica())},validate:()=>registroLocal.legacy()?.raw===original.raw};
+   const ok=await service.recover(candidate);invalidateDraft();await offerDraft();queueRefresh();return ok;
+  }catch(e){state('No se recuperaron datos anteriores: '+e.message);return false;}
+ }
  const consulted=new Set();let checking=false,activeBinding='',generation=0;
  function track(){const binding=context();if(binding!==activeBinding){if(checking)state('Notas locales conservadas · verificación del contexto actual pendiente');activeBinding=binding;generation++;diagnostic=null;pendingFields=[];consulted.delete(binding);for(const id of ['registroConflictOffer','registroDraftOffer','registroUndoOffer']){const el=document.getElementById(id);if(el)el.hidden=true;}invalidateDraft();clearTimeout(periodicTimer);periodicTimer=null;}return generation;}
  function readable(){const ses=getLoginSession();return !!(authenticated()&&ses?.token&&['admin','docente'].includes(ses.role)&&nivel&&areaActual&&areas().includes(areaActual)&&padronBimestre===ctxBase().bim&&typeof tokenPadron!=='undefined'&&tokenPadron===ses.token&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===ses.token&&IEStudents.peekRoster(ctxBase().bim)&&!(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())&&document.getElementById('registroTutorPanel')?.hidden!==false);}
@@ -93,7 +142,7 @@
  async function offerDraft(){const draft=document.getElementById('registroDraftOffer'),undo=document.getElementById('registroUndoOffer'),binding=context();if(!guard()||!init()){if(draft)draft.hidden=true;if(undo)undo.hidden=true;return false;}const revision=draftRevision,stamp=binding+'|'+generation+'|'+revision;let memo=draftMemo.get(stamp);if(!memo||memo.until<=Date.now()){
   memo={until:Infinity,pending:(async()=>{const key=await scope(),rows=await disk.list(key);if(binding!==context()||revision!==draftRevision||!guard())return null;memo.until=rows.length?Math.min(...rows.map(r=>r.created+IERegistroDrafts.ttl)):Infinity;return selectBackups(rows,sliceRegistroArea());})()};draftMemo.set(stamp,memo);memo.pending.catch(()=>draftMemo.delete(stamp));
  }const candidates=await memo.pending;if(!candidates||binding!==context()||revision!==draftRevision||!guard())return false;if(draft)draft.hidden=!candidates.draft;if(undo)undo.hidden=!candidates.undo;return !!(candidates.draft||candidates.undo);}
- function inactive(){retryOffer(false);clearTimeout(refreshTimer);clearTimeout(timer);clearTimeout(periodicTimer);clearTimeout(expiryTimer);refreshTimer=timer=periodicTimer=expiryTimer=null;expiryToken='';for(const id of ['registroDraftOffer','registroConflictOffer','registroUndoOffer']){const el=document.getElementById(id);if(el)el.hidden=true;}state('Inicia sesión para cargar tus notas');}
+ function inactive(){retryOffer(false);clearTimeout(refreshTimer);clearTimeout(timer);clearTimeout(periodicTimer);clearTimeout(expiryTimer);refreshTimer=timer=periodicTimer=expiryTimer=null;expiryToken='';for(const id of ['registroDraftOffer','registroConflictOffer','registroUndoOffer']){const el=document.getElementById(id);if(el)el.hidden=true;}if(typeof registroLocal!=='undefined'&&!registroLocal.matches()){const app=document.getElementById('viewApp');if(app)app.style.display='none';state('La cuenta cambió. Abre Registro nuevamente; las notas anteriores están conservadas.');return;}state('Inicia sesión para cargar tus notas');}
  function armExpiry(){const token=(getLoginSession()||{}).token;if(token===expiryToken)return;expiryToken=token;clearTimeout(expiryTimer);try{const claims=JSON.parse(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'))),ms=Number(claims.exp)-Date.now();if(ms>0)expiryTimer=setTimeout(()=>{track();if(!authenticated())inactive();else queueRefresh();},Math.min(ms+1,2147483647));}catch(_){} }
  function queueRefresh(force=false){track();if(!authenticated()){inactive();return;}armExpiry();if(force)consulted.delete(context());if(!readable()){state(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()?'Solo lectura':'Esperando el padrón autorizado para cargar tus notas');return;}clearTimeout(refreshTimer);const binding=context(),epoch=generation;refreshTimer=setTimeout(async()=>{refreshTimer=null;if(binding!==context()||epoch!==track())return;await automatic();if(binding!==context()||epoch!==track()||bajarRegistroNube.resultado?.estado==='fallo')return;try{await offerDraft();}catch(_){state('No se pudo verificar el respaldo local. Conserva esta pestaña.');}},180);}
  function armPeriodic(){if(periodicTimer||!guard())return;const binding=context();periodicTimer=setTimeout(async()=>{periodicTimer=null;if(binding!==context()||!guard())return;await init()?.emergency(true);if(binding===context()&&guard()&&pendingAcademic())armPeriodic();queueRefresh();},300000);}
@@ -103,8 +152,9 @@
   if(!field&&!button)return;if(event.type==='click'&&!button)return;if(!guard())return;const key=context(),sig=button?IERegistroReconcile.signature(sliceRegistroArea()):null;
   if(button&&observed.get(key)===sig)return;observed.set(key,sig);invalidateDraft();armPeriodic();clearTimeout(timer);timer=setTimeout(async()=>{if(key===context()){await init()?.emergency();if(key===context()){observed.set(key,IERegistroReconcile.signature(sliceRegistroArea()));queueRefresh();}}},2500);
  }
- window.IERegistroRecovery={recover,local,upload,drafts,undo,automatic,resolve,refresh:queueRefresh,review:offerDraft,diagnostic:()=>diagnostic&&copy(diagnostic)};
+ window.IERegistroRecovery={recover,local,upload,drafts,undo,legacy,automatic,resolve,refresh:queueRefresh,review:offerDraft,diagnostic:()=>diagnostic&&copy(diagnostic)};
  document.addEventListener('DOMContentLoaded',()=>{
+  if(typeof registroLocal!=='undefined'){try{const el=document.getElementById('registroLegacyWarning');if(el)el.hidden=!registroLocal.hasLegacy();const button=document.getElementById('registroLegacyReview');if(button){button.hidden=getLoginSession()?.role!=='admin';button.style.display=button.hidden?'none':'inline-flex';}}catch(_){state('No se pudo revisar el almacenamiento anterior. Conserva esta pestaña.');}}
   const footer=document.getElementById('registroAcademicFooter'),fit=()=>{const main=document.querySelector?.('main');if(main&&footer?.getBoundingClientRect){const space=footer.hidden?0:footer.getBoundingClientRect().height+12;main.style.paddingBottom=space+'px';if(document.documentElement?.style)document.documentElement.style.scrollPaddingBottom=space+'px';}};fit();if(typeof ResizeObserver!=='undefined'&&footer)new ResizeObserver(fit).observe(footer);else{window.addEventListener('resize',fit);if(typeof MutationObserver!=='undefined'&&footer)new MutationObserver(fit).observe(footer,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden']});}
   document.addEventListener('input',schedule);const selected=e=>{const before=activeBinding;schedule(e);if(before!==context())queueRefresh();};document.addEventListener('change',selected);document.addEventListener('click',selected);
   document.addEventListener('click',refreshWarning,true);document.addEventListener('change',refreshWarning,true);window.addEventListener('beforeunload',refreshWarning);
