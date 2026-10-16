@@ -1033,6 +1033,15 @@
 /* Conexión obligatoria de Registro. Solo coordina lecturas; nunca escribe datos académicos. */
 (function(root){
  'use strict';let active=null;
+ function reviewSummary(conflicts){
+  const modules={},causes={},fieldModule={grades:'Calificar',sessions:'Calificar',capsSel:'Calificar',finales:'Promedios',concComp:'Conclusiones',concArea:'Conclusiones',asistencia:'Asistencia',asisFechas:'Asistencia',asisFechasEstado:'Asistencia',competenciasEstado:'Configuración'};
+  const add=(map,k)=>map[k]=(map[k]||0)+1;
+  for(const c of conflicts){const paths=c.paths||[c.path],affected=new Set(paths.map(p=>fieldModule[JSON.parse(p)[0]]||'Otro módulo'));if(c.candidates||JSON.parse(c.path)[0]==='identity')affected.add('Identidad histórica');for(const m of affected)add(modules,m);
+   const values=c.candidates?c.candidates.map(x=>x.value):[c.local,c.remote],a=values[0];let cause=c.candidates?'Identidad histórica sin vigencia demostrada':c.unknownBase?'Sin base causal verificable':'Modificaciones concurrentes';
+   if(values.some(v=>v?.borrado))cause='Eliminación frente a datos conservados';else if(values.some(v=>v===undefined))cause='Dato conocido ausente sin borrado explícito';else if(values.some((v,i)=>i&&a?.origen!==v?.origen))cause='Origen de nota diferente o no verificado';else if(values.some((v,i)=>i&&a?.origen==='numero'&&v?.origen==='numero'&&typeof a.nota20==='number'&&typeof v.nota20==='number'&&a.nota20!==v.nota20))cause='Notas numéricas exactas diferentes';else if(values.some((v,i)=>i&&!(a?.origen==='letra'&&v?.origen==='letra')&&a?.nota20!==v?.nota20))cause='Valor o tipo de nota diferente';else if(affected.has('Asistencia'))cause='Asistencia compartida que requiere revisión';
+   add(causes,cause);
+  }return {total:conflicts.length,modules,causes};
+ }
  function create(o){
   const now=o.now||Date.now,set=o.setTimeout||setTimeout,clear=o.clearTimeout||clearTimeout;
   const interval=o.interval||120000,lease=o.lease||150000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
@@ -1067,7 +1076,7 @@
   }
   const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},invalidate(){scope();epoch++;until=0;emit('checking');}};active=api;return api;
  }
- root.IERegistroConnection={create,canEdit:()=>!!active&&active.canEdit(),current:()=>active};
+ root.IERegistroConnection={create,reviewSummary,canEdit:()=>!!active&&active.canEdit(),current:()=>active};
  if(typeof module!=='undefined')module.exports=root.IERegistroConnection;
 })(typeof window==='undefined'?globalThis:window);
 </script>
@@ -2528,7 +2537,7 @@ function renderSesiones() {
     if (del) { borrarSesionFecha(del.dataset.delfecha); return; }
     const b = ev.target.closest('button[data-fecha]');
     if (!b) return;
-    if (sesionActiva && hayNotasPendientes()) {
+    if (!registroSoloLectura() && sesionActiva && hayNotasPendientes()) {
       if (confirm('Hay notas en pantalla.\n¿Desea guardar antes de cambiar de fecha?')) {
         guardarTodo();
         toast('Guardado');
@@ -3222,9 +3231,9 @@ async function prepararVersionAcademica(options){
   if(b.attempt&&IERegistroAcademico.canonical(remote.payload)===IERegistroAcademico.canonical(b.attempt.payload)&&remote.version>b.attempt.version)base=b.attempt.local;
   options.fase?.('conciliacion');const reconciliation=IERegistroReconcile.academicPlan(base,local,remote.payload,estudiantes(),c,competencias(),{sharedAttendance:true,reviewAbsence:true,cleanAcademic:b.version!=null&&IERegistroAcademico.canonical(local)===b.baseline});
   remote.projected=reconciliation.remote;
-  if(options.automatico&&reconciliation.conflicts.length){bajarRegistroNube.resultado={key,token,estado:'conflicto',conflictos:reconciliation.conflicts.length};return false;}
+  if(options.automatico&&reconciliation.conflicts.length){bajarRegistroNube.resultado={key,token,estado:'conflicto',conflictos:reconciliation.conflicts.length,resumen:typeof IERegistroConnection!=='undefined'?IERegistroConnection.reviewSummary(reconciliation.conflicts):null};return false;}
   const choices=options.automatico?{}:await IERegistroReconcile.choose(reconciliation.conflicts,current,{roster:estudiantes(),aliases:local.meta&&local.meta.studentAliases});
-  if(!choices){bajarRegistroNube.resultado={key,token,estado:current()?'conflicto':'pendiente',conflictos:reconciliation.conflicts.length};toast('Conflicto pendiente. El trabajo local se conserva; ninguna nota fue enviada.');return false;}
+  if(!choices){bajarRegistroNube.resultado={key,token,estado:current()?'conflicto':'pendiente',conflictos:reconciliation.conflicts.length,resumen:typeof IERegistroConnection!=='undefined'?IERegistroConnection.reviewSummary(reconciliation.conflicts):null};toast('Conflicto pendiente. El trabajo local se conserva; ninguna nota fue enviada.');return false;}
   if(!current())throw Error('El contexto, la sesión o el borrador cambió. Reintente sin cerrar la pestaña.');
   const payload=reconciliation.resolve(choices);
   // Un único respaldo acotado por contexto. Si falla su persistencia no se envía nada.
@@ -4106,10 +4115,17 @@ if (document.readyState !== 'loading') {
  const connectionContext=()=>context()+(tutorVisible()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:'');
  function connectionReadable(){if(!tutorVisible())return readable();const ses=getLoginSession(),aula=document.getElementById('transAula').value;return !!(authenticated()&&ses.role==='docente'&&(ses.tutorAulas||[]).includes(aula)&&document.getElementById('transBim').value);}
 
+ function reviewMessage(){
+  const result=bajarRegistroNube.resultado,current=result?.key===cloudClaveReg()&&result?.token===(getLoginSession()||{}).token,summary=current&&result?.estado==='conflicto'?result.resumen:null;
+  const modules={grades:'Calificar',sessions:'Calificar',capsSel:'Calificar',finales:'Promedios',concComp:'Conclusiones',concArea:'Conclusiones',asistencia:'Asistencia',asisFechas:'Asistencia',asisFechasEstado:'Asistencia',competenciasEstado:'Configuración'};
+  const affected=summary?Object.entries(summary.modules).map(([m,n])=>m+' ('+n+')').join(', '):[...new Set(pendingFields.map(f=>modules[f]||'Otro módulo'))].join(', ');
+  const count=current&&result.estado==='conflicto'?result.conflictos:0,reason=summary?Object.keys(summary.causes).join('; '):tutorVisible()?'Decisión transversal pendiente de revisión':count?'Desglose no disponible; revisa las alternativas':'Cambios locales pendientes de verificar';
+  return 'Sincronización · '+(affected||'Registro académico')+' · '+count+' conflicto'+(count===1?' confirmado':'s confirmados')+' · '+reason+'. No indica cierre administrativo. Consulta e impresión disponibles. Edición y subida protegidas: Calificar y Promedios comparten registro y una sola versión CAS; requiere revisión explícita.';
+ }
  function connectionState(value){
   const panel=document.getElementById('registroConnectionStatus'),label=document.getElementById('registroConnectionText'),review=document.getElementById('registroConnectionReview');
   const labels={readonly:'Bimestre cerrado — solo lectura.',connected:'Conectado — notas verificadas.',pending:'Guardado local — pendiente de subir.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar… Sin conexión — edición pausada.',server:'Servidor no disponible — edición pausada. Estamos intentando reconectar…',session:'Sesión vencida o sin autorización — vuelve a iniciar sesión.',review:'Conflicto pendiente — requiere revisión. Tus cambios locales están conservados.'};
-  if(panel)panel.dataset.state=value.state;if(label)text(label,value.retentionFailed?'No se pudo proteger la entrada iniciada. Edición pausada: conserva esta pestaña y consulta los respaldos.':labels[value.state]);if(review)review.hidden=value.state!=='review';
+  if(panel)panel.dataset.state=value.state;const period=loadPeriodosAdmin()?.bimestres?.[ctxBase().bim],message=value.state==='review'?reviewMessage():value.state==='readonly'?(['cerrado','bloqueado'].includes(period)?'Cierre administrativo del bimestre — solo lectura. Consulta e impresión disponibles.':'Contexto en solo lectura; no se ha demostrado un cierre administrativo.'):labels[value.state];if(label)text(label,value.retentionFailed?'No se pudo proteger la entrada iniciada. Edición pausada: conserva esta pestaña y consulta los respaldos.':message);if(review)review.hidden=value.state!=='review';
   document.querySelectorAll('#registroRecoveryControls button[onclick*=".local("],#registroRecoveryControls button[onclick*=".upload("]').forEach(el=>el.disabled=!['connected','pending'].includes(value.state));
   if(tutorVisible()){if(['connected','pending'].includes(value.state))tutorRegistroController?.refresh?.();else document.querySelectorAll('#transRows input,#transRows textarea,#transRows select,#transRows button').forEach(el=>el.disabled=true);}
   else if(['connected','pending'].includes(value.state)&&typeof pintarRegistroConciliado==='function')pintarRegistroConciliado();
@@ -4245,7 +4261,7 @@ if (document.readyState !== 'loading') {
  function retryOffer(show){const el=document.getElementById('registroRetryOffer');if(el)el.hidden=!show;}
  function hideConflict(){const offer=document.getElementById('registroConflictOffer');if(offer)offer.hidden=true;}
  function storageBlocked(){hideConflict();state('No se pudo verificar el guardado local. Tus notas están conservadas; no cierres esta pestaña.');}
- function syncState(ok){retryOffer(!ok&&bajarRegistroNube.resultado?.estado==='fallo');const result=bajarRegistroNube.resultado,offer=document.getElementById('registroConflictOffer'),current=result?.key===cloudClaveReg()&&result?.token===(getLoginSession()||{}).token,conflict=current&&result?.estado==='conflicto'&&Number.isInteger(result.conflictos)&&result.conflictos>0;if(offer)offer.hidden=!conflict;if(conflict){state('Hay notas diferentes que necesitan revisión');return;}if(ok&&current&&result.estado==='verificado'){const payload=sliceRegistroArea(),pending=pendingAcademic(payload),plan=typeof prepararVersionAcademica==='undefined'?null:prepararVersionAcademica.plan,empty=academicEmpty(payload)&&plan?.key===result.key&&plan?.token===result.token&&plan.remote?.payload&&academicEmpty(plan.remote.payload);state(empty?'Sin notas registradas'+(pending?' · '+pendingLabel():''):pending?'Cambios pendientes de subir':'Notas actualizadas');return;}state(current&&result?.estado==='pendiente'?'Cambios pendientes de subir':result?.estado==='fallo'?(result.code==='TIMEOUT'?'La verificación tardó demasiado. Tus notas locales están conservadas; reintenta.':'Sin conexión. Tus notas locales están conservadas'):'No se pudo verificar el registro actual. Tus notas locales están conservadas');}
+ function syncState(ok){retryOffer(!ok&&bajarRegistroNube.resultado?.estado==='fallo');const result=bajarRegistroNube.resultado,offer=document.getElementById('registroConflictOffer'),current=result?.key===cloudClaveReg()&&result?.token===(getLoginSession()||{}).token,conflict=current&&result?.estado==='conflicto'&&Number.isInteger(result.conflictos)&&result.conflictos>0;if(offer)offer.hidden=!conflict;if(conflict){state(reviewMessage());return;}if(ok&&current&&result.estado==='verificado'){const payload=sliceRegistroArea(),pending=pendingAcademic(payload),plan=typeof prepararVersionAcademica==='undefined'?null:prepararVersionAcademica.plan,empty=academicEmpty(payload)&&plan?.key===result.key&&plan?.token===result.token&&plan.remote?.payload&&academicEmpty(plan.remote.payload);state(empty?'Sin notas registradas'+(pending?' · '+pendingLabel():''):pending?'Cambios pendientes de subir':'Notas actualizadas');return;}state(current&&result?.estado==='pendiente'?'Cambios pendientes de subir':result?.estado==='fallo'?(result.code==='TIMEOUT'?'La verificación tardó demasiado. Tus notas locales están conservadas; reintenta.':'Sin conexión. Tus notas locales están conservadas'):'No se pudo verificar el registro actual. Tus notas locales están conservadas');}
 
  let diagnostic=null;
  async function automatic(connectionCheck){const epoch=track(),binding=context();if(!authenticated()){inactive();return false;}if(!readable()||checking||consulted.has(binding)||service?.busy()||subirRegistroNube.pending||bajarRegistroNube.pending)return false;checking=true;consulted.add(binding);pendingFields=[];const started=Date.now(),timings={};let phase='preparacion',phaseAt=started,finished=false;const fase=next=>{if(finished)return;const now=Date.now();timings[phase]=(timings[phase]||0)+now-phaseAt;phase=next;phaseAt=now;};try{if(!diskSafe()){storageBlocked();return false;}retryOffer(false);state('Verificando notas…');const ok=await bajarRegistroNube({automatico:true,timeoutMs:15000,fase,validarPersistencia:()=>localStorage.getItem(NOTAS_KEY)===JSON.stringify(store),validar:()=>track()===epoch&&binding===context()&&readable()&&diskSafe()&&(!connectionCheck||connectionCheck())});if(binding===context()&&epoch===track()&&authenticated()){rememberDisk();invalidateDraft();syncState(ok);}else if(!authenticated())inactive();return ok;}catch(e){if(!authenticated())inactive();else if(binding===context()&&epoch===track())state('Sin conexión. Tus notas locales están conservadas');return false;}finally{const stoppedAt=phase;fase('terminado');finished=true;if(binding===context()&&epoch===generation)diagnostic={elapsedMs:Date.now()-started,phase:stoppedAt,phases:timings,outcome:bajarRegistroNube.resultado?.code||bajarRegistroNube.resultado?.estado||'sin resultado',pendingFields:pendingFields.slice()};checking=false;if(binding!==context()||epoch!==generation||!consulted.has(binding))queueRefresh();}}
