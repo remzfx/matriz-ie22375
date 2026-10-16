@@ -20,6 +20,7 @@
   }
   function request(action,data={}){
     if(!ACTIONS.includes(action))return Promise.reject(new Error('Acción no válida.'));
+    if(!action.startsWith('load')&&global.IERegistroConnection&&!global.IERegistroConnection.canEdit())return Promise.reject(Object.assign(Error('Conexión sin verificar. Edición pausada; conserva los cambios.'),{code:'CONNECTION'}));
     if(!action.startsWith('load'))return operation(action,data);
     const key=global.IEStudents.validToken()+':'+action+':'+JSON.stringify(data);
     if(!pending.has(key)){const task=operation(action,data).finally(()=>{if(pending.get(key)===task)pending.delete(key);});pending.set(key,task);}return pending.get(key);
@@ -126,7 +127,7 @@
     if(data.puedeFinal){const save=text('button','Guardar decisión del Tutor',buttons);save.onclick=()=>act('savetransversalfinal');}
     if(data.puedeProcesar){const b=text('button','ENVIAR AL REGISTRO OFICIAL',buttons);b.dataset.process='true';b.onclick=()=>act('procesartransversales');}
 
-    draw();return {dirty:()=>Object.keys(draft).length>0,busy:()=>busy};
+    draw();return {dirty:()=>Object.keys(draft).length>0,busy:()=>busy,refresh:draw};
   }
   function evidenceEditor(container,data,ctx){
     const user=String((global.IEStudents.session()||{}).user||'').trim().toLowerCase(),token=global.IEStudents.validToken();
@@ -184,7 +185,7 @@
   }
   function init(){
     const msg=document.getElementById('transStatus'),aula=document.getElementById('transAula'),bim=document.getElementById('transBim'),box=document.getElementById('transRows');if(!msg)return;
-    let serial=0,active=null,selected=null,disposed=false;const token=global.IEStudents.validToken();
+    let serial=0,active=null,selected=null,disposed=false,verifiedData=null;const token=global.IEStudents.validToken();
     const warn=event=>{if(active&&active.dirty()){event.preventDefault();event.returnValue='';}};if(global.addEventListener)global.addEventListener('beforeunload',warn);
     const controller={canLeave:()=>!(active&&active.busy())&&(!(active&&active.dirty())||confirm('Hay decisiones del Tutor sin guardar. ¿Descartarlas?')),clear:()=>{disposed=true;++serial;active=null;box.replaceChildren();if(global.removeEventListener)global.removeEventListener('beforeunload',warn);},ready:null};
     async function load(){
@@ -192,7 +193,7 @@
       if(active&&active.dirty()&&!confirm('Hay cambios sin guardar. ¿Descartarlos y recargar?')){if(selected){aula.value=selected.aula;bim.value=selected.bim;}return;}
       selected={aula:aula.value,bim:bim.value};active=null;
       const seq=++serial,p=aula.value.split('|');box.replaceChildren();msg.textContent='Cargando aula…';
-      try{const ctx={grado:p[0],seccion:p[1],bimestre:bim.value},data=await request('loadtransversales',ctx);if(disposed||seq!==serial)return;active=editor(box,data,ctx,true);msg.textContent=data.abierto?(data.puedeFinal?'Tutor: guarda tu decisión final y envía al registro oficial.':'Consulta de solo lectura · decisiones oficiales del Tutor'):'Bimestre cerrado/bloqueado · Solo lectura';}
+      try{const ctx={grado:p[0],seccion:p[1],bimestre:bim.value},data=await request('loadtransversales',ctx);if(disposed||seq!==serial)return;verifiedData=JSON.stringify([data.version,data.versionAportes]);active=editor(box,data,ctx,true);msg.textContent=data.abierto?(data.puedeFinal?'Tutor: guarda tu decisión final y envía al registro oficial.':'Consulta de solo lectura · decisiones oficiales del Tutor'):'Bimestre cerrado/bloqueado · Solo lectura';}
       catch(e){if(seq===serial)msg.textContent=e.message;}
     }
     async function initialize(){try{
@@ -204,6 +205,17 @@
       bim.value=['I','II','III','IV'].find(v=>(data.periodos&&data.periodos.bimestres||{})[v]==='abierto')||'I';
       aula.onchange=load;bim.onchange=load;document.getElementById('transReload').onclick=load;await load();
     }catch(e){if(disposed)return;msg.textContent=e.message;document.getElementById('transReload').onclick=initialize;}}
+    controller.refresh=()=>active?.refresh?.();
+    controller.verifyConnection=async({valid,review})=>{
+      if(disposed||!selected||active?.busy())return {ok:false};
+      const binding=aula.value+'|'+bim.value,p=aula.value.split('|'),ctx={grado:p[0],seccion:p[1],bimestre:bim.value};
+      const data=await request('loadtransversales',ctx);
+      if(!valid()||disposed||binding!==aula.value+'|'+bim.value||token!==global.IEStudents.validToken())return {ok:false};
+      if(!Array.isArray(data.estudiantes)||typeof data.versionAportes!=='string')return {ok:false};
+      if(!data.abierto)return {ok:false,code:'CLOSED'};
+      if(active?.dirty())return {ok:true,pending:true,conflict:verifiedData!==JSON.stringify([data.version,data.versionAportes])};
+      verifiedData=JSON.stringify([data.version,data.versionAportes]);box.replaceChildren();active=editor(box,data,ctx,true);return {ok:true};
+    };
     controller.ready=initialize();return controller;
   }
   global.IETransversales={request,valor,COMP,CAPS,editor,init};

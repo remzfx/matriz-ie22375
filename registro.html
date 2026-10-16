@@ -596,6 +596,16 @@
   .calificar-print .print-hdr h2 {font-size:9pt;}
  }
  /* Fin Calificar integral Issue86 */
+
+/* Fase3: conexión separada del estado de sincronización. */
+#registroConnectionStatus {margin:6px 0;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;font-size:12px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;overflow-wrap:anywhere;}
+#registroConnectionStatus[data-state="offline"],#registroConnectionStatus[data-state="server"],#registroConnectionStatus[data-state="session"],#registroConnectionStatus[data-state="review"] {background:#fff7ed;border-color:#fdba74;color:#9a3412;}
+#registroConnectionStatus button {min-height:44px;padding:4px 10px;flex:0 0 auto;}
+#registroConnectionStatus[data-state="checking"]::before,#registroConnectionStatus[data-state="offline"]::before {content:"";width:12px;height:12px;border:2px solid #cbd5e1;border-top-color:#0284c7;border-radius:50%;animation:registro-reconnect 1s linear infinite;}
+@keyframes registro-reconnect {to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#registroConnectionStatus::before {animation:none!important;}}
+@media print{#registroConnectionStatus{display:none!important}}
+/* Fin Fase3 conexión. */
 </style>
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
@@ -727,6 +737,7 @@
       <div class="trans-context"><label>Aula tutorada <select id="transAula"></select></label><label>Bimestre <select id="transBim"></select></label><button type="button" class="btn btn-ghost" id="transReload">Actualizar ↻</button></div>
       <p id="transStatus" role="status">Verificando tutorías…</p><div id="transRows"></div>
     </section>
+    <div id="registroConnectionStatus" role="status" aria-live="polite" data-state="checking"><span id="registroConnectionText">Verificando conexión…</span><button type="button" id="registroConnectionReview" hidden>Revisar y verificar</button><button type="button" id="registroConnectionBackups">Consultar respaldos</button></div>
     <div id="registroAcademicoPanel">
     <div id="registroAccionesAcademicas" class="flex gap-2 flex-wrap">
       <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
@@ -1016,6 +1027,48 @@
   return {key,matches,read,write,verified,legacy,hasLegacy:()=>!!storage.getItem(legacyKey)};
  }
  root.IERegistroLocalStore={create};if(typeof module!=='undefined')module.exports=root.IERegistroLocalStore;
+})(typeof window==='undefined'?globalThis:window);
+</script>
+<script>
+/* Conexión obligatoria de Registro. Solo coordina lecturas; nunca escribe datos académicos. */
+(function(root){
+ 'use strict';let active=null;
+ function create(o){
+  const now=o.now||Date.now,set=o.setTimeout||setTimeout,clear=o.clearTimeout||clearTimeout;
+  const interval=o.interval||120000,lease=o.lease||150000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
+  const online=()=>o.online?o.online():true;
+  function snapshot(){return {state,validUntil:until,pending:state==='pending',retentionFailed,binding};}
+  function emit(next){state=next;if(next!=='connected'&&next!=='pending')until=0;const stamp=binding+'|'+next;if(stamp!==published){published=stamp;o.changed?.(snapshot());}}
+  function scope(){const current=o.binding();if(binding!==current){binding=current;epoch++;until=0;expired=false;retentionFailed=false;state='checking';}return current;}
+  function canEdit(){return !disposed&&!expired&&binding===o.binding()&&o.authorized()&&(state==='connected'||state==='pending')&&now()<until;}
+  function arm(ms){clear(timer);if(disposed||expired)return;timer=set(()=>{timer=null;if(o.visible&&!o.visible()){arm(interval);return;}check(false,true);},ms);}
+  function pause(reason='offline'){
+   if(disposed)return;scope();try{if(canEdit())o.retain?.();}catch(e){retentionFailed=true;reason='review';}
+   epoch++;emit(reason);arm(Math.min(60000,15000*2**Math.min(attempt++,2)));
+  }
+  async function check(review=false,force=false){
+   if(disposed)return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
+   if(!o.authorized()){emit(o.readonly?.()?'readonly':'session');return false;}
+   if(!online()){pause('offline');return false;}
+   if(flight)return flight.promise;if(!force&&!review&&canEdit())return true;
+   try{if(canEdit())o.retain?.();}catch(e){retentionFailed=true;emit('review');return false;}
+   const id=++epoch,key=binding;clear(timer);emit('checking');
+   const same=()=>!disposed&&id===epoch&&key===o.binding();const valid=()=>same()&&o.authorized();
+   const task={};flight=task;task.promise=(async()=>{try{
+    const result=await o.verify({review,valid});if(!same())return false;
+    if(result?.code==='SESSION'||result?.code==='DENIED'){expired=true;emit('session');return false;}
+    if(!o.authorized()){emit('session');return false;}
+    if(result?.code==='CLOSED'){emit('readonly');return false;}
+    if(!result?.ok){emit(result?.conflict?'review':result?.code==='LOCAL_STORAGE'?'review':'server');return false;}
+    if(result.conflict||(result.pending&&!review)){emit('review');return false;}
+    until=now()+lease;attempt=0;emit(result.pending?'pending':'connected');return true;
+   }catch(e){if(valid()){if(['SESSION','DENIED'].includes(e.code)){expired=true;emit('session');}else emit(online()?'server':'offline');}return false;
+   }finally{if(flight===task){flight=null;arm(state==='connected'||state==='pending'?interval:Math.min(60000,15000*2**Math.min(attempt++,2)));}}})();return task.promise;
+  }
+  const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},invalidate(){scope();epoch++;until=0;emit('checking');}};active=api;return api;
+ }
+ root.IERegistroConnection={create,canEdit:()=>!!active&&active.canEdit(),current:()=>active};
+ if(typeof module!=='undefined')module.exports=root.IERegistroConnection;
 })(typeof window==='undefined'?globalThis:window);
 </script>
 <script>
@@ -1418,6 +1471,7 @@ function metaRegistro() {
 }
 let padronBimestre = '', solicitudPadron = 0, padronVerificadoServidor = false, tokenPadron = '', vencimientoCachePadron;
 function registroSoloLectura() {
+  if(typeof IERegistroConnection!=='undefined'&&!IERegistroConnection.canEdit())return true;
   if(typeof registroLocal!=='undefined'&&!registroLocal.matches())return true;
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())return true;
   // Solo bloquea edición local si ya no existe un padrón autorizado para esta misma sesión/bimestre.
@@ -1583,7 +1637,7 @@ function loadPeriodosAdmin() {
   return null;
 }
 
-async function sincronizarPeriodosNube() {
+async function sincronizarPeriodosNube(required=false) {
   try {
     const data = await IEStudents.fetchJSON(CLOUD_API_URL + '?action=loadperiodos&t=' + Date.now(), {cache:'no-store'},8000);
     if (data && data.ok && data.periodos && data.periodos.bimestres) {
@@ -1592,7 +1646,7 @@ async function sincronizarPeriodosNube() {
     }
   } catch(e) {}
   // No inventar periodos: conservar únicamente la última configuración válida bajada desde Admin/nube.
-  return !!loadPeriodosAdmin();
+  return !required&&!!loadPeriodosAdmin();
 }
 
 function bimestreHabilitado(b) {
@@ -2118,7 +2172,7 @@ function esCompetenciaTransversal(comp){return !!claveCompetenciaTransversal(com
 function competenciasParaEvaluar(){
   return competencias().concat(typeof IERegistroTransversales!=='undefined'&&IERegistroTransversales.eligible()?Object.values(IERegistroEvaluacion.COMP):[]);
 }
-async function guardarRegistroIntegrado(){
+async function guardarRegistroIntegrado(options){
   if(document.getElementById('registroTutorPanel')?.hidden===false){toast('Guarda la decisión desde el módulo del Tutor.');return false;}
   if(registroSoloLectura()||bimCerradoDocente())return false;
   const invalidas=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>{if(inp.dataset?.registroContexto&&inp.dataset.registroContexto!==cloudClaveReg())return false;const root=inp.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return false;return !inp.readOnly&&inp.value!==''&&(!Number.isFinite(Number(inp.value))||Number(inp.value)<0||Number(inp.value)>20);});
@@ -2128,6 +2182,7 @@ async function guardarRegistroIntegrado(){
   if(adapter)adapter.capture();
   const aporte=adapter&&adapter.current(),pendiente=!!(aporte&&aporte.dirty);
   if(guardarTodo()===false)return false;
+  if(options?.soloLocal){toast('Guardado local · pendiente de subir');return true;}
   try{
     const ok=!adapter||await adapter.save();
     if(key!==cloudClaveReg()||token!==(getLoginSession()||{}).token)return false;
@@ -2152,6 +2207,7 @@ async function abrirTutorRegistro(){
   if(!cerrarTransversalesRegistro())return;
   document.getElementById('registroTutorPanel').hidden=false;document.getElementById('registroAcademicoPanel').hidden=true;document.getElementById('registroAcademicFooter').hidden=true;renderAreas();
   if(!tutorRegistroController)tutorRegistroController=IETransversales.init();
+  if(typeof IERegistroRecovery!=='undefined'){await tutorRegistroController?.ready;IERegistroRecovery.refresh(true);}
 }
 function setArea(a) {
   if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
@@ -3103,7 +3159,7 @@ async function leerEstadoRemotoAcademico(c,key,token,options){
   if(options.validar&&!options.validar())throw Error('La verificación anterior ya no corresponde. Trabajo local conservado.');
   if(r.status>=400||data.ok!==true)data.ok=false;
   if(key!==cloudClaveReg()||token!==(getLoginSession()||{}).token||areaActual!==c.area||nivel!==c.nivel)throw Error('El contexto o la sesión cambió. Trabajo local conservado.');
-  if(!data.ok){retirarVerificacionNube(token,c.bim,data);throw Error(data.error||'No se pudo verificar el registro académico.');}
+  if(!data.ok){retirarVerificacionNube(token,c.bim,data);throw Object.assign(Error(data.error||'No se pudo verificar el registro académico.'),{code:data.code});}
   if(!data.soportaModeloAcademico)throw Error('El servidor todavía no admite el modelo por competencia. El borrador local se conserva.');
   const rows=(data.items||[]).filter(x=>x.clave===key);
   if(rows.length>1)throw Error('Hay registros duplicados del mismo contexto. Revise antes de sincronizar.');
@@ -4045,6 +4101,29 @@ if (document.readyState !== 'loading') {
  const ownerHashes=new Map(),draftMemo=new Map();let draftRevision=0;
  function invalidateDraft(){draftRevision++;draftMemo.clear();}
  async function scope(snapshot){const ses=getLoginSession()||{},user=snapshot?snapshot.owner:ses.user,role=snapshot?snapshot.role:ses.role,key=snapshot?snapshot.key:cloudClaveReg();if(!user)throw Error('No se identificó al usuario del respaldo.');const owner=user+'|'+role;if(!ownerHashes.has(owner)){const result=crypto.subtle.digest('SHA-256',new TextEncoder().encode(owner)).then(hash=>[...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,'0')).join(''));ownerHashes.set(owner,result);result.catch(()=>ownerHashes.delete(owner));}return await ownerHashes.get(owner)+'|'+key;}
+ let connection=null;
+ const tutorVisible=()=>document.getElementById('registroTutorPanel')?.hidden===false;
+ const connectionContext=()=>context()+(tutorVisible()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:'');
+ function connectionReadable(){if(!tutorVisible())return readable();const ses=getLoginSession(),aula=document.getElementById('transAula').value;return !!(authenticated()&&ses.role==='docente'&&(ses.tutorAulas||[]).includes(aula)&&document.getElementById('transBim').value);}
+
+ function connectionState(value){
+  const panel=document.getElementById('registroConnectionStatus'),label=document.getElementById('registroConnectionText'),review=document.getElementById('registroConnectionReview');
+  const labels={readonly:'Bimestre cerrado — solo lectura.',connected:'Conectado — notas verificadas.',pending:'Guardado local — pendiente de subir.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar… Sin conexión — edición pausada.',server:'Servidor no disponible — edición pausada. Estamos intentando reconectar…',session:'Sesión vencida o sin autorización — vuelve a iniciar sesión.',review:'Conflicto pendiente — requiere revisión. Tus cambios locales están conservados.'};
+  if(panel)panel.dataset.state=value.state;if(label)text(label,value.retentionFailed?'No se pudo proteger la entrada iniciada. Edición pausada: conserva esta pestaña y consulta los respaldos.':labels[value.state]);if(review)review.hidden=value.state!=='review';
+  document.querySelectorAll('#registroRecoveryControls button[onclick*=".local("],#registroRecoveryControls button[onclick*=".upload("]').forEach(el=>el.disabled=!['connected','pending'].includes(value.state));
+  if(tutorVisible()){if(['connected','pending'].includes(value.state))tutorRegistroController?.refresh?.();else document.querySelectorAll('#transRows input,#transRows textarea,#transRows select,#transRows button').forEach(el=>el.disabled=true);}
+  else if(['connected','pending'].includes(value.state)&&typeof pintarRegistroConciliado==='function')pintarRegistroConciliado();
+  if(typeof sincronizarEdicionRegistro==='function')sincronizarEdicionRegistro();
+ }
+ if(typeof IERegistroConnection!=='undefined')connection=IERegistroConnection.create({binding:connectionContext,authorized:connectionReadable,readonly:()=>typeof registroConsultaHistorica==='function'&&registroConsultaHistorica(),online:()=>typeof navigator==='undefined'||navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',retain:()=>{if(guard())capture();},changed:connectionState,verify:async({review,valid})=>{
+  if(tutorVisible())return tutorRegistroController?.verifyConnection?await tutorRegistroController.verifyConnection({valid,review}):{ok:false};
+  if(typeof sincronizarPeriodosNube==='function'){if(!await sincronizarPeriodosNube(true)||!valid())return {ok:false};const estado=loadPeriodosAdmin()?.bimestres?.[ctxBase().bim];if(!['abierto','cerrado','bloqueado'].includes(estado))return {ok:false};if(estado!=='abierto')return {ok:false,code:'CLOSED'};}
+  consulted.delete(context());
+  if(review&&pendingAcademic()&&!confirm('Hay cambios locales pendientes. Se verificará la nube y se conservarán mediante conciliación segura. No se subirá nada. ¿Revisar y continuar?'))return {ok:false,conflict:true};
+  const ok=await (review?resolve(valid):automatic(valid));const result=bajarRegistroNube.resultado;
+  const protocol=prepararVersionAcademica.plan?.remote?.identityProtocol===true;
+  return {ok:!!ok&&valid()&&protocol,conflict:result?.estado==='conflicto',pending:pendingAcademic()||pendingTrans(),code:result?.code||(!protocol?'API_INCOMPATIBLE':undefined)};
+ }});
  const disk=typeof IERegistroDrafts==='undefined'?null:IERegistroDrafts.storage(window.indexedDB);
  async function backup(snapshot,kind){const key=await scope(snapshot),safe=copy(snapshot);safe.context=snapshot.key;delete safe.owner;delete safe.role;const result=await disk.put(key,safe,kind);invalidateDraft();return result;}
  function compare(diff,kind){return new Promise(resolve=>{
@@ -4131,9 +4210,16 @@ if (document.readyState !== 'loading') {
   for(const f of ['grades','finales','concComp','concArea','competenciasEstado','capsSel']){const tombstones=p=>Object.fromEntries(Object.entries(p[f]||{}).filter(([,v])=>v?.borrado).map(([k])=>[k,true]));if(!IERegistroReconcile.equal(tombstones(payload),tombstones(base))&&!pendingFields.includes(f))pendingFields.push(f);}
   return pendingFields.length>0;
  }
- async function local(){if(!guard()||init()?.busy())return false;const binding=context();try{invalidateDraft();capture();const ok=await guardarRegistroIntegrado();if(binding!==context())return false;rememberDisk();state(ok?(pendingAcademic()?'Cambios pendientes de subir':'Guardado en esta computadora'):'Guardado en esta computadora · aporte transversal pendiente');await init()?.emergency();queueRefresh();return ok;}catch(e){state(e.message);return false;}finally{queueRefresh();}}
- async function upload(){if(!guard()||init()?.busy())return false;if(registroNubeNoVerificada()){state('Sin conexión. Tus notas locales están conservadas');return false;}const binding=context();try{if(!diskSafe())throw Error('Otro registro cambió en este navegador. Conserva las pestañas y revisa antes de guardar.');const ok=await subirRegistroNube();if(binding===context()){rememberDisk();invalidateDraft();queueRefresh();state(ok&&!pendingAcademic()?'Notas actualizadas':'Cambios pendientes de subir');}return ok;}catch(e){if(binding===context())state('No se confirmó la subida. Tus notas locales están conservadas');return false;}finally{queueRefresh();}}
- async function restore(kind){refreshWarning();if(!guard()||!init()||service.busy())return false;try{const binding=context(),key=await scope(),rows=await disk.list(key);if(binding!==context()||!guard())return false;let candidate=selectBackups(rows,sliceRegistroArea())[kind];const legacy=baselineAcademica().recovery;if(!candidate&&kind==='draft'&&!baselineAcademica().voluntaryRecovery&&recoverable(legacy?.local))candidate={snapshot:{payload:copy(legacy.local),baseline:{version:baselineAcademica().version,basePayload:copy(legacy.base),baseline:IERegistroAcademico.canonical(legacy.base||{})}}};if(!candidate){state(kind==='undo'?'No hay un respaldo anterior recuperable.':'No hay borradores diferentes recientes para este contexto.');await offerDraft();return false;}const ok=await service.recover(candidate);invalidateDraft();await offerDraft();queueRefresh();return ok;}catch(e){state(e.message);return false;}}
+ async function local(){if(!guard()||init()?.busy())return false;const binding=context();try{invalidateDraft();capture();const ok=await guardarRegistroIntegrado(connection?{soloLocal:true}:undefined);if(binding!==context())return false;rememberDisk();if(ok)connection?.changed(pendingAcademic()||pendingTrans());state(ok?(pendingAcademic()?'Cambios pendientes de subir':'Guardado en esta computadora'):'Guardado en esta computadora · aporte transversal pendiente');await init()?.emergency();queueRefresh();return ok;}catch(e){state(e.message);return false;}finally{queueRefresh();}}
+ async function upload(){if(!guard()||init()?.busy())return false;if(registroNubeNoVerificada()){state('Sin conexión. Tus notas locales están conservadas');return false;}const binding=context();try{if(!diskSafe())throw Error('Otro registro cambió en este navegador. Conserva las pestañas y revisa antes de guardar.');const ok=await subirRegistroNube();if(binding===context()){rememberDisk();invalidateDraft();if(ok)connection?.changed(pendingAcademic()||pendingTrans());queueRefresh();state(ok&&!pendingAcademic()?'Notas actualizadas':'Cambios pendientes de subir');}return ok;}catch(e){if(binding===context())state('No se confirmó la subida. Tus notas locales están conservadas');return false;}finally{queueRefresh();}}
+ async function inspectBackups(){
+  if(!authenticated()||!disk||connection?.snapshot().state==='session')return false;const binding=context(),rows=await disk.list(await scope());if(binding!==context()||!authenticated())return false;
+  const dialog=document.createElement('dialog');dialog.style.cssText='max-width:720px;width:calc(100% - 24px);max-height:80vh;overflow:auto;padding:16px';
+  const title=document.createElement('h2');title.textContent='Respaldos locales — solo consulta';dialog.append(title);
+  const body=document.createElement('pre');body.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere';body.textContent=rows.length?rows.map(r=>'Respaldo '+new Date(r.created).toLocaleString('es-PE')+' · '+r.kind+'\n'+JSON.stringify(r.snapshot.payload,null,2)).join('\n\n'):'No hay respaldos locales para este contexto.';dialog.append(body);
+  const close=document.createElement('button');close.type='button';close.textContent='Cerrar';close.style.minHeight='44px';close.onclick=()=>{dialog.close();dialog.remove();};dialog.append(close);document.body.append(dialog);dialog.showModal();return true;
+ }
+ async function restore(kind){if(connection&&!connection.canEdit())return inspectBackups();refreshWarning();if(!guard()||!init()||service.busy())return false;try{const binding=context(),key=await scope(),rows=await disk.list(key);if(binding!==context()||!guard())return false;let candidate=selectBackups(rows,sliceRegistroArea())[kind];const legacy=baselineAcademica().recovery;if(!candidate&&kind==='draft'&&!baselineAcademica().voluntaryRecovery&&recoverable(legacy?.local))candidate={snapshot:{payload:copy(legacy.local),baseline:{version:baselineAcademica().version,basePayload:copy(legacy.base),baseline:IERegistroAcademico.canonical(legacy.base||{})}}};if(!candidate){state(kind==='undo'?'No hay un respaldo anterior recuperable.':'No hay borradores diferentes recientes para este contexto.');await offerDraft();return false;}const ok=await service.recover(candidate);invalidateDraft();await offerDraft();queueRefresh();return ok;}catch(e){state(e.message);return false;}}
  async function drafts(){return restore('draft');}
  async function undo(){return restore('undo');}
  async function legacy(){
@@ -4162,14 +4248,14 @@ if (document.readyState !== 'loading') {
  function syncState(ok){retryOffer(!ok&&bajarRegistroNube.resultado?.estado==='fallo');const result=bajarRegistroNube.resultado,offer=document.getElementById('registroConflictOffer'),current=result?.key===cloudClaveReg()&&result?.token===(getLoginSession()||{}).token,conflict=current&&result?.estado==='conflicto'&&Number.isInteger(result.conflictos)&&result.conflictos>0;if(offer)offer.hidden=!conflict;if(conflict){state('Hay notas diferentes que necesitan revisión');return;}if(ok&&current&&result.estado==='verificado'){const payload=sliceRegistroArea(),pending=pendingAcademic(payload),plan=typeof prepararVersionAcademica==='undefined'?null:prepararVersionAcademica.plan,empty=academicEmpty(payload)&&plan?.key===result.key&&plan?.token===result.token&&plan.remote?.payload&&academicEmpty(plan.remote.payload);state(empty?'Sin notas registradas'+(pending?' · '+pendingLabel():''):pending?'Cambios pendientes de subir':'Notas actualizadas');return;}state(current&&result?.estado==='pendiente'?'Cambios pendientes de subir':result?.estado==='fallo'?(result.code==='TIMEOUT'?'La verificación tardó demasiado. Tus notas locales están conservadas; reintenta.':'Sin conexión. Tus notas locales están conservadas'):'No se pudo verificar el registro actual. Tus notas locales están conservadas');}
 
  let diagnostic=null;
- async function automatic(){const epoch=track(),binding=context();if(!authenticated()){inactive();return false;}if(!readable()||checking||consulted.has(binding)||service?.busy()||subirRegistroNube.pending||bajarRegistroNube.pending)return false;checking=true;consulted.add(binding);pendingFields=[];const started=Date.now(),timings={};let phase='preparacion',phaseAt=started,finished=false;const fase=next=>{if(finished)return;const now=Date.now();timings[phase]=(timings[phase]||0)+now-phaseAt;phase=next;phaseAt=now;};try{if(!diskSafe()){storageBlocked();return false;}retryOffer(false);state('Verificando notas…');const ok=await bajarRegistroNube({automatico:true,timeoutMs:15000,fase,validarPersistencia:()=>localStorage.getItem(NOTAS_KEY)===JSON.stringify(store),validar:()=>track()===epoch&&binding===context()&&readable()&&diskSafe()});if(binding===context()&&epoch===track()&&authenticated()){rememberDisk();invalidateDraft();syncState(ok);}else if(!authenticated())inactive();return ok;}catch(e){if(!authenticated())inactive();else if(binding===context()&&epoch===track())state('Sin conexión. Tus notas locales están conservadas');return false;}finally{const stoppedAt=phase;fase('terminado');finished=true;if(binding===context()&&epoch===generation)diagnostic={elapsedMs:Date.now()-started,phase:stoppedAt,phases:timings,outcome:bajarRegistroNube.resultado?.code||bajarRegistroNube.resultado?.estado||'sin resultado',pendingFields:pendingFields.slice()};checking=false;if(binding!==context()||epoch!==generation||!consulted.has(binding))queueRefresh();}}
- async function resolve(){if(!readable()||checking||service?.busy()||subirRegistroNube.pending||bajarRegistroNube.pending)return false;const epoch=track(),binding=context();if(!diskSafe()){storageBlocked();return false;}checking=true;try{const ok=await bajarRegistroNube({timeoutMs:15000,validarPersistencia:()=>localStorage.getItem(NOTAS_KEY)===JSON.stringify(store),validar:()=>track()===epoch&&binding===context()&&readable()&&diskSafe()});if(binding===context()&&epoch===track()&&authenticated()){rememberDisk();invalidateDraft();syncState(ok);}else if(!authenticated())inactive();return ok;}finally{checking=false;if(binding!==context()||epoch!==generation||!consulted.has(binding))queueRefresh();}}
+ async function automatic(connectionCheck){const epoch=track(),binding=context();if(!authenticated()){inactive();return false;}if(!readable()||checking||consulted.has(binding)||service?.busy()||subirRegistroNube.pending||bajarRegistroNube.pending)return false;checking=true;consulted.add(binding);pendingFields=[];const started=Date.now(),timings={};let phase='preparacion',phaseAt=started,finished=false;const fase=next=>{if(finished)return;const now=Date.now();timings[phase]=(timings[phase]||0)+now-phaseAt;phase=next;phaseAt=now;};try{if(!diskSafe()){storageBlocked();return false;}retryOffer(false);state('Verificando notas…');const ok=await bajarRegistroNube({automatico:true,timeoutMs:15000,fase,validarPersistencia:()=>localStorage.getItem(NOTAS_KEY)===JSON.stringify(store),validar:()=>track()===epoch&&binding===context()&&readable()&&diskSafe()&&(!connectionCheck||connectionCheck())});if(binding===context()&&epoch===track()&&authenticated()){rememberDisk();invalidateDraft();syncState(ok);}else if(!authenticated())inactive();return ok;}catch(e){if(!authenticated())inactive();else if(binding===context()&&epoch===track())state('Sin conexión. Tus notas locales están conservadas');return false;}finally{const stoppedAt=phase;fase('terminado');finished=true;if(binding===context()&&epoch===generation)diagnostic={elapsedMs:Date.now()-started,phase:stoppedAt,phases:timings,outcome:bajarRegistroNube.resultado?.code||bajarRegistroNube.resultado?.estado||'sin resultado',pendingFields:pendingFields.slice()};checking=false;if(binding!==context()||epoch!==generation||!consulted.has(binding))queueRefresh();}}
+ async function resolve(connectionCheck){if(!readable()||checking||service?.busy()||subirRegistroNube.pending||bajarRegistroNube.pending)return false;const epoch=track(),binding=context();if(!diskSafe()){storageBlocked();return false;}checking=true;try{const ok=await bajarRegistroNube({timeoutMs:15000,validarPersistencia:()=>localStorage.getItem(NOTAS_KEY)===JSON.stringify(store),validar:()=>track()===epoch&&binding===context()&&readable()&&diskSafe()&&(!connectionCheck||connectionCheck())});if(binding===context()&&epoch===track()&&authenticated()){rememberDisk();invalidateDraft();syncState(ok);}else if(!authenticated())inactive();return ok;}finally{checking=false;if(binding!==context()||epoch!==generation||!consulted.has(binding))queueRefresh();}}
  async function offerDraft(){const draft=document.getElementById('registroDraftOffer'),undo=document.getElementById('registroUndoOffer'),binding=context();if(!guard()||!init()){if(draft)draft.hidden=true;if(undo)undo.hidden=true;return false;}const revision=draftRevision,stamp=binding+'|'+generation+'|'+revision;let memo=draftMemo.get(stamp);if(!memo||memo.until<=Date.now()){
   memo={until:Infinity,pending:(async()=>{const key=await scope(),rows=await disk.list(key);if(binding!==context()||revision!==draftRevision||!guard())return null;memo.until=rows.length?Math.min(...rows.map(r=>r.created+IERegistroDrafts.ttl)):Infinity;return selectBackups(rows,sliceRegistroArea());})()};draftMemo.set(stamp,memo);memo.pending.catch(()=>draftMemo.delete(stamp));
  }const candidates=await memo.pending;if(!candidates||binding!==context()||revision!==draftRevision||!guard())return false;if(draft)draft.hidden=!candidates.draft;if(undo)undo.hidden=!candidates.undo;return !!(candidates.draft||candidates.undo);}
  function inactive(){retryOffer(false);clearTimeout(refreshTimer);clearTimeout(timer);clearTimeout(periodicTimer);clearTimeout(expiryTimer);refreshTimer=timer=periodicTimer=expiryTimer=null;expiryToken='';for(const id of ['registroDraftOffer','registroConflictOffer','registroUndoOffer']){const el=document.getElementById(id);if(el)el.hidden=true;}if(typeof registroLocal!=='undefined'&&!registroLocal.matches()){const app=document.getElementById('viewApp');if(app)app.style.display='none';state('La cuenta cambió. Abre Registro nuevamente; las notas anteriores están conservadas.');return;}state('Inicia sesión para cargar tus notas');}
  function armExpiry(){const token=(getLoginSession()||{}).token;if(token===expiryToken)return;expiryToken=token;clearTimeout(expiryTimer);try{const claims=JSON.parse(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'))),ms=Number(claims.exp)-Date.now();if(ms>0)expiryTimer=setTimeout(()=>{track();if(!authenticated())inactive();else queueRefresh();},Math.min(ms+1,2147483647));}catch(_){} }
- function queueRefresh(force=false){track();if(!authenticated()){inactive();return;}armExpiry();if(force)consulted.delete(context());if(!readable()){state(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()?'Solo lectura':'Esperando el padrón autorizado para cargar tus notas');return;}clearTimeout(refreshTimer);const binding=context(),epoch=generation;refreshTimer=setTimeout(async()=>{refreshTimer=null;if(binding!==context()||epoch!==track())return;await automatic();if(binding!==context()||epoch!==track()||bajarRegistroNube.resultado?.estado==='fallo')return;try{await offerDraft();}catch(_){state('No se pudo verificar el respaldo local. Conserva esta pestaña.');}},180);}
+ function queueRefresh(force=false){track();if(connection&&!force){const current=connection.snapshot();if(current.binding===connectionContext()&&['server','offline','review','session','readonly'].includes(current.state)){clearTimeout(refreshTimer);return;}}if(!authenticated()){inactive();return;}armExpiry();if(force){consulted.delete(context());connection?.invalidate();}if(!(connection?connectionReadable():readable())){if(connection&&typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())connection.pause('readonly');state(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()?'Solo lectura':'Esperando el padrón autorizado para cargar tus notas');return;}clearTimeout(refreshTimer);const binding=context(),epoch=generation;refreshTimer=setTimeout(async()=>{refreshTimer=null;if(binding!==context()||epoch!==track())return;await (connection?connection.check():automatic());if(binding!==context()||epoch!==track()||bajarRegistroNube.resultado?.estado==='fallo')return;try{await offerDraft();}catch(_){state('No se pudo verificar el respaldo local. Conserva esta pestaña.');}},180);}
  function armPeriodic(){if(periodicTimer||!guard())return;const binding=context();periodicTimer=setTimeout(async()=>{periodicTimer=null;if(binding!==context()||!guard())return;await init()?.emergency(true);if(binding===context()&&guard()&&pendingAcademic())armPeriodic();queueRefresh();},300000);}
  function schedule(event){refreshWarning();const target=event?.target;if(!target)return;
   const field=target.closest?.('.cal-nota,.fin-nota,.academic-conclusion,.asis-input,#registroAcademicoPanel input,#registroAcademicoPanel textarea'),button=event.type==='click'&&target.closest?.('[data-val],[data-av],[data-adel],.eq-letter,[data-final-toggle],[onclick*="calificarAreaMasiva"],[onclick*="quitarAreaMasiva"],[onclick*="quitarFinalManual"],[onclick*="activarSesion"],[onclick*="borrarSesion"]');
@@ -4177,13 +4263,15 @@ if (document.readyState !== 'loading') {
   if(!field&&!button)return;if(event.type==='click'&&!button)return;if(!guard())return;const key=context(),sig=button?IERegistroReconcile.signature(sliceRegistroArea()):null;
   if(button&&observed.get(key)===sig)return;observed.set(key,sig);invalidateDraft();armPeriodic();clearTimeout(timer);timer=setTimeout(async()=>{if(key===context()){await init()?.emergency();if(key===context()){observed.set(key,IERegistroReconcile.signature(sliceRegistroArea()));queueRefresh();}}},2500);
  }
- window.IERegistroRecovery={recover,local,upload,drafts,undo,legacy,automatic,resolve,refresh:queueRefresh,review:offerDraft,diagnostic:()=>diagnostic&&copy(diagnostic)};
+ window.IERegistroRecovery={recover,local,upload,drafts,undo,legacy,automatic:connection?()=>connection.check():automatic,resolve:connection?()=>connection.check(true,true):resolve,refresh:queueRefresh,review:offerDraft,diagnostic:()=>diagnostic&&copy(diagnostic)};
  document.addEventListener('DOMContentLoaded',()=>{
   if(typeof registroLocal!=='undefined'){try{const el=document.getElementById('registroLegacyWarning');if(el)el.hidden=!registroLocal.hasLegacy();const button=document.getElementById('registroLegacyReview');if(button){button.hidden=getLoginSession()?.role!=='admin';button.style.display=button.hidden?'none':'inline-flex';}}catch(_){state('No se pudo revisar el almacenamiento anterior. Conserva esta pestaña.');}}
+  const review=document.getElementById('registroConnectionReview');if(review)review.onclick=()=>connection?.check(true,true);const backups=document.getElementById('registroConnectionBackups');if(backups)backups.onclick=inspectBackups;
   const footer=document.getElementById('registroAcademicFooter'),fit=()=>{const main=document.querySelector?.('main');if(main&&footer?.getBoundingClientRect){const space=footer.hidden?0:footer.getBoundingClientRect().height+12;main.style.paddingBottom=space+'px';if(document.documentElement?.style)document.documentElement.style.scrollPaddingBottom=space+'px';}};fit();if(typeof ResizeObserver!=='undefined'&&footer)new ResizeObserver(fit).observe(footer);else{window.addEventListener('resize',fit);if(typeof MutationObserver!=='undefined'&&footer)new MutationObserver(fit).observe(footer,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden']});}
-  document.addEventListener('input',schedule);const selected=e=>{const before=activeBinding;schedule(e);if(before!==context())queueRefresh();};document.addEventListener('change',selected);document.addEventListener('click',selected);
+  if(connection){const stop=e=>{const target=e.target;if(connection.canEdit())return;const navigation=target?.closest?.('#registroConnectionReview,#registroConnectionStatus,#areaBtns,#registroAccionesAcademicas,#registro-datos,#transReload,#transAula,#transBim');if(navigation)return;const academic=target?.closest?.('.cal-nota,.fin-nota,.academic-conclusion,.asis-input,[data-av],[data-adel],[data-delfecha],[data-an],[data-val],[data-final-toggle],[data-reg-write],.fin-bulk-actions,#registroTutorPanel input,#registroTutorPanel textarea,#registroTutorPanel button,#registroTutorPanel select');if(academic){e.preventDefault();e.stopImmediatePropagation();}};for(const name of ['beforeinput','click','change'])document.addEventListener(name,stop,true);}
+  document.addEventListener('input',schedule);const selected=e=>{const before=activeBinding;schedule(e);if(before!==context()||e.target?.closest?.('#transAula,#transBim'))queueRefresh(true);};document.addEventListener('change',selected);document.addEventListener('click',selected);
   document.addEventListener('click',refreshWarning,true);document.addEventListener('change',refreshWarning,true);window.addEventListener('beforeunload',refreshWarning);
-  document.addEventListener('ie22375:registro-ready',()=>queueRefresh());document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='hidden')queueRefresh();});window.addEventListener('focus',()=>queueRefresh());window.addEventListener('online',()=>queueRefresh(true));window.addEventListener('storage',e=>{if(['ie22375_session_v1','ie22375_students_session_v1',NOTAS_KEY].includes(e.key)){invalidateDraft();queueRefresh();}});
+  document.addEventListener('ie22375:registro-ready',()=>queueRefresh());document.addEventListener('visibilitychange',()=>{if(document.visibilityState!=='hidden')queueRefresh();else connection?.pause('checking');});window.addEventListener('focus',()=>queueRefresh());window.addEventListener('online',()=>queueRefresh(true));window.addEventListener('offline',()=>connection?.pause('offline'));window.addEventListener('storage',e=>{if(['ie22375_session_v1','ie22375_students_session_v1',NOTAS_KEY].includes(e.key)){invalidateDraft();queueRefresh();}});
   if(guard())observed.set(context(),IERegistroReconcile.signature(sliceRegistroArea()));refreshWarning();queueRefresh();
 
  });
