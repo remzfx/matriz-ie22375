@@ -25,3 +25,5 @@ PR90/91 están fusionados pero NO desplegados. Backend aprobado primero (Codigo.
 Las pestañas/clientes anteriores conservan sus reglas hasta actualizar; no se puede afirmar protección global por fusionar este PR. El heartbeat introduce lecturas razonables y una pausa breve al verificar; cuotas/servicio inaccesible mantienen modo consulta. Una falla local al proteger una entrada exige conservar la pestaña; no borrar caché ni respaldos. La consulta de respaldos sigue sujeta a existencia/cuota/caducidad previa.
 
 NO MERGE. NO DEPLOY. Sin datos reales, limpieza o migración de registros.
+
+CI inicial: 2507/2508; se detectó una lectura redundante al recibir visibilidad sin perder la verificación vigente. Se eliminó el forzado de ese evento (una pausa previa ya invalida la conexión). La regresión de rendimiento y fase3 aprobó 35/35; se requiere CI del HEAD corregido. No se ejecutó ninguna suite completa local ni se repitieron auditorías.
