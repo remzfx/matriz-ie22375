@@ -1,6 +1,15 @@
 /* Conexión obligatoria de Registro. Solo coordina lecturas; nunca escribe datos académicos. */
 (function(root){
  'use strict';let active=null;
+ function reviewSummary(conflicts){
+  const modules={},causes={},fieldModule={grades:'Calificar',sessions:'Calificar',capsSel:'Calificar',finales:'Promedios',concComp:'Conclusiones',concArea:'Conclusiones',asistencia:'Asistencia',asisFechas:'Asistencia',asisFechasEstado:'Asistencia',competenciasEstado:'Configuración'};
+  const add=(map,k)=>map[k]=(map[k]||0)+1;
+  for(const c of conflicts){const paths=c.paths||[c.path],affected=new Set(paths.map(p=>fieldModule[JSON.parse(p)[0]]||'Otro módulo'));if(c.candidates||JSON.parse(c.path)[0]==='identity')affected.add('Identidad histórica');for(const m of affected)add(modules,m);
+   const values=c.candidates?c.candidates.map(x=>x.value):[c.local,c.remote],a=values[0];let cause=c.candidates?'Identidad histórica sin vigencia demostrada':c.unknownBase?'Sin base causal verificable':'Modificaciones concurrentes';
+   if(values.some(v=>v?.borrado))cause='Eliminación frente a datos conservados';else if(values.some(v=>v===undefined))cause='Dato conocido ausente sin borrado explícito';else if(values.some((v,i)=>i&&a?.origen!==v?.origen))cause='Origen de nota diferente o no verificado';else if(values.some((v,i)=>i&&a?.origen==='numero'&&v?.origen==='numero'&&typeof a.nota20==='number'&&typeof v.nota20==='number'&&a.nota20!==v.nota20))cause='Notas numéricas exactas diferentes';else if(values.some((v,i)=>i&&!(a?.origen==='letra'&&v?.origen==='letra')&&a?.nota20!==v?.nota20))cause='Valor o tipo de nota diferente';else if(affected.has('Asistencia'))cause='Asistencia compartida que requiere revisión';
+   add(causes,cause);
+  }return {total:conflicts.length,modules,causes};
+ }
  function create(o){
   const now=o.now||Date.now,set=o.setTimeout||setTimeout,clear=o.clearTimeout||clearTimeout;
   const interval=o.interval||120000,lease=o.lease||150000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
@@ -35,6 +44,6 @@
   }
   const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},invalidate(){scope();epoch++;until=0;emit('checking');}};active=api;return api;
  }
- root.IERegistroConnection={create,canEdit:()=>!!active&&active.canEdit(),current:()=>active};
+ root.IERegistroConnection={create,reviewSummary,canEdit:()=>!!active&&active.canEdit(),current:()=>active};
  if(typeof module!=='undefined')module.exports=root.IERegistroConnection;
 })(typeof window==='undefined'?globalThis:window);
