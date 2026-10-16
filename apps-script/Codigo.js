@@ -940,7 +940,7 @@ function payloadRegistroLectura_(payload, acceso, ctx) {
     concComp: mapaContexto(payload.concComp, true), competenciasEstado: mapaContexto(payload.competenciasEstado, true), modeloAcademico: payload.modeloAcademico,
     concArea: mapaContexto(payload.concArea, true), asistencia: mapaContexto(payload.asistencia, false),
     asisFechas: mapaContexto(payload.asisFechas, false, true), asisFechasEstado: mapaContexto(payload.asisFechasEstado, false),
-    capsSel: mapaContexto(payload.capsSel, true), meta: payload.meta || {}
+    capsSel: mapaContexto(payload.capsSel, true), meta: payload.meta&&Object.prototype.hasOwnProperty.call(payload.meta,'academicHistory')?Object.assign({},payload.meta,{academicHistory:[]}):payload.meta||{}
   };
 }
 
@@ -1355,11 +1355,12 @@ function validarTutores_(list) {
   return true;
 }
 // Envío oficial integral: el padrón privado, nunca el listado del cliente, decide a quién evaluar.
-function validarRegistroIntegral_(payload, ctx) {
+function validarRegistroIntegral_(payload, ctx, identidad) {
   const c={nivel:ctx.nivel,bim:ctx.bimestre,grado:ctx.grado,seccion:ctx.seccion,area:ctx.area};
   const model=registroAcademico_(), comps=(model.catalog[c.nivel]||{})[c.area]||[];
   if(!comps.length)throw Error('Área académica no reconocida para el envío integral.');
-  const sh=hojaEstudiantes_(),base=leerPadronEstudiantes_(sh,c.bim)||leerBaseEstudiantes_(sh,false);
+  const sh=hojaEstudiantes_(),padron=leerPadronEstudiantes_(sh,c.bim),base=padron||leerBaseEstudiantes_(sh,false);
+  if(identidad)identidad.roster=padron;
   if(!base)throw Error('Padrón privado no inicializado. No se puede verificar el envío integral.');
   const alumnos=base.estudiantes.filter(a=>a.nivel===c.nivel&&gradoEscritura_(a.grado)===gradoEscritura_(c.grado)&&seccionEscritura_(a.seccion)===seccionEscritura_(c.seccion));
   if(!alumnos.length)throw Error('El padrón no contiene estudiantes para este contexto.');
@@ -1793,7 +1794,7 @@ function doGet(e) {
           });
         }
       }
-      return responder_({ ok: true, soportaModeloAcademico:true, nivel: nivel, items: items, total: items.length });
+      return responder_({ ok: true, soportaModeloAcademico:true, identidadAcademica:1, nivel: nivel, items: items, total: items.length });
     }
 
     if (action === 'loadaip') {
@@ -2048,15 +2049,41 @@ function doPost(e) {
         if(nuevo&&(body.modeloAcademico!==1||body.version==null||Number(body.version)!==prevVersion))return responder_({ok:false,code:'CONFLICT',error:'El registro cambió. Baje y revise antes de guardar.',version:prevVersion});
         const payload=Object.assign({},body.payload||{});
         for(const field of ['concComp','competenciasEstado'])if(payload[field]===undefined&&prev[field]!==undefined)payload[field]=prev[field];
-        try{registroAcademico_().validate(payload,{nivel:nivelR,bim:bimestre,grado:grado,seccion:seccion,area:area});if(body.modeloAcademico===1&&body.envioIntegral===true)validarRegistroIntegral_(payload,ctx);if(ctx.nivel==='secundaria'&&permiso.role==='docente')validarTransversalesObligatorias_(ctx,permiso);}catch(e){return responder_({ok:false,error:e.message});}
+        const identidad={};
+        try{registroAcademico_().validate(payload,{nivel:nivelR,bim:bimestre,grado:grado,seccion:seccion,area:area});if(body.modeloAcademico===1&&body.envioIntegral===true)validarRegistroIntegral_(body.identidadAcademica===1?Object.assign({},payload,{meta:Object.assign({},payload.meta||{},{studentAliases:{}})}):payload,ctx,identidad);if(ctx.nivel==='secundaria'&&permiso.role==='docente')validarTransversalesObligatorias_(ctx,permiso);}catch(e){return responder_({ok:false,error:e.message});}
         if(permiso.role==='docente'){const meta=payload.meta&&typeof payload.meta==='object'&&!Array.isArray(payload.meta)?payload.meta:{};payload.meta=Object.assign({},meta,{docente:permiso.docente});}
         if(nuevo)payload.modeloAcademico=1;
+        if(prev.meta&&prev.meta.academicHistory&&body.identidadAcademica!==1)return responder_({ok:false,code:'IDENTITY_CLIENT',error:'Actualice el Registro antes de subir. Historial conservado.'});
+        if(body.identidadAcademica===1){
+          if(body.modeloAcademico!==1||body.version==null||Number(body.version)!==prevVersion)return responder_({ok:false,code:'CONFLICT',error:'La identidad académica requiere versión CAS confirmada.'});
+          try{
+            const c={nivel:nivelR,bim:bimestre,grado:grado,seccion:seccion,area:area},roster=Object.prototype.hasOwnProperty.call(identidad,'roster')?identidad.roster:leerPadronEstudiantes_(hojaEstudiantes_(),bimestre);
+            if(!roster)throw Error('Se requiere el padrón autorizado del bimestre para confirmar identidades.');
+            const identity=academicIdentityFactory(),result=identity.project(payload,roster.estudiantes,c,(registroAcademico_().catalog[nivelR]||{})[area]||[]);
+            if(result.conflicts.length)throw Error('Notas históricas ambiguas: requieren revisión explícita.');
+            if(['grades','finales','concComp','competenciasEstado','sessions','capsSel'].some(f=>!identity.equal(result.payload[f]||{},payload[f]||{})))throw Error('La identidad enviada no coincide con el padrón autorizado.');
+            payload.meta=Object.assign({},payload.meta||{});delete payload.meta.academicHistory;
+            const history=prev.meta&&prev.meta.academicHistory||[];
+            if(!Array.isArray(history))throw Error('Historial de identidad inválido. No se reemplazó el registro.');
+            payload.meta.academicHistory=JSON.parse(JSON.stringify(history));
+            if(fila>=0&&registroAcademico_().canonical(payload)!==registroAcademico_().canonical(prev)){
+              const originals={},added={};
+              for(const f of ['grades','finales','concComp','competenciasEstado','capsSel']){
+                originals[f]=Object.fromEntries(Object.entries(prev[f]||{}).filter(([k,v])=>!identity.equal(v,(payload[f]||{})[k])));
+                added[f]=Object.keys(payload[f]||{}).filter(k=>!Object.prototype.hasOwnProperty.call(prev[f]||{},k));
+              }
+              const sessions=identity.equal(prev.sessions||[],payload.sessions||[])?null:JSON.parse(JSON.stringify(prev.sessions||[]));
+              if(sessions||Object.values(originals).some(m=>Object.keys(m).length)||Object.values(added).some(a=>a.length))payload.meta.academicHistory.push({version:prevVersion,originals:originals,added:added,sessions:sessions});
+            }
+          }catch(e){return responder_({ok:false,code:'IDENTITY_REVIEW',error:e.message});}
+        }
+
         if(JSON.stringify(payload).length>49000)return responder_({ok:false,error:'El registro supera el límite seguro de la celda. El borrador se conserva; reduzca el detalle antes de enviar.'});
-        if(nuevo&&fila>=0&&registroAcademico_().canonical(payload)===registroAcademico_().canonical(prev))return responder_({ok:true,clave:clave,fila:fila,version:prevVersion,unchanged:true});
+        if(nuevo&&fila>=0&&registroAcademico_().canonical(payload)===registroAcademico_().canonical(prev))return responder_({ok:true,clave:clave,fila:fila,version:prevVersion,unchanged:true,...(body.identidadAcademica===1?{identityHistory:permiso.role==='admin'?(prev.meta&&prev.meta.academicHistory||[]):[]}: {})});
         if(fila<0)fila=last+1;
         const version=nuevo?Math.max(Date.now(),prevVersion+1):(body.ts||Date.now());
         [clave,nivelR,bimestre,grado,seccion,area,permiso.docente,version,JSON.stringify(payload)].forEach((v,i)=>sh.getRange(fila,i+1).setValue(v));
-        return responder_({ok:true,clave:clave,fila:fila,version:version,msg:'Registro guardado'});
+        return responder_({ok:true,clave:clave,fila:fila,version:version,msg:'Registro guardado',...(body.identidadAcademica===1?{identityHistory:permiso.role==='admin'?payload.meta.academicHistory:[]}: {})});
       }finally{lock.releaseLock();}
     }
 

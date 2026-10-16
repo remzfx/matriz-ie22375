@@ -67,8 +67,8 @@ function client(){
  c.renderStudents=c.renderFinales=c.renderAvance=c.renderSesiones=c.renderAsistencia=()=>{};c.informeSiagie=()=>({ok:true});
  c.store.asistencia={};c.store.asisFechas={};c.store.asisFechasEstado={};c.store.academicSync={};c.estudiantes=()=>[];
  let disk,remote={version:1,payload:{}},writes=0,reads=0;const messages=[];c.NOTAS_KEY='synthetic-a1';c.localStorage={getItem:()=>disk?JSON.stringify(disk):null,setItem:(_,raw)=>disk=JSON.parse(raw)};c.toast=m=>messages.push(m);c.saveStore=()=>disk=copy(c.store);
- c.fetchLecturaNube=async()=>{reads++;return {text:async()=>JSON.stringify({ok:true,soportaModeloAcademico:true,items:[{clave:c.cloudClaveReg(),ts:remote.version,payload:remote.payload}]})}};
- c.fetch=async(url,opt)=>{writes++;const body=JSON.parse(opt.body);assert.equal(body.version,remote.version);remote={version:remote.version+1,payload:copy(body.payload)};return {status:200,text:async()=>JSON.stringify({ok:true,version:remote.version})}};
+ c.fetchLecturaNube=async()=>{reads++;return {text:async()=>JSON.stringify({ok:true,soportaModeloAcademico:true,identidadAcademica:1,items:[{clave:c.cloudClaveReg(),ts:remote.version,payload:remote.payload}]})}};
+ c.fetch=async(url,opt)=>{writes++;const body=JSON.parse(opt.body);assert.equal(body.version,remote.version);remote={version:remote.version+1,payload:copy(body.payload)};remote.payload.meta={...(remote.payload.meta||{}),academicHistory:[]};return {status:200,text:async()=>JSON.stringify({ok:true,version:remote.version,identityHistory:[]})}};
  const b=c.baselineAcademica();b.version=1;b.basePayload=copy(c.sliceRegistroArea());b.baseline=c.IERegistroAcademico.canonical(b.basePayload);remote.payload=copy(b.basePayload);
  const choose=[];c.IERegistroReconcile.choose=async(conflicts)=>{choose.push(copy(conflicts));assert.equal(conflicts.length,0,'Unexpected unresolved conflict');return {};};
  for(const name of ['subirRegistroNube','bajarRegistroNube','recuperarBorradorAcademico'])vm.runInContext(fixture.extract(name),c);
@@ -195,7 +195,7 @@ test('A1 conflict dialog traps keyboard focus within choices and actions',async(
  const f=dialog();let prevented=0;f.apply.disabled=false;f.apply.focus();f.events.keydown({key:'Tab',shiftKey:false,preventDefault(){prevented++}});assert.equal(f.d.activeElement,f.radios[0]);f.events.keydown({key:'Tab',shiftKey:true,preventDefault(){prevented++}});assert.equal(f.d.activeElement,f.apply);assert.equal(prevented,2);f.cancel.onclick();await f.pending;
 });
 test('A1 worker precaches required reconcile module and cleans prior version without changing private exclusions',()=>{
- const sw=read('sw.js');assert.match(sw,/CACHE_PREFIX \+ 'v20'/);assert.match(sw,/'\.\/registro-reconcile\.js'/);assert.match(read('registro.html'),/<script src="registro-reconcile.js" defer><\/script>/);assert.ok(read('registro.html').indexOf('registro-reconcile.js')<read('registro.html').indexOf('registro-academic-model.js'));
+ const sw=read('sw.js');assert.match(sw,/CACHE_PREFIX \+ 'v21'/);assert.match(sw,/'\.\/registro-reconcile\.js'/);assert.match(read('registro.html'),/<script src="registro-reconcile.js" defer><\/script>/);assert.ok(read('registro.html').indexOf('registro-reconcile.js')<read('registro.html').indexOf('registro-academic-model.js'));
 });
 const AULA='secundaria||III||1||A',DATE='2026-10-12',MARK=AULA+'||'+DATE+'||id:1';
 function attendance(marca,ts=1){return {asistencia:{[MARK]:{marca,hora:'08:00',ts}},asisFechas:{[AULA]:[DATE]},asisFechasEstado:{[AULA+'||'+DATE]:{borrado:false,ts}}};}

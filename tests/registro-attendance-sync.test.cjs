@@ -15,14 +15,14 @@ function device(){
    ctxBase:()=>({nivel:'secundaria',bim:'III',grado:4,seccion:'B',area:'Matemática'}),identidadAlumno:x=>x,
    sessionId:s=>JSON.stringify(s),aliasesAula:()=>({}),metaRegistro:()=>({}),cloudClaveReg:()=>ctx+'||Matemática',prefijoReg:()=>ctx+'||Matemática||',
    registroSoloLectura:()=>false,registroNubeNoVerificada:()=>false,getLoginSession:()=>({token:'synthetic-token'}),guardarTodo(){},saveStore(){},renderSesiones(){},renderStudents(){},estudiantes:()=>[],
-   CLOUD_API_URL:'synthetic',fetch:async(url,options)=>{requests.push(JSON.parse(options.body));return {text:async()=>JSON.stringify({ok:true,version:1})}}
+   CLOUD_API_URL:'synthetic',fetch:async(url,options)=>{requests.push(JSON.parse(options.body));return {text:async()=>JSON.stringify({ok:true,version:1,identityHistory:[]})}}
  });
  let localDisk=null;c.NOTAS_KEY='synthetic-attendance';c.localStorage={getItem:()=>localDisk,setItem:(_,raw)=>localDisk=raw};c.saveStore=()=>c.localStorage.setItem(c.NOTAS_KEY,JSON.stringify(store));
  const baseline={version:0,baseline:'not-synchronized'};Object.assign(c,{IERegistroAcademico:{canonical:JSON.stringify},baselineAcademica:()=>baseline,prepararVersionAcademica:async()=>true,informeSiagie:()=>({ok:true}),dirtyAcademico:()=>{}});
  const run=s=>new vm.Script(s).runInContext(c);
  run("let nivel='secundaria',areaActual='Matemática',padronBimestre='III',asisFechaActiva='2026-10-05',sesionActiva=null,notas={},renderedDates=[];function renderAsistencia(){renderedDates=getAsisFechas().slice()}");
  for(const n of ['tsDe','sliceRegistroArea','mergeRegistroPayload','asisCtxKey','asisMarkKey','asisGet','asisSet','mergeFechasAsistencia','getAsisFechas','agregarFechaAsis','borrarFechaAsis','subirRegistroNube','bajarRegistroNube'])run(extract(n));
- c.horaAhora=()=> '09:00';c.estudiantes=()=>[];c.aliasesAula=()=>({});c.renderSesiones=c.renderStudents=()=>{};require('./reconcile-fixture.cjs').core(c);c.fetchLecturaNube=async()=>({text:async()=>JSON.stringify({ok:true,soportaModeloAcademico:true,items:[]})});
+ c.competencias=()=>[];c.horaAhora=()=> '09:00';c.estudiantes=()=>[];c.aliasesAula=()=>({});c.renderSesiones=c.renderStudents=()=>{};require('./reconcile-fixture.cjs').core(c);c.fetchLecturaNube=async()=>({text:async()=>JSON.stringify({ok:true,soportaModeloAcademico:true,identidadAcademica:1,items:[]})});
  return {c,store,run,requests,messages,el,setTime:n=>now=n};
 }
 
@@ -65,7 +65,7 @@ test('Another device restores attendance dates and marks through the real cloud 
  const a=device();a.c.agregarFechaAsis();a.c.asisSet('id:42','P');await a.c.subirRegistroNube();
  assert.equal(a.requests.length,1);const upload=a.requests[0];assert.equal(upload.action,'savereg');assert.equal(upload.token,'synthetic-token');
  assert.deepEqual(upload.payload.asisFechas,{[ctx]:[date]});
- const b=device();b.c.fetchLecturaNube=async()=>({text:async()=>JSON.stringify({ok:true,soportaModeloAcademico:true,items:[{clave:'secundaria||III||4||B||Matemática',ts:1,area:'Matemática',bimestre:'III',grado:4,seccion:'B',payload:upload.payload}]})});
+ const b=device();b.c.fetchLecturaNube=async()=>({text:async()=>JSON.stringify({ok:true,soportaModeloAcademico:true,identidadAcademica:1,items:[{clave:'secundaria||III||4||B||Matemática',ts:1,area:'Matemática',bimestre:'III',grado:4,seccion:'B',payload:upload.payload}]})});
  await b.c.bajarRegistroNube();assert.deepEqual(clone(b.c.getAsisFechas()),[date]);assert.deepEqual(clone(b.run('renderedDates')),[date]);
  assert.equal(b.store.asistencia[key].marca,'P');assert.equal(b.store.asistencia[key].ts,1000);
 });
