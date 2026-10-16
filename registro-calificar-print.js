@@ -34,7 +34,9 @@
   const c=o.context,mode=o.mode==='num'?'num':'letra',unique=new Map();
   for(const s of o.sessions||[])if(s.nivel===c.nivel&&s.bim===c.bim&&String(s.grado)===String(c.grado)&&s.seccion===c.seccion&&s.area===c.area&&s.comp)unique.set(JSON.stringify([s.comp,s.fecha,s.capacidad]),s);
   const all=[...unique.values()],comps=[...new Set([...(o.competences||[]),...all.map(s=>s.comp)])];if(!comps.length)return '';
-  const sessions=all.filter(s=>(!o.from||s.fecha>=o.from)&&(!o.to||s.fecha<=o.to)).sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||''))||comps.indexOf(a.comp)-comps.indexOf(b.comp)||String(a.capacidad||'').localeCompare(String(b.capacidad||'')));
+  const capacityOrder=s=>{const selected=o.capsSel?.[[c.nivel,c.bim,c.grado,c.seccion,c.area,s.fecha].join('||')];if(!Array.isArray(selected))return Infinity;const i=selected.findIndex(x=>typeof x==='string'?x===s.capacidad:x?.comp===s.comp&&x.cap===s.capacidad);return i<0?Infinity:i;};
+  // Historical sessions without a saved selection retain their original stable order.
+  const sessions=all.filter(s=>(!o.from||s.fecha>=o.from)&&(!o.to||s.fecha<=o.to)).sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||''))||comps.indexOf(a.comp)-comps.indexOf(b.comp)||(capacityOrder(a)-capacityOrder(b)||0));
   if((o.from||o.to)&&!sessions.length)return '';
   const groups=comps.map((name,i)=>({name,code:'C'+(i+1),sessions:sessions.filter(s=>s.comp===name)}));
   const key=(s,id)=>[c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,id].join('||');
