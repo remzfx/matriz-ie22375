@@ -30,7 +30,7 @@
   const modules={grades:'Calificar',sessions:'Calificar',capsSel:'Calificar',finales:'Promedios',concComp:'Conclusiones',concArea:'Conclusiones',asistencia:'Asistencia',asisFechas:'Asistencia',asisFechasEstado:'Asistencia',competenciasEstado:'Configuración'};
   const affected=summary?Object.entries(summary.modules).map(([m,n])=>m+' ('+n+')').join(', '):[...new Set(pendingFields.map(f=>modules[f]||'Otro módulo'))].join(', ');
   const count=current&&result.estado==='conflicto'?result.conflictos:0,reason=summary?Object.keys(summary.causes).join('; '):tutorVisible()?'Decisión transversal pendiente de revisión':count?'Desglose no disponible; revisa las alternativas':'Cambios locales pendientes de verificar';
-  return 'Sincronización · '+(affected||'Registro académico')+' · '+count+' conflicto'+(count===1?' confirmado':'s confirmados')+' · '+reason+'. No indica cierre administrativo. Consulta e impresión disponibles. Edición y subida protegidas: Calificar y Promedios comparten registro y una sola versión CAS; requiere revisión explícita.';
+  return (count?'Hay notas diferentes · ':'')+'Sincronización · '+(affected||'Registro académico')+' · '+count+' conflicto'+(count===1?' confirmado':'s confirmados')+' · '+reason+'. No indica cierre administrativo. Consulta e impresión disponibles. Edición y subida protegidas: Calificar y Promedios comparten registro y una sola versión CAS; requiere revisión explícita.';
  }
  function connectionState(value){
   const panel=document.getElementById('registroConnectionStatus'),label=document.getElementById('registroConnectionText'),review=document.getElementById('registroConnectionReview');

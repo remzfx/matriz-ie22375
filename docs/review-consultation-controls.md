@@ -66,6 +66,11 @@ Las fixtures iniciales se corrigieron para respetar versiones CAS distintas y
 el contrato completo del registro (incluido el mapa vacío de asistencia). No se
 eliminaron validaciones para que pasaran; las guardas históricas admiten únicamente
 los hashes exactos del resumen/mensaje y la condición de consulta aprobada.
+El primer CI detectó nueve incompatibilidades de fixtures/expectativas previas.
+Se conservó «Hay notas diferentes» con el desglose adicional, se evitó evaluar la
+guarda en una sesión inexistente y se mantuvo el mensaje reconocido del rechazo
+por hash. Los 129 casos de los archivos afectados aprobaron sin eliminar pruebas.
+El HEAD corregido requiere una nueva ejecución general de CI por ese fallo.
 
 ## Ejecución aislada desde GitHub Desktop
 
