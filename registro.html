@@ -600,7 +600,7 @@
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
 <script src="student-identity.js"></script>
-<script src="registro-reconcile.js" defer></script><script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script><script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script>
+<script src="academic-identity.js" defer></script><script src="registro-reconcile.js" defer></script><script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script><script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script>
   <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body class="min-h-screen text-slate-800">
@@ -1257,7 +1257,8 @@ async function subirRegistroNube() {
   if(!prepared||prepared.key!==cloudClaveReg()||prepared.token!==tokenSubida||prepared.localSignature!==IERegistroReconcile.signature(sliceRegistroArea())){toast('El borrador cambió durante la conciliación. Reintenta; trabajo local conservado.');return false;}
   payload=IERegistroReconcile.copy(prepared.payload);payload.ts=Date.now();
   const academicBaseline=typeof IERegistroAcademico!=='undefined'?baselineAcademica():null;
-  if(IERegistroAcademico.canonical(payload)===IERegistroAcademico.canonical(prepared.remote.payload)){confirmarRegistroConciliado(prepared,prepared.remote);toast('Sin cambios remotos pendientes. Registro conciliado.');return true;}
+  if(IERegistroAcademico.canonical(payload)===IERegistroAcademico.canonical(prepared.remote.projected||prepared.remote.payload)){confirmarRegistroConciliado(prepared,prepared.remote);toast('Sin cambios remotos pendientes. Registro conciliado.');return true;}
+  if(!prepared.remote.identityProtocol){toast('El servidor todavía no admite identidad académica única. Guardado local conservado; no se envió nada.');return false;}
   try {
     academicBaseline.attempt={version:prepared.remote.version,local:IERegistroReconcile.copy(prepared.local),payload:IERegistroReconcile.copy(payload)};saveStore();
     const res = await fetch(CLOUD_API_URL, {
@@ -1265,6 +1266,7 @@ async function subirRegistroNube() {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         action: 'savereg',
+        identidadAcademica: 1,
         envioIntegral: true,
         ...(academicBaseline?{modeloAcademico:1,version:prepared.remote.version}:{}),
         token: tokenSubida,
@@ -1284,7 +1286,7 @@ async function subirRegistroNube() {
     if (res.status>=400||data.ok!==true) data.ok=false;
     if(prepared.key!==cloudClaveReg()||prepared.token!==((getLoginSession()||{}).token||'')){toast('Respuesta de otro contexto o sesión. El respaldo local se conserva.');return false;}
     let applied=false;
-    if(data.ok&&academicBaseline){if(typeof data.version!=='number'||!Number.isFinite(data.version)||data.version<prepared.remote.version||(data.version===prepared.remote.version&&data.unchanged!==true))throw Error('Confirmación de versión inválida.');applied=confirmarRegistroConciliado(prepared,{version:data.version,payload});}
+    if(data.ok&&academicBaseline){if(typeof data.version!=='number'||!Number.isFinite(data.version)||data.version<prepared.remote.version||(data.version===prepared.remote.version&&data.unchanged!==true))throw Error('Confirmación de versión inválida.');if(!Array.isArray(data.identityHistory))throw Error('Confirmación de historial incompleta. Borrador conservado.');const confirmed={...payload,meta:{...(payload.meta||{}),academicHistory:data.identityHistory}};applied=confirmarRegistroConciliado(prepared,{version:data.version,payload:confirmed,projected:payload});}
     if(data.code==='CONFLICT'){toast('CONFLICT: hubo otra escritura. Reintente para revisar la versión actual; no se repite la subida automáticamente.');return false;}
     if (!data.ok) retirarVerificacionNube(tokenSubida, c.bim, data);
     if(data.ok&&academicBaseline&&!applied){toast('Se guardó la versión enviada. Hay cambios locales posteriores pendientes; vuelve a enviar el área.');return false;}
@@ -1407,7 +1409,8 @@ function leerNota(mapa, key) {
   const tail = key.slice(key.lastIndexOf('||') + 2), al = alumnoIdentidad(tail);
   if (!al) return undefined;
   const homonimos = estudiantes().filter(a => IEStudentIdentity.normalizarNombre(a.nombre) === IEStudentIdentity.normalizarNombre(al.nombre));
-  return IEStudentIdentity.leer(mapa, key, al, aliasesAula(), homonimos.length === 1);
+  const ownership=Object.fromEntries(Object.entries(aliasesAula()).map(([id,names])=>[id,Array.isArray(names)?names.filter(n=>IEStudentIdentity.normalizarNombre(n)===IEStudentIdentity.normalizarNombre(al.nombre)):[]]));
+  return IEStudentIdentity.leer(mapa, key, al, ownership, homonimos.length === 1);
 }
 function metaRegistro() {
   const old = store.meta[cloudClaveReg()];
@@ -3105,7 +3108,7 @@ async function leerEstadoRemotoAcademico(c,key,token,options){
   const rows=(data.items||[]).filter(x=>x.clave===key);
   if(rows.length>1)throw Error('Hay registros duplicados del mismo contexto. Revise antes de sincronizar.');
   const row=rows[0];if(row&&(typeof row.ts!=='number'||!Number.isFinite(row.ts)||row.ts<0))throw Error('Versión remota inválida.');
-  return IERegistroReconcile.validateRemote({version:row?Number(row.ts):0,payload:row?row.payload:{},exists:!!row},baselineAcademica());
+  return IERegistroReconcile.validateRemote({version:row?Number(row.ts):0,payload:row?row.payload:{},exists:!!row,identityProtocol:data.identidadAcademica===1},baselineAcademica());
 }
 function aplicarRegistroConciliado(payload,conservarAsistencia=false){
   const pref=prefijoReg(),aula=asisCtxKey(),asisPref=aula+'||',c=ctxBase();
@@ -3145,7 +3148,7 @@ function confirmarRegistroConciliado(plan,remote,options){
   const b=baselineAcademica(),before=IERegistroReconcile.copy(store),current=IERegistroReconcile.signature(sliceRegistroArea());
   try{
     if(current===plan.localSignature)aplicarRegistroConciliado(plan.payload);
-    b.version=remote.version;b.soportaModeloAcademico=true;b.basePayload=IERegistroReconcile.copy(remote.payload);b.baseline=IERegistroAcademico.canonical(remote.payload);delete b.attempt;
+    b.version=remote.version;b.soportaModeloAcademico=true;b.basePayload=IERegistroReconcile.copy(remote.payload);b.baseline=IERegistroAcademico.canonical(remote.projected||remote.payload);delete b.attempt;
     options.fase?.('persistencia');saveStore();if(options.validarPersistencia&&!options.validarPersistencia())throw Error('No se verificó el guardado local.');
   }catch(e){store=before;throw Error('No se pudo conservar la conciliación localmente. No cierre la pestaña; el respaldo permanece disponible.');}
   dirtyAcademico();if(current===plan.localSignature){options.fase?.('pintura');pintarRegistroConciliado();}return current===plan.localSignature;
@@ -3161,8 +3164,8 @@ async function prepararVersionAcademica(options){
   if(!current())throw Error('Hay cambios posteriores. Reintente; todo el trabajo local se conserva.');
   const b=baselineAcademica();let base=b.basePayload||null;
   if(b.attempt&&IERegistroAcademico.canonical(remote.payload)===IERegistroAcademico.canonical(b.attempt.payload)&&remote.version>b.attempt.version)base=b.attempt.local;
-  const groups=IERegistroReconcile.identityConflicts(local,remote.payload,estudiantes(),typeof IEStudentIdentity==='undefined'?null:IEStudentIdentity);
-  options.fase?.('conciliacion');const reconciliation=IERegistroReconcile.plan(base,local,remote.payload,groups,{sharedAttendance:true,reviewAbsence:true});
+  options.fase?.('conciliacion');const reconciliation=IERegistroReconcile.academicPlan(base,local,remote.payload,estudiantes(),c,competencias(),{sharedAttendance:true,reviewAbsence:true,cleanAcademic:b.version!=null&&IERegistroAcademico.canonical(local)===b.baseline});
+  remote.projected=reconciliation.remote;
   if(options.automatico&&reconciliation.conflicts.length){bajarRegistroNube.resultado={key,token,estado:'conflicto',conflictos:reconciliation.conflicts.length};return false;}
   const choices=options.automatico?{}:await IERegistroReconcile.choose(reconciliation.conflicts,current,{roster:estudiantes(),aliases:local.meta&&local.meta.studentAliases});
   if(!choices){bajarRegistroNube.resultado={key,token,estado:current()?'conflicto':'pendiente',conflictos:reconciliation.conflicts.length};toast('Conflicto pendiente. El trabajo local se conserva; ninguna nota fue enviada.');return false;}
@@ -4062,14 +4065,14 @@ if (document.readyState !== 'loading') {
   for(const field of ['asistencia','asisFechas','asisFechasEstado'])payload[field]=copy(local.payload[field]||{});
   try{
    aplicarRegistroConciliado(payload,true);const b=baselineAcademica();
-   if(!candidate){b.version=remote.version;b.basePayload=copy(remote.payload);b.baseline=IERegistroAcademico.canonical(remote.payload);delete b.attempt;}
+   if(!candidate){b.version=remote.version;b.basePayload=copy(remote.rawPayload||remote.payload);b.baseline=IERegistroAcademico.canonical(remote.payload);delete b.attempt;}
    else{const original=candidate.undo?local.baseline:candidate.snapshot.baseline||{};b.version=original.version??null;if(original.basePayload)b.basePayload=copy(original.basePayload);else delete b.basePayload;b.baseline=original.baseline||IERegistroAcademico.canonical(local.payload);delete b.attempt;}
    b.recovery={local:copy(local.payload),base:local.baseline.basePayload||null,remote:copy(remote.payload)};
    if(candidate?.undo)b.voluntaryRecovery={undone:true,created:backupRecord?.created??Date.now()};else if(backupRecord?.id)b.voluntaryRecovery={id:backupRecord.id,created:backupRecord.created};saveStore();
    if(localStorage.getItem(NOTAS_KEY)!==JSON.stringify(store))throw Error('No se verificó el reemplazo local.');lastDisk=localStorage.getItem(NOTAS_KEY);invalidateDraft();dirtyAcademico();pintarRegistroConciliado();
   }catch(e){store=previous;try{if(typeof registroLocal!=='undefined')registroLocal.write(raw===null?JSON.stringify(previous):raw);else if(raw!==null)localStorage.setItem(NOTAS_KEY,raw);}catch(_){}throw Error('Recuperación no confirmada. Borrador conservado; no cierres la pestaña.');}
  }
- function init(){if(!disk)return null;if(!service)service=IERegistroDrafts.controller({context,guard,capture,read:()=>leerEstadoRemotoAcademico(ctxBase(),cloudClaveReg(),(getLoginSession()||{}).token),backup,apply,confirm:compare,state,changed:()=>pendingAcademic(),baseline:()=>IERegistroReconcile.signature(baselineAcademica().basePayload||{})});return service;}
+ function init(){if(!disk)return null;if(!service)service=IERegistroDrafts.controller({context,guard,capture,read:async()=>{const remote=await leerEstadoRemotoAcademico(ctxBase(),cloudClaveReg(),(getLoginSession()||{}).token),projected=IEAcademicIdentity.project(remote.payload,estudiantes(),ctxBase(),competencias());if(projected.conflicts.length)throw Error('Identidades históricas ambiguas: usa Revisar conflictos. Borrador conservado.');return {...remote,rawPayload:remote.payload,payload:projected.payload};},backup,apply,confirm:compare,state,changed:()=>pendingAcademic(),baseline:()=>IERegistroReconcile.signature(baselineAcademica().basePayload||{})});return service;}
  async function recover(){refreshWarning();if(!guard()){state('Recuperación no disponible: revisa sesión, permisos, bimestre y padrón.');return false;}if(!init())return state('Recuperación no disponible. Conserva el borrador.');const ok=await service.recover();invalidateDraft();await offerDraft();queueRefresh();return ok;}
  function diskSafe(){const raw=localStorage.getItem(NOTAS_KEY);return typeof registroLocal!=='undefined'?registroLocal.verified(raw):raw===lastDisk||raw===JSON.stringify(store);}
  function rememberDisk(){const raw=localStorage.getItem(NOTAS_KEY);if(raw===JSON.stringify(store))lastDisk=raw;}

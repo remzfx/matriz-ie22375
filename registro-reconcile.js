@@ -30,7 +30,7 @@
       dates.forEach(date=>out.set(JSON.stringify(['asisFechas',aula,date]),true));
     });
     // Alias es información de compatibilidad, no una autorización.
-    Object.entries(p.meta||{}).forEach(([k,v])=>{if(k!=='docente'&&k!=='studentAliases')out.set(JSON.stringify(['meta',k]),copy(v));});
+    Object.entries(p.meta||{}).forEach(([k,v])=>{if(k!=='docente'&&k!=='studentAliases'&&k!=='academicHistory')out.set(JSON.stringify(['meta',k]),copy(v));});
     Object.keys(p).filter(k=>!maps.includes(k)&&!['sessions','asisFechas','meta','ts','_ts','registroVersion','modeloAcademico'].includes(k))
       .forEach(k=>out.set(JSON.stringify(['extra',k]),copy(p[k])));
     return out;
@@ -191,6 +191,47 @@
     });
     return [...groups.values()].filter(set=>set.size>1).map(set=>[...set]);
   }
+  // Identity is projected only after the raw Phase 1 integrity barrier.
+  function academicPlan(base,local,remote,roster,context,competencies,options={}){
+    const identity=global.IEAcademicIdentity;
+    if(!identity)throw Error('No se cargó el resolvedor académico. Borrador conservado.');
+    const b=base&&identity.project(base,roster,context,competencies),l=identity.project(local,roster,context,competencies,base),r=identity.project(remote,roster,context,competencies,base);
+    // A clean old PC follows a verified unambiguous remote version, not its old key spelling.
+    const complete=!b||['grades','finales','concComp'].every(f=>Object.keys(b.payload[f]||{}).every(k=>has(r.payload[f]||{},k)));
+    if(base&&complete&&(readEqual(local,base)||options.cleanAcademic)&&!r.conflicts.length){for(const field of ['grades','finales','concComp']){l.payload[field]=copy(r.payload[field]||{});if(b)b.payload[field]=copy(r.payload[field]||{});}l.conflicts=[];if(b)b.conflicts=[];}
+    if(base&&readEqual(remote,base))r.conflicts=r.conflicts.filter(conflict=>{
+      const [f,k]=JSON.parse(conflict.path),records=l.groups.get(conflict.path)||[];
+      const changed=records.filter(record=>has(base[f]||{},record.key)&&!equal(record.value,base[f][record.key]));
+      if(changed.length!==1||l.conflicts.some(c=>c.path===conflict.path))return true;
+      // A real local edit establishes intent while the remote group is unchanged.
+      // Keep the old value only as the causal baseline, never as a chosen cloud vote.
+      r.payload[f]=r.payload[f]||{};r.payload[f][k]=copy(base[f][changed[0].key]);
+      if(b){b.payload[f]=b.payload[f]||{};b.payload[f][k]=copy(base[f][changed[0].key]);}return false;
+    });
+    const ambiguous=new Map();
+    for(const [side,projection]of [['local',l],['remote',r]])for(const conflict of projection.conflicts){
+      if(!ambiguous.has(conflict.path))ambiguous.set(conflict.path,{path:conflict.path,paths:[conflict.path],candidates:[],reason:'Identidad histórica verificada, pero notas contradictorias sin vigencia demostrada. Requiere revisión.'});
+      const c=ambiguous.get(conflict.path);
+      for(const record of conflict.records)if(!c.candidates.some(x=>equal(x.value,record.value)))c.candidates.push({id:'candidate:'+c.candidates.length,label:(side==='local'?'Este dispositivo':'Nube')+' · representación '+(c.candidates.length+1),value:copy(record.value),original:record.key});
+    }
+    for(const c of ambiguous.values()){
+      const [f,k]=JSON.parse(c.path);
+      for(const [side,projection]of [['local',l],['remote',r]]){
+        const value=projection.payload[f]&&projection.payload[f][k];
+        if(value!==undefined&&!c.candidates.some(x=>equal(x.value,value)))c.candidates.push({id:'candidate:'+c.candidates.length,label:side==='local'?'Este dispositivo':'Nube',value:copy(value),original:k});
+      }
+      for(const projection of [b,l,r].filter(Boolean))if(projection.payload[f])delete projection.payload[f][k];
+    }
+    const merge=plan(b?b.payload:null,l.payload,r.payload,[],options),conflicts=[...ambiguous.values(),...merge.conflicts];
+    return {conflicts,remote:r.payload,resolve(choices={}){
+      const result=merge.resolve(choices);
+      for(const c of ambiguous.values()){
+        const choice=c.candidates.find(x=>x.id===choices[c.path]);if(!choice)throw Error('Hay identidades sin resolver.');
+        const [f,k]=JSON.parse(c.path);result[f]=result[f]||{};result[f][k]=copy(choice.value);
+      }
+      return result;
+    }};
+  }
   function conflictView(c,context={}){
     const path=JSON.parse(c.paths&&c.paths[0]||c.path),field=path[0],parts=typeof path[1]==='string'?path[1].split('||'):[];
     const types={grades:'Evidencia de evaluación',finales:'Calificación directa',concComp:'Conclusión de competencia',concArea:'Conclusión histórica',asistencia:'Marca de asistencia',asisFechas:'Fecha de asistencia',asisFechasEstado:'Estado de fecha',sessions:'Sesión de evaluación',competenciasEstado:'Competencia trabajada',capsSel:'Capacidades',meta:'Contexto del registro'};
@@ -262,10 +303,10 @@
       conflicts.forEach((c,i)=>{
         const view=conflictView(c,context),field=document.createElement('fieldset'),label=document.createElement('legend');field.className='academic-conflict-card';label.textContent=view.title;field.appendChild(label);
         const options=document.createElement('div');options.className='academic-conflict-options';field.appendChild(options);
-        for(const side of ['local','remote']){
+        for(const side of (c.candidates||['local','remote'])){
           const row=document.createElement('label'),radio=document.createElement('input'),text=document.createElement('div'),source=document.createElement('strong'),value=document.createElement('div');row.className='academic-conflict-option';radio.type='radio';radio.name='academic-conflict-'+i;
-          source.textContent=side==='local'?'Este dispositivo':'Nube';value.className='academic-conflict-value';value.textContent=view[side];text.appendChild(source);text.appendChild(value);
-          radio.onchange=()=>{choices[c.path]=side;apply.disabled=conflicts.some(x=>!choices[x.path]);};row.appendChild(radio);row.appendChild(text);options.appendChild(row);
+          source.textContent=typeof side==='string'?(side==='local'?'Este dispositivo':'Nube'):side.label;value.className='academic-conflict-value';value.textContent=typeof side==='string'?view[side]:conflictView({path:c.path,local:side.value},context).local;text.appendChild(source);text.appendChild(value);
+          radio.onchange=()=>{choices[c.path]=typeof side==='string'?side:side.id;apply.disabled=conflicts.some(x=>!choices[x.path]);};row.appendChild(radio);row.appendChild(text);options.appendChild(row);
         }
         const details=document.createElement('details'),summary=document.createElement('summary'),technical=document.createElement('pre');summary.textContent='Identificación y detalles técnicos';technical.textContent=JSON.stringify(c,null,2);details.appendChild(summary);details.appendChild(technical);field.appendChild(details);content.appendChild(field);
       });
@@ -277,7 +318,7 @@
       document.addEventListener('keydown',key);document.body.appendChild(overlay);cancel.focus();
     });
   }
-  const api={copy,equal,signature,readEqual,validateRemote,plan,identityConflicts,conflictView,choose,has};
+  const api={copy,equal,signature,readEqual,validateRemote,plan,identityConflicts,academicPlan,conflictView,choose,has};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   global.IERegistroReconcile=api;
 })(typeof window!=='undefined'?window:globalThis);

@@ -55,6 +55,7 @@ function setup() {
     },
     ContentService: {MimeType: {JSON: 'json'}, createTextOutput: text => ({setMimeType: () => ({text})})}
   });
+  new vm.Script(fs.readFileSync(path.join(__dirname,'../apps-script/AcademicIdentity.js'),'utf8')).runInContext(c);
   new vm.Script(source).runInContext(c);
   const post = body => JSON.parse(c.doPost({postData: {contents: JSON.stringify(body)}}).text);
   const token = (user, role = 'docente', extra = {}) => c.firmarToken_({user, role, permisosVersion: 1000, exp: Date.now() + 60000, ...extra});
@@ -241,7 +242,7 @@ for (const [file, name, action] of [
     if(name==='subirRegistroNube'){
       s.c.Utilities.getUuid=()=> 'synthetic-official';
       const al={nivel:'primaria',grado:1,seccion:'Única',orden:1,nombre:'Synthetic Student',idSiagie:'synthetic'};
-      s.c.escribirVersionEstudiantes_(s.c.hojaEstudiantes_(),[al],['BASE_ACTUAL']);
+      s.c.escribirVersionEstudiantes_(s.c.hojaEstudiantes_(),[al],['BASE_ACTUAL','PADRON_I']);
       const finales=Object.fromEntries(s.c.registroAcademico_().catalog.primaria['Comunicación'].map(cp=>['primaria||I||1||Única||Comunicación||'+cp+'||id:synthetic',{nota20:15,nivel:'A',origen:'numero'}]));
       context.sliceRegistroArea=()=>({meta:{docente:'Forged Name'},finales});
     }
