@@ -31,6 +31,25 @@ test('Historical missing/partial selections preserve session order, all original
  assert.deepEqual(titles({...options,capsSel:{[key]:[{comp:'Competencia ficticia',cap:caps[2]},{comp:'Otra competencia',cap:caps[1]}]}}),[caps[2],caps[0],caps[1]]);
  assert.deepEqual(titles({...options,capsSel:{[key]:[caps[2],caps[0],caps[1]]}}),[caps[2],caps[0],caps[1]]);assert.equal(JSON.stringify(sessions),before);
 });
+for(const kind of ['dia','semana','bimestre'])test('Interleaved competencies follow actual Calificar order with aligned headers and original student grades: '+kind,()=>{
+ const f=report({level:'secundaria',area:'Comunicación',count:30,mode:'num',kind}),c=f.c,[cp1,cp2]=f.comps,dates=['2026-10-14','2026-10-16','2026-10-20'];
+ const columns=[{comp:cp2,cap:'Capacidad compartida'},{comp:cp1,cap:'Z capacidad ficticia'},{comp:cp2,cap:'A capacidad ficticia'},{comp:cp1,cap:'Capacidad compartida'}];
+ c.store.sessions=[];c.store.capsSel={};
+ for(const date of dates){const order=date===dates[1]?columns.slice().reverse():columns;c.store.capsSel[c.cloudClaveReg()+'||'+date]=order;
+  for(const col of columns.slice().reverse()){c.store.sessions.push({...c.ctxBase(),comp:col.comp,capacidad:col.cap,fecha:date});for(const [i,al]of c.estudiantes().entries()){const n=i%5+columns.indexOf(col)+11;c.store.grades[[c.cloudClaveReg(),col.comp,col.cap,date,c.studentKey(al)].join('||')]={nivel:c.numToLetter(n),nota20:n,origen:'numero'};}}
+ }
+ const vm=require('node:vm'),{extract}=require('./registro-visual-demo.cjs');c.esCompetenciaTransversal=()=>false;c.IERegistroTransversales=undefined;
+ for(const name of ['keyCapsHoy','normCapItem','tieneCapSel','loadCapsElegidas','colsCalificar'])vm.runInContext(extract(source,name),c);
+ const selected=kind==='dia'?dates.slice(0,1):kind==='semana'?dates.slice(0,2):dates,expected=[],before=JSON.stringify(c.store);
+ for(const date of selected){f.el('inpFecha').value=date;c.loadCapsElegidas();c.renderStudents();const visible=Array.from(c.colsCalificar(),x=>({comp:x.comp,cap:x.cap})),head=f.el('stuList').innerHTML.split('</thead>')[0];
+  assert.deepEqual(visible,c.store.capsSel[c.cloudClaveReg()+'||'+date]);const pairs=[...head.matchAll(/class="fin-caps">(.*?)<br>(.*?)<\/div>/g)].map(m=>[m[1],m[2]]);assert.deepEqual(pairs,visible.map(x=>[c.escapeRegistro(x.comp),c.escapeRegistro(x.cap)]));expected.push(...visible.map(x=>({...x,date})));
+ }
+ c.prepararImpresion(kind==='dia'?{desde:dates[0],hasta:dates[0]}:kind==='semana'?{desde:dates[0],hasta:dates[1]}:{});const h=f.el('printArea').innerHTML;
+ const codes=expected.map(x=>'C'+(f.comps.indexOf(x.comp)+1));assert.deepEqual([...h.matchAll(/class="competence-head"[^>]*colspan="(\d+)">([^<]+)</g)].map(m=>[Number(m[1]),m[2]]),codes.map(code=>[1,code]));
+ assert.deepEqual([...h.matchAll(/class="evidence-title"[^>]*title="([^"]+)">([^/]+)\//g)].map(m=>[m[1],m[2]]),expected.map((x,i)=>[x.cap,codes[i]]));
+ for(const al of c.estudiantes()){const id=c.studentKey(al),row=h.split('data-student="'+id+'"')[1].split('</tr>')[0],cells=[...row.matchAll(/data-evidence="([^"]+)">([^<]+)</g)].map(m=>[m[1],m[2]]);assert.deepEqual(cells,expected.map(x=>{const key=[c.cloudClaveReg(),x.comp,x.cap,x.date,id].join('||');return [c.escapeRegistro(key),String(c.store.grades[key].nota20)];}));}
+ assert.equal(JSON.stringify(c.store),before);assert.equal(f.calls.length,0);
+});
 const cases=[['secundaria','Educación para el Trabajo (EPT)',1],['secundaria','Comunicación',3],['secundaria','Matemática',4],['primaria','Personal Social',5]];
 for(const [level,area,n]of cases)for(const mode of ['letra','num'])test('integral '+level+' '+n+' competencies '+mode+': one roster, all dates/evidence/results, zero mutations or network',()=>{
  const f=report({level,area,count:30,mode,kind:'bimestre'}),h=f.html,pages=Math.ceil((n*4)/(22-n));

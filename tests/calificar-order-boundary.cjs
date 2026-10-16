@@ -5,7 +5,7 @@ const printer=read('registro-calificar-print.js').trim(),old=read('registro.html
 const wrapper=s=>{const a=s.indexOf('function prepararImpresion(');return s.slice(a,s.indexOf('\n}',a)+2);};
 function html(s){s=s.replace(/\r\n/g,'\n');if(!s.includes('const capacityOrder='))return s;
  const start=s.indexOf('/* Vista integral de Calificar:'),end=s.indexOf('\n</script>',start),current=s.slice(start,end).trim();
- assert.equal(hash(current),'a721167af2a55a4f6ed5a420023b0475823a33f6e469b10e02f1b00a258fd164','Exact capacity-order-only builder');
+ assert.equal(hash(current),'a7e0e30094f914f9fe3acfc69fa78a95d4e4c2653920f521ac4051b155a2715b','Exact capacity-order-only builder');
  const fn=wrapper(s);assert.equal(hash(fn),'f799255dc39bdf2f98b91d045316294c7a18bc7ca0ee6760290735e82aba46e5','Exact print capsSel argument');
  return s.replace(current,printer).replace(fn,wrapper(old));
 }
