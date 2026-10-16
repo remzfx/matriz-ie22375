@@ -15,6 +15,7 @@ function ui(level='secundaria'){
  for(const n of ['confirmarEdicionNumerica','datosEstadisticasCompetencias','estadisticasCompetenciasHTML','finalKey','sliceRegistroArea','metaRegistro','baselineAcademica','dirtyAcademico','setConclusionAcademica','setCompetenciaTrabajada','numeroExactoComp','promReferencialAlumno','validarConclusionesOficial','informeSiagie','escapeRegistro','estadisticaResumenHTML','renderAvance','renderFinales','seleccionarFinalReversible','aplicarFinalManual','quitarFinalManual','upsertSesionCap','prepararVersionAcademica','mergeRegistroPayload'])vm.runInContext(extract(n),c);
  require('./reconcile-fixture.cjs').core(c);
  c.aliasesAula=()=>({});c.metaRegistro=()=>({});c.asisCtxKey=()=>[level,'I',2,'A'].join('||');c.mergeFechasAsistencia=()=>{};
+ let localDisk=null;c.NOTAS_KEY='synthetic-model';c.localStorage={getItem:()=>localDisk,setItem:(_,raw)=>localDisk=raw};c.saveStore=()=>c.localStorage.setItem(c.NOTAS_KEY,JSON.stringify(c.store));
  const id=c.studentKey(f.s.roster[0]);return {...f,c,comps,id,key:cp=>c.finalKey(cp,id),grade:(cp,n,origin='numero')=>{c.store.finales[c.finalKey(cp,id)]={nota20:n,nivel:c.numToLetter(n),origen:origin,ts:100};},conclusion:(cp,text)=>c.setConclusionAcademica(cp,id,text)};
 }
 for(const level of ['primaria','secundaria']){

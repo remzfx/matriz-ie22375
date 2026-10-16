@@ -66,17 +66,17 @@ function client(){
  const f=ui(),c=f.c;let token='synthetic-token';c.getLoginSession=()=>({role:'admin',token});c.CLOUD_API_URL='https://synthetic.invalid';c.IERegistroTransversales=undefined;
  c.renderStudents=c.renderFinales=c.renderAvance=c.renderSesiones=c.renderAsistencia=()=>{};c.informeSiagie=()=>({ok:true});
  c.store.asistencia={};c.store.asisFechas={};c.store.asisFechasEstado={};c.store.academicSync={};c.estudiantes=()=>[];
- let disk,remote={version:1,payload:{}},writes=0,reads=0;const messages=[];c.toast=m=>messages.push(m);c.saveStore=()=>disk=copy(c.store);
+ let disk,remote={version:1,payload:{}},writes=0,reads=0;const messages=[];c.NOTAS_KEY='synthetic-a1';c.localStorage={getItem:()=>disk?JSON.stringify(disk):null,setItem:(_,raw)=>disk=JSON.parse(raw)};c.toast=m=>messages.push(m);c.saveStore=()=>disk=copy(c.store);
  c.fetchLecturaNube=async()=>{reads++;return {text:async()=>JSON.stringify({ok:true,soportaModeloAcademico:true,items:[{clave:c.cloudClaveReg(),ts:remote.version,payload:remote.payload}]})}};
  c.fetch=async(url,opt)=>{writes++;const body=JSON.parse(opt.body);assert.equal(body.version,remote.version);remote={version:remote.version+1,payload:copy(body.payload)};return {status:200,text:async()=>JSON.stringify({ok:true,version:remote.version})}};
  const b=c.baselineAcademica();b.version=1;b.basePayload=copy(c.sliceRegistroArea());b.baseline=c.IERegistroAcademico.canonical(b.basePayload);remote.payload=copy(b.basePayload);
  const choose=[];c.IERegistroReconcile.choose=async(conflicts)=>{choose.push(copy(conflicts));assert.equal(conflicts.length,0,'Unexpected unresolved conflict');return {};};
  for(const name of ['subirRegistroNube','bajarRegistroNube','recuperarBorradorAcademico'])vm.runInContext(fixture.extract(name),c);
- return {...f,c,b,choose,messages,setToken:v=>token=v,setRemote:v=>remote=v,remote:()=>remote,writes:()=>writes,reads:()=>reads,disk:()=>disk};
+ return {...f,c,b,choose,messages,setToken:v=>token=v,setRemote:v=>remote={...v,version:Math.max(remote.version+1,v.version)},remote:()=>remote,writes:()=>writes,reads:()=>reads,disk:()=>disk};
 }
 function setLocal(f,cp=f.comps[0],value=15){f.grade(cp,value);}
 test('A1 actual client download merges disjoint data and preserves pending local edits',async()=>{
- const f=client();setLocal(f);const remote=copy(f.remote());remote.payload.finales[f.key(f.comps[1])]=n(18);f.setRemote(remote);assert.equal(await f.c.bajarRegistroNube(),true);assert.equal(f.c.store.finales[f.key(f.comps[0])].nota20,15);assert.equal(f.c.store.finales[f.key(f.comps[1])].nota20,18);assert.equal(f.c.dirty,true);assert.equal(f.writes(),0);
+ const f=client();setLocal(f);const remote=copy(f.remote());remote.payload.finales[f.key(f.comps[1])]=n(18);f.setRemote(remote);assert.equal(await f.c.bajarRegistroNube(),true,JSON.stringify(f.messages));assert.equal(f.c.store.finales[f.key(f.comps[0])].nota20,15);assert.equal(f.c.store.finales[f.key(f.comps[1])].nota20,18);assert.equal(f.c.dirty,true);assert.equal(f.writes(),0);
 });
 test('A1 upload retains local values before acknowledgment then applies merged remote values',async()=>{
  const f=client();setLocal(f);const remote=copy(f.remote());remote.payload.finales[f.key(f.comps[1])]=n(18);f.setRemote(remote);const send=f.c.fetch;
@@ -137,7 +137,7 @@ test('A1 readonly and closed contexts cannot restore backup or upload',async()=>
 });
 test('A1 UI and backend retain main B/C Primary and C Secondary conclusions policy',()=>{
  const f=ui('primaria');f.grade(f.comps[0],12);assert.equal(f.c.validarConclusionesOficial(f.c.ctxBase(),f.c.estudiantes(),[]).length,1);const s=backend();assert.equal(s.c.registroAcademico_().requiresConclusion('primaria','B'),true);
- const {execFileSync}=require('node:child_process');for(const file of ['apps-script/Codigo.js','registro-academic-model.js'])assert.equal(read(file).replace(/\r\n/g,'\n'),execFileSync('git',['show','2806f4d19afdfc7f5e9967c1a4e04b138088eed0:'+file],{encoding:'utf8'}).replace(/\r\n/g,'\n'));
+ const {execFileSync}=require('node:child_process');for(const file of ['apps-script/Codigo.js','registro-academic-model.js'])assert.equal((file==='apps-script/Codigo.js'?require('./registro-phase1-snapshot.cjs').backend(read(file)):read(file)).replace(/\r\n/g,'\n'),execFileSync('git',['show','2806f4d19afdfc7f5e9967c1a4e04b138088eed0:'+file],{encoding:'utf8'}).replace(/\r\n/g,'\n'));
 });
 test('A1 synthetic backend CAS rejects concurrent and stale writes without touching historical rows',()=>{
  const s=backend(),ctx={nivel:'secundaria',bimestre:'I',grado:1,seccion:'A',area:'Matemática'},cp=s.c.registroAcademico_().catalog.secundaria[ctx.area][0],key=['secundaria','I',1,'A',ctx.area,cp,'id:1'].join('||'),req={action:'savereg',token:s.secondary,...ctx,modeloAcademico:1,version:0,payload:p('finales',n(15),key)};

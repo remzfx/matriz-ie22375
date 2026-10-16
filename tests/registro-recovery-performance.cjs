@@ -7,6 +7,8 @@ const flush=async()=>{for(let i=0;i<30;i++)await new Promise(r=>setImmediate(r))
 function setup({source,count=40,competencies=5,authenticated=true,slow=false,offline=false}={}){
  let now=1800000000000,finish,valid=authenticated;const counts={requests:0,writes:0,indexedDB:0,serializations:0,hashes:0,renders:0,statusWrites:0},copy=x=>JSON.parse(JSON.stringify(x));
  const f=fixture(null,{boot:false,source,prepare(c,{timers,intervals,db,r,f}){
+  // Compare the historical adapter with its pre-integrity read core, not a mixed contract.
+  if(source===baseline()){const prior=execFileSync('git',['show','a5be5a91185fc3621994f99eeb90cddef4af9847:registro.html'],{encoding:'utf8',maxBuffer:4000000});for(const n of ['leerEstadoRemotoAcademico','prepararVersionAcademica']){const a=prior.search(new RegExp('^(?:async )?function '+n+'\\(','m'));vm.runInContext(prior.slice(a,prior.indexOf('\n}',a)+2),c);}}
   c.Date=class extends Date{static now(){return now;}};
   c.setTimeout=(fn,ms)=>{const t={fn,ms,at:now+ms};timers.push(t);return t;};
   c.setInterval=(fn,ms)=>{intervals.push({fn,ms,next:now+ms});};
