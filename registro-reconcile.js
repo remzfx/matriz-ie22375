@@ -63,7 +63,8 @@
   function validateRemote(remote,known={}){
     const object=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
     const fail=(code,message)=>{const e=Error(message+' Tus notas locales y su base verificada se conservan.');e.code=code;throw e;};
-    const p=remote.payload,b=known.basePayload;
+    const p=remote.payload;let b=known.basePayload;
+    if(!b&&Number(known.version)>0){try{b=JSON.parse(known.baseline);}catch(_){fail('READ_BASE','No se pudo verificar la base histórica de este registro.');}if(!object(b))fail('READ_BASE','La base histórica es inválida.');}
     if(!object(p))fail('READ_INVALID','Respuesta académica inválida.');
     for(const f of maps)if(p[f]!==undefined&&!object(p[f]))fail('READ_INVALID','Mapa académico inválido.');
     for(const f of ['grades','finales','concComp'])if(Object.values(p[f]||{}).some(v=>!object(v)))fail('READ_INVALID','Registro académico incompleto o inválido.');

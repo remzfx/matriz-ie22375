@@ -28,6 +28,8 @@ lectura genuinamente nueva puede ser vacía. Tras una versión verificada, fila 
 retroceso, omisión de un campo con datos, vaciado global sin tombstones o contenido
 distinto bajo la misma versión son errores recuperables: local/base/backups quedan intactos.
 Las rutas legacy dispersas se admiten en su primera lectura si su forma es válida.
+Una base antigua con versión y baseline canónico pero sin basePayload también se verifica;
+si ese baseline es ilegible, no autoriza reemplazar datos.
 El backend devuelve READ_CORRUPT al leer JSON ilegible/raíz inválida de una fila autorizada;
 no devuelve un falso registro vacío y no repara la hoja. La lectura usa last - 1 filas
 tras la cabecera: no intenta interpretar una fila fantasma posterior al último registro.
