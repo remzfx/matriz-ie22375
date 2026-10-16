@@ -43,8 +43,8 @@ test('backend without Phase 2 capability supports safe reads, never receives the
  assert.equal(await f.c.subirRegistroNube(),false);assert.equal(r.writes,0);assert.equal(f.c.store.finales[f.key].nota20,15);
 });
 test('CAS remains mandatory even when a manipulated caller omits modeloAcademico',()=>{const w=world();const out=w.s.post({action:'savereg',token:w.s.admin,...w.ctx,bimestre:w.ctx.bim,identidadAcademica:1,payload:{}});assert.equal(out.ok,false);assert.equal(out.code,'CONFLICT');assert.equal(w.s.tables.get('RegistroNotas').rows.length,1);});
-test('history size guard rejects atomically rather than truncating originals or overwriting the row',async()=>{
- const w=world(),a=w.device();w.fill(a,15);assert.equal(await a.c.subirRegistroNube(),true);const row=w.s.tables.get('RegistroNotas').rows[1],p=JSON.parse(row[8]);p.meta.academicHistory=[{version:1,originals:{synthetic:'x'.repeat(49000)}}];row[8]=JSON.stringify(p);
+test('active payload size guard rejects atomically before archiving, without truncating originals',async()=>{
+ const w=world(),a=w.device();w.fill(a,15);assert.equal(await a.c.subirRegistroNube(),true);const row=w.s.tables.get('RegistroNotas').rows[1],p=JSON.parse(row[8]);p.meta.observacion='x'.repeat(49000);
  const before=JSON.stringify(row),writes=w.s.state.writes;const body={action:'savereg',token:w.s.admin,...w.ctx,bimestre:w.ctx.bim,identidadAcademica:1,modeloAcademico:1,version:row[7],payload:copy(p)};body.payload.finales[a.key].nota20=12;
  const out=w.s.post(body);assert.equal(out.ok,false);assert.match(out.error,/límite seguro/);assert.equal(JSON.stringify(row),before);assert.equal(w.s.state.writes,writes);
 });

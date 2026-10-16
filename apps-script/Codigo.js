@@ -1970,6 +1970,62 @@ function doGet(e) {
   }
 }
 
+// Private append-only history. Called only inside the authorized savereg CAS lock.
+function hashHistorialAcademico_(raw) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,raw,Utilities.Charset.UTF_8).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join('');
+}
+function referenciaHistorialAcademico_(history) {
+  if(!Array.isArray(history))throw Error('Historial académico inválido; antecedentes conservados.');
+  const refs=history.filter(x=>x&&x.academicArchive===1);
+  if(!refs.length)return null;
+  const r=refs[0];
+  if(refs.length!==1||r!==history[0]||!Number.isSafeInteger(r.row)||r.row<2||!Number.isSafeInteger(r.parts)||r.parts<1||r.parts>64||!Number.isSafeInteger(r.version)||r.version<0||!/^[a-f0-9]{64}$/.test(r.id)||!/^[a-f0-9]{64}$/.test(r.sha256))throw Error('Referencia histórica inválida; no se reemplazó el registro.');
+  return r;
+}
+function leerBloqueHistorialAcademico_(clave,ref,sh) {
+  referenciaHistorialAcademico_([ref]);
+  if(!sh||ref.row+ref.parts-1>sh.getLastRow())throw Error('Falta un bloque histórico. Conserve el borrador y solicite revisión.');
+  const rows=sh.getRange(ref.row,1,ref.parts,7).getValues();
+  if(rows.some((r,i)=>r[0]!==ref.id||r[1]!==clave||Number(r[2])!==ref.version||Number(r[3])!==i||Number(r[4])!==ref.parts||r[5]!==ref.sha256||(typeof r[6]!=='string'||!r[6].startsWith('j:'))))throw Error('Bloque histórico incompleto o de otro contexto.');
+  const raw=rows.map(r=>r[6].slice(2)).join('');
+  if(hashHistorialAcademico_(raw)!==ref.sha256||hashHistorialAcademico_(JSON.stringify([clave,ref.version,raw]))!==ref.id)throw Error('No se verificó la integridad del historial.');
+  const history=JSON.parse(raw),previous=referenciaHistorialAcademico_(history);
+  if(previous&&(previous.row>=ref.row||previous.version>ref.version))throw Error('Cadena histórica inválida.');
+  return history;
+}
+// Read-only maintenance helper; not exposed by GET/POST. Never creates a sheet or restores notes.
+function leerHistorialAcademico_(clave,history) {
+  const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('RegistroHistorialAcademico'),segments=[],seen=new Set();
+  let current=history;
+  for(;;){const ref=referenciaHistorialAcademico_(current);if(!ref){segments.push(current);break;}if(seen.has(ref.id))throw Error('Ciclo en el historial.');seen.add(ref.id);segments.push(current.slice(1));current=leerBloqueHistorialAcademico_(clave,ref,sh);}
+  return JSON.parse(JSON.stringify(segments.reverse().flat()));
+}
+function archivarHistorialAcademico_(payload,clave,version) {
+  const history=payload.meta.academicHistory,previous=referenciaHistorialAcademico_(history),raw=JSON.stringify(history);
+  if(JSON.stringify({...payload,meta:{...payload.meta,academicHistory:[]}}).length>49000)throw Error('Las notas actuales superan el límite seguro de la celda. Conserve el borrador; no borre antecedentes.');
+  const ss=SpreadsheetApp.getActiveSpreadsheet(),name='RegistroHistorialAcademico';let sh=previous?ss.getSheetByName(name):null;
+  if(previous){if(previous.version>version)throw Error('La referencia histórica adelantó la versión activa.');leerBloqueHistorialAcademico_(clave,previous,sh);}
+  if(!history.some(x=>!x||x.academicArchive!==1)||(raw.length<=8000&&JSON.stringify(payload).length<=47000))return;
+  const sha256=hashHistorialAcademico_(raw),id=hashHistorialAcademico_(JSON.stringify([clave,version,raw])),chunks=[];
+  for(let start=0;start<raw.length;){let end=Math.min(start+29990,raw.length);if(end<raw.length&&/[\uD800-\uDBFF]/.test(raw[end-1]))end--;chunks.push(raw.slice(start,end));start=end;}
+  const parts=chunks.length;
+  if(parts>64)throw Error('Bloque histórico demasiado grande; solicite revisión sin borrar datos.');
+  const ref={academicArchive:1,id,row:10000000,parts,sha256,version};
+  // Preflight before creating/appending any archive rows. The maximum row number reserves space.
+  payload.meta.academicHistory=[ref];
+  if(JSON.stringify(payload).length>49000)throw Error('Las notas actuales superan el límite seguro de la celda. Conserve el borrador; no borre antecedentes.');
+  const headers=['id','clave','version','parte','total','sha256','json'];if(!sh)sh=ss.getSheetByName(name);
+  if(!sh){sh=ss.insertSheet(name);sh.appendRow(headers);}
+  if(JSON.stringify(sh.getRange(1,1,1,7).getValues()[0])!==JSON.stringify(headers))throw Error('La hoja de historial tiene un formato distinto. No se sobrescribió.');
+  // Reuse a fully verified block after a lost response. Incomplete/orphan blocks remain untouched.
+  const last=sh.getLastRow(),matches=last>1?sh.getRange(2,1,last-1,1).createTextFinder(id).matchEntireCell(true).matchCase(true).findAll():[];
+  for(const match of matches){const candidate={...ref,row:match.getRow()};try{if(JSON.stringify(leerBloqueHistorialAcademico_(clave,candidate,sh))===raw){payload.meta.academicHistory=[candidate];return;}}catch(_) {}}
+  ref.row=last+1;const rows=chunks.map((chunk,i)=>[id,clave,version,i,parts,sha256,'j:'+chunk]);
+  const required=ref.row+parts-1,max=sh.getMaxRows();if(required>max)sh.insertRowsAfter(max,required-max);
+  sh.getRange(ref.row,1,parts,7).setValues(rows);SpreadsheetApp.flush();
+  leerBloqueHistorialAcademico_(clave,ref,sh); // No active pointer until the entire archive is durable and verified.
+}
+
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
@@ -2054,6 +2110,7 @@ function doPost(e) {
         if(permiso.role==='docente'){const meta=payload.meta&&typeof payload.meta==='object'&&!Array.isArray(payload.meta)?payload.meta:{};payload.meta=Object.assign({},meta,{docente:permiso.docente});}
         if(nuevo)payload.modeloAcademico=1;
         if(prev.meta&&prev.meta.academicHistory&&body.identidadAcademica!==1)return responder_({ok:false,code:'IDENTITY_CLIENT',error:'Actualice el Registro antes de subir. Historial conservado.'});
+        if(body.identidadAcademica!==1&&payload.meta&&Object.prototype.hasOwnProperty.call(payload.meta,'academicHistory')){payload.meta=Object.assign({},payload.meta);delete payload.meta.academicHistory;}
         if(body.identidadAcademica===1){
           if(body.modeloAcademico!==1||body.version==null||Number(body.version)!==prevVersion)return responder_({ok:false,code:'CONFLICT',error:'La identidad académica requiere versión CAS confirmada.'});
           try{
@@ -2078,11 +2135,12 @@ function doPost(e) {
           }catch(e){return responder_({ok:false,code:'IDENTITY_REVIEW',error:e.message});}
         }
 
-        if(JSON.stringify(payload).length>49000)return responder_({ok:false,error:'El registro supera el límite seguro de la celda. El borrador se conserva; reduzca el detalle antes de enviar.'});
         if(nuevo&&fila>=0&&registroAcademico_().canonical(payload)===registroAcademico_().canonical(prev))return responder_({ok:true,clave:clave,fila:fila,version:prevVersion,unchanged:true,...(body.identidadAcademica===1?{identityHistory:permiso.role==='admin'?(prev.meta&&prev.meta.academicHistory||[]):[]}: {})});
+        try{if(body.identidadAcademica===1)archivarHistorialAcademico_(payload,clave,prevVersion);}catch(e){return responder_({ok:false,code:'HISTORY_ARCHIVE',error:e.message});}
+        if(JSON.stringify(payload).length>49000)return responder_({ok:false,error:'El registro supera el límite seguro de la celda. El borrador y sus antecedentes se conservan.'});
         if(fila<0)fila=last+1;
         const version=nuevo?Math.max(Date.now(),prevVersion+1):(body.ts||Date.now());
-        [clave,nivelR,bimestre,grado,seccion,area,permiso.docente,version,JSON.stringify(payload)].forEach((v,i)=>sh.getRange(fila,i+1).setValue(v));
+        sh.getRange(fila,1,1,9).setValues([[clave,nivelR,bimestre,grado,seccion,area,permiso.docente,version,JSON.stringify(payload)]]);
         return responder_({ok:true,clave:clave,fila:fila,version:version,msg:'Registro guardado',...(body.identidadAcademica===1?{identityHistory:permiso.role==='admin'?payload.meta.academicHistory:[]}: {})});
       }finally{lock.releaseLock();}
     }
