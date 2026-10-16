@@ -31,6 +31,20 @@ test('Same A and same displayed number with different origins keeps the explicit
  assert.match(api.conflictView(conflict(a,b),{roster}).explanation,/origen de la nota.*Letras, Numérica/);
 });
 
+test('Letter versus numeric explanations never describe the reference as a second exact numeric grade',()=>{
+ const letter={nivel:'A',nota20:15,origen:'letra'};
+ for(const n of [14,15])for(const reverse of [false,true]){
+  const number={nivel:'A',nota20:n,origen:'numero'},[a,b]=reverse?[number,letter]:[letter,number],view=api.conflictView(conflict(a,b),{roster});
+  assert.match(view.explanation,/ingresada como letra y otra como número/);assert.match(view.explanation,/En Letras, nota20 es solo una referencia/);assert.doesNotMatch(view.explanation,/Compare las notas numéricas exactas|Compare los números exactos|diferencias en: nota exacta/);
+ }
+ const view=api.conflictView({path:JSON.stringify(['finales',id]),candidates:[{value:letter},{value:{nivel:'A',nota20:14,origen:'numero'}}]},{roster});assert.match(view.explanation,/ingresada como letra/);assert.doesNotMatch(view.explanation,/Compare las notas numéricas exactas/);
+});
+
+test('Numeric explanation uses actual exact values; unverified origins or types never acquire numeric authority',()=>{
+ const a={nivel:'B',nota20:11,origen:'numero'},b={nivel:'B',nota20:12,origen:'numero'};assert.match(api.conflictView(conflict(a,b),{roster}).explanation,/11 frente a 12/);
+ for(const alternative of [{nivel:'B',nota20:12},{...b,nota20:'12'}]){const view=api.conflictView(conflict(a,alternative),{roster});assert.match(view.explanation,/valor o tipo de nota20/);assert.doesNotMatch(view.explanation,/Compare las notas numéricas exactas/);}
+});
+
 test('Reproduction: identical visible grades conceal an additional field; UI names it without inventing academic equivalence',()=>{
  const a={nivel:'A',nota20:15,origen:'numero'},b={...a,revisionFicticia:'por verificar'},view=api.conflictView(conflict(a,b),{roster});
  assert.equal(view.local,view.remote);assert.equal(api.equal(a,b),false);assert.match(view.explanation,/campo adicional «revisionFicticia»/);assert.match(view.explanation,/se ven iguales.*detalles técnicos/);

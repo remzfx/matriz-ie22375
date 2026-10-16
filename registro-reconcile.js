@@ -267,10 +267,13 @@
       if(a&&b&&typeof a==='object'&&typeof b==='object'&&!Array.isArray(a)&&!Array.isArray(b))for(const k of new Set([...Object.keys(a),...Object.keys(b)])){if(!equal(a[k],b[k]))different.add(k);}
       else if(!equal(a,b))different.add('registro');
     }
-    const labels={nivel:'nivel de logro',nota20:'nota exacta de 0–20',origen:'origen de la nota (Letras, Numérica o sin verificar)',borrado:'estado de borrado',registro:'presencia o contenido del registro'};
+    const mixedOrigins=alternatives.some(v=>v?.origen==='letra')&&alternatives.some(v=>v?.origen==='numero');
+    const exactNumeric=alternatives.length>1&&alternatives.every(v=>v?.origen==='numero'&&typeof v.nota20==='number'&&Number.isFinite(v.nota20));
+    const labels={nivel:'nivel de logro',nota20:exactNumeric?'nota exacta de 0–20':mixedOrigins?'valor asociado al origen (referencia en Letras o nota numérica)':'valor o tipo de nota20, sin equivalencia numérica demostrada',origen:'origen de la nota (Letras, Numérica o sin verificar)',borrado:'estado de borrado',registro:'presencia o contenido del registro'};
     const fields=[...different].map(k=>labels[k]||'campo adicional «'+k+'»');
     let explanation=fields.length?'Se requiere revisión por diferencias en: '+fields.join('; ')+'. La misma letra visible no demuestra que los registros sean iguales.':'La revisión corresponde al conjunto de datos indicado; las marcas de tiempo y los números de referencia de Letras no deciden la vigencia.';
-    if(different.has('nota20'))explanation+=' Compare los números exactos: A con 14 y A con 15 son calificaciones distintas.';
+    if(mixedOrigins)explanation+=' Una alternativa fue ingresada como letra y otra como número. En Letras, nota20 es solo una referencia; no representa una nota numérica ingresada.';
+    if(different.has('nota20')&&exactNumeric)explanation+=' Compare las notas numéricas exactas: '+[...new Set(alternatives.map(v=>v.nota20))].join(' frente a ')+'. Compartir nivel no las hace equivalentes.';
     if(alternatives.some((v,i)=>i&&value(v)===value(alternatives[0])&&!equal(v,alternatives[0])))explanation+=' Las alternativas se ven iguales en el resumen; abra «Identificación y detalles técnicos» para ver el valor y tipo de cada campo.';
     if(individual&&!student)explanation+=' La identidad no está verificada inequívocamente en el padrón mostrado; no se deben asociar estudiantes por suposición.';
     return {title,local:value(c.local),remote:value(c.remote),explanation};
