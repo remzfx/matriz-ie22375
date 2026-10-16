@@ -234,6 +234,11 @@ test('A1 homonymous students remain distinct through official identity and order
 test('A1 conflict UI retains exact technical identification in collapsed safe details',async()=>{
  const f=dialog(),field=f.content.children.find(x=>x.tag==='fieldset'),details=field.children.find(x=>x.tag==='details');assert.equal(details.open,undefined);assert.match(details.children[1].textContent,/id:synthetic/);assert.equal(details.children[1].innerHTML,undefined);assert.match(field.children[1].children[0].children[1].children[0].textContent,/Este dispositivo/);assert.match(field.children[1].children[1].children[1].children[0].textContent,/Nube/);f.cancel.onclick();assert.equal(await f.pending,null);
 });
+
+test('A1 modal exposes the concrete reason before technical details without preselecting or writing',async()=>{
+ const f=dialog(),field=f.content.children.find(x=>x.tag==='fieldset'),reason=field.children.find(x=>x.className==='academic-conflict-explanation');
+ assert.ok(reason);assert.match(reason.textContent,/Se requiere revisión por diferencias/);assert.equal(reason.innerHTML,undefined);assert.equal(f.apply.disabled,true);f.cancel.onclick();assert.equal(await f.pending,null);
+});
 test('A1 switching to another area with an older copy never silently reverts shared attendance',async()=>{
  const f=client(),a=f.c.asisCtxKey(),key=a+'||'+DATE+'||id:1';f.c.cloudClaveReg=()=>[f.c.nivel,f.c.bim,f.c.grado,f.c.seccion,f.c.areaActual].join('||');f.c.prefijoReg=()=>f.c.cloudClaveReg()+'||';f.c.store.asistencia[key]={marca:'P',ts:900};f.c.store.asisFechas[a]=[DATE];f.c.areaActual='Comunicación';const b=f.c.baselineAcademica();b.basePayload=copy(f.c.sliceRegistroArea());b.version=1;const remote={version:1,payload:copy(b.basePayload)};remote.payload.asistencia[key]={marca:'F',ts:1};f.setRemote(remote);f.c.IERegistroReconcile.choose=async cs=>{assert.equal(cs.length,1);return {[cs[0].path]:'local'}};
  assert.equal(await f.c.bajarRegistroNube(),true);assert.equal(f.c.store.asistencia[key].marca,'P');assert.deepEqual(copy(f.c.store.asisFechas[a]),[DATE]);assert.equal(f.writes(),0);

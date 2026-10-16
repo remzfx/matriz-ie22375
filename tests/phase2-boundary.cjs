@@ -6,7 +6,7 @@ const markers={html:'src="academic-identity.js"',reconcile:'function academicPla
 const digest=s=>crypto.createHash('sha256').update(s).digest('hex');
 function original(kind){if(!memo.has(kind))memo.set(kind,execFileSync('git',['show',base+':'+files[kind]],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'));return memo.get(kind);}
 const fn=(s,n)=>{const start=s.search(new RegExp('^(?:async )?function '+n+'\\(','m'));return s.slice(start,s.indexOf('\n}',start)+2);};
-function without(kind,source){if(['html','recovery'].includes(kind))source=require('./phase3-boundary.cjs')[kind](source);source=source.replace(/\r\n/g,'\n');if(!source.includes(markers[kind]))return source;
+function without(kind,source){if(kind==='reconcile')source=require('./reconciliation-ui-boundary.cjs')(source);if(['html','recovery'].includes(kind))source=require('./phase3-boundary.cjs')[kind](source);source=source.replace(/\r\n/g,'\n');if(!source.includes(markers[kind]))return source;
  if(kind==='html'){
   for(const [name,hash]of Object.entries(functions)){const value=fn(source,name);assert.equal(digest(value),hash,'Exact reviewed Phase 2 function: '+name);source=source.replace(value,fn(original('html'),name));}
   const start=source.indexOf('/* Adaptador frontend: operaciones explícitas'),end=source.indexOf('\n</script>',start),adapter=source.slice(start,end).trim();

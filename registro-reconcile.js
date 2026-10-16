@@ -239,7 +239,7 @@
     const tail=parts.at(-1)||'',decode=s=>{try{return decodeURIComponent(s);}catch(e){return s;}};
     const candidates=(context.roster||[]).filter(al=>{
       const id=typeof global.studentKey==='function'?global.studentKey(al):al.idSiagie?'id:'+encodeURIComponent(al.idSiagie):al.codigoEstudiante?'cod:'+encodeURIComponent(al.codigoEstudiante):'nom:'+encodeURIComponent(normalize(al.nombre));
-      return id===tail||(al.codigoEstudiante&&tail==='cod:'+encodeURIComponent(al.codigoEstudiante))||[al.nombre,...(context.aliases&&context.aliases[id]||[])].some(n=>normalize(n)===normalize(decode(tail.replace(/^nom:/,''))));
+      return id===tail||(al.codigoEstudiante&&tail==='cod:'+encodeURIComponent(al.codigoEstudiante))||normalize(al.nombre)===normalize(decode(tail.replace(/^nom:/,'')));
     });
     const student=candidates.length===1?candidates[0]:null;
     const individual=['grades','finales','concComp','concArea','asistencia'].includes(field);
@@ -261,7 +261,19 @@
       }
       return v===true?'Presente':String(v);
     }
-    return {title,local:value(c.local),remote:value(c.remote)};
+    const alternatives=c.candidates?c.candidates.map(x=>x.value):[c.local,c.remote],different=new Set();
+    for(let i=1;i<alternatives.length;i++){
+      const a=clean(alternatives[0]),b=clean(alternatives[i]);
+      if(a&&b&&typeof a==='object'&&typeof b==='object'&&!Array.isArray(a)&&!Array.isArray(b))for(const k of new Set([...Object.keys(a),...Object.keys(b)])){if(!equal(a[k],b[k]))different.add(k);}
+      else if(!equal(a,b))different.add('registro');
+    }
+    const labels={nivel:'nivel de logro',nota20:'nota exacta de 0–20',origen:'origen de la nota (Letras, Numérica o sin verificar)',borrado:'estado de borrado',registro:'presencia o contenido del registro'};
+    const fields=[...different].map(k=>labels[k]||'campo adicional «'+k+'»');
+    let explanation=fields.length?'Se requiere revisión por diferencias en: '+fields.join('; ')+'. La misma letra visible no demuestra que los registros sean iguales.':'La revisión corresponde al conjunto de datos indicado; las marcas de tiempo y los números de referencia de Letras no deciden la vigencia.';
+    if(different.has('nota20'))explanation+=' Compare los números exactos: A con 14 y A con 15 son calificaciones distintas.';
+    if(alternatives.some((v,i)=>i&&value(v)===value(alternatives[0])&&!equal(v,alternatives[0])))explanation+=' Las alternativas se ven iguales en el resumen; abra «Identificación y detalles técnicos» para ver el valor y tipo de cada campo.';
+    if(individual&&!student)explanation+=' La identidad no está verificada inequívocamente en el padrón mostrado; no se deben asociar estudiantes por suposición.';
+    return {title,local:value(c.local),remote:value(c.remote),explanation};
   }
   function choose(conflicts,isCurrent,context={}){
     if(!conflicts.length)return Promise.resolve({});
@@ -308,6 +320,7 @@
           source.textContent=typeof side==='string'?(side==='local'?'Este dispositivo':'Nube'):side.label;value.className='academic-conflict-value';value.textContent=typeof side==='string'?view[side]:conflictView({path:c.path,local:side.value},context).local;text.appendChild(source);text.appendChild(value);
           radio.onchange=()=>{choices[c.path]=typeof side==='string'?side:side.id;apply.disabled=conflicts.some(x=>!choices[x.path]);};row.appendChild(radio);row.appendChild(text);options.appendChild(row);
         }
+        const explanation=document.createElement('p');explanation.className='academic-conflict-explanation';explanation.textContent=view.explanation;field.appendChild(explanation);
         const details=document.createElement('details'),summary=document.createElement('summary'),technical=document.createElement('pre');summary.textContent='Identificación y detalles técnicos';technical.textContent=JSON.stringify(c,null,2);details.appendChild(summary);details.appendChild(technical);field.appendChild(details);content.appendChild(field);
       });
       apply.type=cancel.type='button';apply.textContent='Continuar con las decisiones';cancel.textContent='Cancelar';apply.disabled=true;
