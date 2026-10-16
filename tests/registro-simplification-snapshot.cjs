@@ -6,6 +6,7 @@ const footerCSS="  /* Recovery footer: compact opaque actions, horizontal scroll
 const modules=['registro-drafts.js','registro-recovery-ui.js'].map(f=>'<script>\n'+fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/\r\n/g,'\n')+'\n</script>').join('\n');
 const added='<!-- Inicio simplificación docente: dependencia separada, sin cambiar handlers académicos. -->\n'+modules+'\n<!-- Fin simplificación docente. -->\n';
 module.exports=s=>{
+ s=require('./registro-phase1-snapshot.cjs')(s);
  s=require('./registro-pr84-snapshot.cjs')(s);
  s=s.replace(/\r\n/g,'\n');if(!s.includes('<!-- Inicio simplificación docente:')){assert.ok(!s.includes('onclick="IERegistroRecovery.'),'No partial removal of recovery additions');return s;}
  s=require('./registro-read-deadline-snapshot.cjs')(s);

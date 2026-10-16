@@ -1766,7 +1766,7 @@ function doGet(e) {
       const last = sh.getLastRow();
       const items = [];
       if (last >= 2) {
-        const data = sh.getRange(2, 1, last, 9).getValues();
+        const data = sh.getRange(2, 1, last - 1, 9).getValues();
         for (let i = 0; i < data.length; i++) {
           const rowNivel = String(data[i][1] || '').toLowerCase();
           if (nivel && rowNivel !== nivel) continue;
@@ -1775,9 +1775,11 @@ function doGet(e) {
           let payload = {};
           try {
             const raw = data[i][8];
-            if (typeof raw === 'string' && raw) payload = JSON.parse(raw);
+            if (typeof raw === 'string' && raw.trim()) payload = JSON.parse(raw);
             else if (raw && typeof raw === 'object') payload = raw;
-          } catch (err) { payload = {}; }
+            else throw Error('Registro sin JSON válido.');
+          } catch (err) { return responder_({ok:false,code:'READ_CORRUPT',error:'Registro académico ilegible. No se reemplazaron datos; solicita revisión.'}); }
+          if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return responder_({ok:false,code:'READ_CORRUPT',error:'Formato académico inválido. No se reemplazaron datos; solicita revisión.'});
           items.push({
             clave: data[i][0],
             nivel: data[i][1],

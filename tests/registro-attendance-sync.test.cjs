@@ -17,6 +17,7 @@ function device(){
    registroSoloLectura:()=>false,registroNubeNoVerificada:()=>false,getLoginSession:()=>({token:'synthetic-token'}),guardarTodo(){},saveStore(){},renderSesiones(){},renderStudents(){},estudiantes:()=>[],
    CLOUD_API_URL:'synthetic',fetch:async(url,options)=>{requests.push(JSON.parse(options.body));return {text:async()=>JSON.stringify({ok:true,version:1})}}
  });
+ let localDisk=null;c.NOTAS_KEY='synthetic-attendance';c.localStorage={getItem:()=>localDisk,setItem:(_,raw)=>localDisk=raw};c.saveStore=()=>c.localStorage.setItem(c.NOTAS_KEY,JSON.stringify(store));
  const baseline={version:0,baseline:'not-synchronized'};Object.assign(c,{IERegistroAcademico:{canonical:JSON.stringify},baselineAcademica:()=>baseline,prepararVersionAcademica:async()=>true,informeSiagie:()=>({ok:true}),dirtyAcademico:()=>{}});
  const run=s=>new vm.Script(s).runInContext(c);
  run("let nivel='secundaria',areaActual='Matemática',padronBimestre='III',asisFechaActiva='2026-10-05',sesionActiva=null,notas={},renderedDates=[];function renderAsistencia(){renderedDates=getAsisFechas().slice()}");

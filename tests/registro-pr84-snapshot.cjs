@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const base=require('node:child_process').execFileSync('git',['show','e3243fe74a0aee6981f8173835f4cb183b3622df:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 const fn=(s,n)=>{const a=s.indexOf('function '+n+'(');return s.slice(a,s.indexOf('\n}',a)+2);};
 module.exports=source=>{
+ source=require('./registro-phase1-snapshot.cjs')(source);
  source=require('./registro-issue86-snapshot.cjs')(source);
  let s=source.replace(/\r\n/g,'\n');if(!s.includes('const registroLocal = IERegistroLocalStore.create('))return s;
  const module='<script>\n'+fs.readFileSync(path.join(__dirname,'..','registro-local-store.js'),'utf8').trim().replace(/\r\n/g,'\n')+'\n</script>\n';

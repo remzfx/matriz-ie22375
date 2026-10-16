@@ -3105,7 +3105,7 @@ async function leerEstadoRemotoAcademico(c,key,token,options){
   const rows=(data.items||[]).filter(x=>x.clave===key);
   if(rows.length>1)throw Error('Hay registros duplicados del mismo contexto. Revise antes de sincronizar.');
   const row=rows[0];if(row&&(typeof row.ts!=='number'||!Number.isFinite(row.ts)||row.ts<0))throw Error('Versión remota inválida.');
-  return {version:row?Number(row.ts):0,payload:row?row.payload||{}:{},exists:!!row};
+  return IERegistroReconcile.validateRemote({version:row?Number(row.ts):0,payload:row?row.payload:{},exists:!!row},baselineAcademica());
 }
 function aplicarRegistroConciliado(payload,conservarAsistencia=false){
   const pref=prefijoReg(),aula=asisCtxKey(),asisPref=aula+'||',c=ctxBase();
@@ -3162,7 +3162,7 @@ async function prepararVersionAcademica(options){
   const b=baselineAcademica();let base=b.basePayload||null;
   if(b.attempt&&IERegistroAcademico.canonical(remote.payload)===IERegistroAcademico.canonical(b.attempt.payload)&&remote.version>b.attempt.version)base=b.attempt.local;
   const groups=IERegistroReconcile.identityConflicts(local,remote.payload,estudiantes(),typeof IEStudentIdentity==='undefined'?null:IEStudentIdentity);
-  options.fase?.('conciliacion');const reconciliation=IERegistroReconcile.plan(base,local,remote.payload,groups,{sharedAttendance:true});
+  options.fase?.('conciliacion');const reconciliation=IERegistroReconcile.plan(base,local,remote.payload,groups,{sharedAttendance:true,reviewAbsence:true});
   if(options.automatico&&reconciliation.conflicts.length){bajarRegistroNube.resultado={key,token,estado:'conflicto',conflictos:reconciliation.conflicts.length};return false;}
   const choices=options.automatico?{}:await IERegistroReconcile.choose(reconciliation.conflicts,current,{roster:estudiantes(),aliases:local.meta&&local.meta.studentAliases});
   if(!choices){bajarRegistroNube.resultado={key,token,estado:current()?'conflicto':'pendiente',conflictos:reconciliation.conflicts.length};toast('Conflicto pendiente. El trabajo local se conserva; ninguna nota fue enviada.');return false;}
@@ -3170,10 +3170,14 @@ async function prepararVersionAcademica(options){
   const payload=reconciliation.resolve(choices);
   // Un único respaldo acotado por contexto. Si falla su persistencia no se envía nada.
   const previous=IERegistroReconcile.copy(b);
-  b.recovery={local,base:b.basePayload||null,remote:IERegistroReconcile.copy(remote.payload)};
+  // Preserve the useful recovery slot on identical re-reads; retain three distinct pre-replacement snapshots.
+  if(!IERegistroReconcile.readEqual(payload,local)){
+    const history=b.readBackups||[];if(!history.some(x=>IERegistroReconcile.readEqual(x.local,local)))b.readBackups=[{local,base:b.basePayload||null,version:b.version},...history].slice(0,3);
+    b.recovery={local,base:b.basePayload||null,remote:IERegistroReconcile.copy(remote.payload)};
+  }
   // La lectura no cambia la base causal: un POST rechazado debe poder conciliarlas de nuevo.
   b.soportaModeloAcademico=true;
-  options.fase?.('respaldo');try{saveStore();if(options.validarPersistencia&&!options.validarPersistencia())throw Error('No se verificó el respaldo local.');}catch(e){store.academicSync[key]=previous;throw Error('No se pudo guardar el respaldo local. No cierre la pestaña; no se enviaron notas.');}
+  options.fase?.('respaldo');try{saveStore();if(localStorage.getItem(NOTAS_KEY)!==JSON.stringify(store))throw Error('No se verificó el respaldo local.');if(options.validarPersistencia&&!options.validarPersistencia())throw Error('No se verificó el respaldo local.');}catch(e){store.academicSync[key]=previous;throw Error('No se pudo guardar el respaldo local. No cierre la pestaña; no se enviaron notas.');}
   prepararVersionAcademica.plan={key,token,localSignature,local,payload,remote};return true;
 }
 

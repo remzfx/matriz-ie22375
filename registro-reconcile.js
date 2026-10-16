@@ -51,6 +51,35 @@
     }));return out;
   }
   function signature(p){return JSON.stringify([...flatten(p)].sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,clean(v)]));}
+  // Read integrity is separate from A1: an absent/corrupt row is not a deletion.
+  function readEqual(a,b){
+    const project=p=>{p=p||{};const out={...p,meta:{...(p.meta||{})}};delete out.meta.docente;delete out.meta.studentAliases;delete out.modeloAcademico;
+      maps.forEach(f=>out[f]=p[f]||{});
+      const sessionKey=s=>[s.nivel,s.bim,s.grado,s.seccion,s.area,s.comp,s.capacidad,s.fecha].join('||');
+      out.sessions=(p.sessions||[]).slice().sort((x,y)=>sessionKey(x).localeCompare(sessionKey(y)));
+      out.asisFechas=Object.fromEntries(Object.entries(p.asisFechas||{}).filter(([,v])=>v.length).map(([k,v])=>[k,[...new Set(v)].sort()]));return out;};
+    return equal(project(a),project(b));
+  }
+  function validateRemote(remote,known={}){
+    const object=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
+    const fail=(code,message)=>{const e=Error(message+' Tus notas locales y su base verificada se conservan.');e.code=code;throw e;};
+    const p=remote.payload,b=known.basePayload;
+    if(!object(p))fail('READ_INVALID','Respuesta académica inválida.');
+    for(const f of maps)if(p[f]!==undefined&&!object(p[f]))fail('READ_INVALID','Mapa académico inválido.');
+    for(const f of ['grades','finales','concComp'])if(Object.values(p[f]||{}).some(v=>!object(v)))fail('READ_INVALID','Registro académico incompleto o inválido.');
+    if(p.sessions!==undefined&&(!Array.isArray(p.sessions)||p.sessions.some(s=>!object(s))))fail('READ_INVALID','Sesiones inválidas.');
+    if(p.asisFechas!==undefined&&(!object(p.asisFechas)||Object.values(p.asisFechas).some(v=>!Array.isArray(v))))fail('READ_INVALID','Fechas inválidas.');
+    if(remote.exists===false&&Number(known.version)>0)fail('READ_MISSING','No se encontró un registro previamente verificado.');
+    if(known.version!=null&&remote.version<known.version)fail('READ_STALE','La lectura retrocedió de versión.');
+    if(!b)return remote;
+    if(remote.version===known.version&&!readEqual(p,b))fail('READ_VERSION','La misma versión contiene datos diferentes.');
+    for(const f of [...maps,'sessions'])if(Object.keys(b[f]||{}).length&&p[f]===undefined)fail('READ_INCOMPLETE','La lectura omite información previamente verificada.');
+    const fields=['grades','finales','concComp','concArea'];
+    const records=x=>fields.flatMap(f=>Object.entries(x[f]||{}).filter(([,v])=>v&&!v.borrado).map(([k])=>[f,k]));
+    const previous=records(b);
+    if(previous.length&&!records(p).length&&!previous.every(([f,k])=>p[f]&&p[f][k]&&p[f][k].borrado))fail('READ_EMPTY','La lectura está vacía sin borrados explícitos verificables.');
+    return remote;
+  }
   function plan(base,local,remote,identityGroups=[],options={}){
     const b=base===null?null:flatten(base),l=flatten(local),r=flatten(remote),merged=new Map(),conflicts=[];
     const keys=[...new Set([...(b?b.keys():[]),...l.keys(),...r.keys()])].sort();
@@ -67,6 +96,7 @@
         else if(rv===undefined)merged.set(path,lv);
         else conflicts.push({path,local:copy(lv),remote:copy(rv),unknownBase:true,reason:'Asistencia compartida entre áreas: requiere decisión explícita'});
       }
+      else if(options.reviewAbsence&&b&&bv!==undefined&&(lv===undefined||rv===undefined))conflicts.push({path,base:copy(bv),local:copy(lv),remote:copy(rv),reason:'Un dato conocido está ausente sin marca explícita de borrado. Revisa antes de reemplazarlo.'});
       else if(b&&equal(lv,bv)){if(rv!==undefined)merged.set(path,rv);}
       else if(b&&equal(rv,bv)){if(lv!==undefined)merged.set(path,lv);}
       else if(!b&&lv===undefined){merged.set(path,rv);}
@@ -246,7 +276,7 @@
       document.addEventListener('keydown',key);document.body.appendChild(overlay);cancel.focus();
     });
   }
-  const api={copy,equal,signature,plan,identityConflicts,conflictView,choose,has};
+  const api={copy,equal,signature,readEqual,validateRemote,plan,identityConflicts,conflictView,choose,has};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   global.IERegistroReconcile=api;
 })(typeof window!=='undefined'?window:globalThis);
