@@ -586,6 +586,16 @@
  }
  /* Fin Calificar integral Issue86 */
 
+/* Fase3: conexión separada del estado de sincronización. */
+#registroConnectionStatus {margin:6px 0;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;font-size:12px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;overflow-wrap:anywhere;}
+#registroConnectionStatus[data-state="offline"],#registroConnectionStatus[data-state="server"],#registroConnectionStatus[data-state="session"],#registroConnectionStatus[data-state="review"] {background:#fff7ed;border-color:#fdba74;color:#9a3412;}
+#registroConnectionStatus button {min-height:44px;padding:4px 10px;flex:0 0 auto;}
+#registroConnectionStatus[data-state="checking"]::before,#registroConnectionStatus[data-state="offline"]::before {content:"";width:12px;height:12px;border:2px solid #cbd5e1;border-top-color:#0284c7;border-radius:50%;animation:registro-reconnect 1s linear infinite;}
+@keyframes registro-reconnect {to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#registroConnectionStatus::before {animation:none!important;}}
+@media print{#registroConnectionStatus{display:none!important}}
+/* Fin Fase3 conexión. */
+
 @media screen{#printArea{display:block;position:static;padding:10mm;background:white}.fixture-controls{padding:12px;background:#e0f2fe}.fixture-controls button{padding:8px 16px}.bimestral-table{border-collapse:collapse;width:100%}.bimestral-table th,.bimestral-table td{border:1px solid #cbd5e1;padding:4px}.bimestral-grade,.bimestral-number{text-align:center;vertical-align:middle}.bimestral-name{text-align:left;white-space:normal;overflow-wrap:anywhere}}/* Calificar integral Issue86 */
  @page calificar-integral {size:A4 landscape;margin:8mm;}
  @media screen {
