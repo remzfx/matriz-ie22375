@@ -1,6 +1,55 @@
 // Only synthetic roster/grades and the actual read-only print wrapper/model.
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{report}=require('./registro-bimestral-print-fixture.cjs'),printer=require('../registro-calificar-print.js');
 const source=fs.readFileSync(path.join(__dirname,'..','registro.html'),'utf8').replace(/\r\n/g,'\n');
+test('Capacity order change is confined to the exact print builder and capsSel argument; all other source stays intact',()=>{
+ const old=require('node:child_process').execFileSync('git',['show','86e06835c6a42ce90f439d91ca8e39d1cfc8400e:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
+ assert.equal(require('./calificar-order-boundary.cjs').html(source),old);
+ assert.ok(source.includes(fs.readFileSync(path.join(__dirname,'..','registro-calificar-print.js'),'utf8').trim().replace(/\r\n/g,'\n')));
+});
+for(const kind of ['dia','semana','bimestre'])test('Persisted non-alphabetic capacity order matches actual Calificar grid and '+kind+' print without moving grades',()=>{
+ const f=report({level:'secundaria',area:'Educación para el Trabajo (EPT)',count:30,kind}),c=f.c,cp=f.comps[0],caps=['Crea propuesta de valor','Aplica habilidades técnicas'],dates=['2026-10-14','2026-10-16','2026-10-20'];
+ c.store.sessions=dates.flatMap(fecha=>caps.slice().reverse().map(capacidad=>({...c.ctxBase(),comp:cp,capacidad,fecha})));c.store.capsSel={};
+ for(const date of dates){const order=date==='2026-10-16'?caps.slice().reverse():caps;c.store.capsSel[c.cloudClaveReg()+'||'+date]=order.map(cap=>({comp:cp,cap}));
+  for(const [i,al]of c.estudiantes().entries())for(const [j,cap]of caps.entries())c.store.grades[[c.cloudClaveReg(),cp,cap,date,c.studentKey(al)].join('||')]={nivel:(i+j)%2?'A':'B',nota20:(i+j)%2?15:12,origen:'numero'};
+ }
+ const vm=require('node:vm'),{extract}=require('./registro-visual-demo.cjs');c.esCompetenciaTransversal=()=>false;c.IERegistroTransversales=undefined;
+ for(const name of ['keyCapsHoy','normCapItem','tieneCapSel','loadCapsElegidas','colsCalificar'])vm.runInContext(extract(source,name),c);
+ const selected=kind==='dia'?dates.slice(0,1):kind==='semana'?dates.slice(0,2):dates,expected=[];
+ const before=JSON.stringify(c.store);
+ for(const date of selected){f.el('inpFecha').value=date;c.loadCapsElegidas();c.renderStudents();const visible=Array.from(c.colsCalificar(),x=>x.cap),head=f.el('stuList').innerHTML.split('</thead>')[0];assert.ok(head.indexOf(visible[0])<head.indexOf(visible[1]));expected.push(...visible);}
+ c.prepararImpresion(kind==='dia'?{desde:dates[0],hasta:dates[0]}:kind==='semana'?{desde:dates[0],hasta:dates[1]}:{});
+ const h=f.el('printArea').innerHTML;assert.deepEqual([...h.matchAll(/class="evidence-title"[^>]*title="([^"]+)"/g)].map(m=>m[1]),expected);
+ for(const date of selected)for(const al of c.estudiantes())for(const cap of caps){const key=[c.cloudClaveReg(),cp,cap,date,c.studentKey(al)].join('||');assert.ok(h.includes('data-evidence="'+c.escapeRegistro(key)+'">'+c.store.grades[key].nivel+'</td>'));}
+ assert.equal(JSON.stringify(c.store),before);assert.equal(f.calls.length,0);
+});
+
+test('Historical missing/partial selections preserve session order, all original keys, dates and competence groups',()=>{
+ const context={nivel:'secundaria',bim:'III',grado:2,seccion:'A',area:'Área ficticia'},caps=['Z histórica','A histórica','M histórica'],sessions=caps.map(capacidad=>({...context,comp:'Competencia ficticia',fecha:'2026-10-14',capacidad}));
+ const options={context,competences:['Competencia ficticia'],sessions,students:[],mode:'letra',year:2026,teacher:'FICTICIO'};
+ const titles=o=>[...printer.build(o).matchAll(/class="evidence-title"[^>]*title="([^"]+)"/g)].map(m=>m[1]),key=Object.values(context).join('||')+'||2026-10-14',before=JSON.stringify(sessions);
+ assert.deepEqual(titles(options),caps);assert.deepEqual(titles({...options,capsSel:{[key]:null}}),caps);
+ assert.deepEqual(titles({...options,capsSel:{[key]:[{comp:'Competencia ficticia',cap:caps[2]},{comp:'Otra competencia',cap:caps[1]}]}}),[caps[2],caps[0],caps[1]]);
+ assert.deepEqual(titles({...options,capsSel:{[key]:[caps[2],caps[0],caps[1]]}}),[caps[2],caps[0],caps[1]]);assert.equal(JSON.stringify(sessions),before);
+});
+for(const kind of ['dia','semana','bimestre'])test('Interleaved competencies follow actual Calificar order with aligned headers and original student grades: '+kind,()=>{
+ const f=report({level:'secundaria',area:'Comunicación',count:30,mode:'num',kind}),c=f.c,[cp1,cp2]=f.comps,dates=['2026-10-14','2026-10-16','2026-10-20'];
+ const columns=[{comp:cp2,cap:'Capacidad compartida'},{comp:cp1,cap:'Z capacidad ficticia'},{comp:cp2,cap:'A capacidad ficticia'},{comp:cp1,cap:'Capacidad compartida'}];
+ c.store.sessions=[];c.store.capsSel={};
+ for(const date of dates){const order=date===dates[1]?columns.slice().reverse():columns;c.store.capsSel[c.cloudClaveReg()+'||'+date]=order;
+  for(const col of columns.slice().reverse()){c.store.sessions.push({...c.ctxBase(),comp:col.comp,capacidad:col.cap,fecha:date});for(const [i,al]of c.estudiantes().entries()){const n=i%5+columns.indexOf(col)+11;c.store.grades[[c.cloudClaveReg(),col.comp,col.cap,date,c.studentKey(al)].join('||')]={nivel:c.numToLetter(n),nota20:n,origen:'numero'};}}
+ }
+ const vm=require('node:vm'),{extract}=require('./registro-visual-demo.cjs');c.esCompetenciaTransversal=()=>false;c.IERegistroTransversales=undefined;
+ for(const name of ['keyCapsHoy','normCapItem','tieneCapSel','loadCapsElegidas','colsCalificar'])vm.runInContext(extract(source,name),c);
+ const selected=kind==='dia'?dates.slice(0,1):kind==='semana'?dates.slice(0,2):dates,expected=[],before=JSON.stringify(c.store);
+ for(const date of selected){f.el('inpFecha').value=date;c.loadCapsElegidas();c.renderStudents();const visible=Array.from(c.colsCalificar(),x=>({comp:x.comp,cap:x.cap})),head=f.el('stuList').innerHTML.split('</thead>')[0];
+  assert.deepEqual(visible,c.store.capsSel[c.cloudClaveReg()+'||'+date]);const pairs=[...head.matchAll(/class="fin-caps">(.*?)<br>(.*?)<\/div>/g)].map(m=>[m[1],m[2]]);assert.deepEqual(pairs,visible.map(x=>[c.escapeRegistro(x.comp),c.escapeRegistro(x.cap)]));expected.push(...visible.map(x=>({...x,date})));
+ }
+ c.prepararImpresion(kind==='dia'?{desde:dates[0],hasta:dates[0]}:kind==='semana'?{desde:dates[0],hasta:dates[1]}:{});const h=f.el('printArea').innerHTML;
+ const codes=expected.map(x=>'C'+(f.comps.indexOf(x.comp)+1));assert.deepEqual([...h.matchAll(/class="competence-head"[^>]*colspan="(\d+)">([^<]+)</g)].map(m=>[Number(m[1]),m[2]]),codes.map(code=>[1,code]));
+ assert.deepEqual([...h.matchAll(/class="evidence-title"[^>]*title="([^"]+)">([^/]+)\//g)].map(m=>[m[1],m[2]]),expected.map((x,i)=>[x.cap,codes[i]]));
+ for(const al of c.estudiantes()){const id=c.studentKey(al),row=h.split('data-student="'+id+'"')[1].split('</tr>')[0],cells=[...row.matchAll(/data-evidence="([^"]+)">([^<]+)</g)].map(m=>[m[1],m[2]]);assert.deepEqual(cells,expected.map(x=>{const key=[c.cloudClaveReg(),x.comp,x.cap,x.date,id].join('||');return [c.escapeRegistro(key),String(c.store.grades[key].nota20)];}));}
+ assert.equal(JSON.stringify(c.store),before);assert.equal(f.calls.length,0);
+});
 const cases=[['secundaria','Educación para el Trabajo (EPT)',1],['secundaria','Comunicación',3],['secundaria','Matemática',4],['primaria','Personal Social',5]];
 for(const [level,area,n]of cases)for(const mode of ['letra','num'])test('integral '+level+' '+n+' competencies '+mode+': one roster, all dates/evidence/results, zero mutations or network',()=>{
  const f=report({level,area,count:30,mode,kind:'bimestre'}),h=f.html,pages=Math.ceil((n*4)/(22-n));
