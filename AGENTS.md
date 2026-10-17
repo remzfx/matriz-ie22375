@@ -4,23 +4,31 @@ Este documento establece el protocolo operativo obligatorio y la guía técnica 
 
 ---
 
-## 1. Protección de producción
+## 1. Protección de producción y datos reales
 
 - **Datos protegidos e históricos:** Nunca modificar calificaciones, asistencias, padrones ni otros datos reales. Proteger explícitamente los datos académicos históricos y los snapshots de periodos anteriores; queda estrictamente prohibida cualquier sobrescritura o eliminación no autorizada de información académica.
-- **Backend intacto:** Nunca ejecutar pruebas de escritura contra el backend de producción (Google Apps Script / Google Sheets en producción).
+- **Backend intacto:** Nunca ejecutar pruebas de escritura contra el backend de producción (Google Apps Script / Google Sheets en producción). Solo utilizar datos y transportes ficticios.
 - **Operaciones restringidas:** Nunca ejecutar `deploy`, `merge`, `push`, restauraciones o borrados sin autorización explícita para esa operación específica.
 - **Seguridad y privacidad:** No modificar ni exponer contraseñas, DNI, listados completos de estudiantes, tokens, URLs privadas ni configuraciones sensibles en código, logs, documentación ni pruebas.
+- **Prioridad de la nota directa en Promedios:** Mantener intacta la prioridad de la nota directa ingresada en **Promedios** sobre cualquier resultado calculado generado desde **Calificar**. Una descarga o recálculo a partir de evidencias puede mostrar resultados calculados, pero nunca debe sobrescribir una nota directa ni desencadenar subidas automáticas a la nube. Cualquier reemplazo de una nota directa deberá depender exclusivamente de una operación explícita autorizada.
+- **Integridad de datos locales y recuperación:** No ejecutar escrituras académicas de producción, subidas a nube, recuperación de borradores, limpieza indiscriminada de `localStorage`/`IndexedDB` ni invalidación de respaldos sin consentimiento específico y previa revisión de riesgo. Preservar íntegros el control de concurrencia, baseline CAS, separación de cuentas y mecanismos de recuperación (borradores/recovery).
+- **Contención ante incidentes en producción:** Si una profesora o docente reporta notas ausentes o avisos de fallo local, queda terminantemente prohibido pedirle que limpie la caché, borre datos locales o reemplace información a ciegas. La acción inmediata obligatoria es detener operaciones de escritura y recopilar evidencia para diagnóstico.
 
 ---
 
 ## 2. Desarrollo y reglas de negocio
 
 - **Ramas autorizadas:** Trabajar única y exclusivamente en las ramas asignadas y autorizadas para la tarea.
-- **Control de ramas y cambios locales:** Verificar siempre `git status` antes de cambiar de rama. No descartar, forzar ni sobrescribir cambios locales pendientes de trabajo.
+- **Control de ramas y cambios locales:** Verificar siempre `git status` antes de cambiar de rama. No descartar, forzar (`--force`) ni sobrescribir cambios locales pendientes de trabajo.
 - **Datos de prueba:** Utilizar únicamente datos ficticios y entornos simulados para pruebas y validaciones.
 - **Calidad de solución:** Priorizar soluciones estructurales y definitivas sobre parches o paliativos acumulativos.
-- **Conciliación y resolución de conflictos:** Ninguna conciliación puede elegir automáticamente entre calificaciones contradictorias. Preservar de forma íntegra el almacenamiento local, los mecanismos de recuperación (borradores/recovery), la identidad académica del estudiante y las versiones CAS (Compare-And-Swap).
-- **Alcance acotado:** No modificar código, estilos ni configuraciones ajenas a la tarea asignada.
+- **Conciliación y resolución de conflictos:** Ninguna conciliación puede elegir automáticamente entre calificaciones contradictorias. Preservar de forma íntegra el almacenamiento local, los mecanismos de recuperación (borradores/recovery), la identidad académica oficial del estudiante y las versiones CAS (Compare-And-Swap).
+- **Alcance acotado:** Leer y modificar únicamente los archivos y funciones directamente relevantes para la tarea asignada; evitar barridos masivos, reescrituras completas o refactors no relacionados.
+- **Optimización de investigación y pruebas:**
+  1. Revisar primero documentos de continuidad, issues, PRs y pruebas anteriores relacionados. **No volver a auditar** objetivos ya aprobados sin un indicio nuevo o dependencia directa.
+  2. Reutilizar pruebas y utilidades existentes; añadir reproducciones sintéticas focalizadas solo donde falte cobertura, evitando duplicar comprobaciones.
+  3. Agrupar correcciones relacionadas en un único PR en lugar de abrir múltiples ramas para detalles menores.
+  4. Ahorrar tiempo o tokens nunca justifica omitir comprobaciones necesarias para la seguridad o la integridad académica.
 - **Reglas de negocio del sistema:**
   - *Admin es la fuente de verdad:* Las configuraciones de bimestres, permisos, asignaciones y base de datos gobernadas desde Admin tienen prioridad sobre cualquier valor local o fallback. No hardcodear permisos, aulas, áreas, bimestres ni total de estudiantes.
   - *Relación área → aula en Secundaria:* Respetar la asignación estricta por aula (`asignaciones[área] = [aulas]`). No tratar `areas` y `aulas` como conjuntos independientes:
@@ -45,19 +53,19 @@ Este documento establece el protocolo operativo obligatorio y la guía técnica 
 
 ## 3. Validación
 
-- **Pruebas automáticas y CI:** Ejecutar siempre las pruebas automatizadas pertinentes y el CI completo cuando corresponda antes de dar por concluida una tarea.
-- **Criterio de aprobación:** Un CI exitoso es un requisito indispensable, pero no sustituye la revisión independiente humana y técnica.
-- **Transparencia:** Informar con exactitud los resultados reales de las pruebas, incluyendo fallos, advertencias o regresiones detectadas.
+- **Pruebas automáticas y CI:** Ejecutar primero pruebas focalizadas; tras cambios relevantes, ejecutar la suite completa aplicable y el CI antes de dar por concluida una tarea.
+- **Criterio de aprobación:** Un CI exitoso es un requisito indispensable, pero no sustituye la revisión independiente humana y técnica ni la validación prudente en producción.
+- **Transparencia:** Informar con exactitud los resultados reales de las pruebas, incluyendo fallos, advertencias, HEAD y riesgos residuales.
 - **Criterio de resolución:** No afirmar que un problema de producción está resuelto basándose únicamente en pruebas sintéticas locales.
 - **Integridad de tests:** Queda estrictamente prohibido eliminar, comentar o debilitar pruebas existentes para forzar un CI exitoso.
 
 ---
 
-## 4. Integración
+## 4. Integración y control de cambios
 
 - **Tamaño de cambios:** Preparar cambios atómicos, pequeños, coherentes y fácilmente revisables.
-- **Pull Requests:** Crear PR en estado **DRAFT** únicamente cuando sea autorizado explícitamente.
-- **Merge restringido:** Prohibido fusionar ramas con `main` sin autorización explícita.
+- **Pull Requests:** Crear PR en estado **DRAFT** únicamente cuando sea autorizado explícitamente, referido al issue o tarea correspondiente.
+- **Merge restringido:** Prohibido fusionar ramas con `main` sin autorización expresa e individual. Nunca activar auto-merge.
 - **Despliegues:** El despliegue a producción queda reservado de forma exclusiva al responsable del proyecto.
 
 ---
@@ -75,15 +83,34 @@ Este documento establece el protocolo operativo obligatorio y la guía técnica 
 
 ---
 
-## 6. Coordinación entre agentes
+## 6. Coordinación entre agentes y flujo operativo (vigente desde PR #85)
 
-- **Concurrencia de ramas:** Antigravity, Codex y otros agentes no deben modificar simultáneamente la misma rama de Git.
-- **Transparencia y reporte:** Cada agente debe comunicar con precisión:
-  - Rama de trabajo.
-  - Hash del último commit.
-  - Lista de archivos modificados.
-  - Pruebas ejecutadas y su resultado.
-- **Respeto al trabajo en curso:** No alterar, sobreescribir ni revertir trabajos o borradores pendientes de otro agente sin instrucción expresa del responsable del proyecto.
+### Responsabilidades por rol
+
+- **Usuario:** Aporta evidencia de producción, realiza solo pruebas manuales que no puedan automatizarse, autoriza expresamente **cada merge por separado** y ejecuta personalmente el despliegue a producción.
+- **ChatGPT:** Clasifica incidentes y riesgos, revisa cambios/PRs y resultados de CI, solicita la autorización individual para fusionar, y realiza el merge únicamente tras recibirla explícitamente. No despliega.
+- **Codex / Antigravity:** Implementa cambios complejos y pruebas sintéticas automatizadas, crea y actualiza el PR en estado **DRAFT**, y documenta resultados de forma breve y verificable. **Nunca ejecuta merge ni deploy** por iniciativa propia.
+
+### Secuencia obligatoria de cambio
+
+1. Evidencia de producción.
+2. Diagnóstico focalizado.
+3. Autorización de cambios.
+4. Implementación por el agente en PR **DRAFT**.
+5. Revisión técnica, CI y pruebas aplicables.
+6. Autorización expresa e individual de merge.
+7. Merge realizado por ChatGPT.
+8. Despliegue ejecutado personalmente por el usuario.
+9. Observación prudente de producción.
+
+Una autorización para investigar, editar archivos, preparar un PR o actualizar instrucciones **no autoriza un merge**.
+
+### Concurrencia y entregables de los agentes
+
+- **Concurrencia de ramas:** Antigravity, Codex y otros agentes no deben trabajar ni modificar simultáneamente la misma rama de Git.
+- **Entregables:** PR en estado **DRAFT**, referido al issue correspondiente, sin fusión ni despliegue. Cada agente debe reportar con exactitud: rama de trabajo, hash del último commit (HEAD), archivos modificados, pruebas ejecutadas con sus resultados y riesgo residual.
+- **Criterio de cierre:** No declarar un cambio «en producción» ni «fusionado» hasta disponer de evidencia verificada de cada etapa.
+- **Respeto al trabajo en curso:** No alterar, sobrescribir ni revertir tareas o borradores pendientes de otro agente sin instrucción expresa del responsable del proyecto.
 
 ---
 
