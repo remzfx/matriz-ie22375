@@ -2,6 +2,14 @@
 (function(root){
  'use strict';
 
+  const SAFE_CODES = new Set([
+   'SESSION','DENIED','CLOSED','TIMEOUT','HTTP','READ_INVALID','READ_MISSING',
+   'READ_STALE','READ_VERSION','READ_INCOMPLETE','READ_EMPTY','READ_BASE',
+   'READ_CORRUPT','CONTEXT_CHANGED','UNAVAILABLE','DUPLICATE','API_INCOMPATIBLE',
+   'MODULE_MISSING'
+  ]);
+  const safeErrorCode = code => SAFE_CODES.has(String(code)) ? String(code) : 'UNAVAILABLE';
+
  function escapeHtml(str){
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
  }
@@ -16,7 +24,7 @@
   // Error view if unavailable or read rejected
   if(report?.status === 'unavailable' || report?.status === 'read_rejected'){
    return '<div style="color:#991b1b;background:#fef2f2;padding:12px;border-radius:8px;border:1px solid #fecaca;margin-bottom:12px">'
-    + '<h3 style="margin:0 0 6px 0;font-size:14px;font-weight:700">No se pudo completar la consulta de lectura ('+escapeHtml(report?.code||'ERROR')+')</h3>'
+    + '<h3 style="margin:0 0 6px 0;font-size:14px;font-weight:700">No se pudo completar la consulta de lectura ('+escapeHtml(safeErrorCode(report?.code))+')</h3>'
     + '<p style="margin:0;font-size:12px">Conserva esta pestaña abierta. No recargues la página ni limpies la memoria caché.</p></div>';
   }
 
@@ -88,12 +96,12 @@
   // 5. Almacenamiento anterior y controles en edición
   let storageHtml = '<div style="margin-bottom:12px;font-size:12px;color:#475569">';
   if(report?.legacyLocal){
-   storageHtml += '<p style="margin:2px 0;color:#b45309">⚠️ <strong>Almacenamiento anterior:</strong> Se detectaron datos locales de versiones anteriores (conservados intactos; no afectan el aula actual).</p>';
+   storageHtml += '<p style="margin:2px 0;color:#b45309">⚠️ <strong>Almacenamiento anterior:</strong> Se detectó almacenamiento anterior protegido en este navegador.</p>';
   } else {
-   storageHtml += '<p style="margin:2px 0">Almacenamiento anterior: Limpio (sin datos antiguos pendientes).</p>';
+   storageHtml += '<p style="margin:2px 0">Almacenamiento anterior: Sin registros anteriores en este navegador.</p>';
   }
   if(report?.domChangedControls > 0){
-   storageHtml += '<p style="margin:2px 0;color:#d97706">ℹ️ Hay '+report.domChangedControls+' casillas en pantalla con datos recién tipeados aún no procesados en memoria.</p>';
+   storageHtml += '<p style="margin:2px 0;color:#d97706">ℹ️ Hay '+report.domChangedControls+' control(es) en pantalla cuyo valor difiere del valor inicial cargado.</p>';
   }
   storageHtml += '</div>';
 
@@ -182,12 +190,15 @@
    }
    report = await root.IERegistroSyncDiagnostic.runPage();
   } catch(e) {
-   report = {schema:1,readOnly:true,status:'unavailable',code:e?.code||'UNEXPECTED'};
+   report = {schema:1,readOnly:true,status:'unavailable',code:safeErrorCode(e?.code)};
   } finally {
    if(btn){
     btn.disabled = false;
     btn.textContent = prevText || 'Diagnosticar sincronización';
    }
+  }
+  if(report && report.code){
+   report.code = safeErrorCode(report.code);
   }
   showDialog(report);
   return report;

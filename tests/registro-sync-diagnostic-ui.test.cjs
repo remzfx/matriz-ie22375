@@ -200,7 +200,7 @@ test('UI: buildDialogContent muestra estado administrativo real y aclara bloqueo
   assert.match(htmlReview, /el bimestre permanece <strong>ABIERTO<\/strong>/);
   assert.match(htmlReview, /Promedios:<\/strong> 1 conflicto/);
   assert.match(htmlReview, /Origen de calificación diferente/);
-  assert.match(htmlReview, /Almacenamiento anterior.*datos locales de versiones anteriores/);
+  assert.match(htmlReview, /Almacenamiento anterior:.*Se detectó almacenamiento anterior protegido en este navegador/);
 
   const reportClosed = {
     schema: 1, readOnly: true,
@@ -236,6 +236,35 @@ test('UI y Privacidad: El informe renderizado y el JSON copiado omiten datos per
 
   assert.doesNotMatch(html, /PRIVATE|DNI|token|estudiante|alumno/i);
   assert.doesNotMatch(json, /PRIVATE|token|password|dni/i);
+});
+
+test('UI y Privacidad: Errores arbitrarios con datos sensibles ficticios se neutralizan con lista cerrada', () => {
+  const contextVm = vm.createContext({ window: null });
+  contextVm.window = contextVm;
+  vm.runInContext(uiSource, contextVm);
+  const { buildDialogContent } = contextVm.IERegistroSyncDiagnosticUI;
+
+  // Intento de inyectar datos sensibles en código de error (token, DNI, nombres)
+  const leakCodes = [
+    'ERROR_TOKEN_eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.sensitive_payload',
+    'FAILED_DNI_72345678_NOT_FOUND',
+    'STUDENT_JUAN_PEREZ_NOTA_18_INVALID',
+    'SQL_INJECTION_OR_STACK_TRACE_LEAK'
+  ];
+
+  for (const maliciousCode of leakCodes) {
+    const report = { status: 'unavailable', code: maliciousCode };
+    const html = buildDialogContent(report);
+    assert.match(html, /No se pudo completar la consulta de lectura \(UNAVAILABLE\)/);
+    assert.doesNotMatch(html, /ERROR_TOKEN|eyJhbGci|72345678|JUAN_PEREZ|NOTA_18|SQL_INJECTION/);
+  }
+
+  // Códigos legítimos de la lista cerrada se conservan
+  for (const validCode of ['TIMEOUT', 'SESSION', 'READ_INVALID', 'MODULE_MISSING']) {
+    const report = { status: 'unavailable', code: validCode };
+    const html = buildDialogContent(report);
+    assert.match(html, new RegExp('No se pudo completar la consulta de lectura \\(' + validCode + '\\)'));
+  }
 });
 
 test('UI: Manejo de errores de conexión y contexto (TIMEOUT, CONTEXT_CHANGED, SESSION)', () => {
