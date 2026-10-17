@@ -1,308 +1,146 @@
-# AGENTS.md — I.E. 22375 Santa Rosa
-
-## Objetivo del proyecto
-
-Este repositorio contiene el sistema académico de la **I.E. N.° 22375 “Santa Rosa” — San José de los Molinos, Ica**.
-
-El sistema ya está en uso. Prioriza **estabilidad, compatibilidad y conservación de datos** sobre reescrituras grandes.
-
-## Stack actual
-
-- Frontend: HTML + CSS/Tailwind + JavaScript puro
-- Hosting: GitHub Pages
-- Backend: Google Apps Script
-- Datos: Google Sheets + localStorage/sessionStorage
-- Dominio: biblioteca360.com / matriz.biblioteca360.com
-
-No introducir frameworks ni reemplazar la arquitectura actual salvo pedido explícito.
-
-## Archivos principales
-
-- `index.html`: login y selección de módulos
-- `admin.html`: docentes, accesos, bimestres y configuración
-- `registro.html`: Registro auxiliar, notas, competencias, capacidades, asistencia y resúmenes
-- `primaria.html`: Matriz consolidada Primaria
-- `secundaria.html`: Matriz consolidada Secundaria
-- `auxiliar.html`: asistencia/QR
-- `photochecks.html`: fotochecks QR
-- `aula_innovacion.html`: AIP
-- `students.js`: carga protegida y caché temporal de estudiantes por sesión
-- Hoja privada `EstudiantesBase`: base oficial y respaldo de restauración, administrados desde Admin
-- Apps Script: sincronización con Google Sheets y acciones de nube
-
-Antes de editar, leer siempre la versión actual desde `main`.
-
-## Reglas de negocio críticas
-
-### Admin es la fuente de verdad
-
-La configuración hecha en Admin debe gobernar los demás módulos.
-
-No hardcodear como reglas permanentes:
-- permisos de docentes
-- aulas
-- áreas
-- bimestres
-- cantidad de estudiantes
-
-Un fallback nunca debe sobreescribir una configuración válida de Admin/nube.
-
-### Permisos docentes
-
-Cada docente tiene cuenta individual.
-
-Primaria:
-- solo ve los grados asignados.
-
-Secundaria:
-- debe existir relación exacta **área → aula(s)**.
-- No tratar `areas` y `aulas` como conjuntos independientes.
-
-Estructura preferida:
-
-```js
-{
-  user,
-  pass,
-  nombre,
-  nivel: "secundaria",
-  areas: ["Matemática", "Ciencia y Tecnología"],
-  aulas: ["1|A", "1|B", "2|A", "2|B", "5|ÚNICA"],
-  asignaciones: {
-    "Matemática": ["1|A", "1|B", "2|A", "2|B"],
-    "Ciencia y Tecnología": ["5|ÚNICA"]
-  }
-}
-```
-
-Ese ejemplo es solo ilustrativo. No hardcodearlo globalmente.
-
-Si el docente selecciona 5° Única y allí solo tiene Ciencia y Tecnología, Matemática no debe aparecer.
-
-Aplicar la misma lógica área→aula en:
-- sesión de login
-- Registro auxiliar
-- Matriz Secundaria
-- Comparativo
-- futuros módulos docentes
-
-Mantener compatibilidad con registros antiguos sin `asignaciones`, pero preferir migración desde Admin.
-
-### Bimestres
-
-Admin controla el estado:
-- `abierto`
-- `cerrado`
-- `bloqueado`
-
-Reglas:
-- Registro auxiliar del docente: solo bimestres permitidos por Admin deben ser seleccionables/editables.
-- Matrices consolidadas: bimestres cerrados/bloqueados pueden consultarse, pero deben quedar **solo lectura**.
-- El backend debe rechazar escrituras a bimestres no abiertos.
-- No inventar estados locales si existe configuración válida de Admin/nube.
-
-### Cantidad de estudiantes
-
-No es un campo manual.
-
-Debe calcularse desde la base oficial según:
-- nivel
-- grado
-- sección
-
-Mostrarla solo como dato informativo.
-
-No permitir edición manual ni dejar que registros antiguos de matriz reemplacen el total oficial.
-
-### Categorías de logro
-
-Etiquetas visibles:
-- C = Inicio
-- B = Proceso
-- A = Logrado
-- AD = Destacado
-
-La clave interna `previsto` puede existir por compatibilidad. No renombrar claves almacenadas sin migración.
-
-## Rendimiento
-
-Preferir **render local inmediato + actualización de nube en segundo plano**.
-
-La interfaz debe pintar de inmediato usando:
-- última respuesta autorizada del backend
-- última caché válida
-- sesión actual
-
-Luego refrescar la nube asincrónicamente.
-
-Evitar bloquear toda la pantalla con `await fetch(...)` antes de mostrar:
-- docente
-- grado
-- sección
-- estudiantes
-- áreas
-
-si esos datos ya existen localmente.
-
-Login:
-- usar caché temporal de docentes
-- refrescar si está vencida
-- conservar fallback compatible con Safari/iPhone
-
-## Móvil
-
-El sistema se usa frecuentemente en teléfonos.
-
-En móvil:
-- objetivos táctiles de al menos ~44 px
-- evitar paneles sticky que quiten demasiado espacio
-- permitir que el contenido académico gane pantalla al hacer scroll
-- filas de muchos botones pueden desplazarse horizontalmente
-- centrar texto horizontal y verticalmente
-- no mostrar controles vacíos mientras se espera la nube
-
-Desktop puede conservar comportamiento sticky cuando sea útil.
-
-## Apps Script
-
-Cuando se cambie backend:
-
-1. Mantener la URL de implementación existente cuando sea posible.
-2. Actualizar la implementación existente con una nueva versión.
-3. Preservar acciones y payloads existentes.
-4. Añadir rutas sin romper las anteriores.
-5. Probar GET/JSONP y POST cuando haya problemas cross-origin/móvil.
-6. Evitar llamadas innecesarias a Sheets.
-
-Cuando se entregue Apps Script al usuario, entregar el **código completo y compacto**, no solo un parche.
-
-Flujo preferido del usuario:
-- Ctrl+A
-- reemplazar todo
-- guardar
-- nueva versión de la implementación
-
-No expandir el script a miles de líneas por reformateo innecesario.
-
-## Seguridad y datos
-
-No exponer en documentación, logs, PRs o pruebas:
-- contraseñas
-- DNI
-- listados completos de estudiantes
-- otros datos personales
-
-No agregar nuevas credenciales en texto plano al repositorio.
-
-No borrar o resetear silenciosamente:
-- estudiantes
-- permisos docentes
-- IDs
-- claves de localStorage
-- estados de bimestre
-- esquemas de Sheets
-
-Cuando cambie un esquema, mantener compatibilidad y migrar deliberadamente.
-
-## Forma de trabajo
-
-Para cada cambio:
-
-1. Entender/reproducir el comportamiento actual.
-2. Leer los archivos relevantes desde `main`.
-3. Identificar la causa raíz.
-4. Hacer el cambio coherente más pequeño posible.
-5. Evitar refactors no relacionados.
-6. Conservar compatibilidad.
-7. Validar sintaxis JavaScript de scripts inline modificados.
-8. Revisar consumidores cuando cambie un esquema compartido.
-9. Preferir branch + PR + merge.
-10. Releer `main` después del merge.
-
-No reportar un arreglo como terminado hasta verificar que está realmente en `main`.
-
-## Cambios que requieren revisión cruzada
-
-Asignación docente:
-- `admin.html`
-- `index.html`
-- `registro.html`
-- `secundaria.html`
-
-Bimestres:
-- `admin.html`
-- `registro.html`
-- `primaria.html`
-- `secundaria.html`
-- guards del Apps Script
-
-Base de estudiantes:
-- Registro
-- Matriz Primaria
-- Matriz Secundaria
-- flujo de importación de Admin
-
-## Escenarios mínimos de regresión
-
-### Docente de Secundaria con varias áreas
-
-Ejemplo:
-- Área A → 1A, 1B
-- Área B → 5U
-
-Verificar:
-- 1A muestra solo Área A
-- 5U muestra solo Área B
-- Registro y Matriz se comportan igual
-
-### Bimestres
-
-Verificar:
-- abierto = editable
-- cerrado/bloqueado = consulta donde corresponda, sin edición
-- backend rechaza escrituras no autorizadas
-
-### Estudiantes
-
-Verificar:
-- el total cambia por aula
-- no es editable
-- proviene de la base oficial
-
-### Móvil
-
-Verificar:
-- no aparecen cabeceras vacías mientras carga nube
-- botones superiores son tocables
-- paneles sticky no ocultan el trabajo principal
-
-## Lenguaje de interfaz
-
-La interfaz es en español.
-
-Usar terminología escolar:
-- Bimestre
-- Grado
-- Sección
-- Área
-- Docente responsable
-- Estudiantes
-- Registro auxiliar
-- Matriz consolidada
-- Solo lectura
-
-## Filosofía
-
-Preferir:
-- estable
-- incremental
-- comprensible
-- reversible
-- compatible
-
-sobre:
-- reescrituras grandes
-- abstracciones innecesarias
-- cambios simultáneos difíciles de verificar
-
-La migración futura a una arquitectura más robusta puede hacerse después. La prioridad actual es estabilizar el flujo de producción existente.
+# Instrucciones Compartidas para Agentes de Desarrollo — I.E. 22375 Santa Rosa
+
+Este documento establece el protocolo operativo obligatorio y la guía técnica para todos los agentes de desarrollo (Antigravity, Codex y otros) que colaboren en el repositorio `remzfx/matriz-ie22375`.
+
+---
+
+## 1. Protección de producción
+
+- **Datos protegidos e históricos:** Nunca modificar calificaciones, asistencias, padrones ni otros datos reales. Proteger explícitamente los datos académicos históricos y los snapshots de periodos anteriores; queda estrictamente prohibida cualquier sobrescritura o eliminación no autorizada de información académica.
+- **Backend intacto:** Nunca ejecutar pruebas de escritura contra el backend de producción (Google Apps Script / Google Sheets en producción).
+- **Operaciones restringidas:** Nunca ejecutar `deploy`, `merge`, `push`, restauraciones o borrados sin autorización explícita para esa operación específica.
+- **Seguridad y privacidad:** No modificar ni exponer contraseñas, DNI, listados completos de estudiantes, tokens, URLs privadas ni configuraciones sensibles en código, logs, documentación ni pruebas.
+
+---
+
+## 2. Desarrollo y reglas de negocio
+
+- **Ramas autorizadas:** Trabajar única y exclusivamente en las ramas asignadas y autorizadas para la tarea.
+- **Control de ramas y cambios locales:** Verificar siempre `git status` antes de cambiar de rama. No descartar, forzar ni sobrescribir cambios locales pendientes de trabajo.
+- **Datos de prueba:** Utilizar únicamente datos ficticios y entornos simulados para pruebas y validaciones.
+- **Calidad de solución:** Priorizar soluciones estructurales y definitivas sobre parches o paliativos acumulativos.
+- **Conciliación y resolución de conflictos:** Ninguna conciliación puede elegir automáticamente entre calificaciones contradictorias. Preservar de forma íntegra el almacenamiento local, los mecanismos de recuperación (borradores/recovery), la identidad académica del estudiante y las versiones CAS (Compare-And-Swap).
+- **Alcance acotado:** No modificar código, estilos ni configuraciones ajenas a la tarea asignada.
+- **Reglas de negocio del sistema:**
+  - *Admin es la fuente de verdad:* Las configuraciones de bimestres, permisos, asignaciones y base de datos gobernadas desde Admin tienen prioridad sobre cualquier valor local o fallback. No hardcodear permisos, aulas, áreas, bimestres ni total de estudiantes.
+  - *Relación área → aula en Secundaria:* Respetar la asignación estricta por aula (`asignaciones[área] = [aulas]`). No tratar `areas` y `aulas` como conjuntos independientes:
+    ```js
+    {
+      user, pass, nombre, nivel: "secundaria",
+      areas: ["Matemática", "Ciencia y Tecnología"],
+      aulas: ["1|A", "1|B", "5|ÚNICA"],
+      asignaciones: {
+        "Matemática": ["1|A", "1|B"],
+        "Ciencia y Tecnología": ["5|ÚNICA"]
+      }
+    }
+    ```
+    Si el docente selecciona 5° Única y allí solo tiene Ciencia y Tecnología, Matemática no debe aparecer.
+  - *Bimestres:* Respetar los estados `abierto` (editable), `cerrado` y `bloqueado` (solo lectura). En matrices consolidadas, los periodos cerrados/bloqueados se consultan en solo lectura. El backend debe rechazar escrituras fuera de periodos abiertos.
+  - *Estudiantes:* La cantidad de estudiantes proviene de la base oficial según nivel, grado y sección; es un dato informativo y no un campo de edición manual.
+  - *Categorías de logro:* C (Inicio), B (Proceso), A (Logrado), AD (Destacado). Mantener compatibilidad con claves internas históricas (`previsto`).
+  - *Rendimiento y render local condicionado:* Priorizar render local inmediato para agilidad visual, pero esto **no autoriza** edición ni sincronización de escritura sin verificar primero los permisos del docente/usuario, el periodo académico habilitado y el estado de conexión.
+
+---
+
+## 3. Validación
+
+- **Pruebas automáticas y CI:** Ejecutar siempre las pruebas automatizadas pertinentes y el CI completo cuando corresponda antes de dar por concluida una tarea.
+- **Criterio de aprobación:** Un CI exitoso es un requisito indispensable, pero no sustituye la revisión independiente humana y técnica.
+- **Transparencia:** Informar con exactitud los resultados reales de las pruebas, incluyendo fallos, advertencias o regresiones detectadas.
+- **Criterio de resolución:** No afirmar que un problema de producción está resuelto basándose únicamente en pruebas sintéticas locales.
+- **Integridad de tests:** Queda estrictamente prohibido eliminar, comentar o debilitar pruebas existentes para forzar un CI exitoso.
+
+---
+
+## 4. Integración
+
+- **Tamaño de cambios:** Preparar cambios atómicos, pequeños, coherentes y fácilmente revisables.
+- **Pull Requests:** Crear PR en estado **DRAFT** únicamente cuando sea autorizado explícitamente.
+- **Merge restringido:** Prohibido fusionar ramas con `main` sin autorización explícita.
+- **Despliegues:** El despliegue a producción queda reservado de forma exclusiva al responsable del proyecto.
+
+---
+
+## 5. Estado actual
+
+> [!NOTE]
+> Los estados de los PR son referencias temporales. Antes de comenzar cualquier tarea, verificar en GitHub el estado, rama y HEAD vigentes. No asumir que esta sección está actualizada.
+
+- **PR #94 (Impresión):** Pendiente.
+- **PR #96 (Diagnóstico de sincronización):** DRAFT.
+- **PR #97 (Consulta durante conflictos):** DRAFT y CI aprobado.
+- **Investigación prioritaria:** Diferencias entre Calificar, Promedios y conciliación de notas.
+- **Función futura:** *Procesar a Promedios* — **todavía no implementarla**.
+
+---
+
+## 6. Coordinación entre agentes
+
+- **Concurrencia de ramas:** Antigravity, Codex y otros agentes no deben modificar simultáneamente la misma rama de Git.
+- **Transparencia y reporte:** Cada agente debe comunicar con precisión:
+  - Rama de trabajo.
+  - Hash del último commit.
+  - Lista de archivos modificados.
+  - Pruebas ejecutadas y su resultado.
+- **Respeto al trabajo en curso:** No alterar, sobreescribir ni revertir trabajos o borradores pendientes de otro agente sin instrucción expresa del responsable del proyecto.
+
+---
+
+## 7. Arquitectura y mapa del sistema
+
+### Stack técnico
+- **Frontend:** HTML + CSS/Tailwind + JavaScript puro (Vanilla JS, sin frameworks).
+- **Hosting:** GitHub Pages (`biblioteca360.com` / `matriz.biblioteca360.com`).
+- **Backend:** Google Apps Script.
+- **Datos:** Google Sheets + localStorage / sessionStorage.
+
+### Módulos y archivos principales
+- `index.html`: Login y selector de módulos docentes y administrativos.
+- `admin.html`: Administración de docentes, credenciales, accesos, bimestres y configuración general.
+- `registro.html`: Registro auxiliar docente (calificaciones, competencias, capacidades, asistencia, resúmenes, borradores locales y recuperación).
+- `primaria.html`: Matriz consolidada de Primaria.
+- `secundaria.html`: Matriz consolidada de Secundaria.
+- `auxiliar.html`: Control de asistencia por QR y lectores móviles.
+- `photochecks.html`: Emisión y visualización de fotochecks con código QR.
+- `aula_innovacion.html`: Registro de asistencia y control de Aula de Innovación Pedagógica (AIP).
+- `students.js`: Carga protegida y caché temporal de estudiantes por sesión.
+- Hoja privada `EstudiantesBase`: Base oficial y respaldo administrados desde Admin.
+- `apps-script/`: Código fuente del backend en Google Apps Script.
+
+---
+
+## 8. Criterios técnicos de implementación
+
+### Interfaz móvil
+- Objetivos táctiles de al menos ~44 px.
+- Evitar paneles sticky que reduzcan excesivamente el área visible en pantallas pequeñas.
+- Permitir que el contenido académico gane pantalla al desplazarse.
+- Permitir scroll horizontal en filas de botones densas; centrar contenido táctil.
+
+### Backend Google Apps Script
+- El código fuente se mantiene versionado en GitHub (directorio `apps-script/`).
+- Los cambios se preparan mediante ramas y PR revisables.
+- El merge requiere autorización explícita.
+- El despliegue de Apps Script lo realiza de forma exclusiva el responsable del proyecto mediante el procedimiento autorizado desde GitHub.
+- Queda estrictamente prohibido ejecutar despliegues automáticamente o de forma manual no autorizada.
+- Preservar acciones, payloads y compatibilidad de endpoints existentes; añadir rutas sin romper contratos previos.
+- Validar compatibilidad de transporte (GET/JSONP vs POST) ante problemas de CORS o restricciones móviles.
+
+### Revisión cruzada obligatoria
+- **Asignación docente:** verificar impacto en `admin.html`, `index.html`, `registro.html` y `secundaria.html`.
+- **Bimestres:** verificar impacto en `admin.html`, `registro.html`, `primaria.html`, `secundaria.html` y los guards de Apps Script.
+- **Estudiantes:** verificar coherencia en `registro.html`, matrices consolidadas y flujo de importación en Admin.
+
+### Escenarios mínimos de regresión
+1. **Docente de Secundaria con varias áreas:** comprobar que cada aula muestre exclusivamente el área asignada (`1A` $\rightarrow$ Área A, `5U` $\rightarrow$ Área B) y coincida entre Registro y Matriz.
+2. **Bimestres cerrado/bloqueado:** comprobar que los formularios queden en solo lectura y que el backend rechace escrituras no permitidas.
+3. **Padrones oficiales:** comprobar que el recuento provenga de la base oficial por aula y no permita edición manual.
+4. **Móvil:** verificar que los controles táctiles sean accesibles y no se generen bloqueos visuales en espera de la red.
+
+---
+
+## 9. Terminología y filosofía
+
+- **Lenguaje escolar oficial (en español):** Bimestre, Grado, Sección, Área, Docente responsable, Estudiantes, Registro auxiliar, Matriz consolidada, Solo lectura.
+- **Filosofía de desarrollo:** Priorizar lo estable, incremental, comprensible, reversible y compatible sobre reescrituras grandes o abstracciones prematuras.
