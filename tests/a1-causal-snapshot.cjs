@@ -8,7 +8,10 @@ const added=`      // Comparar cada representación con su misma ruta, incluyend
       // Cambios bilaterales en diferentes claves de la misma identidad
       // requieren revisar el conjunto; no decidir por marcas de tiempo.`;
 module.exports=(file,source)=>{
+ if(file==='sw.js')return require('./phase2-boundary.cjs').sw(source);
+ if(file==='apps-script/Codigo.js')return require('./registro-phase1-snapshot.cjs').backend(source);
  if(file!=='registro-reconcile.js')return source;
+ source=require('./registro-phase1-snapshot.cjs').reconcile(source);
  source=source.replace(/\r\n/g,'\n');assert.equal(source.split(added).length,2,'Exactly one approved causal group correction');
  return source.replace(added,'      // Diferentes claves de una misma identidad no son cambios disjuntos.');
 };

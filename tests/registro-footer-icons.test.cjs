@@ -26,7 +26,7 @@ test('only the actions track scrolls; opaque footer keeps status/alerts outside 
 });
 test('icons and scrolling do not change any button gate/handler or any academic inline script',()=>{
  const old=execFileSync('git',['show','cd2e3b8c194aa684221f148c2a35ad26a96a6474:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
- const strip=s=>s.replace(css(s),'').replace(footer(s),'');assert.equal(strip(html),strip(old));
+ const strip=s=>s.replace(css(s),'').replace(footer(s),'');assert.equal(strip(require('./registro-pr84-snapshot.cjs').reviewed(html)),strip(old));
  const oldButtons=[...footer(old).matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)];assert.deepEqual(buttons.map(b=>b[1]),oldButtons.map(b=>b[1]));assert.deepEqual(buttons.map(b=>b[2].replace(/<svg[\s\S]*?<\/svg>|<\/?span>/g,'')),oldButtons.map(b=>b[2]));
 });
 test('fictitious review fixture includes the exact production footer and CSS without a network dependency',()=>{

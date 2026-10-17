@@ -553,6 +553,7 @@ body{font-family:system-ui;margin:0;background:#f8fafc}*{box-sizing:border-box}.
         <span class="px-2 py-1 rounded-lg bg-lime-50 text-lime-700">A <span id="cA">0</span></span>
         <span class="px-2 py-1 rounded-lg bg-green-50 text-green-700">AD <span id="cAD">0</span></span>
       </div>
+      <p id="registroLegacyWarning" hidden class="text-xs text-amber-800 p-2">Hay datos anteriores sin propietario verificable. Se conservan intactos; consulta con Admin para revisarlos. <button id="registroLegacyReview" hidden style="display:none;min-height:44px" type="button" class="btn btn-ghost" onclick="IERegistroRecovery.legacy()">Revisar datos anteriores · Admin</button></p>
       <div id="registroRecoveryControls">
         <div class="registro-recovery-actions" role="group" aria-label="Acciones de notas · desplázate horizontalmente para ver más" tabindex="0">
           <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#fee2e2;color:#991b1b" data-reg-write onclick="IERegistroRecovery.recover()"><svg class="registro-action-icon" data-icon="cloud-download" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 13v8m-4-4 4 4 4-4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Recuperar Nube</span></button>

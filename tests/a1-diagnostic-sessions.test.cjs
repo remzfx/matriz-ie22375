@@ -10,8 +10,8 @@ function session(remote,disk={raw:null},role='admin'){
  c.NOTAS_KEY='synthetic-memory-only';c.localStorage={getItem:()=>disk.raw,setItem:(k,v)=>disk.raw=v};
  for(const n of ['loadStore','saveStore','subirRegistroNube','bajarRegistroNube','recuperarBorradorAcademico'])vm.runInContext(fixture.extract(n),c);
  if(disk.raw)c.loadStore();else c.store.academicSync={};
- c.fetchLecturaNube=async()=>{remote.reads++;return {status:200,text:async()=>JSON.stringify({ok:true,soportaModeloAcademico:true,items:[{clave:c.cloudClaveReg(),ts:remote.version,payload:copy(remote.payload)}]})};};
- c.fetch=async(url,opt)=>{const body=JSON.parse(opt.body);remote.writes++;if(body.version!==remote.version)return {status:200,text:async()=>JSON.stringify({ok:false,code:'CONFLICT'})};remote.version++;remote.payload=copy(body.payload);return {status:200,text:async()=>JSON.stringify({ok:true,version:remote.version})};};
+ c.fetchLecturaNube=async()=>{remote.reads++;return {status:200,text:async()=>JSON.stringify({ok:true,soportaModeloAcademico:true,identidadAcademica:1,items:[{clave:c.cloudClaveReg(),ts:remote.version,payload:copy(remote.payload)}]})};};
+ c.fetch=async(url,opt)=>{const body=JSON.parse(opt.body);remote.writes++;if(body.version!==remote.version)return {status:200,text:async()=>JSON.stringify({ok:false,code:'CONFLICT'})};remote.version++;remote.payload=copy(body.payload);remote.payload.meta={...(remote.payload.meta||{}),academicHistory:[]};return {status:200,text:async()=>JSON.stringify({ok:true,version:remote.version,identityHistory:[]})};};
  const choices=[];c.IERegistroReconcile.choose=async cs=>{choices.push(copy(cs));return cs.length?null:{};};
  const key=c.finalKey(f.comps[0],'id:synthetic-1'),set=(n)=>{c.baselineAcademica();c.store.finales[key]={nota20:n,nivel:c.numToLetter(n),origen:'numero',ts:10};c.saveStore();};
  return {c,disk,choices,key,set,roster,reopen:()=>session(remote,disk,role)};
@@ -29,16 +29,19 @@ test('C/F: true conflict cancellation and reopen preserve local, remote and caus
 test('F: explicit reconciliation retains recovery across reopen; recovery writes memory only',async()=>{
  const r=cloud(),f=session(r);f.set(15);await f.c.subirRegistroNube();f.set(18);r.payload.finales[f.key].nota20=12;r.payload.finales[f.key].nivel='B';r.version++;f.c.IERegistroReconcile.choose=async cs=>Object.fromEntries(cs.map(x=>[x.path,'remote']));assert.equal(await f.c.bajarRegistroNube(),true);const next=f.reopen();assert.equal(next.c.store.finales[next.key].nota20,12);assert.equal(next.c.recuperarBorradorAcademico(),true);assert.equal(next.c.store.finales[next.key].nota20,18);assert.equal(next.c.baselineAcademica().recovery.local.finales[next.key].nota20,12);assert.equal(r.writes,1);
 });
-test('D: identical payload/base with divergent historical alias stays conflict-free after reopen',async()=>{
- const r=cloud(),f=session(r);f.set(15);const old=f.key.slice(0,f.key.lastIndexOf('||')+2)+'Estudiante Ficticio Uno';f.c.store.finales[old]={nivel:'C',origen:'letra',nota20:8,ts:1};r.payload=copy(f.c.sliceRegistroArea());const b=f.c.baselineAcademica();b.version=r.version;b.basePayload=copy(r.payload);b.baseline=f.c.IERegistroAcademico.canonical(r.payload);f.c.saveStore();
- for(const current of [f,f.reopen()]){assert.equal(api.signature(current.c.sliceRegistroArea()),api.signature(r.payload));const before=copy(current.c.store.finales);assert.equal(await current.c.bajarRegistroNube(),true);assert.equal(current.choices.at(-1).length,0);assert.deepEqual(copy(current.c.store.finales),before);const identity=current.c.IEStudentIdentity;assert.equal(identity.leer(current.c.store.finales,current.key,current.roster[0],{}).nota20,15);}assert.equal(r.writes,0);
+test('D: identical historical contradictions still require review after reopen; no arbitrary ID priority',async()=>{
+ const r=cloud(),f=session(r);f.set(15);const old=f.key.slice(0,f.key.lastIndexOf('||')+2)+f.roster[0].nombre;f.c.store.finales[old]={nivel:'C',origen:'letra',nota20:8,ts:1};r.payload=copy(f.c.sliceRegistroArea());const b=f.c.baselineAcademica();b.version=r.version;b.basePayload=copy(r.payload);b.baseline=f.c.IERegistroAcademico.canonical(r.payload);f.c.saveStore();
+ for(const current of [f,f.reopen()]){const before=copy(current.c.store.finales);assert.equal(await current.c.bajarRegistroNube(),false);assert.equal(current.choices.at(-1).length,1);assert.deepEqual(copy(current.c.store.finales),before);}assert.equal(r.writes,0);
 });
+
 test('Diagnostic D: historical untagged reference differs from tagged letter; distinct exact numbers remain distinct',()=>{
  assert.equal(api.equal({nivel:'B',nota20:12},{nivel:'B',nota20:12,origen:'letra'}),false);assert.equal(api.equal({nivel:'B',nota20:12,origen:'letra'},{nivel:'B',nota20:13,origen:'letra'}),true);assert.equal(api.equal({nivel:'B',nota20:12,origen:'numero'},{nivel:'B',nota20:13,origen:'numero'}),false);
 });
-test('D: cold download of identical historical sets stays conflict-free after reopening',async()=>{
- const r=cloud(),f=session(r);f.set(15);const old=f.key.slice(0,f.key.lastIndexOf('||')+2)+f.roster[0].nombre;f.c.store.finales[old]={nivel:'C',nota20:8,origen:'letra'};r.payload=copy(f.c.sliceRegistroArea());assert.equal(await f.c.bajarRegistroNube(),true);assert.equal(f.choices.at(-1).length,0);const next=f.reopen();assert.equal(await next.c.bajarRegistroNube(),true);assert.equal(next.choices.at(-1).length,0);assert.equal(next.c.store.finales[next.key].nota20,15);assert.equal(next.c.store.finales[old].nivel,'C');assert.equal(r.writes,0);
+test('D: empty PC never silently selects one contradictory historical grade',async()=>{
+ const r=cloud(),source=session(r);source.set(15);const old=source.key.slice(0,source.key.lastIndexOf('||')+2)+source.roster[0].nombre;source.c.store.finales[old]={nivel:'C',nota20:8,origen:'letra'};r.payload=copy(source.c.sliceRegistroArea());const fresh=session(r);
+ assert.equal(await fresh.c.bajarRegistroNube(),false);assert.equal(fresh.choices.at(-1).length,1);assert.equal(fresh.c.store.finales[fresh.key],undefined);assert.equal(r.writes,0);
 });
+
 test('C: both devices preserve their competing exact numbers and demand explicit resolution',async()=>{
  const r=cloud(),a=session(r);a.set(15);await a.c.subirRegistroNube();const b=session(r);await b.c.bajarRegistroNube();a.set(18);b.set(12);assert.equal(await a.c.subirRegistroNube(),true);assert.equal(await b.c.bajarRegistroNube(),false);assert.equal(b.c.store.finales[b.key].nota20,12);assert.equal(r.payload.finales[a.key].nota20,18);assert.equal(b.choices.at(-1).length,1);assert.equal(r.writes,2);
 });
@@ -79,5 +82,5 @@ test('Permission denial on protected download preserves pending grades and sends
  const r=cloud(),f=session(r);f.set(18);const before=copy(f.c.store);f.c.fetchLecturaNube=async()=>({status:403,text:async()=>JSON.stringify({ok:false,code:'SESSION',error:'Sesión ficticia revocada'})});assert.equal(await f.c.bajarRegistroNube(),false);assert.deepEqual(copy(f.c.store),before);assert.equal(r.writes,0);
 });
 test('Unilateral pending ID edit with a historical alias survives download and reopening without POST',async()=>{
- const r=cloud(),f=session(r);f.set(15);const old=f.key.slice(0,f.key.lastIndexOf('||')+2)+f.roster[0].nombre;f.c.store.finales[old]={nivel:'C',nota20:8,origen:'letra'};r.payload=copy(f.c.sliceRegistroArea());await f.c.bajarRegistroNube();f.set(18);const next=f.reopen();assert.equal(await next.c.bajarRegistroNube(),true);assert.equal(next.choices.at(-1).length,0);assert.equal(next.c.store.finales[next.key].nota20,18);assert.equal(next.c.store.finales[old].nivel,'C');assert.equal(next.c.dirty,true);assert.equal(r.payload.finales[next.key].nota20,15);assert.equal(r.writes,0);
+ const r=cloud(),f=session(r);f.set(15);const old=f.key.slice(0,f.key.lastIndexOf('||')+2)+f.roster[0].nombre;f.c.store.finales[old]={nivel:'C',nota20:8,origen:'letra'};r.payload=copy(f.c.sliceRegistroArea());const baseline=f.c.baselineAcademica();baseline.version=r.version;baseline.basePayload=copy(r.payload);baseline.baseline=f.c.IERegistroAcademico.canonical(r.payload);f.c.saveStore();f.set(18);const next=f.reopen();assert.equal(await next.c.bajarRegistroNube(),true);assert.equal(next.choices.at(-1).length,0);assert.equal(next.c.store.finales[next.key].nota20,18);assert.equal(next.c.store.finales[old],undefined);assert.equal(next.c.baselineAcademica().basePayload.finales[old].nivel,'C');assert.equal(next.c.dirty,true);assert.equal(r.payload.finales[next.key].nota20,15);assert.equal(r.writes,0);
 });

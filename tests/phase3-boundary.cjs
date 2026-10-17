@@ -1,0 +1,15 @@
+// Phase3 exact allowlist: old approved checks still compare every unrelated byte.
+const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process');
+const base="112b30450326d1588dbe506e1039606e8aa1d885",memo=new Map(),digest=s=>crypto.createHash('sha256').update(s).digest('hex');
+const old=p=>{if(!memo.has(p))memo.set(p,execFileSync('git',['show',base+':'+p],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'));return memo.get(p);};
+const fn=(s,n)=>{const a=s.search(new RegExp('^(?:async )?function '+n+'\\(','m'));return s.slice(a,s.indexOf('\n}',a)+2);};
+const hashes={"registroSoloLectura": "ad971b78f76ebe27469f0f244daccb493be62dc1df5f499d083da6193aa1b3f6", "guardarRegistroIntegrado": "9644cc21198cbc2e5933c5df3e3cd53188b29f64cb540c7c41a08537e52bf8ec", "leerEstadoRemotoAcademico": "fc5165c366147c254291ea02d56fdfa4d76e9c5c52a9655e2f2fbfba95ca5cae", "abrirTutorRegistro": "8f54ff8f09422a0b5d11dc874e4dcf21740dbea23f442549e857a0b22f4bd2c2", "sincronizarPeriodosNube": "0ffe0881f2c2d6edb0f5bfa4a91a68682dccb945a46924a2691ec91571bf89b8"};
+function recovery(s){s=s.replace(/\r\n/g,'\n');if(!s.includes('let connection=null;'))return s;assert.equal(digest(s),"0b780cfc865d192c6f6c8eabf7b516d506978844dbdbac19bf78631b4e188901",'Exact Phase3 recovery adapter');return old('registro-recovery-ui.js');}
+function html(s){s=s.replace(/\r\n/g,'\n');if(!s.includes('/* Conexión obligatoria de Registro.'))return s;
+ const module=fs.readFileSync(path.join(__dirname,'..','registro-connection.js'),'utf8').trim().replace(/\r\n/g,'\n');assert.equal(digest(module),"cad463ddea65b256587dd9943f80ae2ed11f360abd9895f2f42444b0666f8f19",'Exact tested connection controller');const script='<script>\n'+module+'\n</script>\n';assert.equal(s.split(script).length,2);s=s.replace(script,'');
+ const a=s.indexOf('/* Fase3: conexión separada'),b=s.indexOf('/* Fin Fase3 conexión. */',a)+'/* Fin Fase3 conexión. */'.length,css=s.slice(a,b);assert.equal(digest(css),"7db720c17e13facb167dd7ad1ca88f09533ebb85525378ece38eb25d2ac07b64");s=s.replace('\n'+css+'\n','');
+ const banner="    <div id=\"registroConnectionStatus\" role=\"status\" aria-live=\"polite\" data-state=\"checking\"><span id=\"registroConnectionText\">Verificando conexi\u00f3n\u2026</span><button type=\"button\" id=\"registroConnectionReview\" hidden>Revisar y verificar</button><button type=\"button\" id=\"registroConnectionBackups\">Consultar respaldos</button></div>\n";assert.equal(s.split(banner).length,2);s=s.replace(banner,'');
+ for(const [n,h]of Object.entries(hashes)){assert.equal(digest(fn(s,n)),h,'Exact Phase3 hook: '+n);s=s.replace(fn(s,n),fn(old('registro.html'),n));}
+ const start=s.indexOf('/* Adaptador frontend: operaciones explícitas'),end=s.indexOf('\n</script>',start);s=s.slice(0,start)+recovery(s.slice(start,end).trim()+'\n').trim()+'\n'+s.slice(end);return s;
+}
+module.exports={html,recovery};

@@ -30,7 +30,7 @@
       dates.forEach(date=>out.set(JSON.stringify(['asisFechas',aula,date]),true));
     });
     // Alias es información de compatibilidad, no una autorización.
-    Object.entries(p.meta||{}).forEach(([k,v])=>{if(k!=='docente'&&k!=='studentAliases')out.set(JSON.stringify(['meta',k]),copy(v));});
+    Object.entries(p.meta||{}).forEach(([k,v])=>{if(k!=='docente'&&k!=='studentAliases'&&k!=='academicHistory')out.set(JSON.stringify(['meta',k]),copy(v));});
     Object.keys(p).filter(k=>!maps.includes(k)&&!['sessions','asisFechas','meta','ts','_ts','registroVersion','modeloAcademico'].includes(k))
       .forEach(k=>out.set(JSON.stringify(['extra',k]),copy(p[k])));
     return out;
@@ -51,6 +51,36 @@
     }));return out;
   }
   function signature(p){return JSON.stringify([...flatten(p)].sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,clean(v)]));}
+  // Read integrity is separate from A1: an absent/corrupt row is not a deletion.
+  function readEqual(a,b){
+    const project=p=>{p=p||{};const out={...p,meta:{...(p.meta||{})}};delete out.meta.docente;delete out.meta.studentAliases;delete out.modeloAcademico;
+      maps.forEach(f=>out[f]=p[f]||{});
+      const sessionKey=s=>[s.nivel,s.bim,s.grado,s.seccion,s.area,s.comp,s.capacidad,s.fecha].join('||');
+      out.sessions=(p.sessions||[]).slice().sort((x,y)=>sessionKey(x).localeCompare(sessionKey(y)));
+      out.asisFechas=Object.fromEntries(Object.entries(p.asisFechas||{}).filter(([,v])=>v.length).map(([k,v])=>[k,[...new Set(v)].sort()]));return out;};
+    return equal(project(a),project(b));
+  }
+  function validateRemote(remote,known={}){
+    const object=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
+    const fail=(code,message)=>{const e=Error(message+' Tus notas locales y su base verificada se conservan.');e.code=code;throw e;};
+    const p=remote.payload;let b=known.basePayload;
+    if(!b&&Number(known.version)>0){try{b=JSON.parse(known.baseline);}catch(_){fail('READ_BASE','No se pudo verificar la base histórica de este registro.');}if(!object(b))fail('READ_BASE','La base histórica es inválida.');}
+    if(!object(p))fail('READ_INVALID','Respuesta académica inválida.');
+    for(const f of maps)if(p[f]!==undefined&&!object(p[f]))fail('READ_INVALID','Mapa académico inválido.');
+    for(const f of ['grades','finales','concComp'])if(Object.values(p[f]||{}).some(v=>!object(v)))fail('READ_INVALID','Registro académico incompleto o inválido.');
+    if(p.sessions!==undefined&&(!Array.isArray(p.sessions)||p.sessions.some(s=>!object(s))))fail('READ_INVALID','Sesiones inválidas.');
+    if(p.asisFechas!==undefined&&(!object(p.asisFechas)||Object.values(p.asisFechas).some(v=>!Array.isArray(v))))fail('READ_INVALID','Fechas inválidas.');
+    if(remote.exists===false&&Number(known.version)>0)fail('READ_MISSING','No se encontró un registro previamente verificado.');
+    if(known.version!=null&&remote.version<known.version)fail('READ_STALE','La lectura retrocedió de versión.');
+    if(!b)return remote;
+    if(remote.version===known.version&&!readEqual(p,b))fail('READ_VERSION','La misma versión contiene datos diferentes.');
+    for(const f of [...maps,'sessions'])if(Object.keys(b[f]||{}).length&&p[f]===undefined)fail('READ_INCOMPLETE','La lectura omite información previamente verificada.');
+    const fields=['grades','finales','concComp','concArea'];
+    const records=x=>fields.flatMap(f=>Object.entries(x[f]||{}).filter(([,v])=>v&&!v.borrado).map(([k])=>[f,k]));
+    const previous=records(b);
+    if(previous.length&&!records(p).length&&!previous.every(([f,k])=>p[f]&&p[f][k]&&p[f][k].borrado))fail('READ_EMPTY','La lectura está vacía sin borrados explícitos verificables.');
+    return remote;
+  }
   function plan(base,local,remote,identityGroups=[],options={}){
     const b=base===null?null:flatten(base),l=flatten(local),r=flatten(remote),merged=new Map(),conflicts=[];
     const keys=[...new Set([...(b?b.keys():[]),...l.keys(),...r.keys()])].sort();
@@ -67,6 +97,7 @@
         else if(rv===undefined)merged.set(path,lv);
         else conflicts.push({path,local:copy(lv),remote:copy(rv),unknownBase:true,reason:'Asistencia compartida entre áreas: requiere decisión explícita'});
       }
+      else if(options.reviewAbsence&&b&&bv!==undefined&&(lv===undefined||rv===undefined))conflicts.push({path,base:copy(bv),local:copy(lv),remote:copy(rv),reason:'Un dato conocido está ausente sin marca explícita de borrado. Revisa antes de reemplazarlo.'});
       else if(b&&equal(lv,bv)){if(rv!==undefined)merged.set(path,rv);}
       else if(b&&equal(rv,bv)){if(lv!==undefined)merged.set(path,lv);}
       else if(!b&&lv===undefined){merged.set(path,rv);}
@@ -160,6 +191,47 @@
     });
     return [...groups.values()].filter(set=>set.size>1).map(set=>[...set]);
   }
+  // Identity is projected only after the raw Phase 1 integrity barrier.
+  function academicPlan(base,local,remote,roster,context,competencies,options={}){
+    const identity=global.IEAcademicIdentity;
+    if(!identity)throw Error('No se cargó el resolvedor académico. Borrador conservado.');
+    const b=base&&identity.project(base,roster,context,competencies),l=identity.project(local,roster,context,competencies,base),r=identity.project(remote,roster,context,competencies,base);
+    // A clean old PC follows a verified unambiguous remote version, not its old key spelling.
+    const complete=!b||['grades','finales','concComp'].every(f=>Object.keys(b.payload[f]||{}).every(k=>has(r.payload[f]||{},k)));
+    if(base&&complete&&(readEqual(local,base)||options.cleanAcademic)&&!r.conflicts.length){for(const field of ['grades','finales','concComp']){l.payload[field]=copy(r.payload[field]||{});if(b)b.payload[field]=copy(r.payload[field]||{});}l.conflicts=[];if(b)b.conflicts=[];}
+    if(base&&readEqual(remote,base))r.conflicts=r.conflicts.filter(conflict=>{
+      const [f,k]=JSON.parse(conflict.path),records=l.groups.get(conflict.path)||[];
+      const changed=records.filter(record=>has(base[f]||{},record.key)&&!equal(record.value,base[f][record.key]));
+      if(changed.length!==1||l.conflicts.some(c=>c.path===conflict.path))return true;
+      // A real local edit establishes intent while the remote group is unchanged.
+      // Keep the old value only as the causal baseline, never as a chosen cloud vote.
+      r.payload[f]=r.payload[f]||{};r.payload[f][k]=copy(base[f][changed[0].key]);
+      if(b){b.payload[f]=b.payload[f]||{};b.payload[f][k]=copy(base[f][changed[0].key]);}return false;
+    });
+    const ambiguous=new Map();
+    for(const [side,projection]of [['local',l],['remote',r]])for(const conflict of projection.conflicts){
+      if(!ambiguous.has(conflict.path))ambiguous.set(conflict.path,{path:conflict.path,paths:[conflict.path],candidates:[],reason:'Identidad histórica verificada, pero notas contradictorias sin vigencia demostrada. Requiere revisión.'});
+      const c=ambiguous.get(conflict.path);
+      for(const record of conflict.records)if(!c.candidates.some(x=>equal(x.value,record.value)))c.candidates.push({id:'candidate:'+c.candidates.length,label:(side==='local'?'Este dispositivo':'Nube')+' · representación '+(c.candidates.length+1),value:copy(record.value),original:record.key});
+    }
+    for(const c of ambiguous.values()){
+      const [f,k]=JSON.parse(c.path);
+      for(const [side,projection]of [['local',l],['remote',r]]){
+        const value=projection.payload[f]&&projection.payload[f][k];
+        if(value!==undefined&&!c.candidates.some(x=>equal(x.value,value)))c.candidates.push({id:'candidate:'+c.candidates.length,label:side==='local'?'Este dispositivo':'Nube',value:copy(value),original:k});
+      }
+      for(const projection of [b,l,r].filter(Boolean))if(projection.payload[f])delete projection.payload[f][k];
+    }
+    const merge=plan(b?b.payload:null,l.payload,r.payload,[],options),conflicts=[...ambiguous.values(),...merge.conflicts];
+    return {conflicts,remote:r.payload,resolve(choices={}){
+      const result=merge.resolve(choices);
+      for(const c of ambiguous.values()){
+        const choice=c.candidates.find(x=>x.id===choices[c.path]);if(!choice)throw Error('Hay identidades sin resolver.');
+        const [f,k]=JSON.parse(c.path);result[f]=result[f]||{};result[f][k]=copy(choice.value);
+      }
+      return result;
+    }};
+  }
   function conflictView(c,context={}){
     const path=JSON.parse(c.paths&&c.paths[0]||c.path),field=path[0],parts=typeof path[1]==='string'?path[1].split('||'):[];
     const types={grades:'Evidencia de evaluación',finales:'Calificación directa',concComp:'Conclusión de competencia',concArea:'Conclusión histórica',asistencia:'Marca de asistencia',asisFechas:'Fecha de asistencia',asisFechasEstado:'Estado de fecha',sessions:'Sesión de evaluación',competenciasEstado:'Competencia trabajada',capsSel:'Capacidades',meta:'Contexto del registro'};
@@ -167,7 +239,7 @@
     const tail=parts.at(-1)||'',decode=s=>{try{return decodeURIComponent(s);}catch(e){return s;}};
     const candidates=(context.roster||[]).filter(al=>{
       const id=typeof global.studentKey==='function'?global.studentKey(al):al.idSiagie?'id:'+encodeURIComponent(al.idSiagie):al.codigoEstudiante?'cod:'+encodeURIComponent(al.codigoEstudiante):'nom:'+encodeURIComponent(normalize(al.nombre));
-      return id===tail||(al.codigoEstudiante&&tail==='cod:'+encodeURIComponent(al.codigoEstudiante))||[al.nombre,...(context.aliases&&context.aliases[id]||[])].some(n=>normalize(n)===normalize(decode(tail.replace(/^nom:/,''))));
+      return id===tail||(al.codigoEstudiante&&tail==='cod:'+encodeURIComponent(al.codigoEstudiante))||normalize(al.nombre)===normalize(decode(tail.replace(/^nom:/,'')));
     });
     const student=candidates.length===1?candidates[0]:null;
     const individual=['grades','finales','concComp','concArea','asistencia'].includes(field);
@@ -189,7 +261,22 @@
       }
       return v===true?'Presente':String(v);
     }
-    return {title,local:value(c.local),remote:value(c.remote)};
+    const alternatives=c.candidates?c.candidates.map(x=>x.value):[c.local,c.remote],different=new Set();
+    for(let i=1;i<alternatives.length;i++){
+      const a=clean(alternatives[0]),b=clean(alternatives[i]);
+      if(a&&b&&typeof a==='object'&&typeof b==='object'&&!Array.isArray(a)&&!Array.isArray(b))for(const k of new Set([...Object.keys(a),...Object.keys(b)])){if(!equal(a[k],b[k]))different.add(k);}
+      else if(!equal(a,b))different.add('registro');
+    }
+    const mixedOrigins=alternatives.some(v=>v?.origen==='letra')&&alternatives.some(v=>v?.origen==='numero');
+    const exactNumeric=alternatives.length>1&&alternatives.every(v=>v?.origen==='numero'&&typeof v.nota20==='number'&&Number.isFinite(v.nota20));
+    const labels={nivel:'nivel de logro',nota20:exactNumeric?'nota exacta de 0–20':mixedOrigins?'valor asociado al origen (referencia en Letras o nota numérica)':'valor o tipo de nota20, sin equivalencia numérica demostrada',origen:'origen de la nota (Letras, Numérica o sin verificar)',borrado:'estado de borrado',registro:'presencia o contenido del registro'};
+    const fields=[...different].map(k=>labels[k]||'campo adicional «'+k+'»');
+    let explanation=fields.length?'Se requiere revisión por diferencias en: '+fields.join('; ')+'. La misma letra visible no demuestra que los registros sean iguales.':'La revisión corresponde al conjunto de datos indicado; las marcas de tiempo y los números de referencia de Letras no deciden la vigencia.';
+    if(mixedOrigins)explanation+=' Una alternativa fue ingresada como letra y otra como número. En Letras, nota20 es solo una referencia; no representa una nota numérica ingresada.';
+    if(different.has('nota20')&&exactNumeric)explanation+=' Compare las notas numéricas exactas: '+[...new Set(alternatives.map(v=>v.nota20))].join(' frente a ')+'. Compartir nivel no las hace equivalentes.';
+    if(alternatives.some((v,i)=>i&&value(v)===value(alternatives[0])&&!equal(v,alternatives[0])))explanation+=' Las alternativas se ven iguales en el resumen; abra «Identificación y detalles técnicos» para ver el valor y tipo de cada campo.';
+    if(individual&&!student)explanation+=' La identidad no está verificada inequívocamente en el padrón mostrado; no se deben asociar estudiantes por suposición.';
+    return {title,local:value(c.local),remote:value(c.remote),explanation};
   }
   function choose(conflicts,isCurrent,context={}){
     if(!conflicts.length)return Promise.resolve({});
@@ -231,11 +318,12 @@
       conflicts.forEach((c,i)=>{
         const view=conflictView(c,context),field=document.createElement('fieldset'),label=document.createElement('legend');field.className='academic-conflict-card';label.textContent=view.title;field.appendChild(label);
         const options=document.createElement('div');options.className='academic-conflict-options';field.appendChild(options);
-        for(const side of ['local','remote']){
+        for(const side of (c.candidates||['local','remote'])){
           const row=document.createElement('label'),radio=document.createElement('input'),text=document.createElement('div'),source=document.createElement('strong'),value=document.createElement('div');row.className='academic-conflict-option';radio.type='radio';radio.name='academic-conflict-'+i;
-          source.textContent=side==='local'?'Este dispositivo':'Nube';value.className='academic-conflict-value';value.textContent=view[side];text.appendChild(source);text.appendChild(value);
-          radio.onchange=()=>{choices[c.path]=side;apply.disabled=conflicts.some(x=>!choices[x.path]);};row.appendChild(radio);row.appendChild(text);options.appendChild(row);
+          source.textContent=typeof side==='string'?(side==='local'?'Este dispositivo':'Nube'):side.label;value.className='academic-conflict-value';value.textContent=typeof side==='string'?view[side]:conflictView({path:c.path,local:side.value},context).local;text.appendChild(source);text.appendChild(value);
+          radio.onchange=()=>{choices[c.path]=typeof side==='string'?side:side.id;apply.disabled=conflicts.some(x=>!choices[x.path]);};row.appendChild(radio);row.appendChild(text);options.appendChild(row);
         }
+        const explanation=document.createElement('p');explanation.className='academic-conflict-explanation';explanation.textContent=view.explanation;field.appendChild(explanation);
         const details=document.createElement('details'),summary=document.createElement('summary'),technical=document.createElement('pre');summary.textContent='Identificación y detalles técnicos';technical.textContent=JSON.stringify(c,null,2);details.appendChild(summary);details.appendChild(technical);field.appendChild(details);content.appendChild(field);
       });
       apply.type=cancel.type='button';apply.textContent='Continuar con las decisiones';cancel.textContent='Cancelar';apply.disabled=true;
@@ -246,7 +334,7 @@
       document.addEventListener('keydown',key);document.body.appendChild(overlay);cancel.focus();
     });
   }
-  const api={copy,equal,signature,plan,identityConflicts,conflictView,choose,has};
+  const api={copy,equal,signature,readEqual,validateRemote,plan,identityConflicts,academicPlan,conflictView,choose,has};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
   global.IERegistroReconcile=api;
 })(typeof window!=='undefined'?window:globalThis);

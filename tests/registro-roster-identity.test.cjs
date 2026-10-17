@@ -53,16 +53,16 @@ test('Same ID keeps notes after rename/order change; new is empty, removed is hi
  assert.equal(s.run("leerNota(store.finales,finalKey('Resuelve','id:44'))"),undefined);
  assert.equal(s.run("estudiantes().some(a=>a.idSiagie==='43')"),false);assert.equal(s.run('JSON.stringify(store.finales)'),before);
 });
-test('Historical name keys remain readable; aliases persist in object meta and survive cloud round-trip',async()=>{
+test('Current roster names remain readable; unverified historical names survive but are not reassigned after rename',async()=>{
  const s=fixture(),al={idSiagie:'42',nombre:'Synthetic Before',grado:4,seccion:'B'};s.c.base=s.roster([al]);s.run('bdEstudiantes=base;recordarPadron(base)');
  s.run("store.finales[cloudClaveReg()+'||Resuelve||Synthetic Before']={nota20:16};store.meta[cloudClaveReg()]='Synthetic Teacher'");
  assert.equal(s.run("leerNota(store.finales,finalKey('Resuelve','id:42')).nota20"),16);
  s.c.next=[{...al,nombre:'Synthetic Corrected'}];await s.c.cargarPadronRegistro('III');
- assert.equal(s.run("leerNota(store.finales,finalKey('Resuelve','id:42')).nota20"),16);
+ assert.equal(s.run("leerNota(store.finales,finalKey('Resuelve','id:42'))"),undefined);
  const payload=s.c.sliceRegistroArea();assert.equal(typeof payload.meta,'object');assert.equal(payload.meta.docente,'Synthetic Teacher');
  assert.ok(Object.hasOwn(payload.finales,'secundaria||III||4||B||Matemática||Resuelve||Synthetic Before'));
  s.c.payload=JSON.parse(JSON.stringify(payload));s.run('store={sessions:[],grades:{},finales:{},concArea:{},meta:{},studentAliases:{}};mergeRegistroPayload(payload)');
- assert.equal(s.run("leerNota(store.finales,finalKey('Resuelve','id:42')).nota20"),16);
+ assert.equal(s.run("leerNota(store.finales,finalKey('Resuelve','id:42'))"),undefined);
 });
 test('Stable keys take precedence; clearing a note does not resurrect its legacy name key',()=>{
  const s=fixture();s.c.base=s.roster([{idSiagie:'42',nombre:'Synthetic Student'}]);s.run('bdEstudiantes=base');

@@ -16,8 +16,8 @@ test('PR82 native Grade/Section selects are hidden by initial CSS; compact contr
  for(const id of ['registroBotonesBim','registroBotonesGrado','registroBotonesSeccion'])assert.equal((source.match(new RegExp('id="'+id+'"','g'))||[]).length,1);assert.match(source,/\.registro-opcion \{min-width:34px;min-height:33px/);
 });
 test('PR82 snapshot guard rejects unapproved context events, spacing and duplicate hiding; never conceals academic changes',()=>{
- assert.throws(()=>normalize(source.replace('onchange="onGrado()"','onchange="onContexto()"')),/approved context/);
+ assert.throws(()=>normalize(source.replace('onchange="onGrado()"','onchange="onContexto()"')),/approved context|Exact reviewed Phase 2/);
  assert.throws(()=>normalize(source.replace('column-gap:24px;row-gap:10px;align-items:start;','column-gap:2px;row-gap:10px;align-items:start;')),/approved context grid/);
  const line=source.split('\n').find(l=>l.startsWith('    .registro-datos-grid #selGrado,'));assert.throws(()=>normalize(source.replace(line,line+'\n'+line)),/native-select hiding/);
- const changed=source.replace('async function prepararVersionAcademica(options){','async function prepararVersionAcademica(options){\n  throw Error("Synthetic mutation");');assert.throws(()=>normalize(changed),/Only bounded read\/instrumentation changes in prepararVersionAcademica/);
+ const changed=source.replace('async function prepararVersionAcademica(options){','async function prepararVersionAcademica(options){\n  throw Error("Synthetic mutation");');assert.throws(()=>normalize(changed),/Exact Phase 1 guard\/backup boundary: prepararVersionAcademica|Exact reviewed Phase 2 function: prepararVersionAcademica/);
 });
