@@ -610,7 +610,7 @@
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
 <script src="student-identity.js"></script>
-<script src="academic-identity.js" defer></script><script src="registro-reconcile.js" defer></script><script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script><script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script>
+<script src="academic-identity.js" defer></script><script src="registro-reconcile.js" defer></script><script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script><script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script><script src="registro-sync-diagnostic.js" defer></script><script src="registro-sync-diagnostic-ui.js" defer></script>
   <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body class="min-h-screen text-slate-800">
@@ -737,7 +737,7 @@
       <div class="trans-context"><label>Aula tutorada <select id="transAula"></select></label><label>Bimestre <select id="transBim"></select></label><button type="button" class="btn btn-ghost" id="transReload">Actualizar ↻</button></div>
       <p id="transStatus" role="status">Verificando tutorías…</p><div id="transRows"></div>
     </section>
-    <div id="registroConnectionStatus" role="status" aria-live="polite" data-state="checking"><span id="registroConnectionText">Verificando conexión…</span><button type="button" id="registroConnectionReview" hidden>Revisar y verificar</button><button type="button" id="registroConnectionBackups">Consultar respaldos</button></div>
+    <div id="registroConnectionStatus" role="status" aria-live="polite" data-state="checking"><span id="registroConnectionText">Verificando conexión…</span><button type="button" id="registroConnectionReview" hidden>Revisar y verificar</button><button type="button" id="registroConnectionBackups">Consultar respaldos</button><button type="button" id="registroConnectionDiagnostic">Diagnosticar sincronización</button></div>
     <div id="registroAcademicoPanel">
     <div id="registroAccionesAcademicas" class="flex gap-2 flex-wrap">
       <button type="button" id="tabCal" class="btn btn-primary flex-1 text-sm" onclick="showPanel('cal')">Calificar</button>
