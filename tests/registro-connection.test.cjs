@@ -36,3 +36,108 @@ test('Previous backend identity protocol cannot reopen academic editing',async()
 test('Phase3 changes only the exact connection hooks; approved academic/backend modules stay byte-identical',()=>{const {execFileSync}=require('node:child_process');const base='112b30450326d1588dbe506e1039606e8aa1d885';assert.equal(require('./phase3-boundary.cjs').html(read('registro.html')),execFileSync('git',['show',base+':registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'));for(const file of ['apps-script/Codigo.js','apps-script/AcademicIdentity.js','academic-identity.js','registro-reconcile.js','registro-transversales.js','registro-academic-model.js','registro-local-store.js','registro-drafts.js','sw.js'])assert.equal(file==='registro-reconcile.js'?require('./reconciliation-ui-boundary.cjs')(read(file)):read(file).replace(/\r\n/g,'\n'),execFileSync('git',['show',base+':'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n'),file);});
 
 test('Failure retaining an in-progress field blocks reconciliation instead of overwriting it',async()=>{let reads=0;const c=create({binding:()=> 'same-account',authorized:()=>true,setTimeout:()=>0,clearTimeout(){},retain(){throw Error('Synthetic storage failure');},verify:async()=>{reads++;return {ok:true};}});await c.check();c.pause();assert.equal(c.snapshot().retentionFailed,true);assert.equal(await c.check(true),false);assert.equal(reads,1);assert.equal(c.canEdit(),false);});
+
+test('Heartbeat in pending state renews lease without degrading to review when zero conflicts',async()=>{
+ let conflict=false;
+ const f=clock({verify:()=>({ok:true,pending:true,conflict})});
+ assert.equal(await f.c.check(),false);
+ assert.equal(f.c.snapshot().state,'review');
+ assert.equal(await f.c.check(true),true);
+ assert.equal(f.c.snapshot().state,'pending');
+ assert.equal(f.c.canEdit(),true);
+ f.time(120000);
+ assert.equal(await f.c.check(false,true),true);
+ assert.equal(f.c.snapshot().state,'pending');
+ assert.equal(f.c.canEdit(),true);
+ conflict=true;
+ f.time(240000);
+ assert.equal(await f.c.check(false,true),false);
+ assert.equal(f.c.snapshot().state,'review');
+ assert.equal(f.c.canEdit(),false);
+});
+
+test('UI: Heartbeat while in pending preserves editing lease; remote version conflict degrades to review',async()=>{
+ const f=ui();
+ await f.api.automatic();
+ f.c.store.finales[f.key]={nota20:18,nivel:'AD',origen:'numero'};
+ f.c.saveStore();
+ f.connection.pause();
+ assert.equal(await f.api.automatic(),false);
+ assert.equal(f.connection.snapshot().state,'review');
+ f.c.confirm=()=>true;
+ assert.equal(await f.api.resolve(),true);
+ assert.equal(f.connection.snapshot().state,'pending');
+ assert.equal(f.connection.canEdit(),true);
+ assert.equal(await f.connection.check(false,true),true);
+ assert.equal(f.connection.snapshot().state,'pending');
+ assert.equal(f.connection.canEdit(),true);
+ f.r.version++;
+ f.r.payload.finales[f.key]={nota20:11,nivel:'C',origen:'numero'};
+ assert.equal(await f.connection.check(false,true),false);
+ assert.equal(f.connection.snapshot().state,'review');
+ assert.equal(f.connection.canEdit(),false);
+});
+
+test('priorPending never bypasses guards: context change, deauth, lease expiry, closed period, network failure, and real conflicts pause editing',async()=>{
+ let binding='1A-MAT',authorized=true,verifyResult={ok:true,pending:true,conflict:false};
+ const f=clock({verify:async()=>verifyResult});
+ f.key(binding);
+ f.auth(authorized);
+ f.time(0);
+
+ // 1. Inicial con pendientes entra en review; al resolver review entra en pending y canEdit es true
+ assert.equal(await f.c.check(),false);
+ assert.equal(f.c.snapshot().state,'review');
+ assert.equal(await f.c.check(true),true);
+ assert.equal(f.c.snapshot().state,'pending');
+ assert.equal(f.c.canEdit(),true);
+
+ // 2. Cambio de contexto académico / binding resetea inmediatamente canEdit a false y check exige revisión nueva
+ f.key('2B-COM');
+ assert.equal(f.c.canEdit(),false);
+ assert.equal(await f.c.check(),false);
+ assert.equal(f.c.snapshot().state,'review');
+ assert.equal(f.c.canEdit(),false);
+
+ // Reautorizar en pending para 2B-COM
+ assert.equal(await f.c.check(true),true);
+ assert.equal(f.c.snapshot().state,'pending');
+ assert.equal(f.c.canEdit(),true);
+
+ // 3. Pérdida de identidad / autorización revoca de inmediato la edición y check no mantiene pending
+ f.auth(false);
+ assert.equal(f.c.canEdit(),false);
+ assert.equal(await f.c.check(),false);
+ assert.notEqual(f.c.snapshot().state,'pending');
+ assert.equal(f.c.canEdit(),false);
+ f.auth(true);
+
+ // Re-entrar en pending
+ assert.equal(await f.c.check(true),true);
+ assert.equal(f.c.canEdit(),true);
+
+ // 4. Expiración de lease bloquea edición puramente por tiempo transcurrido sin evento de red
+ f.time(160000);
+ assert.equal(f.c.canEdit(),false);
+
+ // 5. Falla de verificación remota (TIMEOUT / error de servidor) transiciona a server y pausa edición
+ verifyResult={ok:false,code:'TIMEOUT'};
+ assert.equal(await f.c.check(),false);
+ assert.equal(f.c.snapshot().state,'server');
+ assert.equal(f.c.canEdit(),false);
+
+ // 6. Cierre administrativo del periodo (CLOSED) entra en readonly y pausa edición
+ verifyResult={ok:true,code:'CLOSED'};
+ assert.equal(await f.c.check(true),false);
+ assert.equal(f.c.snapshot().state,'readonly');
+ assert.equal(f.c.canEdit(),false);
+
+ // 7. Conflicto real confirmado (conflict: true) entra en review y pausa edición incluso durante heartbeat
+ verifyResult={ok:true,pending:true,conflict:false};
+ assert.equal(await f.c.check(true),true);
+ assert.equal(f.c.canEdit(),true);
+ verifyResult={ok:true,pending:true,conflict:true};
+ assert.equal(await f.c.check(false,true),false);
+ assert.equal(f.c.snapshot().state,'review');
+ assert.equal(f.c.canEdit(),false);
+});
