@@ -359,3 +359,60 @@ test('registro.html: El botón de diagnóstico está en #registroConnectionStatu
   assert.match(html, /<script src="registro-sync-diagnostic\.js" defer><\/script>/);
   assert.match(html, /<script src="registro-sync-diagnostic-ui\.js" defer><\/script>/);
 });
+
+test('UI: Caso real con 0 conflictos y cambios locales pendientes muestra diferencias cuantitativas y razón clara sin exponer PII', () => {
+  const contextVm = vm.createContext({ window: null });
+  contextVm.window = contextVm;
+  vm.runInContext(uiSource, contextVm);
+  const { buildDialogContent } = contextVm.IERegistroSyncDiagnosticUI;
+
+  const mockReport = {
+    schema: 1, readOnly: true,
+    period: { server: 'abierto', closed: false },
+    connection: { state: 'review', leaseExpired: false, retentionFailed: false },
+    conflicts: { total: 0, byModule: {}, causes: {} },
+    pendingEquivalentToCloud: false,
+    blocks: { period: false, synchronization: true },
+    legacyLocal: true,
+    counts: {
+      local: { sessions: 2, grades: 56, finales: 2, concComp: 1, capsSel: 2 },
+      cloud: { sessions: 2, grades: 56, finales: 1, concComp: 0, capsSel: 1 }
+    },
+    status: 'no_conflicts'
+  };
+
+  const html = buildDialogContent(mockReport);
+  assert.match(html, /cambios locales guardados en este dispositivo pendientes de subir a la nube, sin conflictos contradictorios/);
+  assert.match(html, /Diferencias cuantitativas por módulo \(local vs\. nube\):/);
+  assert.match(html, /Calificaciones directas \(Promedios\):.*2 local \/ 1 nube \(\+1 en este dispositivo\)/);
+  assert.match(html, /Conclusiones descriptivas:.*1 local \/ 0 nube \(\+1 en este dispositivo\)/);
+  assert.match(html, /Capacidades seleccionadas:.*2 local \/ 1 nube \(\+1 en este dispositivo\)/);
+  assert.doesNotMatch(html, /Sin bloqueos activos de sincronización: notas locales y nube sincronizadas/);
+  assert.doesNotMatch(html, /DNI|token|estudiante|alumno|password/i);
+});
+
+test('UI: Estado totalmente sincronizado cuando pendingEquivalentToCloud es true y 0 conflictos', () => {
+  const contextVm = vm.createContext({ window: null });
+  contextVm.window = contextVm;
+  vm.runInContext(uiSource, contextVm);
+  const { buildDialogContent } = contextVm.IERegistroSyncDiagnosticUI;
+
+  const mockReport = {
+    schema: 1, readOnly: true,
+    period: { server: 'abierto', closed: false },
+    connection: { state: 'connected', leaseExpired: false, retentionFailed: false },
+    conflicts: { total: 0, byModule: {}, causes: {} },
+    pendingEquivalentToCloud: true,
+    blocks: { period: false, synchronization: false },
+    legacyLocal: false,
+    counts: {
+      local: { sessions: 2, grades: 56, finales: 1, concComp: 0, capsSel: 1 },
+      cloud: { sessions: 2, grades: 56, finales: 1, concComp: 0, capsSel: 1 }
+    },
+    status: 'no_conflicts'
+  };
+
+  const html = buildDialogContent(mockReport);
+  assert.match(html, /Sin bloqueos activos de sincronización: notas locales y nube sincronizadas/);
+  assert.doesNotMatch(html, /Diferencias cuantitativas por m&oacute;dulo/);
+});

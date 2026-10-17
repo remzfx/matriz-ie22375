@@ -43,7 +43,11 @@
   if(report?.blocks?.synchronization){
    let reason = 'Edición pausada por sincronización.';
    if(c.state === 'review' || report.status === 'review'){
-    reason = 'Edición pausada por revisión de sincronización. Hay discrepancias entre el trabajo local y la nube que requieren revisión explícita para proteger las notas.';
+    if(conf.total > 0){
+     reason = 'Edición pausada por revisión de sincronización. Hay discrepancias entre el trabajo local y la nube que requieren revisión explícita para proteger las notas.';
+    } else {
+     reason = 'Edición pausada por revisión de sincronización. Hay cambios locales guardados en este dispositivo pendientes de subir a la nube, sin conflictos contradictorios con el servidor.';
+    }
    } else if(c.state === 'offline'){
     reason = 'Sin conexión a internet. Edición pausada para proteger notas locales.';
    } else if(c.state === 'session'){
@@ -57,7 +61,11 @@
    }
    blockHtml += '</div>';
   } else if(!report?.blocks?.period){
-   blockHtml = '<div style="padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;color:#166534;margin-bottom:8px">🟢 Sin bloqueos activos de sincronización.</div>';
+   if(report?.pendingEquivalentToCloud === false){
+    blockHtml = '<div style="padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;color:#166534;margin-bottom:8px">🟢 Conexión activa: los cambios locales guardados en este dispositivo están listos para subir a la nube.</div>';
+   } else {
+    blockHtml = '<div style="padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;color:#166534;margin-bottom:8px">🟢 Sin bloqueos activos de sincronización: notas locales y nube sincronizadas.</div>';
+   }
   }
 
   // 3. Conflictos agregados por módulo
@@ -68,11 +76,42 @@
     const modLabel = mod === 'promedios' ? 'Promedios' : mod === 'calificar' ? 'Calificar' : mod === 'asistencia' ? 'Asistencia' : mod === 'identidades' ? 'Identidades' : mod;
     modulesHtml += '<li><strong>'+escapeHtml(modLabel)+':</strong> '+count+' conflicto(s)</li>';
    }
-   modulesHtml += '</ul>';
+   modulesHtml += '</ul></div>';
   } else {
    modulesHtml += ' <span style="color:#166534">0 conflictos confirmados</span></div>';
   }
-  if(conf.total > 0) modulesHtml += '</div>';
+
+  // 3b. Diferencias cuantitativas por módulo (sin datos personales)
+  const counts = report?.counts || {};
+  const localCounts = counts.local || {};
+  const cloudCounts = counts.cloud || {};
+  const moduleNames = {
+   sessions: 'Sesiones de evaluación',
+   grades: 'Evidencias (Calificar)',
+   finales: 'Calificaciones directas (Promedios)',
+   concComp: 'Conclusiones descriptivas',
+   capsSel: 'Capacidades seleccionadas',
+   asistencia: 'Marcas de asistencia'
+  };
+  const diffs = [];
+  for(const field of ['sessions','grades','finales','concComp','capsSel','asistencia']){
+   const loc = Number(localCounts[field] || 0);
+   const cld = Number(cloudCounts[field] || 0);
+   if(loc !== cld){
+    diffs.push({ field, label: moduleNames[field] || field, local: loc, cloud: cld, diff: loc - cld });
+   }
+  }
+  let countsHtml = '';
+  if(diffs.length > 0){
+   countsHtml = '<div style="margin-bottom:8px;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:12px">'
+    + '<strong>Diferencias cuantitativas por módulo (local vs. nube):</strong>'
+    + '<ul style="margin:4px 0 0 16px;padding:0;list-style-type:disc">';
+   for(const d of diffs){
+    const diffText = d.diff > 0 ? '(+' + d.diff + ' en este dispositivo)' : '(' + d.diff + ' en este dispositivo)';
+    countsHtml += '<li><strong>' + escapeHtml(d.label) + ':</strong> ' + d.local + ' local / ' + d.cloud + ' nube ' + escapeHtml(diffText) + '</li>';
+   }
+   countsHtml += '</ul></div>';
+  }
 
   // 4. Causas identificadas
   let causesHtml = '';
@@ -105,7 +144,7 @@
   }
   storageHtml += '</div>';
 
-  return periodHtml + blockHtml + modulesHtml + causesHtml + storageHtml;
+  return periodHtml + blockHtml + modulesHtml + countsHtml + causesHtml + storageHtml;
  }
 
  function showDialog(report){
