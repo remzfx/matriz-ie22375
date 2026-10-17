@@ -2437,7 +2437,7 @@ function recolectarPantalla() {
     if (n !== '') n = Math.round(n);
     const k = capKeyHoy(comp, cap, nombre);
     const previo = leerNota(store.grades, k);
-    if (n === '' && previo && previo.origen==='letra') return;
+    if (n === '' && (!previo || previo.borrado || previo.origen==='letra')) return;
     if (previo && previo.origen!=='letra' && n!=='' && Number(previo.nota20)===n) return;
     if (!confirmarEdicionNumerica(inp,comp,nombre,previo,n,cap)) return;
     upsertSesionCap(comp, cap);
@@ -2454,7 +2454,7 @@ function recolectarPantalla() {
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(cp, nombre);
     const previo = leerNota(store.finales, k);
-    if (nraw === '' && previo && previo.origen==='letra') return;
+    if (nraw === '' && (!previo || previo.borrado || previo.origen==='letra')) return;
     if (previo && previo.origen!=='letra' && nraw!=='' && Number(previo.nota20)===Math.round(nraw)) return;
     if (!confirmarEdicionNumerica(inp,cp,nombre,previo,nraw)) return;
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
@@ -3642,7 +3642,7 @@ function guardarFinales() {
     const nraw = inp.value !== '' ? Number(inp.value) : '';
     const k = finalKey(comp, nombre);
     const previo = leerNota(store.finales, k);
-    if (nraw === '' && previo && previo.origen==='letra') return;
+    if (nraw === '' && (!previo || previo.borrado || previo.origen==='letra')) return;
     if (previo && previo.origen!=='letra' && nraw!=='' && Number(previo.nota20)===Math.round(nraw)) return;
     if (!confirmarEdicionNumerica(inp,comp,nombre,previo,nraw)) return;
     if (nraw === '' || isNaN(nraw)) { store.finales[k] = {borrado: true, ts: Date.now()}; return; }
