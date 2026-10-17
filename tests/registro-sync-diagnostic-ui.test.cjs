@@ -416,3 +416,72 @@ test('UI: Estado totalmente sincronizado cuando pendingEquivalentToCloud es true
   assert.match(html, /Sin bloqueos activos de sincronización: notas locales y nube sincronizadas/);
   assert.doesNotMatch(html, /Diferencias cuantitativas por m&oacute;dulo/);
 });
+
+test('UI: countsHtml con diferencias cuantitativas se incorpora en el resultado visible del modal y de buildDialogContent', async () => {
+  const dialogCreated = [];
+  const btnElem = { id: 'registroConnectionDiagnostic', textContent: 'Diagnosticar sincronización', dataset: {} };
+  const dom = {
+    readyState: 'complete',
+    addEventListener: () => {},
+    getElementById: (id) => id === 'registroConnectionDiagnostic' ? btnElem : null,
+    createElement: (tag) => {
+      const el = {
+        tagName: tag.toUpperCase(),
+        style: {},
+        appendChild(child) { (this.children = this.children || []).push(child); },
+        showModal() { this.open = true; },
+        close() { this.open = false; },
+        remove() {}
+      };
+      if (tag === 'dialog') dialogCreated.push(el);
+      return el;
+    },
+    body: { appendChild() {} }
+  };
+
+
+  const mockReportWithDiffs = {
+    schema: 1, readOnly: true,
+    period: { server: 'abierto', closed: false },
+    connection: { state: 'review' },
+    conflicts: { total: 0, byModule: {}, causes: {} },
+    pendingEquivalentToCloud: false,
+    blocks: { period: false, synchronization: true },
+    legacyLocal: true, domChangedControls: 0, status: 'no_conflicts',
+    counts: {
+      local: { sessions: 2, grades: 56, finales: 3, concComp: 2, capsSel: 2 },
+      cloud: { sessions: 2, grades: 56, finales: 1, concComp: 0, capsSel: 1 }
+    }
+  };
+
+  const contextVm = vm.createContext({
+    document: dom,
+    window: null,
+    navigator: { clipboard: { writeText: async () => {} } },
+    IERegistroSyncDiagnostic: {
+      runPage: async () => mockReportWithDiffs
+    }
+  });
+  contextVm.window = contextVm;
+
+  vm.runInContext(uiSource, contextVm);
+  const { buildDialogContent, init } = contextVm.IERegistroSyncDiagnosticUI;
+
+  // 1. Verificación en el string de buildDialogContent()
+  const html = buildDialogContent(mockReportWithDiffs);
+  assert.match(html, /Diferencias cuantitativas por módulo \(local vs\. nube\):/);
+  assert.match(html, /Calificaciones directas \(Promedios\):.*3 local \/ 1 nube \(\+2 en este dispositivo\)/);
+  assert.match(html, /Conclusiones descriptivas:.*2 local \/ 0 nube \(\+2 en este dispositivo\)/);
+
+  // 2. Verificación en el modal visible (<dialog>) creado en el DOM
+  init();
+  assert.equal(typeof btnElem.onclick, 'function');
+  await btnElem.onclick();
+
+  assert.equal(dialogCreated.length, 1);
+  assert.equal(dialogCreated[0].open, true);
+  const contentDiv = dialogCreated[0].children.find(c => c.innerHTML && c.innerHTML.includes('Diferencias cuantitativas'));
+  assert.ok(contentDiv, 'El div de contenido del modal debe incluir las diferencias cuantitativas de countsHtml');
+  assert.match(contentDiv.innerHTML, /Diferencias cuantitativas por módulo \(local vs\. nube\):/);
+  assert.match(contentDiv.innerHTML, /Calificaciones directas \(Promedios\):.*3 local \/ 1 nube/);
+});

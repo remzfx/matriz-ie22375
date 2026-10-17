@@ -77,3 +77,67 @@ test('UI: Heartbeat while in pending preserves editing lease; remote version con
  assert.equal(f.connection.snapshot().state,'review');
  assert.equal(f.connection.canEdit(),false);
 });
+
+test('priorPending never bypasses guards: context change, deauth, lease expiry, closed period, network failure, and real conflicts pause editing',async()=>{
+ let binding='1A-MAT',authorized=true,verifyResult={ok:true,pending:true,conflict:false};
+ const f=clock({verify:async()=>verifyResult});
+ f.key(binding);
+ f.auth(authorized);
+ f.time(0);
+
+ // 1. Inicial con pendientes entra en review; al resolver review entra en pending y canEdit es true
+ assert.equal(await f.c.check(),false);
+ assert.equal(f.c.snapshot().state,'review');
+ assert.equal(await f.c.check(true),true);
+ assert.equal(f.c.snapshot().state,'pending');
+ assert.equal(f.c.canEdit(),true);
+
+ // 2. Cambio de contexto académico / binding resetea inmediatamente canEdit a false y check exige revisión nueva
+ f.key('2B-COM');
+ assert.equal(f.c.canEdit(),false);
+ assert.equal(await f.c.check(),false);
+ assert.equal(f.c.snapshot().state,'review');
+ assert.equal(f.c.canEdit(),false);
+
+ // Reautorizar en pending para 2B-COM
+ assert.equal(await f.c.check(true),true);
+ assert.equal(f.c.snapshot().state,'pending');
+ assert.equal(f.c.canEdit(),true);
+
+ // 3. Pérdida de identidad / autorización revoca de inmediato la edición y check no mantiene pending
+ f.auth(false);
+ assert.equal(f.c.canEdit(),false);
+ assert.equal(await f.c.check(),false);
+ assert.notEqual(f.c.snapshot().state,'pending');
+ assert.equal(f.c.canEdit(),false);
+ f.auth(true);
+
+ // Re-entrar en pending
+ assert.equal(await f.c.check(true),true);
+ assert.equal(f.c.canEdit(),true);
+
+ // 4. Expiración de lease bloquea edición puramente por tiempo transcurrido sin evento de red
+ f.time(160000);
+ assert.equal(f.c.canEdit(),false);
+
+ // 5. Falla de verificación remota (TIMEOUT / error de servidor) transiciona a server y pausa edición
+ verifyResult={ok:false,code:'TIMEOUT'};
+ assert.equal(await f.c.check(),false);
+ assert.equal(f.c.snapshot().state,'server');
+ assert.equal(f.c.canEdit(),false);
+
+ // 6. Cierre administrativo del periodo (CLOSED) entra en readonly y pausa edición
+ verifyResult={ok:true,code:'CLOSED'};
+ assert.equal(await f.c.check(true),false);
+ assert.equal(f.c.snapshot().state,'readonly');
+ assert.equal(f.c.canEdit(),false);
+
+ // 7. Conflicto real confirmado (conflict: true) entra en review y pausa edición incluso durante heartbeat
+ verifyResult={ok:true,pending:true,conflict:false};
+ assert.equal(await f.c.check(true),true);
+ assert.equal(f.c.canEdit(),true);
+ verifyResult={ok:true,pending:true,conflict:true};
+ assert.equal(await f.c.check(false,true),false);
+ assert.equal(f.c.snapshot().state,'review');
+ assert.equal(f.c.canEdit(),false);
+});
