@@ -1286,34 +1286,6 @@ async function listarPlantillasSiagie() {
     ).join('') + '</ul>';
   } catch(e) { box.textContent = 'No se pudo leer la nube. Verifique la conexión e intente nuevamente.'; }
 }
-async function subirPlantillaSiagie() {
-  const msg = document.getElementById('tplMsg');
-  const f = (document.getElementById('tplFile')||{}).files;
-  if (!f || !f[0]) { msg.textContent = 'Elija el Excel oficial RegNotas.'; return; }
-  const nivel = document.getElementById('tplNivel').value;
-  const bim = document.getElementById('tplBim').value;
-  const grado = document.getElementById('tplGrado').value.trim();
-  const seccion = document.getElementById('tplSec').value.trim() || (nivel==='primaria'?'Única':'A');
-  if (!grado) { msg.textContent = 'Indique el grado.'; return; }
-  msg.textContent = 'Subiendo plantilla…';
-  const buf = await f[0].arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let bin = '';
-  for (let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
-  const b64 = btoa(bin);
-  try {
-    const res = await fetch(CLOUD_API_URL, {
-      method:'POST',
-      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action:'savetpl',token:tokenSesionAdmin(), nivel, bimestre:bim, grado, seccion, filename:f[0].name, b64, ts:Date.now() })
-    });
-    const data = JSON.parse(await res.text());
-    msg.textContent = data.ok ? ('Habilitado: '+f[0].name) : (data.error || 'Error al subir');
-    listarPlantillasSiagie();
-  } catch(e) {
-    msg.textContent = 'No se pudo sincronizar con la nube. Verifique la conexión e intente nuevamente.';
-  }
-}
 const WA_KEY = 'ie22375_wa_grupos_v1';
 function loadGruposWa(){
   try { const r=JSON.parse(localStorage.getItem(WA_KEY)||'[]'); if(Array.isArray(r)) return r; } catch(e){}

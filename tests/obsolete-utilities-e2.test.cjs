@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const base='391e5d0418b563302b19c65c07aa1d2ddb3c5e18',read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/\r\n/g,'\n');
 const previous=f=>execFileSync('git',['show',base+':'+f],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 function declaration(s,name){const m=new RegExp('^( *)(?:async )?function '+name+'\\(','m').exec(s);if(!m)return '';const first=s.indexOf('\n',m.index),end=s.slice(m.index,first).trimEnd().endsWith('}')?first:s.indexOf('\n'+m[1]+'}',first)+m[1].length+2;return s.slice(m.index,end);}
-const candidates={'primaria.html':['truncarTexto','actualizarNombreDocente','cerrarComparativo','setTotalEstudiantes','setNombreDocente'],'secundaria.html':['truncarTexto','cerrarComparativo','setTotalEstudiantes'],'admin.html':['exportarHorario','importarHorario']};
+const candidates={'primaria.html':['truncarTexto','actualizarNombreDocente','cerrarComparativo','setTotalEstudiantes','setNombreDocente'],'secundaria.html':['truncarTexto','cerrarComparativo','setTotalEstudiantes'],'admin.html':['exportarHorario','importarHorario','subirPlantillaSiagie']};
 for(const [file,names]of Object.entries(candidates))test(file+': only the approved unused utilities can differ from E1',()=>{
  let expected=previous(file);for(const name of names){const old=declaration(expected,name),current=declaration(read(file),name);assert.ok(old,name);if(!current)expected=expected.replace(old+'\n','');else assert.equal(current,old);}
  assert.equal(read(file),expected);

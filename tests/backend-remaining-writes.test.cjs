@@ -199,7 +199,6 @@ for (const file of ['index.html', 'admin.html', 'auxiliar.html', 'aula_innovacio
   });
 }
 for (const [file, name, helper, role, action] of [
-  ['admin.html', 'subirPlantillaSiagie', 'tokenSesionAdmin', 'admin', 'savetpl'],
   ['admin.html', 'subirPlantillaAula', 'tokenSesionAdmin', 'admin', 'savetpl'],
   ['admin.html', 'guardarGruposWa', 'tokenSesionAdmin', 'admin', 'savewa'],
   ['auxiliar.html', 'subirUnoNube', 'tokenSesionAuxiliar', 'auxiliar', 'saveasis'],
