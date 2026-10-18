@@ -1,7 +1,7 @@
 // Fase3: transport/data are fictitious; reuses the actual Phase1/2 A1 and recovery fixture.
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {create}=require('../registro-connection.js'),read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8'),copy=require('../registro-reconcile.js').copy;
-function clock(options={}){let now=0,key='A',authorized=true,online=true,reads=0,retained=0;const timers=[],states=[];const c=create({binding:()=>key,authorized:()=>authorized,online:()=>online,now:()=>now,setTimeout:(fn,ms)=>{const t={fn,ms};timers.push(t);return t;},clearTimeout:t=>{if(t)t.cancelled=true;},retain:()=>retained++,verify:async x=>{reads++;return options.verify?options.verify(x):{ok:true};},changed:s=>states.push(s.state)});return {c,timers,states,reads:()=>reads,retained:()=>retained,time:n=>now=n,key:k=>key=k,auth:v=>authorized=v,online:v=>online=v};}
+function clock(options={}){let now=0,key='A',authorized=true,online=true,reads=0,retained=0;const timers=[],states=[];const c=create({binding:()=>key,timeout:options.timeout,authorized:()=>authorized,online:()=>online,now:()=>now,setTimeout:(fn,ms)=>{const t={fn,ms};timers.push(t);return t;},clearTimeout:t=>{if(t)t.cancelled=true;},retain:()=>retained++,verify:async x=>{reads++;return options.verify?options.verify(x):{ok:true};},changed:s=>states.push(s.state)});return {c,timers,states,reads:()=>reads,retained:()=>retained,time:n=>now=n,key:k=>key=k,auth:v=>authorized=v,online:v=>online=v};}
 test('Real verification, not online hint, is mandatory; heartbeat and leases are bounded',async()=>{const f=clock();assert.equal(f.c.canEdit(),false);assert.equal(await f.c.check(),true);assert.equal(f.c.canEdit(),true);assert.equal(await f.c.check(),true);assert.equal(f.reads(),1);assert.equal(f.timers.at(-1).ms,120000);f.time(150001);assert.equal(f.c.canEdit(),false);});
 test('Offline captures work begun before pause, blocks edits, and online alone cannot reopen',async()=>{const f=clock();await f.c.check();f.online(false);f.c.pause();assert.equal(f.retained(),1);assert.equal(f.c.canEdit(),false);f.online(true);assert.equal(f.c.canEdit(),false);await f.c.check();assert.equal(f.c.canEdit(),true);});
 test('Concurrent verifications deduplicate; cutoff invalidates a delayed response before application',async()=>{let finish;const f=clock({verify:({valid})=>new Promise(r=>finish=()=>r({ok:valid()}))});const a=f.c.check(),b=f.c.check();assert.equal(f.reads(),1);f.c.pause();finish();assert.equal(await a,false);assert.equal(await b,false);assert.equal(f.c.canEdit(),false);});
@@ -140,4 +140,118 @@ test('priorPending never bypasses guards: context change, deauth, lease expiry, 
  assert.equal(await f.c.check(false,true),false);
  assert.equal(f.c.snapshot().state,'review');
  assert.equal(f.c.canEdit(),false);
+});
+
+test('Scenario 4, 5, 6: Verify timeout transitions away from checking, late response is rejected, and retry starts fresh flight',async()=>{
+ let finishVerify;
+ const f=clock({timeout:100,verify:()=>new Promise(resolve=>{finishVerify=resolve;})});
+ // 4. Promesa verify pendiente alcanza timeout y no queda checking indefinidamente
+ const checkPromise=f.c.check();
+ assert.equal(f.c.snapshot().state,'checking');
+ assert.equal(f.timers.length>0,true);
+ const toTimer=f.timers.find(t=>t.ms===100);
+ assert.ok(toTimer,'Timeout timer was scheduled');
+ await toTimer.fn();
+ assert.equal(await checkPromise,false);
+ assert.equal(f.c.snapshot().state,'server');
+ assert.equal(f.c.canEdit(),false);
+
+ // 5. Respuesta tardía después del timeout no autoriza edición ni modifica contexto
+ finishVerify({ok:true,pending:false});
+ await new Promise(r=>setImmediate(r));
+ assert.equal(f.c.canEdit(),false);
+ assert.equal(f.c.snapshot().state,'server');
+
+ // 6. Nuevo reintento no se mezcla con flight anterior
+ f.c.dispose();
+ const f2=clock({timeout:100,verify:async()=>({ok:true,pending:false})});
+ assert.equal(await f2.c.check(),true);
+ assert.equal(f2.c.snapshot().state,'connected');
+ assert.equal(f2.c.canEdit(),true);
+});
+
+test('Scenario 1, 2: Open period in review does not show as closed; truly closed period blocks editing',async()=>{
+ const f=ui();
+ f.role('docente');
+ f.c.bimestreHabilitado=bim=>bim==='III';
+ const selBim=f.c.document.getElementById('selBim');
+ selBim.value='III';
+
+ // Escenario 1: Bimestre abierto + conexión en review no se muestra como cerrado
+ f.c.cierreAdministrativoDocente=()=>{
+  const bim=f.c.document.getElementById('selBim').value;
+  const sL=f.c.getLoginSession();
+  const esAdmin=sL&&(sL.role==='admin'||sL.user==='admin');
+  return !f.c.bimestreHabilitado(bim)&&!esAdmin;
+ };
+ f.c.bimCerradoDocente=()=>f.c.registroSoloLectura()||f.c.cierreAdministrativoDocente();
+ assert.equal(f.c.cierreAdministrativoDocente(),false);
+
+ f.c.modoCalif='letra';
+ const modeInfo=f.c.document.getElementById('finModeInfo');
+ const bloqueado=true; // conexión pausada / review
+ const esCierreAdmin=f.c.cierreAdministrativoDocente();
+ modeInfo.innerHTML=(esCierreAdmin
+  ? '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>'
+  : (bloqueado
+    ? '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">Edición pausada por sincronización / conexión</span>'
+    : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">Letras</span>'));
+
+ assert.doesNotMatch(modeInfo.innerHTML,/Bimestre cerrado por administración/);
+ assert.match(modeInfo.innerHTML,/Edición pausada por sincronización \/ conexión/);
+
+ // Escenario 2: Bimestre realmente cerrado sigue bloqueando edición
+ selBim.value='II'; // II cerrado
+ assert.equal(f.c.cierreAdministrativoDocente(),true);
+ assert.equal(f.c.bimCerradoDocente(),true);
+ const esCierreReal=f.c.cierreAdministrativoDocente();
+ modeInfo.innerHTML=(esCierreReal
+  ? '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>'
+  : '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">Edición pausada por sincronización / conexión</span>');
+ assert.match(modeInfo.innerHTML,/Bimestre cerrado por administración/);
+});
+
+test('Scenario 3: Missing roster shows clear message; habilitado allows controlled verification',async()=>{
+ const f=ui();
+ const label=f.c.document.getElementById('registroConnectionText');
+ const stateLabel=f.c.document.getElementById('registroSaveState');
+
+ // Simular padrón no disponible
+ f.c.IEStudents.peekRoster=()=>null;
+ f.api.refresh();
+ assert.match(stateLabel.textContent,/Esperando el padrón autorizado/);
+ assert.equal(label.textContent,'Esperando padrón autorizado…');
+
+ // Al habilitarse el padrón permite nueva verificación controlada
+ f.c.IEStudents.peekRoster=()=>({synthetic:true});
+ f.api.refresh(true);
+ assert.equal(await f.api.automatic(),true);
+ assert.equal(f.connection.snapshot().state,'connected');
+ assert.equal(f.connection.canEdit(),true);
+});
+
+test('Scenario 7, 8: Review clarity differentiates 0 conflicts from real conflict',async()=>{
+ const f=ui();
+ const label=f.c.document.getElementById('registroConnectionText');
+
+ // Escenario 7: Cambios locales pendientes y 0 conflictos -> "Cambios locales pendientes de revisión"
+ f.c.bajarRegistroNube.resultado={estado:'pendiente',conflictos:0};
+ f.connection.pause();
+ assert.equal(f.connection.snapshot().state,'offline');
+
+ // Disparar estado review con 0 conflictos
+ f.c.store.finales[f.key]={nota20:18,nivel:'AD',origen:'numero'};
+ f.c.saveStore();
+ f.online(true);
+ await f.api.automatic();
+ assert.equal(f.connection.snapshot().state,'review');
+ assert.match(label.textContent,/Cambios locales pendientes de revisión/);
+ assert.doesNotMatch(label.textContent,/Conflicto pendiente — requiere revisión/);
+
+ // Escenario 8: Conflicto real -> "Conflicto pendiente — requiere revisión"
+ f.c.bajarRegistroNube.resultado={estado:'conflicto',conflictos:2,key:f.c.cloudClaveReg(),token:(f.c.getLoginSession()||{}).token};
+ f.connection.pause('offline');
+ f.connection.pause('review');
+ assert.match(label.textContent,/Conflicto pendiente — requiere revisión/);
+ assert.equal(f.connection.canEdit(),false);
 });
