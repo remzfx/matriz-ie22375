@@ -1703,18 +1703,6 @@ window.__IE_gradoOK = function(gradoVal) {
         function getTotalEstudiantes() {
             return totalEstudiantesDesdeBD(estado.grado, estado.seccion);
         }
-        function setTotalEstudiantes(val, ts) {
-            if (!estado.totalesPorAula) estado.totalesPorAula = {};
-            if (!estado.totalesPorAulaTs) estado.totalesPorAulaTs = {};
-            val = parseInt(val) || 30;
-            if (val < 1) val = 1;
-            if (val > 60) val = 60;
-            const k = claveAula();
-            estado.totalesPorAula[k] = val;
-            estado.totalesPorAulaTs[k] = (ts != null ? Number(ts) : Date.now());
-            estado.totalEstudiantes = val; // legado
-            return val;
-        }
         function syncInputTotalEstudiantes() {
             const el = document.getElementById('totalEstudiantes');
             const fuente = document.getElementById('totalEstudiantesFuente');

@@ -1527,18 +1527,6 @@ window.__IE_gradoOK = function(gradoVal) {
             const sec = String(estado.seccion || 'UNICA').toUpperCase().replace('Ú', 'U');
             return baseOficialEstudiantes.filter(al => Number(al.grado) === grados[estado.grado] && String(al.seccion).toUpperCase().replace('Ú', 'U') === sec).length;
         }
-        function setTotalEstudiantes(val, ts) {
-            if (!estado.totalesPorAula) estado.totalesPorAula = {};
-            if (!estado.totalesPorAulaTs) estado.totalesPorAulaTs = {};
-            val = parseInt(val) || 26;
-            if (val < 1) val = 1;
-            if (val > 60) val = 60;
-            const k = claveAula();
-            estado.totalesPorAula[k] = val;
-            estado.totalesPorAulaTs[k] = (ts != null ? Number(ts) : Date.now());
-            estado.totalEstudiantes = val; // legado
-            return val;
-        }
         function syncInputTotalEstudiantes() {
             const el = document.getElementById('totalEstudiantes');
             if (!el) return;
@@ -1555,17 +1543,6 @@ window.__IE_gradoOK = function(gradoVal) {
         function nombreDocenteParaSubir(area) {
             if (typeof IEMatrixTeachers === 'undefined') throw new Error('Espera mientras se verifica el docente responsable');
             return IEMatrixTeachers.exigirNombre('primaria', estado.grado, estado.seccion || 'UNICA', area || estado.areaActual || 'Comunicación');
-        }
-        function setNombreDocente(nombre, ts) {
-            if (!estado.docentesPorAula) estado.docentesPorAula = {};
-            if (!estado.docentesPorAulaTs) estado.docentesPorAulaTs = {};
-            const k = claveAula();
-            nombre = (nombre || '').trim();
-            if (/^(Pendiente de verificar|Sin registrar)$/i.test(nombre)) return;
-            estado.docentesPorAula[k] = nombre;
-            estado.docentesPorAulaTs[k] = (ts != null ? Number(ts) : Date.now());
-            estado.nombreDocente = nombre; // sincroniza legado / firmas
-            return nombre;
         }
         function syncInputDocente() {
             const el = document.getElementById('nombreDocente');
