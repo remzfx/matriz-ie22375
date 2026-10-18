@@ -8,8 +8,9 @@ function fixture(source,level='secundaria',sessions=[],selected=[]){
  const context={nivel:level,bim:'III',grado:1,seccion:'A',area:'Área ficticia'},elements={selCap:{value:''},selComp:{value:''},selUnidad:{value:''},inpCapacidad:{value:''},inpFecha:{value:'2026-10-01'}};
  let remote=0;const c=vm.createContext({store:{sessions:structuredClone(sessions)},capsElegidas:structuredClone(selected),ctxBase:()=>context,esCompetenciaTransversal:comp=>comp==='TIC ficticia',document:{getElementById:id=>elements[id]},fetch(){remote++;throw Error('No remote calls allowed');},effects:[]});c.window=c;
  vm.runInContext(read('registro-grading.js'),c);
+ if(source.includes('function renderChipsCaps()'))vm.runInContext(extract(source,'renderChipsCaps'),c);
  for(const name of ['normCapItem','tieneCapSel','capacidadElegida','capsDeComp','onSesionChange','abrirSesionFecha'])vm.runInContext(extract(source,name),c);
- Object.assign(c,{loadCapsElegidas(){c.effects.push('load');c.capsElegidas=structuredClone(selected);},saveCapsElegidas(){c.effects.push('save');},renderChipsCaps(){c.effects.push('chips');},renderStudents(){c.effects.push('render');},renderSesiones(){c.effects.push('sessions');},fillCaps(){c.effects.push('fill');}});
+ Object.assign(c,{loadCapsElegidas(){c.effects.push('load');c.capsElegidas=structuredClone(selected);},saveCapsElegidas(){c.effects.push('save');},renderStudents(){c.effects.push('render');},renderSesiones(){c.effects.push('sessions');},fillCaps(){c.effects.push('fill');}});
  return {c,context,elements,remote:()=>remote};
 }
 for(const level of ['primaria','secundaria'])test(level+': historical capability normalization preserves raw names, fallback and origin',()=>{
@@ -48,7 +49,7 @@ for(const level of ['primaria','secundaria'])test(level+': context/day preparati
  const selected=[{comp:'Otra competencia',cap:'Otra',origen:'academica'}];
  const a=fixture(before,level,sessions,selected),b=fixture(current,level,sessions,selected),initial=JSON.stringify(b.c.store);
  assert.deepEqual(clone(b.c.capsDeComp('Competencia')),clone(a.c.capsDeComp('Competencia')));
- a.c.onSesionChange();b.c.onSesionChange();assert.deepEqual(clone(b.c.capsElegidas),clone(a.c.capsElegidas));assert.deepEqual(clone(b.c.effects),['load','save','chips','render']);
+ a.c.onSesionChange();b.c.onSesionChange();assert.deepEqual(clone(b.c.capsElegidas),clone(a.c.capsElegidas));assert.deepEqual(clone(b.c.effects),['load','save','render']);
  assert.equal(JSON.stringify(b.c.store),initial);assert.equal(b.remote(),0);
  assert.equal(b.c.capsElegidas.filter(x=>x.cap===s.capacidad).length,1);
 });

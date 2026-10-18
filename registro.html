@@ -1992,7 +1992,6 @@ function onContexto(options) {
     // Al cambiar contexto: limpiar capacidad (fecha la elige el docente)
     fillCaps();
     loadCapsElegidas();
-    renderChipsCaps();
     sesionActiva = null;
     notas = {};
     markClean();
@@ -2146,7 +2145,6 @@ function onCompChange() {
   }
   fillCaps();
   loadCapsElegidas();
-  renderChipsCaps();
   sesionActiva = null;
   notas = {};
   document.getElementById('lblSesionActiva').textContent = 'Agrega las capacidades que evaluarás hoy';
@@ -2159,9 +2157,6 @@ function hayNotasPendientes() {
   return dirty === true;
 }
 
-function markDirty() {
-  dirty = true;
-}
 
 function markClean() {
   dirty = false;
@@ -2192,7 +2187,6 @@ function onSesionChange() {
     }
   });
   saveCapsElegidas();
-  renderChipsCaps();
   renderStudents();
 }
 
@@ -2227,7 +2221,6 @@ function activarSesion() {
   loadCapsElegidas();
   if (tieneCapSel(comp, capacidad)) {
     toast('Esa capacidad ya está en la grilla');
-    renderChipsCaps();
     renderStudents();
     return;
   }
@@ -2237,7 +2230,6 @@ function activarSesion() {
   saveCapsElegidas();
   sesionActiva = { fecha, unidad, comp, capacidad };
   upsertSesionCap(comp, capacidad);
-  renderChipsCaps();
   renderSesiones();
   renderStudents();
   toast('Capacidad agregada');
@@ -2428,7 +2420,6 @@ function abrirSesionFecha(fecha) {
   });
   saveCapsElegidas();
   sesionActiva = delDia[0] ? { fecha, unidad: delDia[0].unidad??'', comp: delDia[0].comp, capacidad: delDia[0].capacidad } : { fecha, unidad:'', comp:'', capacidad:'' };
-  renderChipsCaps();
   renderSesiones();
   renderStudents();
 }
@@ -2452,7 +2443,6 @@ function borrarSesionFecha(fecha) {
   if (store.capsSel) delete store.capsSel[keyCapsHoy()];
   saveStore();
   loadCapsElegidas();
-  renderChipsCaps();
   renderSesiones();
   renderStudents();
   toast('Sesión del ' + fecha + ' eliminada');
@@ -2501,7 +2491,6 @@ function saveCapsElegidas() {
   store.capsSel[keyCapsHoy()] = capsElegidas.filter(x=>x.origen!=='transversal'&&!esCompetenciaTransversal(x.comp));
   saveStore();
 }
-function renderChipsCaps() { /* las columnas de la grilla ya muestran competencia y capacidad */ }
 function quitarCapGrilla(i) {
   if (registroSoloLectura()) return false;
   const col = capsElegidas[i];
@@ -2528,7 +2517,6 @@ function quitarCapGrilla(i) {
   capsElegidas.splice(i,1);
   saveCapsElegidas();
   saveStore();
-  renderChipsCaps();
   renderSesiones();
   renderStudents();
   toast('Capacidad eliminada');

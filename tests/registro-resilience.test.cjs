@@ -27,7 +27,7 @@ function fixture(){
  function ctxBase(){return {nivel,bim:document.getElementById('selBim').value,grado:4,seccion:'B',area:areaActual}};
  function getLoginSession(){return IEStudents.session()};function loadPeriodosAdmin(){return {bimestres:{III:'abierto'}}};
  function areas(){return ['Matemática','Comunicación']};function renderAreas(){};function fillComps(){};function actualizarDocenteResponsable(){};
- function fillCaps(){};function loadCapsElegidas(){};function renderChipsCaps(){};function markClean(){};function updateHdr(){};
+ function fillCaps(){};function loadCapsElegidas(){};function markClean(){};function updateHdr(){};
  function renderSesiones(){renders++};function renderFinales(){};function renderAvance(){};function renderAsistencia(){};
  function consultarEstadoSiagie(){};function recolectarPantalla(){};function guardarMeta(){};function saveCapsElegidas(){};`);
  for(const name of ['registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','bloquearRegistroMientrasValida','pintarPadronInmediato','vigilarCachePadron','cargarPadronRegistro','cambiarBimestreRegistro','reintentarPadronRegistro','actualizarUnidades','onContexto','guardarTodo'])run(extract(name));
