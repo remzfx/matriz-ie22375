@@ -33,6 +33,22 @@ test('SW precaches critical JavaScript and matrix-teachers.js offline returns Ja
   assert.equal(response.status,200);assert.match(response.headers.get('Content-Type'),/javascript/);
   assert.equal(await response.text(),'/* original JavaScript */');
 });
+
+test('external Registro implementations survive offline as actual JavaScript, never HTML',async()=>{
+  const {modules,source:read}=require('./registro-script-fixture.cjs'),s=fixture();
+  s.network(async req=>{
+    const file=new URL(req.url).pathname.split('/').at(-1),js=file.endsWith('.js');
+    return new Response(modules.includes(file)?read(file):js?'/* synthetic dependency */':'<html>synthetic shell</html>',
+      {headers:{'Content-Type':js?'application/javascript':'text/html'}});
+  });
+  await s.dispatch('install');s.offline();
+  for(const file of modules){
+    const response=await s.dispatch('fetch',{request:s.request(file)});
+    assert.equal(response.status,200,file);assert.match(response.headers.get('Content-Type'),/javascript/);
+    const code=await response.text();assert.equal(code,read(file));assert.doesNotMatch(code,/<html|<!doctype/i);
+    new vm.Script(code,{filename:file});
+  }
+});
 test('SW offline missing or HTML-corrupted JavaScript cache never falls back to index.html',async()=>{
   const s=fixture();await s.dispatch('install');s.offline();
   const cache=s.cache('matriz-ie22375-v21');

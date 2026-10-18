@@ -14,6 +14,9 @@ function fixture(){
  const els=new Map(),element=id=>{if(!els.has(id)){const classes=new Set();els.set(id,{value:id==='selBim'?'III':id==='selGrado'?'4':id==='selSeccion'?'B':'',innerHTML:'',textContent:'',disabled:false,hidden:false,classList:{contains:k=>classes.has(k),add:k=>classes.add(k),remove:k=>classes.delete(k)}});}return els.get(id);};
  const writes=[element('save')],cloud=[element('upload')],main={inert:false,setAttribute(){},querySelectorAll:sel=>sel.includes('data-reg-cloud')?cloud:sel.includes('data-reg-write')?writes:[]};
  const calls=[],alerts=[],c=vm.createContext({window:{},Date:class extends Date{static now(){return now;}},AbortController,atob,setTimeout:timer,clearTimeout:key=>timers.delete(key),sessionStorage:storage,localStorage:storage,document:{getElementById:element,querySelectorAll:sel=>main.querySelectorAll(sel),querySelector:()=>main},alert:m=>alerts.push(m),console});
+ // Isolate roster/history behavior behind a simulated valid connection.
+ // The real mandatory gate, offline pause and reconnection are covered by registro-connection.test.cjs.
+ c.IERegistroConnection={canEdit:()=>true};
  const response=(name='Synthetic Verified',bimestre='III')=>({ok:true,inicializada:true,version:'v',bimestre,padronInicializado:true,estudiantes:[{nivel:'secundaria',grado:4,seccion:'B',idSiagie:'42',nombre:name}]});
  c.fetch=async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>response()};};
  new vm.Script(read('registro-academic-model.js')).runInContext(c);c.IERegistroAcademico=c.window.IERegistroAcademico;new vm.Script(read('students.js')).runInContext(c);c.IEStudents=c.window.IEStudents;

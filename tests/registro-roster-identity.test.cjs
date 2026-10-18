@@ -13,6 +13,9 @@ function fixture(){
  const main={inert:false,attrs:{},setAttribute(k,v){this.attrs[k]=v;},querySelectorAll:()=>[]};
  const c=vm.createContext({setTimeout:()=>0,clearTimeout(){},window:{},document:{getElementById:el,querySelectorAll:()=>[],querySelector:s=>s==='main'?main:null},console,alert:v=>alerts.push(v),toast(){},saveStore(){},renderStudents(){},getLoginSession:()=>({role:'docente'}),bimestreHabilitado:()=>true,
    IEStudents:{validToken:()=> 'synthetic-token',empty:()=>roster([]),peekRoster:()=>c.base || null,loadRoster:async bim=>{requests.push(bim);return roster(c.next,bim);}}});
+ // Isolate roster/history behavior behind a simulated valid connection.
+ // The real mandatory gate, offline pause and reconnection are covered by registro-connection.test.cjs.
+ c.IERegistroConnection={canEdit:()=>true};
  new vm.Script(read('student-identity.js')).runInContext(c);c.studentKey=c.window.studentKey;c.IEStudentIdentity=c.window.IEStudentIdentity;
  c.pintarBotonesContextoRegistro=c.actualizarBotonesContextoRegistro=()=>{};
  const run=s=>new vm.Script(s).runInContext(c);
