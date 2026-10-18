@@ -2035,30 +2035,6 @@ function guardarHorario() {
   saveHorarioObj(h);
   alert('Horario guardado en este navegador.\nSi el auxiliar usa otro equipo, descargue horario_ingreso.json y súbalo a GitHub.');
 }
-function exportarHorario() {
-  guardarHorario();
-  const blob = new Blob([JSON.stringify(loadHorario(), null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'horario_ingreso.json';
-  a.click();
-}
-function importarHorario(inp) {
-  const f = inp.files && inp.files[0];
-  inp.value = '';
-  if (!f) return;
-  const r = new FileReader();
-  r.onload = function() {
-    try {
-      const j = JSON.parse(r.result);
-      if (!j.defaults) throw new Error('JSON inválido');
-      saveHorarioObj(Object.assign(horarioDefecto(), j));
-      initHorarioUI();
-      alert('Horario importado.');
-    } catch (e) { alert('No se pudo leer el archivo.'); }
-  };
-  r.readAsText(f);
-}
 
 // Abrir el panel con la sesión Admin creada en el inicio.
 function sesionIndexAdmin() {

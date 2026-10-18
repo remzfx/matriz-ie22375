@@ -18,6 +18,9 @@ for(const file of ['primaria.html','secundaria.html'])test(file+': characterize 
  for(const text of ['',null,'Álvarez Ñandú y nombre largo','Texto <sintético> & "comillas"'])for(const max of [undefined,0,1,5,80]){const raw=String(text||'').trim(),expected=!max||raw.length<=max?raw:raw.slice(0,Math.max(1,max-1)).trimEnd()+'…';assert.equal(c.truncarTexto(text,max),expected);}
 });
 test('old teacher alias only delegates to the still-active teacher renderer',()=>{let calls=0;const c=vm.createContext({syncInputDocente(){calls++;}});vm.runInContext(declaration(previous('primaria.html'),'actualizarNombreDocente').trim(),c);c.actualizarNombreDocente();assert.equal(calls,1);assert.match(read('primaria.html'),/function syncInputDocente\(/);});
+test('comparative close helpers remain intact while the baseline navigation exit is not certified',()=>{
+ for(const file of ['primaria.html','secundaria.html'])assert.equal(declaration(read(file),'cerrarComparativo'),declaration(previous(file),'cerrarComparativo'));
+});
 test('Admin active schedule edit/save works without the disconnected import/export helpers',()=>{
  const state=new Map(),els=new Map(),writes=[],c=vm.createContext({localStorage:{getItem:k=>state.get(k)||null,setItem:(k,v)=>{state.set(k,v);writes.push(k);}},document:{getElementById:id=>{if(!els.has(id))els.set(id,{value:'',innerHTML:''});return els.get(id);}},alert(){},fetch(){throw Error('No remote writes');}});
  vm.runInContext("const HORARIO_KEY='synthetic-schedule';",c);
