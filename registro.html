@@ -1009,9 +1009,25 @@
  root.IECalificarPrint={build,css};if(typeof module!=='undefined')module.exports=root.IECalificarPrint;
 })(typeof window==='undefined'?globalThis:window);
 </script>
-<script src="registro-local-store.js"></script>
-<script src="registro-connection.js"></script>
 <script>
+/* Inicio control de dependencias obligatorias. */
+function registroDependenciaFallida(){
+  const status=document.getElementById('registroConnectionStatus'),label=document.getElementById('registroConnectionText');
+  if(status)status.dataset.state='server';
+  if(label)label.textContent='No se pudo cargar un componente de Registro. Edición pausada; tus notas locales están conservadas. Vuelve a abrir Registro cuando haya conexión.';
+  if(typeof IERegistroConnection!=='undefined')IERegistroConnection.current()?.dispose();
+  document.querySelectorAll('[data-reg-write],[data-reg-cloud],#registroRecoveryControls button,.cal-nota,.fin-nota,.academic-conclusion,.asis-input').forEach(el=>el.disabled=true);
+}
+/* Fin control de dependencias obligatorias. */
+</script>
+<script src="registro-local-store.js" onerror="registroDependenciaFallida()"></script>
+<script src="registro-connection.js" onerror="registroDependenciaFallida()"></script>
+<script>
+/* Inicio guard de arranque de Registro. */
+if(typeof IERegistroLocalStore==='undefined'||typeof IERegistroConnection==='undefined'){
+  registroDependenciaFallida();throw Error('Registro pausado: falta una dependencia obligatoria.');
+}
+/* Fin guard de arranque de Registro. */
 const registroLocal = IERegistroLocalStore.create(localStorage,getLoginSession);
 const NOTAS_KEY = registroLocal.key;
 const EST_PRIM = {"Personal Social":{"competencias":["Construye su Identidad","Convive y participa democráticamente","Construye interpretaciones históricas","Gestiona responsablemente el espacio y el ambiente","Gestiona responsablemente los recursos económicos"]},"Educación Física":{"competencias":["Se desenvuelve de manera autónoma a través de su motricidad","Asume una vida saludable","Interactúa a través de sus habilidades sociomotrices"]},"Comunicación":{"competencias":["Se comunica oralmente en su lengua materna","Lee diversos tipos de textos escritos en su lengua materna","Escribe diversos tipos de textos en su lengua materna"]},"Arte y Cultura":{"competencias":["Aprecia de manera crítica manifestaciones artístico-culturales","Crea proyectos artísticos desde los lenguajes artísticos"]},"Matemática":{"competencias":["Resuelve problemas de cantidad","Resuelve problemas de regularidad, equivalencia y cambio","Resuelve problemas de forma, movimiento y localización","Resuelve problemas de gestión de datos e incertidumbre"]},"Ciencia y Tecnología":{"competencias":["Indaga mediante métodos científicos para construir sus conocimientos","Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo","Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"]},"Educación Religiosa":{"competencias":["Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas","Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"]},"Competencias Transversales":{"competencias":["Se desenvuelven en entornos virtuales generados por las TIC","Gestiona su aprendizaje de manera autónoma"]}};
@@ -3970,8 +3986,8 @@ if (document.readyState !== 'loading') {
 }
 </script>
 <!-- Inicio simplificación docente: dependencia separada, sin cambiar handlers académicos. -->
-<script src="registro-drafts.js"></script>
-<script src="registro-recovery-ui.js"></script>
+<script src="registro-drafts.js" onerror="registroDependenciaFallida()"></script>
+<script src="registro-recovery-ui.js" onerror="registroDependenciaFallida()"></script>
 <!-- Fin simplificación docente. -->
 </body>
 </html>

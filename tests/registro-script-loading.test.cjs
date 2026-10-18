@@ -48,6 +48,39 @@ test('missing mandatory connection dependency never grants editing from a cached
  c.IERegistroConnection={canEdit:()=>false};assert.equal(c.registroSoloLectura(),true);
 });
 
+test('recovery remains strict after adding the dependency guard',()=>{
+ const code=entries.find(s=>s.src==='registro-recovery-ui.js').code;
+ const probe=code.replace('let service,','__syntheticUndeclaredProbe=1;let service,');
+ assert.notEqual(probe,code);
+ assert.throws(()=>vm.runInNewContext(probe,{}),/__syntheticUndeclaredProbe is not defined/);
+});
+
+for(const missing of modules)test('failed '+missing+' is controlled, never enables editing and preserves every synthetic storage key',()=>{
+ const {pageGuard,coreGuard}=require('./registro-script-fixture.cjs');
+ const data=new Map([['synthetic-owner-III-2026','{"finales":{"synthetic":"B"},"historial":["A"]}'],
+  ['matriz_SEC_IE22375','{"anio":2026,"II":{"synthetic":"A"}}'],['legacy-other-period','{"synthetic":"C"}']]);
+ const before=JSON.stringify([...data]),controls=[{disabled:false},{disabled:false}],status={dataset:{}},label={textContent:''};let writes=0,remoteWrites=0;
+ const c=vm.createContext({document:{getElementById:id=>id==='registroConnectionStatus'?status:label,querySelectorAll:()=>controls},
+  localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>{writes++;data.set(k,v);}},getLoginSession:()=>({role:'docente',user:'synthetic'}),
+  setTimeout:()=>0,clearTimeout:()=>{},fetch:()=>{remoteWrites++;throw Error('Remote network forbidden');}});
+ vm.runInContext(scripts(pageGuard)[0].code,c);
+ for(const file of modules){
+  assert.match(entries.find(s=>s.src===file).attributes,/onerror="registroDependenciaFallida\(\)"/);
+  if(file===missing)vm.runInContext('registroDependenciaFallida()',c);
+  else if(file!=='registro-recovery-ui.js')vm.runInContext(entries.find(s=>s.src===file).code,c);
+  if(file==='registro-connection.js'){
+   if(['registro-local-store.js','registro-connection.js'].includes(missing))assert.throws(()=>vm.runInContext(coreGuard,c),/Registro pausado/);
+   else vm.runInContext(coreGuard,c);
+  }
+ }
+ if(missing!=='registro-recovery-ui.js')vm.runInContext(entries.find(s=>s.src==='registro-recovery-ui.js').code,c);
+ vm.runInContext(require('./reconcile-fixture.cjs').extract('registroSoloLectura'),c);
+ assert.equal(c.registroSoloLectura(),true);assert.equal(c.IERegistroConnection?.canEdit()||false,false);
+ assert.equal(c.IERegistroRecovery,undefined,'adapter never starts partially');
+ assert.equal(status.dataset.state,'server');assert.match(label.textContent,/Edición pausada.*notas locales están conservadas/);
+ assert.ok(controls.every(c=>c.disabled));assert.equal(writes,0);assert.equal(remoteWrites,0);assert.equal(JSON.stringify([...data]),before);
+});
+
 test('2026 III historical records roundtrip unchanged; II matrices and other periods/accounts are untouched',()=>{
  const c=vm.createContext({});vm.runInContext(entries.find(s=>s.src==='registro-local-store.js').code,c);
  const legacy='ie22375_registro_notas_v2',data=new Map(),writes=[];

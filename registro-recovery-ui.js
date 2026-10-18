@@ -1,6 +1,12 @@
 /* Adaptador frontend: operaciones explícitas y timers exclusivamente locales. */
 (function(){
- 'use strict';let service,timer,lastDisk,refreshTimer,periodicTimer,expiryTimer,expiryToken='';const observed=new Map();try{lastDisk=localStorage.getItem(NOTAS_KEY);}catch(_){}
+ 'use strict';
+ /* Inicio guard de dependencias de recuperación. */
+ if(typeof registroDependenciaFallida==='function'&&(typeof IERegistroLocalStore==='undefined'||typeof IERegistroConnection==='undefined'||typeof IERegistroDrafts==='undefined')){
+  registroDependenciaFallida();return;
+ }
+ /* Fin guard de dependencias de recuperación. */
+ let service,timer,lastDisk,refreshTimer,periodicTimer,expiryTimer,expiryToken='';const observed=new Map();try{lastDisk=localStorage.getItem(NOTAS_KEY);}catch(_){}
  const copy=x=>IERegistroReconcile.copy(x),context=()=>{const s=getLoginSession()||{};return cloudClaveReg()+'|'+(s.token||'')+'|'+(s.user||'')+'|'+(s.role||'');};
  function authenticated(){const s=getLoginSession();return !!(s?.token&&['admin','docente'].includes(s.role)&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&(typeof registroLocal==='undefined'||registroLocal.matches()));}
  function text(el,value){if(el&&el.textContent!==value)el.textContent=value;}
