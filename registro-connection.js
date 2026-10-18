@@ -25,8 +25,8 @@
    const same=()=>!disposed&&id===epoch&&key===o.binding();const valid=()=>same()&&o.authorized();
    let toTimer=null;const task={};flight=task;task.promise=(async()=>{try{
     const verifyPromise=o.verify({review,valid});
-    const timeoutPromise=new Promise((_,reject)=>{toTimer=set(()=>{if(toTimer&&toTimer.cancelled)return;reject(Object.assign(new Error('TIMEOUT'),{code:'TIMEOUT'}));},timeout);});
-    const result=await Promise.race([verifyPromise,timeoutPromise]);clear(toTimer);toTimer=null;
+    const timeoutPromise=(!review&&timeout)?new Promise((_,reject)=>{toTimer=set(()=>{if(toTimer&&toTimer.cancelled)return;reject(Object.assign(new Error('TIMEOUT'),{code:'TIMEOUT'}));},timeout);}) : null;
+    const result=timeoutPromise?await Promise.race([verifyPromise,timeoutPromise]):await verifyPromise;clear(toTimer);toTimer=null;
     if(!same())return false;
     if(result?.code==='SESSION'||result?.code==='DENIED'){expired=true;emit('session');return false;}
     if(!o.authorized()){emit('session');return false;}

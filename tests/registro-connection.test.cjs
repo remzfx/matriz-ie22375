@@ -274,3 +274,102 @@ test('Scenario 7, 8: Review clarity differentiates trusted zero conflicts, confi
  assert.equal(label.textContent,'Conflicto pendiente — requiere revisión. Tus cambios locales están conservados.');
  assert.equal(f.connection.canEdit(),false);
 });
+
+test('Manual review exceeding 30s without context change completes successfully, while deauth during review blocks edit with zero writes',async()=>{
+ // 1. Revisión manual que supera 30s sin cambio de contexto completa exitosamente
+ let resolveManualReview;
+ const f=clock({
+  timeout:30000,
+  verify:async({review,valid})=>{
+   if(review){
+    return new Promise(resolve=>{
+     resolveManualReview=()=>resolve({ok:valid(),pending:false});
+    });
+   }
+   return {ok:true,pending:true};
+  }
+ });
+
+ assert.equal(await f.c.check(),false);
+ assert.equal(f.c.snapshot().state,'review');
+
+ const reviewTask=f.c.check(true,true);
+ assert.equal(f.c.snapshot().state,'checking');
+
+ // Pasan 45 segundos en decisión humana sin que venza por timeout de red
+ f.time(45000);
+ const timeoutTimer=f.timers.find(t=>t.ms===30000&&!t.cancelled);
+ assert.equal(timeoutTimer,undefined,'No network timeout scheduled during human review');
+
+ resolveManualReview();
+ assert.equal(await reviewTask,true);
+ assert.equal(f.c.snapshot().state,'connected');
+ assert.equal(f.c.canEdit(),true);
+
+ // 2. Pérdida real de autorización durante la revisión manual bloquea edición
+ let resolveDeauthReview;
+ const fDeauth=clock({
+  timeout:30000,
+  verify:async({review,valid})=>{
+   if(review){
+    return new Promise(resolve=>{
+     resolveDeauthReview=()=>resolve({ok:valid(),pending:false});
+    });
+   }
+   return {ok:true,pending:true};
+  }
+ });
+
+ await fDeauth.c.check();
+ const reviewDeauthTask=fDeauth.c.check(true,true);
+ fDeauth.time(15000);
+
+ // Pérdida real de autorización durante la interacción manual
+ fDeauth.auth(false);
+
+ resolveDeauthReview();
+ assert.equal(await reviewDeauthTask,false);
+ assert.equal(fDeauth.c.snapshot().state,'session');
+ assert.equal(fDeauth.c.canEdit(),false);
+});
+
+test('Integration: UI manual resolve exceeding 30s preserves choices without upload; deauth during resolve blocks edit and writes zero',async()=>{
+ const f=ui();
+ await f.api.automatic();
+ f.c.store.finales[f.key]={nota20:18,nivel:'AD',origen:'numero'};
+ f.c.saveStore();
+ f.connection.pause();
+ f.r.version++;
+ f.r.payload.finales[f.key]={nota20:12,nivel:'B',origen:'numero'};
+
+ // 1. Superar 30s durante la conciliación manual con IERegistroReconcile.choose
+ let finishChoose, chooseStarted;
+ const choosePromise=new Promise(r=>chooseStarted=r);
+ f.c.IERegistroReconcile.choose=async cs=>new Promise(resolve=>{
+  finishChoose=()=>resolve(Object.fromEntries(cs.map(x=>[x.path,'local'])));
+  chooseStarted();
+ });
+
+ const resolveTask=f.api.resolve();
+ await choosePromise;
+ finishChoose();
+ assert.equal(await resolveTask,true);
+ assert.equal(f.connection.canEdit(),true);
+ assert.equal(f.r.writes,0);
+
+ // 2. Pérdida de autorización durante resolve
+ f.connection.pause();
+ let finishDeauthChoose, deauthStarted;
+ const deauthPromise=new Promise(r=>deauthStarted=r);
+ f.c.IERegistroReconcile.choose=async cs=>new Promise(resolve=>{
+  finishDeauthChoose=()=>resolve(Object.fromEntries(cs.map(x=>[x.path,'local'])));
+  deauthStarted();
+ });
+ const deauthResolveTask=f.api.resolve();
+ await deauthPromise;
+ f.role('auxiliar');
+ finishDeauthChoose();
+ assert.equal(await deauthResolveTask,false);
+ assert.equal(f.connection.canEdit(),false);
+ assert.equal(f.r.writes,0);
+});
