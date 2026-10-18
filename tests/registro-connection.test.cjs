@@ -142,13 +142,21 @@ test('priorPending never bypasses guards: context change, deauth, lease expiry, 
  assert.equal(f.c.canEdit(),false);
 });
 
-test('Scenario 4, 5, 6: Verify timeout transitions away from checking, late response is rejected, and retry starts fresh flight',async()=>{
- let finishVerify;
- const f=clock({timeout:100,verify:()=>new Promise(resolve=>{finishVerify=resolve;})});
+test('Scenario 4, 5, 6: Verify timeout transitions away from checking, late response is rejected, and retry ON SAME CONTROLLER starts fresh flight',async()=>{
+ let finishVerify,secondExecuted=false,callCount=0;
+ const f=clock({
+  timeout:100,
+  verify:()=>{
+   callCount++;
+   if(callCount===1)return new Promise(resolve=>{finishVerify=resolve;});
+   secondExecuted=true;
+   return Promise.resolve({ok:true,pending:false});
+  }
+ });
+
  // 4. Promesa verify pendiente alcanza timeout y no queda checking indefinidamente
  const checkPromise=f.c.check();
  assert.equal(f.c.snapshot().state,'checking');
- assert.equal(f.timers.length>0,true);
  const toTimer=f.timers.find(t=>t.ms===100);
  assert.ok(toTimer,'Timeout timer was scheduled');
  await toTimer.fn();
@@ -156,62 +164,54 @@ test('Scenario 4, 5, 6: Verify timeout transitions away from checking, late resp
  assert.equal(f.c.snapshot().state,'server');
  assert.equal(f.c.canEdit(),false);
 
- // 5. Respuesta tardía después del timeout no autoriza edición ni modifica contexto
- finishVerify({ok:true,pending:false});
- await new Promise(r=>setImmediate(r));
- assert.equal(f.c.canEdit(),false);
- assert.equal(f.c.snapshot().state,'server');
+ // 5 & 6. Reintento efectivo SOBRE EL MISMO CONTROLLER mientras la primera sigue pendiente
+ const checkPromise2=f.c.check();
+ assert.equal(await checkPromise2,true);
+ assert.equal(secondExecuted,true);
+ assert.equal(f.c.snapshot().state,'connected');
+ assert.equal(f.c.canEdit(),true);
 
- // 6. Nuevo reintento no se mezcla con flight anterior
- f.c.dispose();
- const f2=clock({timeout:100,verify:async()=>({ok:true,pending:false})});
- assert.equal(await f2.c.check(),true);
- assert.equal(f2.c.snapshot().state,'connected');
- assert.equal(f2.c.canEdit(),true);
+ // 5b. Respuesta tardía de la primera operación colgada no autoriza edición ni modifica estado
+ finishVerify({ok:true,pending:true});
+ await new Promise(r=>setImmediate(r));
+ assert.equal(f.c.snapshot().state,'connected');
+ assert.equal(f.c.canEdit(),true);
 });
 
-test('Scenario 1, 2: Open period in review does not show as closed; truly closed period blocks editing',async()=>{
- const f=ui();
+test('Scenario 1, 2: Real renderFinales shows sync pause when open in review, admin closure when period closed, and both maintain controls locked',async()=>{
+ const f=ui(),rf=require('./reconcile-fixture.cjs');
+ vm.runInContext(rf.extract('cierreAdministrativoDocente'),f.c);
+ vm.runInContext(rf.extract('bimCerradoDocente'),f.c);
+ vm.runInContext(rf.extract('renderFinales'),f.c);
  f.role('docente');
  f.c.bimestreHabilitado=bim=>bim==='III';
- const selBim=f.c.document.getElementById('selBim');
- selBim.value='III';
+ f.c.document.getElementById('selBim').value='III';
 
- // Escenario 1: Bimestre abierto + conexión en review no se muestra como cerrado
- f.c.cierreAdministrativoDocente=()=>{
-  const bim=f.c.document.getElementById('selBim').value;
-  const sL=f.c.getLoginSession();
-  const esAdmin=sL&&(sL.role==='admin'||sL.user==='admin');
-  return !f.c.bimestreHabilitado(bim)&&!esAdmin;
- };
- f.c.bimCerradoDocente=()=>f.c.registroSoloLectura()||f.c.cierreAdministrativoDocente();
- assert.equal(f.c.cierreAdministrativoDocente(),false);
-
- f.c.modoCalif='letra';
+ // Escenario 1: Bimestre abierto + conexión en review -> "Edición pausada por sincronización / conexión"
+ f.connection.pause('review');
+ f.c.renderFinales();
  const modeInfo=f.c.document.getElementById('finModeInfo');
- const bloqueado=true; // conexión pausada / review
- const esCierreAdmin=f.c.cierreAdministrativoDocente();
- modeInfo.innerHTML=(esCierreAdmin
-  ? '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>'
-  : (bloqueado
-    ? '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">Edición pausada por sincronización / conexión</span>'
-    : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">Letras</span>'));
-
  assert.doesNotMatch(modeInfo.innerHTML,/Bimestre cerrado por administración/);
  assert.match(modeInfo.innerHTML,/Edición pausada por sincronización \/ conexión/);
-
- // Escenario 2: Bimestre realmente cerrado sigue bloqueando edición
- selBim.value='II'; // II cerrado
- assert.equal(f.c.cierreAdministrativoDocente(),true);
+ const htmlReview=f.c.document.getElementById('finLista').innerHTML;
+ assert.ok(htmlReview.includes('readonly'));
+ assert.ok(htmlReview.includes('disabled'));
  assert.equal(f.c.bimCerradoDocente(),true);
- const esCierreReal=f.c.cierreAdministrativoDocente();
- modeInfo.innerHTML=(esCierreReal
-  ? '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>'
-  : '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">Edición pausada por sincronización / conexión</span>');
+ assert.equal(f.c.aplicarFinalManual(f.c.competencias()[0],'id:synthetic-1','AD'),false);
+
+ // Escenario 2: Bimestre cerrado administrativamente ('II') -> "Bimestre cerrado por administración"
+ f.c.document.getElementById('selBim').value='II';
+ f.c.renderFinales();
  assert.match(modeInfo.innerHTML,/Bimestre cerrado por administración/);
+ assert.doesNotMatch(modeInfo.innerHTML,/Edición pausada por sincronización \/ conexión/);
+ const htmlClosed=f.c.document.getElementById('finLista').innerHTML;
+ assert.ok(htmlClosed.includes('readonly'));
+ assert.ok(htmlClosed.includes('disabled'));
+ assert.equal(f.c.bimCerradoDocente(),true);
+ assert.equal(f.c.aplicarFinalManual(f.c.competencias()[0],'id:synthetic-1','AD'),false);
 });
 
-test('Scenario 3: Missing roster shows clear message; habilitado allows controlled verification',async()=>{
+test('Scenario 3: Missing roster shows message, exercises 10 retry timer attempts, stops without infinite loop, and recovers once roster enables',async()=>{
  const f=ui();
  const label=f.c.document.getElementById('registroConnectionText');
  const stateLabel=f.c.document.getElementById('registroSaveState');
@@ -222,7 +222,19 @@ test('Scenario 3: Missing roster shows clear message; habilitado allows controll
  assert.match(stateLabel.textContent,/Esperando el padrón autorizado/);
  assert.equal(label.textContent,'Esperando padrón autorizado…');
 
- // Al habilitarse el padrón permite nueva verificación controlada
+ // Ejercitar los 10 temporizadores de reintento de 1 segundo
+ for(let i=0;i<10;i++){
+  const retry=f.timers.find(t=>t.ms===1000&&!t.cancelled&&!t.executed);
+  assert.ok(retry,`Padron retry attempt ${i+1} exists`);
+  retry.executed=true;
+  retry.fn();
+ }
+
+ // Comprobar que al llegar a 10 intentos no sigue en bucle infinito
+ const leftover=f.timers.find(t=>t.ms===1000&&!t.cancelled&&!t.executed);
+ assert.equal(leftover,undefined,'No further timers scheduled after 10 attempts');
+
+ // Al habilitarse el padrón posteriormente, refresh(true) limpia intentos y autoriza edición
  f.c.IEStudents.peekRoster=()=>({synthetic:true});
  f.api.refresh(true);
  assert.equal(await f.api.automatic(),true);
@@ -230,28 +242,35 @@ test('Scenario 3: Missing roster shows clear message; habilitado allows controll
  assert.equal(f.connection.canEdit(),true);
 });
 
-test('Scenario 7, 8: Review clarity differentiates 0 conflicts from real conflict',async()=>{
- const f=ui();
- const label=f.c.document.getElementById('registroConnectionText');
+test('Scenario 7, 8: Review clarity differentiates trusted zero conflicts, confirmed real conflict, and untrusted/mismatched contexts',async()=>{
+ const f=ui(),label=f.c.document.getElementById('registroConnectionText'),ses=f.c.getLoginSession()||{};
 
- // Escenario 7: Cambios locales pendientes y 0 conflictos -> "Cambios locales pendientes de revisión"
- f.c.bajarRegistroNube.resultado={estado:'pendiente',conflictos:0};
- f.connection.pause();
- assert.equal(f.connection.snapshot().state,'offline');
+ // Caso A: Sin resultado confiable (null) -> Mensaje neutral
+ f.c.bajarRegistroNube.resultado=null;
+ f.connection.pause('review');
+ assert.equal(label.textContent,'Revisión de sincronización requerida. Tus cambios locales están conservados.');
 
- // Disparar estado review con 0 conflictos
- f.c.store.finales[f.key]={nota20:18,nivel:'AD',origen:'numero'};
- f.c.saveStore();
- f.online(true);
- await f.api.automatic();
- assert.equal(f.connection.snapshot().state,'review');
- assert.match(label.textContent,/Cambios locales pendientes de revisión/);
- assert.doesNotMatch(label.textContent,/Conflicto pendiente — requiere revisión/);
-
- // Escenario 8: Conflicto real -> "Conflicto pendiente — requiere revisión"
- f.c.bajarRegistroNube.resultado={estado:'conflicto',conflictos:2,key:f.c.cloudClaveReg(),token:(f.c.getLoginSession()||{}).token};
+ // Caso B: Resultado con clave o token de otro contexto -> Mensaje neutral
+ f.c.bajarRegistroNube.resultado={key:'other-key',token:ses.token,estado:'conflicto',conflictos:2};
  f.connection.pause('offline');
  f.connection.pause('review');
- assert.match(label.textContent,/Conflicto pendiente — requiere revisión/);
+ assert.equal(label.textContent,'Revisión de sincronización requerida. Tus cambios locales están conservados.');
+
+ f.c.bajarRegistroNube.resultado={key:f.c.cloudClaveReg(),token:'different-token',estado:'conflicto',conflictos:2};
+ f.connection.pause('offline');
+ f.connection.pause('review');
+ assert.equal(label.textContent,'Revisión de sincronización requerida. Tus cambios locales están conservados.');
+
+ // Caso C: Resultado confiable del contexto actual con 0 conflictos y cambios locales -> Cambios locales pendientes
+ f.c.bajarRegistroNube.resultado={key:f.c.cloudClaveReg(),token:ses.token,estado:'pendiente',conflictos:0};
+ f.connection.pause('offline');
+ f.connection.pause('review');
+ assert.equal(label.textContent,'Cambios locales pendientes de revisión. Tus cambios locales están conservados.');
+
+ // Caso D: Resultado confiable del contexto actual con conflicto real confirmado -> Conflicto pendiente
+ f.c.bajarRegistroNube.resultado={key:f.c.cloudClaveReg(),token:ses.token,estado:'conflicto',conflictos:2};
+ f.connection.pause('offline');
+ f.connection.pause('review');
+ assert.equal(label.textContent,'Conflicto pendiente — requiere revisión. Tus cambios locales están conservados.');
  assert.equal(f.connection.canEdit(),false);
 });

@@ -3,7 +3,7 @@
  'use strict';let active=null;
  function create(o){
   const now=o.now||Date.now,set=o.setTimeout||setTimeout,clear=o.clearTimeout||clearTimeout;
-  const interval=o.interval||120000,lease=o.lease||150000,timeout=o.timeout||15000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
+  const interval=o.interval||120000,lease=o.lease||150000,timeout=o.timeout||30000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
   const online=()=>o.online?o.online():true;
   function snapshot(){return {state,validUntil:until,pending:state==='pending',retentionFailed,binding};}
   function emit(next){state=next;if(next!=='connected'&&next!=='pending')until=0;const stamp=binding+'|'+next;if(stamp!==published){published=stamp;o.changed?.(snapshot());}}
