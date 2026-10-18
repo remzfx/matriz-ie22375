@@ -947,7 +947,7 @@ function registroDependenciaFallida(){
 <script src="registro-connection.js" onerror="registroDependenciaFallida()"></script>
 <script>
 /* Inicio guard de arranque de Registro. */
-if(typeof IERegistroLocalStore==='undefined'||typeof IERegistroConnection==='undefined'){
+if(typeof IERegistroLocalStore==='undefined'||typeof IERegistroConnection==='undefined'||typeof IERegistroEvaluacion==='undefined'){
   registroDependenciaFallida();throw Error('Registro pausado: falta una dependencia obligatoria.');
 }
 /* Fin guard de arranque de Registro. */
@@ -1005,14 +1005,9 @@ function toast(msg) {
 }
 
 function numToLetter(n) {
-  n = Number(n);
-  if (isNaN(n) || n < 0 || n > 20) return '';
-  if (n >= 18) return 'AD';
-  if (n >= 14) return 'A';
-  if (n >= 11) return 'B';
-  return 'C';
+  return IERegistroEvaluacion.numToLetter(n);
 }
-function letterToNum(L) { return ({ AD:19, A:15, B:12, C:8 })[L] ?? ''; }
+function letterToNum(L) { return IERegistroEvaluacion.letterToNum(L); }
 function eqClass(L) {
   return ({ C:'eq-c', B:'eq-b', A:'eq-a', AD:'eq-ad' })[L] || 'eq-none';
 }
@@ -3743,9 +3738,7 @@ function renderAsistencia() {
 }
 
 function promedioNums(arr) {
-  const v = arr.filter(x => x !== '' && x != null && !isNaN(Number(x))).map(Number);
-  if (!v.length) return null;
-  return Math.round(v.reduce((a,b)=>a+b,0) / v.length);
+  return IERegistroEvaluacion.promedioNums(arr);
 }
 
 function escapeRegistro(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}

@@ -1,7 +1,8 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8'),clone=x=>JSON.parse(JSON.stringify(x));
 const studentsFixture=new Function('require','__dirname',read('tests/backend-students.test.cjs').split('\ntest(')[0]+'\nreturn studentsFixture;')(require,__dirname);
-const {extract,fixture:client}=new Function('require','__dirname',read('tests/students-client.test.cjs').split('\ntest(')[0]+'\nreturn {extract,fixture};')(require,__dirname);
+const {extract,fixture:bareClient}=new Function('require','__dirname',read('tests/students-client.test.cjs').split('\ntest(')[0]+'\nreturn {extract,fixture};')(require,__dirname);
+const client=(...args)=>{const f=bareClient(...args);f.run(read('registro-evaluation.js'));f.c.IERegistroEvaluacion=f.c.window.IERegistroEvaluacion;return f;};
 function fixture(){
   const s=studentsFixture(),docs=[s.docentes[0],
     {user:'math',nombre:'Synthetic Math',pass:'synthetic-only',nivel:'secundaria',areas:['Matemática'],aulas:['2|A'],asignaciones:{'Matemática':['2|A']},tutorAulas:['2|A']},

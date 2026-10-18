@@ -2,7 +2,7 @@
 (function(){
  'use strict';
  /* Inicio guard de dependencias de recuperación. */
- if(typeof registroDependenciaFallida==='function'&&(typeof IERegistroLocalStore==='undefined'||typeof IERegistroConnection==='undefined'||typeof IERegistroDrafts==='undefined')){
+ if(typeof registroDependenciaFallida==='function'&&(typeof IERegistroLocalStore==='undefined'||typeof IERegistroConnection==='undefined'||typeof IERegistroDrafts==='undefined'||typeof IERegistroEvaluacion==='undefined')){
   registroDependenciaFallida();return;
  }
  /* Fin guard de dependencias de recuperación. */
