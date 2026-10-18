@@ -1,7 +1,8 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{execFileSync}=require('node:child_process');
 const before=execFileSync('git',['show','47d357a:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
-const after=fs.readFileSync(path.join(__dirname,'..','registro.html'),'utf8').replace(/\r\n/g,'\n');
+const rawAfter=fs.readFileSync(path.join(__dirname,'..','registro.html'),'utf8').replace(/\r\n/g,'\n');
+const after=require('./registro-script-fixture.cjs').restoreObsoleteAvCSS(rawAfter);
 const dirty="function markDirty() {\n  dirty = true;\n}\n",noop="function renderChipsCaps() { /* las columnas de la grilla ya muestran competencia y capacidad */ }\n";
 test('E1 production change is exclusively two dead declarations and eight empty calls',()=>{
  assert.equal(before.split(dirty).length-1,1);assert.equal(before.split(noop).length-1,1);
