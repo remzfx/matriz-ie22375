@@ -49,7 +49,7 @@ test('Photochecks retains shell-wide while upgrading A4 print and high-resolutio
  assert.match(now,/vendor\/qrcodejs\.min\.js/);
 });
 test('SW changes only static version and shared stylesheet entry, preserving API transport and cache policy',()=>{
- const sw=read('sw.js').replace(/\r\n/g,'\n').replace(" './matrix-registry-import.js',",'');assert.match(sw,/CACHE_PREFIX \+ 'v21'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace(", './academic-identity.js'",'').replace(", './registro-reconcile.js'",'').replace("CACHE_PREFIX + 'v21'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
+ const sw=require('./registro-script-fixture.cjs').historicalWorker(read('sw.js')).replace(/\r\n/g,'\n').replace(" './matrix-registry-import.js',",'');assert.match(sw,/CACHE_PREFIX \+ 'v21'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace(", './academic-identity.js'",'').replace(", './registro-reconcile.js'",'').replace("CACHE_PREFIX + 'v21'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
 });
 test('v21 installs actual shared CSS and serves it offline without caching external Apps Script POST',async()=>{
  const setup=new Function('require','__dirname',read('tests/service-worker-static.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname),s=setup(),css=read('layout-shells.css');
