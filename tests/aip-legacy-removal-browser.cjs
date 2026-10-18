@@ -1,0 +1,29 @@
+// Isolated AIP regression: synthetic storage, blocked external network, no real profiles.
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const repo=path.resolve(__dirname,'..');
+const output=path.resolve(process.env.IE_AIP_OUTPUT||require('node:os').tmpdir());
+fs.mkdirSync(output,{recursive:true});
+const read=f=>fs.readFileSync(path.join(repo,f),'utf8');
+const checks=[];async function check(name,fn){await fn();checks.push(name);console.log('PASS '+name);}
+const stripHS=s=>s.replace(/const HS = \{[\s\S]*?\n\};/,'const HS = {};');
+const html=stripHS(read('aula_innovacion.html')).replace('</head>','<style>.hidden{display:none!important}</style></head>');
+const KEY='ie22375_aip_plan_v1',CFG='ie22375_aip_cfg_v1',HS='ie22375_aip_hs_oficial_2026';
+const historical={'2026-09-01':{pri:{4:{tipo:'grupo',texto:'HISTORICO FICTICIO'}}},'2027-01-04':{sec:{1:{tipo:'soporte',texto:'FUTURO FICTICIO'}}}};
+const config={bloque:'2',modo:'asignar',plantilla:{pri:{4:[1,3],5:[1,3],6:[1,3]},sec:{1:[0,1,3],2:[0,1,2,3,4]}},feriados:{'2026-09-15':'Feriado ficticio'}};
+(async()=>{
+const {chromium}=require(process.env.IE_PLAYWRIGHT_MODULE||'playwright');const browser=await chromium.launch({channel:'msedge',headless:true});
+try{for(const width of [1366,390]){
+const context=await browser.newContext({viewport:{width,height:768},serviceWorkers:'block'});const requests=[],errors=[];
+await context.addInitScript(({KEY,CFG,HS,historical,config})=>{if(!localStorage.getItem('seeded')){localStorage.setItem(KEY,JSON.stringify(historical));localStorage.setItem(CFG,JSON.stringify(config));localStorage.setItem(HS,JSON.stringify({0:{1:{'1A':{area:'MAT',doc:'DOCENTE FICTICIO'}},2:{'1A':{area:'MAT',doc:'DOCENTE FICTICIO'}}}}));localStorage.setItem('academic-sentinel','FICTICIO SIN CAMBIOS');localStorage.setItem('seeded','yes');}window.remoteCalls=0;window.fetch=()=>{window.remoteCalls++;return Promise.reject(Error('External network blocked'));};Storage.prototype.removeItem=()=>{throw Error('Unexpected storage removal');};Storage.prototype.clear=()=>{throw Error('Unexpected storage clear');};},{KEY,CFG,HS,historical,config});
+await context.route('**/*',route=>{const u=new URL(route.request().url());requests.push(u.origin+u.pathname);if(u.origin==='https://fixture.invalid'&&u.pathname==='/aula_innovacion.html')return route.fulfill({contentType:'text/html',body:html});if(u.origin==='https://fixture.invalid'&&u.pathname==='/layout-shells.css')return route.fulfill({contentType:'text/css',body:read('layout-shells.css')});return route.abort();});
+const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+await check(width+' current AIP boots without legacy JS or storage mutation',async()=>{await page.goto('https://fixture.invalid/aula_innovacion.html');assert.ok(await page.locator('#boxPri table').count());assert.ok(await page.locator('#boxSec table').count());assert.deepEqual(JSON.parse(await page.evaluate(k=>localStorage.getItem(k),KEY)),historical);assert.deepEqual(JSON.parse(await page.evaluate(k=>localStorage.getItem(k),CFG)),config);assert.equal(await page.locator('#selBloque').inputValue(),'2');assert.ok(!requests.some(u=>u.endsWith('/aula_innovacion.js')));assert.deepEqual(errors,[]);});
+await check(width+' institutional timetable and configuration persist locally',async()=>{await page.evaluate(()=>showAipTab('reloj'));await page.locator('#hpIni').fill('08:15');await page.locator('button[onclick="aplicarHorarioInst()"]').click();const c=JSON.parse(await page.evaluate(k=>localStorage.getItem(k),CFG));assert.equal(c.horario.pri.inicio,'08:15');assert.equal(c.feriados['2026-09-15'],'Feriado ficticio');});
+await check(width+' synthetic plan saves and historical months remain intact',async()=>{await page.evaluate(()=>{setCelda('2026-10-06','pri',4,{tipo:'grupo',texto:'GRUPO FICTICIO'});guardar(true);render();});const p=JSON.parse(await page.evaluate(k=>localStorage.getItem(k),KEY));for(const d of Object.keys(historical))assert.deepEqual(p[d],historical[d]);assert.equal(p['2026-10-06'].pri[4].texto,'GRUPO FICTICIO');});
+await check(width+' template selection and explicit monthly planning keep prior months',async()=>{await page.evaluate(()=>{togglePlantilla('pri',4,2);document.getElementById('inpMes').value='2026-11';onMes();armarMes();guardar(true);});const p=JSON.parse(await page.evaluate(k=>localStorage.getItem(k),KEY));for(const d of Object.keys(historical))assert.deepEqual(p[d],historical[d]);assert.ok(Object.keys(p).some(k=>k.startsWith('2026-11')));});
+await check(width+' already loaded AIP remains usable offline without cloud writes',async()=>{await context.setOffline(true);await page.evaluate(()=>{document.getElementById('inpMes').value='2026-10';onMes();guardar(true);});assert.equal(await page.evaluate(()=>window.remoteCalls),0);assert.equal(await page.evaluate(()=>localStorage.getItem('academic-sentinel')),'FICTICIO SIN CAMBIOS');});
+await check(width+' reload recovers saved plan/settings without fetching legacy JS',async()=>{await context.setOffline(false);await page.reload();assert.equal(await page.locator('#hpIni').inputValue(),'08:15');const p=JSON.parse(await page.evaluate(k=>localStorage.getItem(k),KEY));for(const d of Object.keys(historical))assert.deepEqual(p[d],historical[d]);assert.equal(p['2026-10-06'].pri[4].texto,'GRUPO FICTICIO');assert.equal(await page.evaluate(()=>window.remoteCalls),0);assert.deepEqual(errors,[]);});
+await page.screenshot({path:path.join(output,'aip-'+width+'.png'),fullPage:false});await context.close();
+}}finally{await browser.close();}
+console.log(JSON.stringify({passed:checks.length,failed:0,checks},null,2));fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({passed:checks.length,failed:0,checks},null,2));
+})().catch(e=>{console.error(e.stack);process.exitCode=1;});

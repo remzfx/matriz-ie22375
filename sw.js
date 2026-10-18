@@ -1,6 +1,6 @@
 /* Service Worker — respaldo estático versionado, siempre network-first. */
 const CACHE_PREFIX = 'matriz-ie22375-';
-const CACHE = CACHE_PREFIX + 'v22';
+const CACHE = CACHE_PREFIX + 'v23';
 const MAX_STATIC_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const PRECACHE = [
   './', './index.html', './admin.html', './primaria.html', './secundaria.html', './auxiliar.html',
@@ -9,7 +9,7 @@ const PRECACHE = [
   './registro-calificar-print.js',
   './registro-local-store.js', './registro-connection.js', './registro-drafts.js', './registro-recovery-ui.js',
   './students.js', './matrix-teachers.js', './student-identity.js', './matrix-registry-import.js', './auxiliar-permissions.js', './login-bridge.js',
-  './registro.html', './registro-academic-model.js', './registro-reconcile.js', './academic-identity.js','./conclusion-suggestions.js', './transversales.html', './transversales-client.js', './registro-evaluation.js', './registro-transversales.js', './students-migration.js', './aula_innovacion.js'
+  './registro.html', './registro-academic-model.js', './registro-reconcile.js', './academic-identity.js','./conclusion-suggestions.js', './transversales.html', './transversales-client.js', './registro-evaluation.js', './registro-transversales.js', './students-migration.js'
 ];
 const STATIC_URLS = new Set(PRECACHE.map(path => new URL(path, self.registration.scope).href));
 // Puente de lectura: comparte una petición en curso entre Hub y Auxiliar al navegar.

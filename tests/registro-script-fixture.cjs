@@ -36,5 +36,6 @@ function historicalContent(html){
  .replace(/<script src="(registro-(?:local-store|connection|drafts|recovery-ui|calificar-print)\.js)"><\/script>/g,(_,file)=>
   '<script>\n'+(file==='registro-recovery-ui.js'?historicalRecovery(source(file)):source(file)).trimEnd()+(file==='registro-drafts.js'||file==='registro-recovery-ui.js'?'\n\n':'\n')+'</script>');
 }
-function historicalWorker(source){return source.replace(/\r\n/g,'\n').replace("\n  './registro-grading.js',",'').replace("\n  './registro-calificar-print.js',",'').replace("CACHE_PREFIX + 'v22'","CACHE_PREFIX + 'v21'").replace("\n  './registro-local-store.js', './registro-connection.js', './registro-drafts.js', './registro-recovery-ui.js',",'');}
+// Restore the deliberately retired B1 resource only when reconstructing a historical golden.
+function historicalWorker(source){return source.replace("'./students-migration.js'", "'./students-migration.js', './aula_innovacion.js'").replace(/\r\n/g,'\n').replace("\n  './registro-grading.js',",'').replace("\n  './registro-calificar-print.js',",'').replace("CACHE_PREFIX + 'v23'","CACHE_PREFIX + 'v21'").replace("\n  './registro-local-store.js', './registro-connection.js', './registro-drafts.js', './registro-recovery-ui.js',",'');}
 module.exports={withoutObsoleteAvCSS,restoreObsoleteAvCSS,modules,source,scripts,historicalContent,historicalWorker,historicalRecovery,pageGuard,coreGuard};
