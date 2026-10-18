@@ -2135,8 +2135,7 @@ function onCapSel() {
 }
 function capacidadElegida() {
   const v = (document.getElementById('selCap')||{}).value || '';
-  if (v === '__otra__') return ((document.getElementById('inpCapacidad')||{}).value || '').trim();
-  return v.trim();
+  return IERegistroGrading.capabilityValue(v,v==='__otra__'?(document.getElementById('inpCapacidad')||{}).value:'');
 }
 function onCompChange() {
   if (sesionActiva && hayNotasPendientes()) {
@@ -2187,9 +2186,8 @@ function onSesionChange() {
   loadCapsElegidas();
   const c = ctxBase();
   const fecha = (document.getElementById('inpFecha')||{}).value || '';
-  (store.sessions||[]).forEach(s => {
-    if (s.nivel===c.nivel && s.bim===c.bim && String(s.grado)===String(c.grado) &&
-        s.seccion===c.seccion && s.area===c.area && s.fecha===fecha && s.capacidad) {
+  IERegistroGrading.sessionsOn(store.sessions,c,fecha).forEach(s => {
+    if (s.capacidad) {
       if (!tieneCapSel(s.comp, s.capacidad)) capsElegidas.push(normCapItem({ comp: s.comp, cap: s.capacidad }));
     }
   });
@@ -2415,10 +2413,7 @@ function renderSesiones() {
 function abrirSesionFecha(fecha) {
  if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return conRegistroHistorico(()=>abrirSesionFecha(fecha));
   const c = ctxBase();
-  const delDia = (store.sessions || []).concat(typeof IERegistroTransversales!=='undefined'?IERegistroTransversales.sessions():[]).filter(s =>
-    s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
-    s.seccion === c.seccion && s.area === c.area && s.fecha === fecha
-  );
+  const delDia = IERegistroGrading.sessionsOn((store.sessions || []).concat(typeof IERegistroTransversales!=='undefined'?IERegistroTransversales.sessions():[]),c,fecha);
   document.getElementById('inpFecha').value = fecha;
   if (delDia[0]) {
     document.getElementById('selUnidad').value = delDia[0].unidad ?? '';
@@ -2489,10 +2484,7 @@ function keyCapsHoy() {
   return [c.nivel, c.bim, c.grado, c.seccion, c.area, fecha].join('||');
 }
 function normCapItem(x, fallbackComp) {
-  if (!x) return null;
-  if (typeof x === 'string') return normCapItem({comp:fallbackComp||'',cap:x});
-  if (x.cap){const comp=x.comp||fallbackComp||'';return {comp:comp,cap:x.cap,origen:esCompetenciaTransversal(comp)?'transversal':'academica'};}
-  return null;
+  return IERegistroGrading.normalizeCapability(x,fallbackComp,esCompetenciaTransversal);
 }
 function tieneCapSel(comp, cap) {
   return capsElegidas.some(x => x.comp === comp && x.cap === cap);
@@ -3135,18 +3127,7 @@ function bimCerradoDocente() {
 }
 
 function capsDeComp(comp) {
-  const c = ctxBase();
-  const seen = {};
-  const out = [];
-  (store.sessions || []).forEach(s => {
-    if (s.nivel!==c.nivel || s.bim!==c.bim || String(s.grado)!==String(c.grado) ||
-        s.seccion!==c.seccion || s.area!==c.area || s.comp!==comp) return;
-    const cap = (s.capacidad || '').trim();
-    if (!cap || seen[cap]) return;
-    seen[cap] = 1;
-    out.push({ capacidad: cap, fecha: s.fecha || '' });
-  });
-  return out;
+  return IERegistroGrading.capabilitiesFor(store.sessions,ctxBase(),comp);
 }
 function notaDesdeSesiones(comp, nombre) {
   const c=ctxBase(),records=IERegistroGrading.sessionsFor(store.sessions,c,comp).map(s=>

@@ -5,11 +5,11 @@ const before=execFileSync('git',['show','076da3b:registro.html'],{encoding:'utf8
 const clone=x=>JSON.parse(JSON.stringify(x));
 function extract(source,name){const start=source.indexOf('function '+name+'(');assert.ok(start>=0,name);const line=source.slice(start,source.indexOf('\n',start));return line.endsWith('}')?line:source.slice(start,source.indexOf('\n}',start)+2);}
 function fixture(source,level='secundaria',sessions=[],selected=[]){
- const context={nivel:level,bim:'III',grado:1,seccion:'A',area:'Área ficticia'},elements={selCap:{value:''},inpCapacidad:{value:''},inpFecha:{value:'2026-10-01'}};
+ const context={nivel:level,bim:'III',grado:1,seccion:'A',area:'Área ficticia'},elements={selCap:{value:''},selComp:{value:''},selUnidad:{value:''},inpCapacidad:{value:''},inpFecha:{value:'2026-10-01'}};
  let remote=0;const c=vm.createContext({store:{sessions:structuredClone(sessions)},capsElegidas:structuredClone(selected),ctxBase:()=>context,esCompetenciaTransversal:comp=>comp==='TIC ficticia',document:{getElementById:id=>elements[id]},fetch(){remote++;throw Error('No remote calls allowed');},effects:[]});c.window=c;
  vm.runInContext(read('registro-grading.js'),c);
- for(const name of ['normCapItem','tieneCapSel','capacidadElegida','capsDeComp','onSesionChange'])vm.runInContext(extract(source,name),c);
- Object.assign(c,{loadCapsElegidas(){c.effects.push('load');c.capsElegidas=structuredClone(selected);},saveCapsElegidas(){c.effects.push('save');},renderChipsCaps(){c.effects.push('chips');},renderStudents(){c.effects.push('render');}});
+ for(const name of ['normCapItem','tieneCapSel','capacidadElegida','capsDeComp','onSesionChange','abrirSesionFecha'])vm.runInContext(extract(source,name),c);
+ Object.assign(c,{loadCapsElegidas(){c.effects.push('load');c.capsElegidas=structuredClone(selected);},saveCapsElegidas(){c.effects.push('save');},renderChipsCaps(){c.effects.push('chips');},renderStudents(){c.effects.push('render');},renderSesiones(){c.effects.push('sessions');},fillCaps(){c.effects.push('fill');}});
  return {c,context,elements,remote:()=>remote};
 }
 for(const level of ['primaria','secundaria'])test(level+': historical capability normalization preserves raw names, fallback and origin',()=>{
@@ -17,6 +17,22 @@ for(const level of ['primaria','secundaria'])test(level+': historical capability
  for(const x of [null,undefined,'',' Capacidad antigua ',{cap:'Capacidad',comp:'Competencia'},{cap:'Capacidad',comp:'TIC ficticia'},{cap:'Capacidad'},{cap:''},{cap:0},{cap:'__proto__'},{}])for(const fallback of [undefined,'Competencia histórica','TIC ficticia']){
   const original=JSON.stringify(x);assert.deepEqual(clone(b.c.normCapItem(x,fallback)),clone(a.c.normCapItem(x,fallback)));assert.equal(JSON.stringify(x),original);
  }
+});
+for(const level of ['primaria','secundaria'])test(level+': opening a historical date retains first active session, units and transversal columns',()=>{
+ const s={...fixture(before,level).context,comp:'Competencia',capacidad:'Capacidad',fecha:'2026-10-01',unidad:'U6'};
+ for(const sessions of [[],[s,{...s},{...s,grado:'1',comp:'Otra',unidad:'U7'}]]){
+  const a=fixture(before,level,sessions),b=fixture(current,level,sessions),trans={...s,comp:'TIC ficticia',capacidad:'TIC'};
+  for(const f of [a,b])f.c.IERegistroTransversales={sessions:()=>[trans]};
+  a.c.abrirSesionFecha(s.fecha);b.c.abrirSesionFecha(s.fecha);
+  assert.deepEqual(clone(b.c.sesionActiva),clone(a.c.sesionActiva));assert.deepEqual(clone(b.c.capsElegidas),clone(a.c.capsElegidas));assert.deepEqual(clone(b.c.effects),clone(a.c.effects));assert.deepEqual(b.elements,a.elements);assert.equal(b.remote(),0);
+ }
+});
+test('pure session preparation accepts frozen inputs and keeps original duplicates and order',()=>{
+ const api=require('../registro-grading.js'),context=Object.freeze(fixture(before).context),s=Object.freeze({...context,fecha:'2026-10-01',comp:'Competencia',capacidad:'Capacidad'}),sessions=Object.freeze([s,s]);
+ assert.deepEqual(api.sessionsOn(sessions,context,s.fecha),[s,s]);assert.deepEqual(api.sessionsOn(sessions,context,'different'),[]);
+ assert.deepEqual(api.capabilitiesFor(sessions,context,s.comp),[{capacidad:'Capacidad',fecha:s.fecha}]);
+ const item=Object.freeze({comp:'Competencia',cap:'Capacidad'});assert.deepEqual(api.normalizeCapability(item,'',()=>false),{...item,origen:'academica'});
+ assert.equal(sessions.length,2);
 });
 test('capability choice trims only the selected value and uses custom text only for Otra',()=>{
  const a=fixture(before),b=fixture(current);
