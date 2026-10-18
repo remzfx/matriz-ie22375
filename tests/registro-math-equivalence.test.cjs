@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),vm=requir
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/\r\n/g,'\n');
 const old=execFileSync('git',['show','7df796b:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 function fn(source,name){const m=new RegExp('^\\s*(?:async )?function '+name+'\\(','m').exec(source);assert.ok(m,name);const start=source.indexOf('function '+name+'(',m.index),line=source.slice(start,source.indexOf('\n',start));if(line.trimEnd().endsWith('}'))return line;const indent=source.slice(source.lastIndexOf('\n',start)+1,start);return source.slice(start,source.indexOf('\n'+indent+'}',start)+indent.length+2);}
-function setup(){const c=vm.createContext({});c.window=c;vm.runInContext(read('registro-evaluation.js'),c);return c;}
+function setup(){const c=vm.createContext({});c.window=c;vm.runInContext(read('registro-evaluation.js'),c);vm.runInContext(read('registro-grading.js'),c);return c;}
 const current=setup(),original=setup();for(const name of ['numToLetter','letterToNum','promedioNums']){vm.runInContext(fn(read('registro.html'),name),current);vm.runInContext(fn(old,name),original);}
 
 test('numeric conversion is equivalent at every eighth-point boundary and for empty/invalid historical scalars',()=>{
@@ -73,8 +73,8 @@ test('session calculation and transversal results differ on malformed historical
  assert.equal(c.IERegistroEvaluacion.resultados(evidence,['synthetic']).valores.synthetic.tic,undefined);
 });
 
-test('priority, evidence weighting, direct notes and referential calculation functions remain unchanged',()=>{
- for(const name of ['notaDesdeSesiones','notaDirectaAlumno','notaCompAlumno','promGeneralAlumno','promReferencialAlumno'])assert.equal(fn(read('registro.html'),name),fn(old,name),name);
+test('direct priority and unchanged referential calculation remain compatible with the extracted readers',()=>{
+ for(const name of ['promGeneralAlumno','promReferencialAlumno'])assert.equal(fn(read('registro.html'),name),fn(old,name),name);
  const c=setup();Object.assign(c,{competenciaTrabajada:()=>true,notaDirectaAlumno:()=>({nota:12,letra:'B'}),notaDesdeSesiones:()=>({nota:19,letra:'AD'}),letterToNum:c.IERegistroEvaluacion.letterToNum});
  vm.runInContext(fn(read('registro.html'),'notaCompAlumno'),c);assert.equal(c.notaCompAlumno('ficticia','synthetic').letra,'B');
 });

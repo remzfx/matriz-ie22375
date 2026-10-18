@@ -55,7 +55,7 @@ test('recovery remains strict after adding the dependency guard',()=>{
  assert.throws(()=>vm.runInNewContext(probe,{}),/__syntheticUndeclaredProbe is not defined/);
 });
 
-for(const missing of [...modules,'registro-evaluation.js'])test('failed '+missing+' is controlled, never enables editing and preserves every synthetic storage key',()=>{
+for(const missing of [...modules,'registro-evaluation.js','registro-grading.js'])test('failed '+missing+' is controlled, never enables editing and preserves every synthetic storage key',()=>{
  const {pageGuard,coreGuard}=require('./registro-script-fixture.cjs');
  const data=new Map([['synthetic-owner-III-2026','{"finales":{"synthetic":"B"},"historial":["A"]}'],
   ['matriz_SEC_IE22375','{"anio":2026,"II":{"synthetic":"A"}}'],['legacy-other-period','{"synthetic":"C"}']]);
@@ -63,13 +63,13 @@ for(const missing of [...modules,'registro-evaluation.js'])test('failed '+missin
  const c=vm.createContext({document:{getElementById:id=>id==='registroConnectionStatus'?status:label,querySelectorAll:()=>controls},
   localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>{writes++;data.set(k,v);}},getLoginSession:()=>({role:'docente',user:'synthetic'}),
   setTimeout:()=>0,clearTimeout:()=>{},fetch:()=>{remoteWrites++;throw Error('Remote network forbidden');}});
- c.window=c;if(missing!=='registro-evaluation.js')vm.runInContext(source('registro-evaluation.js'),c);vm.runInContext(scripts(pageGuard)[0].code,c);
+ c.window=c;if(missing!=='registro-evaluation.js')vm.runInContext(source('registro-evaluation.js'),c);if(missing!=='registro-grading.js')vm.runInContext(source('registro-grading.js'),c);vm.runInContext(scripts(pageGuard)[0].code,c);
  for(const file of modules){
   assert.match(entries.find(s=>s.src===file).attributes,/onerror="registroDependenciaFallida\(\)"/);
   if(file===missing)vm.runInContext('registroDependenciaFallida()',c);
   else if(file!=='registro-recovery-ui.js')vm.runInContext(entries.find(s=>s.src===file).code,c);
   if(file==='registro-connection.js'){
-   if(['registro-local-store.js','registro-connection.js','registro-evaluation.js'].includes(missing))assert.throws(()=>vm.runInContext(coreGuard,c),/Registro pausado/);
+   if(['registro-local-store.js','registro-connection.js','registro-evaluation.js','registro-grading.js'].includes(missing))assert.throws(()=>vm.runInContext(coreGuard,c),/Registro pausado/);
    else vm.runInContext(coreGuard,c);
   }
  }

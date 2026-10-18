@@ -9,7 +9,7 @@ const copy=x=>structuredClone(x);
 function setup(source,options={}){
  const ctx={nivel:options.level||'secundaria',bim:'III',grado:1,seccion:'A',area:'Área ficticia'},comp='Competencia ficticia';
  const student={idSiagie:'synthetic',codigoEstudiante:'synthetic-code',nombre:'ALUMNO FICTICIO ÁLVAREZ',grado:1,seccion:'A'};
- const c=vm.createContext({});c.window=c;vm.runInContext(read('student-identity.js'),c);vm.runInContext(read('registro-evaluation.js'),c);
+ const c=vm.createContext({});c.window=c;vm.runInContext(read('student-identity.js'),c);vm.runInContext(read('registro-evaluation.js'),c);if(source.includes('IERegistroGrading.'))vm.runInContext(read('registro-grading.js'),c);
  const id=c.studentKey(student),prefix=[ctx.nivel,ctx.bim,ctx.grado,ctx.seccion,ctx.area,comp].join('||'),aula=[ctx.nivel,ctx.grado,ctx.seccion].join('||');
  const sessions=(options.sessions||[{...ctx,comp,capacidad:'Capacidad ficticia',fecha:'2026-10-01'}]).map(s=>({...s}));
  const store={sessions,grades:{},finales:{},concComp:{[prefix+'||'+id]:{texto:'Conclusión ficticia conservada'}},asistencia:{unrelated:{marca:'P',ts:1}},academicSync:{unrelated:{version:7}},studentAliases:{[aula]:{[id]:[student.nombre]}}};

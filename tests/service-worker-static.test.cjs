@@ -74,7 +74,7 @@ for(const missing of ['registro.html',...require('./registro-script-fixture.cjs'
 });
 
 test('external Registro implementations survive offline as actual JavaScript, never HTML',async()=>{
-  const {modules,source:read}=require('./registro-script-fixture.cjs'),s=fixture(),staticModules=[...modules,'registro-calificar-print.js'];
+  const {modules,source:read}=require('./registro-script-fixture.cjs'),s=fixture(),staticModules=[...modules,'registro-calificar-print.js','registro-grading.js'];
   s.network(async req=>{
     const file=new URL(req.url).pathname.split('/').at(-1),js=file.endsWith('.js');
     return new Response(staticModules.includes(file)?read(file):js?'/* synthetic dependency */':'<html>synthetic shell</html>',

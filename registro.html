@@ -610,7 +610,7 @@
   <script src="login-bridge.js"></script>
 <script src="students.js"></script>
 <script src="student-identity.js"></script>
-<script src="academic-identity.js" defer></script><script src="registro-reconcile.js" defer></script><script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script><script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script><script src="registro-sync-diagnostic.js" defer></script><script src="registro-sync-diagnostic-ui.js" defer></script>
+<script src="academic-identity.js" defer></script><script src="registro-reconcile.js" defer></script><script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script><script src="registro-evaluation.js"></script><script src="registro-grading.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script><script src="registro-sync-diagnostic.js" defer></script><script src="registro-sync-diagnostic-ui.js" defer></script>
   <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body class="min-h-screen text-slate-800">
@@ -947,7 +947,7 @@ function registroDependenciaFallida(){
 <script src="registro-connection.js" onerror="registroDependenciaFallida()"></script>
 <script>
 /* Inicio guard de arranque de Registro. */
-if(typeof IERegistroLocalStore==='undefined'||typeof IERegistroConnection==='undefined'||typeof IERegistroEvaluacion==='undefined'){
+if(typeof IERegistroLocalStore==='undefined'||typeof IERegistroConnection==='undefined'||typeof IERegistroEvaluacion==='undefined'||typeof IERegistroGrading==='undefined'){
   registroDependenciaFallida();throw Error('Registro pausado: falta una dependencia obligatoria.');
 }
 /* Fin guard de arranque de Registro. */
@@ -2995,11 +2995,7 @@ function finalKey(comp, nombre) {
   return [c.nivel, c.bim, c.grado, c.seccion, c.area, comp, identidadAlumno(nombre)].join('||');
 }
 function notaDirectaAlumno(comp, nombre) {
-  const f = leerNota(store.finales, finalKey(comp, nombre));
-  if (!f) return { nota:'', letra:'' };
-  const nota = (f.nota20!=='' && f.nota20!=null && !isNaN(Number(f.nota20))) ? Number(f.nota20) : '';
-  const letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
-  return { nota, letra };
+  return IERegistroGrading.direct(leerNota(store.finales,finalKey(comp,nombre)),IERegistroEvaluacion);
 }
 function competenciaTrabajada(comp,c=ctxBase()){const k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');return !store.competenciasEstado||!store.competenciasEstado[k]||store.competenciasEstado[k].trabajada!==false;}
 function concCompAlumno(comp,nombre){return ((leerNota(store.concComp||{},finalKey(comp,nombre))||{}).texto||'').trim();}
@@ -3116,12 +3112,10 @@ async function prepararVersionAcademica(options){
 }
 
 function notaCompAlumno(comp, nombre) {
-  if(typeof competenciaTrabajada==='function'&&!competenciaTrabajada(comp))return {nota:'',letra:'',src:''};
-  const dir = notaDirectaAlumno(comp, nombre);
-  if (dir.letra) return { nota: dir.nota!==''?dir.nota:letterToNum(dir.letra), letra: dir.letra, src: 'P' };
-  const ev = notaDesdeSesiones(comp, nombre);
-  if (ev.nota !== '' && ev.nota != null) return { nota: ev.nota, letra: ev.letra, src: 'C' };
-  return { nota:'', letra:'', src:'' };
+  const worked=typeof competenciaTrabajada!=='function'||competenciaTrabajada(comp);
+  if(!worked)return IERegistroGrading.effective(false,null,null,IERegistroEvaluacion);
+  const direct=notaDirectaAlumno(comp,nombre);
+  return IERegistroGrading.effective(true,direct,direct.letra?null:notaDesdeSesiones(comp,nombre),IERegistroEvaluacion);
 }
 function promGeneralAlumno(nombre, comps) {
   const nums = [];
@@ -3155,21 +3149,9 @@ function capsDeComp(comp) {
   return out;
 }
 function notaDesdeSesiones(comp, nombre) {
-  const c = ctxBase();
-  const sess = (store.sessions||[]).filter(s =>
-    s.nivel===c.nivel && s.bim===c.bim && String(s.grado)===String(c.grado) &&
-    s.seccion===c.seccion && s.area===c.area && s.comp===comp
-  );
-  const nums = [];
-  sess.forEach(s => {
-    const gk = [c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha, identidadAlumno(nombre)].join('||');
-    const g = leerNota(store.grades, gk);
-    if (!g) return;
-    if (g.nota20!=='' && g.nota20!=null && !isNaN(Number(g.nota20))) nums.push(Number(g.nota20));
-    else if (g.nivel) { const m = letterToNum(g.nivel); if (m!=='') nums.push(Number(m)); }
-  });
-  const prom = promedioNums(nums);
-  return { nota: prom==null?'':prom, letra: prom==null?'':numToLetter(prom) };
+  const c=ctxBase(),records=IERegistroGrading.sessionsFor(store.sessions,c,comp).map(s=>
+    leerNota(store.grades,[c.nivel,c.bim,c.grado,c.seccion,c.area,s.comp,s.capacidad,s.fecha,identidadAlumno(nombre)].join('||')));
+  return IERegistroGrading.calculated(records,IERegistroEvaluacion);
 }
 function aplicarFinalManual(comp, nombre, val, posponerRender) {
   if (registroSoloLectura() || bimCerradoDocente() || !competenciaTrabajada(comp) || !['AD','A','B','C'].includes(val)) return false;
