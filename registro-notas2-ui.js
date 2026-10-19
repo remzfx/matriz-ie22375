@@ -19,7 +19,12 @@
    store[field]=store[field]||{};for(const k of Object.keys(store[field]))if(k.startsWith(prefix))delete store[field][k];Object.assign(store[field],copy(value));
   }
   if(model.fields.asistencia.some(f=>p[f]))mergeRegistroPayload(Object.fromEntries(model.fields.asistencia.map(f=>[f,p[f]||{}])));
-  if(p.sessions){sesionActiva=null;notas={};capsElegidas=[];}
+  if(p.sessions){
+   const date=document.getElementById('inpFecha')?.value||'',previous=sesionActiva;
+   const sessions=IERegistroGrading.sessionsOn(store.sessions,c,date),selected=sessions.find(s=>s.comp===previous?.comp&&s.capacidad===previous?.capacidad)||sessions[0];
+   sesionActiva=selected?{fecha:date,unidad:selected.unidad??'',comp:selected.comp,capacidad:selected.capacidad}:null;
+   notas={};loadCapsElegidas();
+  }
  }
  async function request(body,options){
   const c=ctxBase(),session=getLoginSession()||{},response=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},cache:'no-store',signal:options.signal,body:JSON.stringify({...body,token:session.token,nivel:c.nivel,bimestre:c.bim,grado:c.grado,seccion:c.seccion,area:c.area,docente:session.nombre||''})});
