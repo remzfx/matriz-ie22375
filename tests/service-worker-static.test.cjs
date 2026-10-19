@@ -45,7 +45,7 @@ const actualStatic=req=>{
     {headers:{'Content-Type':file.endsWith('.js')?'application/javascript':'text/html'}});
 };
 
-test('v21 client upgrades to coherent v23 HTML and all four mandatory implementations',async()=>{
+test('v21 client upgrades to coherent v24 HTML and all four mandatory implementations',async()=>{
   const old=fixture(priorWorker());old.network(async req=>new Response(req.url.endsWith('registro.html')?priorHtml():'/* synthetic prior static */',
     {headers:{'Content-Type':req.url.endsWith('.js')?'application/javascript':'text/html'}}));
   await old.dispatch('install');await old.dispatch('activate');
@@ -60,10 +60,10 @@ test('v21 client upgrades to coherent v23 HTML and all four mandatory implementa
   }
   for(const file of modules)assert.equal(scripts(read('registro.html')).filter(s=>s.src===file).length,1);
   await next.dispatch('activate');assert.equal(next.stores.has('matriz-ie22375-v21'),false);
-  assert.ok(next.stores.has('matriz-ie22375-v23'));assert.deepEqual(next.lifecycle,['skipWaiting','claim']);
+  assert.ok(next.stores.has('matriz-ie22375-v24'));assert.deepEqual(next.lifecycle,['skipWaiting','claim']);
 });
 
-for(const missing of ['registro.html',...require('./registro-script-fixture.cjs').modules])test('v23 incomplete install preserves active v21 when '+missing+' fails',async()=>{
+for(const missing of ['registro.html',...require('./registro-script-fixture.cjs').modules])test('v24 incomplete install preserves active v21 when '+missing+' fails',async()=>{
   const old=fixture(priorWorker());await old.dispatch('install');await old.dispatch('activate');
   const before=await (await old.cache('matriz-ie22375-v21').match(old.request('registro.html'))).text();
   const next=fixture(source,old.stores);next.network(async req=>{
@@ -93,7 +93,7 @@ test('external Registro implementations survive offline as actual JavaScript, ne
 });
 test('SW offline missing or HTML-corrupted JavaScript cache never falls back to index.html',async()=>{
   const s=fixture();await s.dispatch('install');s.offline();
-  const cache=s.cache('matriz-ie22375-v23');
+  const cache=s.cache('matriz-ie22375-v24');
   await cache.put(s.request('matrix-teachers.js'),new Response('<html>wrong cached page</html>',
     {headers:{'Content-Type':'text/html','X-IE-Cached-At':String(s.now())}}));
   for(const file of ['matrix-teachers.js','uncached.js','another.mjs']) {
@@ -116,13 +116,13 @@ test('SW expires static versions after seven days and cleans previous applicatio
   const s=fixture();s.cache('matriz-ie22375-v1');s.cache('matriz-ie22375-v16');s.cache('matriz-ie22375-v17');s.cache('matriz-ie22375-v18');s.cache('unrelated-cache');await s.dispatch('install');await s.dispatch('activate');
   assert.equal(s.stores.has('matriz-ie22375-v1'),false);assert.equal(s.stores.has('matriz-ie22375-v17'),false);assert.equal(s.stores.has('matriz-ie22375-v16'),false);assert.equal(s.stores.has('unrelated-cache'),true);assert.equal(s.stores.has('matriz-ie22375-v18'),false);
   s.advance(8*24*60*60*1000);s.offline();const response=await s.dispatch('fetch',{request:s.request('matrix-teachers.js')});
-  assert.equal(response.type,'error');assert.equal(await s.cache('matriz-ie22375-v23').match(s.request('matrix-teachers.js')),undefined);
+  assert.equal(response.type,'error');assert.equal(await s.cache('matriz-ie22375-v24').match(s.request('matrix-teachers.js')),undefined);
 });
 test('SW neither caches private API responses nor uses HTML fallback for APIs or POST',async()=>{
   const s=fixture();await s.dispatch('install');
   const api=s.request('api?action=loadperiodos');
   s.network(async()=>new Response('{"ok":true}',{headers:{'Content-Type':'application/json'}}));
-  await s.dispatch('fetch',{request:api});assert.equal(await s.cache('matriz-ie22375-v23').match(api),undefined);
+  await s.dispatch('fetch',{request:api});assert.equal(await s.cache('matriz-ie22375-v24').match(api),undefined);
   s.offline();const response=await s.dispatch('fetch',{request:api});assert.equal(response.type,'error');
   assert.equal(await s.dispatch('fetch',{request:new Request(api.url,{method:'POST',body:'synthetic'})}),undefined);
   for(const url of ['https://synthetic-api.example/exec','https://synthetic-cdn.example/library.js']) {
@@ -141,7 +141,7 @@ test('SW precaches auxiliar.html and serves its exact static page offline, exclu
   assert.equal(response.status,200);assert.equal(await response.text(),html);
   assert.ok(s.calls.some(call=>call.req.url.endsWith('/auxiliar.html')));
   assert.equal(s.calls.some(call=>call.req.url.endsWith('/auxiliar-admin.js')),false);
-  assert.equal(await s.cache('matriz-ie22375-v23').match(s.request('auxiliar-admin.js')),undefined);
+  assert.equal(await s.cache('matriz-ie22375-v24').match(s.request('auxiliar-admin.js')),undefined);
 });
 
 test('SW offline auxiliar-permissions.js returns executable JavaScript, never index.html',async()=>{
@@ -158,7 +158,7 @@ test('SW offline auxiliar-permissions.js returns executable JavaScript, never in
 
 test('SW missing or HTML-corrupted auxiliar-permissions.js never receives the cached home page',async()=>{
   const s=fixture();await s.dispatch('install');s.offline();
-  const cache=s.cache('matriz-ie22375-v23'),request=s.request('auxiliar-permissions.js');
+  const cache=s.cache('matriz-ie22375-v24'),request=s.request('auxiliar-permissions.js');
   await cache.put(request,new Response('<html>wrong</html>',{headers:{'Content-Type':'text/html','X-IE-Cached-At':String(s.now())}}));
   for(let i=0;i<2;i++){
     const response=await s.dispatch('fetch',{request});
@@ -168,7 +168,7 @@ test('SW missing or HTML-corrupted auxiliar-permissions.js never receives the ca
   assert.equal(await cache.match(request),undefined);
 });
 
-test('SW activating v23 deletes v2, v3 and v4 while preserving the installed cache and unrelated caches',async()=>{
+test('SW activating v24 deletes v2, v3 and v4 while preserving the installed cache and unrelated caches',async()=>{
   const s=fixture();s.cache('matriz-ie22375-v2');s.cache('matriz-ie22375-v3');s.cache('matriz-ie22375-v4');s.cache('matriz-ie22375-v5');s.cache('matriz-ie22375-v6');s.cache('matriz-ie22375-v7');s.cache('matriz-ie22375-v9');s.cache('matriz-ie22375-v10');s.cache('matriz-ie22375-v11');s.cache('matriz-ie22375-v13');s.cache('unrelated-cache');
   await s.dispatch('install');await s.dispatch('activate');
   assert.equal(s.stores.has('matriz-ie22375-v2'),false);
@@ -176,9 +176,9 @@ test('SW activating v23 deletes v2, v3 and v4 while preserving the installed cac
   assert.equal(s.stores.has('matriz-ie22375-v4'),false);assert.equal(s.stores.has('matriz-ie22375-v5'),false);
   assert.equal(s.stores.has('matriz-ie22375-v6'),false);
   assert.equal(s.stores.has('matriz-ie22375-v7'),false);assert.equal(s.stores.has('matriz-ie22375-v9'),false);
-  assert.equal(s.stores.has('matriz-ie22375-v13'),false);assert.equal(s.stores.has('matriz-ie22375-v11'),false);assert.equal(s.stores.has('matriz-ie22375-v10'),false);assert.equal(s.stores.has('matriz-ie22375-v23'),true);
+  assert.equal(s.stores.has('matriz-ie22375-v13'),false);assert.equal(s.stores.has('matriz-ie22375-v11'),false);assert.equal(s.stores.has('matriz-ie22375-v10'),false);assert.equal(s.stores.has('matriz-ie22375-v24'),true);
   assert.equal(s.stores.has('unrelated-cache'),true);
-  assert.ok(await s.cache('matriz-ie22375-v23').match(s.request('auxiliar-permissions.js')));
+  assert.ok(await s.cache('matriz-ie22375-v24').match(s.request('auxiliar-permissions.js')));
 });
 
 test('SW never intercepts Apps Script login or protected student POST requests',async()=>{
@@ -187,7 +187,7 @@ test('SW never intercepts Apps Script login or protected student POST requests',
   for(const action of ['login','loadstudents']){
     const response=await s.dispatch('fetch',{request:new Request(endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action})})});
     assert.equal(response,undefined);assert.equal(s.calls.length,before);
-    assert.equal(await s.cache('matriz-ie22375-v23').match(new Request(endpoint)),undefined);
+    assert.equal(await s.cache('matriz-ie22375-v24').match(new Request(endpoint)),undefined);
   }
 });
 
@@ -206,7 +206,7 @@ test('SW installs and returns exact current Auxiliary resources offline; HTML an
   }
 });
 
-test('SW v23 cannot take over before all Auxiliary dependencies install successfully',async()=>{
+test('SW v24 cannot take over before all Auxiliary dependencies install successfully',async()=>{
   const s=fixture();s.cache('matriz-ie22375-v3');
   s.network(async req=>new Response(req.url.endsWith('auxiliar-permissions.js')?'<html>bad script</html>':req.url.endsWith('.js')?'/* JS */':'<html>page</html>',
     {headers:{'Content-Type':req.url.endsWith('.js')&&!req.url.endsWith('auxiliar-permissions.js')?'application/javascript':'text/html'}}));
@@ -218,10 +218,10 @@ test('transversal static dependencies recover offline while private RPC/POST res
  const s=fixture();await s.dispatch('install');s.offline();
  const js=await s.dispatch('fetch',{request:s.request('transversales-client.js')});assert.match(js.headers.get('Content-Type'),/javascript/);
  const page=await s.dispatch('fetch',{request:s.request('transversales.html')});assert.equal(page.status,200);
- const api=new Request('https://script.google.com/macros/s/synthetic/exec',{method:'POST',body:'synthetic private request'});assert.equal(await s.dispatch('fetch',{request:api}),undefined);assert.equal(await s.cache('matriz-ie22375-v23').match(api),undefined);
+ const api=new Request('https://script.google.com/macros/s/synthetic/exec',{method:'POST',body:'synthetic private request'});assert.equal(await s.dispatch('fetch',{request:api}),undefined);assert.equal(await s.cache('matriz-ie22375-v24').match(api),undefined);
 });
 
-for(const resource of ['registro.html','registro-academic-model.js','registro-evaluation.js','registro-transversales.js','transversales.html','transversales-client.js'])test('SW v23 installs current coupled grading resource: '+resource,async()=>{const s=fixture();await s.dispatch('install');s.network(async()=>{throw Error('offline')});const response=await s.dispatch('fetch',{request:s.request(resource)});assert.equal(response.ok,true);if(resource.endsWith('.js'))assert.match(response.headers.get('Content-Type'),/javascript/);assert.ok(s.stores.has('matriz-ie22375-v23'));});
+for(const resource of ['registro.html','registro-academic-model.js','registro-evaluation.js','registro-transversales.js','transversales.html','transversales-client.js'])test('SW v24 installs current coupled grading resource: '+resource,async()=>{const s=fixture();await s.dispatch('install');s.network(async()=>{throw Error('offline')});const response=await s.dispatch('fetch',{request:s.request(resource)});assert.equal(response.ok,true);if(resource.endsWith('.js'))assert.match(response.headers.get('Content-Type'),/javascript/);assert.ok(s.stores.has('matriz-ie22375-v24'));});
 
 // B1: static retirement only; older HTML relying on the removed script is unsupported.
 const workerV22=()=>require('node:child_process').execFileSync('git',['show','fd83e261dc9ff2387305b79039b34614c43360b9:sw.js'],{encoding:'utf8'});
@@ -235,7 +235,7 @@ test('AIP current production files have no reference to the physically retired J
   assert.match(html,/function loadCfg\(/);assert.match(html,/function guardar\(/);
 });
 
-test('v22 to v23 installs before activation, retires legacy static cache and never accesses user storage',async()=>{
+test('v22 to v24 installs before activation, retires legacy static cache and never accesses user storage',async()=>{
   const old=fixture(workerV22());await old.dispatch('install');await old.dispatch('activate');
   assert.ok(await old.cache('matriz-ie22375-v22').match(old.request('aula_innovacion.js')));
   const next=fixture(source,old.stores),before=[...next.userData];
@@ -244,13 +244,13 @@ test('v22 to v23 installs before activation, retires legacy static cache and nev
   assert.equal(next.calls.some(c=>c.req.url.endsWith('/aula_innovacion.js')),false);
   await next.dispatch('activate');
   assert.equal(next.stores.has('matriz-ie22375-v22'),false);
-  assert.ok(next.stores.has('matriz-ie22375-v23'));assert.ok(next.stores.has('unrelated-cache'));
-  assert.equal(await next.cache('matriz-ie22375-v23').match(next.request('aula_innovacion.js')),undefined);
+  assert.ok(next.stores.has('matriz-ie22375-v24'));assert.ok(next.stores.has('unrelated-cache'));
+  assert.equal(await next.cache('matriz-ie22375-v24').match(next.request('aula_innovacion.js')),undefined);
   assert.deepEqual(next.lifecycle,['skipWaiting','claim']);assert.deepEqual([...next.userData],before);
   assert.deepEqual(next.storageCalls,[]);assert.deepEqual(old.storageCalls,[]);
 });
 
-for(const resource of ['index.html','students.js'])test('v23 failed install of '+resource+' leaves installed v22 usable',async()=>{
+for(const resource of ['index.html','students.js'])test('v24 failed install of '+resource+' leaves installed v22 usable',async()=>{
   const old=fixture(workerV22());await old.dispatch('install');await old.dispatch('activate');
   const next=fixture(source,old.stores),before=[...next.userData];
   next.network(async req=>new Response(req.url.endsWith('/'+resource)?'unavailable':req.url.endsWith('.js')?'/* JS */':'<html>shell</html>',
@@ -267,4 +267,16 @@ test('retired AIP JavaScript never receives HTML even on a navigation request or
   s.network(async()=>new Response('<html>404 shell</html>',{status:404,headers:{'Content-Type':'text/html'}}));
   let response=await s.dispatch('fetch',{request});assert.equal(response.type,'error');assert.doesNotMatch(await response.text(),/<html/i);
   s.offline();response=await s.dispatch('fetch',{request});assert.equal(response.type,'error');assert.doesNotMatch(await response.text(),/<html/i);
+});
+
+// Notas 2.0 HTML/core/UI must install as one static release. No private payload is cached.
+const workerV23=()=>require('node:child_process').execFileSync('git',['show','666e52837034cafacaa4f027b2665bef37555c3b:sw.js'],{encoding:'utf8'});
+const notasStatic=req=>{const name=new URL(req.url).pathname.split('/').at(-1),js=name.endsWith('.js');return new Response(['registro.html','registro-notas2.js','registro-notas2-ui.js'].includes(name)?fs.readFileSync(path.join(__dirname,'..',name),'utf8'):js?'/* synthetic JS */':'<html>synthetic static</html>',{headers:{'Content-Type':js?'application/javascript':'text/html'}});};
+test('v23 upgrades to v24 with exact current Notas 2 HTML and both JavaScript modules offline',async()=>{
+ const old=fixture(workerV23());await old.dispatch('install');await old.dispatch('activate');
+ const s=fixture(source,old.stores);s.network(async req=>notasStatic(req));await s.dispatch('install');assert.ok(s.stores.has('matriz-ie22375-v23'));await s.dispatch('activate');assert.ok(!s.stores.has('matriz-ie22375-v23'));s.offline();
+ for(const file of ['registro.html','registro-notas2.js','registro-notas2-ui.js']){const r=await s.dispatch('fetch',{request:s.request(file)}),body=await r.text();assert.equal(body,fs.readFileSync(path.join(__dirname,'..',file),'utf8'));if(file.endsWith('.js')){assert.match(r.headers.get('Content-Type'),/javascript/);new vm.Script(body);}}
+});
+for(const missing of ['registro.html','registro-notas2.js','registro-notas2-ui.js'])test('v24 missing '+missing+' cannot take over active v23',async()=>{
+ const old=fixture(workerV23());await old.dispatch('install');await old.dispatch('activate');const s=fixture(source,old.stores);s.network(async req=>req.url.endsWith('/'+missing)?new Response('missing',{status:404}):notasStatic(req));await assert.rejects(s.dispatch('install'));assert.deepEqual(s.lifecycle,[]);assert.ok(s.stores.has('matriz-ie22375-v23'));old.offline();assert.ok((await old.dispatch('fetch',{request:old.request('registro.html')})).ok);
 });

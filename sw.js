@@ -1,10 +1,11 @@
 /* Service Worker — respaldo estático versionado, siempre network-first. */
 const CACHE_PREFIX = 'matriz-ie22375-';
-const CACHE = CACHE_PREFIX + 'v23';
+const CACHE = CACHE_PREFIX + 'v24';
 const MAX_STATIC_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const PRECACHE = [
   './', './index.html', './admin.html', './primaria.html', './secundaria.html', './auxiliar.html',
   './layout-shells.css', './manifest.json', './icon-192.png', './icon-512.png',
+  './registro-notas2.js', './registro-notas2-ui.js',
   './registro-grading.js',
   './registro-calificar-print.js',
   './registro-local-store.js', './registro-connection.js', './registro-drafts.js', './registro-recovery-ui.js',

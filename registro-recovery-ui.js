@@ -1,6 +1,7 @@
 /* Adaptador frontend: operaciones explícitas y timers exclusivamente locales. */
 (function(){
  'use strict';
+ if(document.documentElement?.dataset?.notas2==='1'){if(typeof IERegistroNotas2UI==='undefined')registroDependenciaFallida();return;}
  /* Inicio guard de dependencias de recuperación. */
  if(typeof registroDependenciaFallida==='function'&&(typeof IERegistroLocalStore==='undefined'||typeof IERegistroConnection==='undefined'||typeof IERegistroDrafts==='undefined'||typeof IERegistroEvaluacion==='undefined'||typeof IERegistroGrading==='undefined')){
   registroDependenciaFallida();return;

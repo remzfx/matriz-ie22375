@@ -7,7 +7,7 @@
  function stable(value){if(Array.isArray(value))return value.map(stable);if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).filter(k=>k!=='ts').sort().map(k=>[k,stable(value[k])]));return value;}
  const signature=value=>JSON.stringify(stable(value));
  function panel(payload,name){if(!fields[name])fail('PANEL','Panel académico inválido.');return Object.fromEntries(fields[name].map(f=>[f,copy(payload[f]||(f==='sessions'?[]:{}))]));}
- function validPayload(p){return p&&typeof p==='object'&&!Array.isArray(p)&&Array.isArray(p.sessions)&&Object.values(fields).flat().filter(f=>f!=='sessions').every(f=>p[f]&&typeof p[f]==='object'&&!Array.isArray(p[f]));}
+ function validPayload(p){return p&&typeof p==='object'&&!Array.isArray(p)&&Array.isArray(p.sessions)&&Object.values(fields).flat().filter(f=>f!=='sessions').every(f=>p[f]&&typeof p[f]==='object'&&!Array.isArray(p[f]))&&p.sessions.every(s=>s&&typeof s==='object'&&!Array.isArray(s))&&['grades','finales','concComp','competenciasEstado','calificarEstado'].every(f=>Object.values(p[f]).every(v=>v&&typeof v==='object'&&!Array.isArray(v)));}
  function process(payload,o){
   const next=copy(payload),prefix=[o.context.nivel,o.context.bim,o.context.grado,o.context.seccion,o.context.area].join('||')+'||';
   next.finales=next.finales||{};next.competenciasEstado=next.competenciasEstado||{};
@@ -41,13 +41,14 @@
   }
   async function load(options={}){
    if(flight)return false;readable();const id=++epoch,names=options.panel?[options.panel]:Object.keys(fields);names.forEach(n=>panel({},n));
-   if(options.manual&&!await o.confirm?.({panels:names,at:Object.fromEntries(names.map(n=>[n,entries[n]?.at??null]))}))return false;
    if(!same()||id!==epoch)return false;
-   flight=true;emit('checking');
+   const previousState=state;flight=true;emit('checking');
    try{
     const r=validate(await request({action:'loadnotas2'}));if(id!==epoch)return false;
     if(r.exists!==true&&r.exists!==false)fail('INCOMPLETE','Falta la confirmación de existencia del registro.');
-    if(!r.exists&&o.hasExisting?.())fail('MISSING','No existe una copia remota válida. Información anterior conservada.');
+    if(!r.exists&&names.some(n=>entries[n]?.hasContent||!entries[n]&&o.hasExisting?.(n)))fail('MISSING','No existe una copia remota válida. Información anterior conservada.');
+    for(const name of names){const part=panel(r.payload,name),meaningful=name==='calificar'?!!(part.sessions.length||Object.keys(part.grades).length):name==='promedios'?!!(Object.keys(part.finales).length||Object.keys(part.concComp).length):!!Object.keys(part.asistencia).length;if(!meaningful&&(entries[name]?.hasContent||!entries[name]&&o.hasExisting?.(name)))fail('EMPTY','Lectura vacía inesperada. La información anterior se conserva.');}
+    if(options.manual&&!await o.confirm?.({panels:names,at:r.at})){emit(previousState);return false;}readable();if(id!==epoch)return false;
     serverClosed=r.readonly;legacy=r.legacy;
     const changed=options.verify&&names.some(n=>pending(n)&&r.versions[n]!==entries[n].version);
     if(changed){emit('conflict');return false;}
@@ -55,7 +56,7 @@
     const updates=Object.assign({},...apply.map(n=>panel(r.payload,n)));
     // Apply is a synchronous atomic adapter; no partial DOM/persistence work here.
     if(apply.length)o.apply(copy(updates));
-    for(const name of apply)entries[name]={version:r.versions[name],at:r.at[name],signature:signature(panel(r.payload,name))};
+    for(const name of apply)entries[name]={version:r.versions[name],at:r.at[name],signature:signature(panel(r.payload,name)),hasContent:name==='calificar'?!!(r.payload.sessions.length||Object.keys(r.payload.grades).length):name==='promedios'?!!(Object.keys(r.payload.finales).length||Object.keys(r.payload.concComp).length):!!Object.keys(r.payload.asistencia).length};
     emit('ready');return true;
    }catch(e){if(same())emit(['SESSION','DENIED'].includes(e.code)?'session':e.code==='CONFLICT'?'conflict':'server');o.error?.(e);return false;}
    finally{flight=false;o.changed?.(status());}
@@ -68,7 +69,7 @@
     const r=validate(await request({action:'savenotas2',panel:name,version:entry.version,payload:sent}));
     if(id!==epoch||r.panel!==name||!Number.isFinite(r.at[name])||r.versions[name]<entry.version||r.versions[name]===entry.version&&signature(sent)!==entry.signature||signature(panel(r.payload,name))!==signature(sent))fail('INCOMPLETE','Confirmación de guardado inválida.');
     // Never overwrite edits made during the request or confirm the other panel.
-    entries[name]={version:r.versions[name],at:r.at[name],signature:signature(sent)};legacy=r.legacy;processed=false;serverClosed=r.readonly;emit('ready');return true;
+    entries[name]={version:r.versions[name],at:r.at[name],signature:signature(sent),hasContent:name==='calificar'?!!(sent.sessions.length||Object.keys(sent.grades).length):name==='promedios'?!!(Object.keys(sent.finales).length||Object.keys(sent.concComp).length):!!Object.keys(sent.asistencia).length};legacy=r.legacy;if(name==='promedios')processed=false;serverClosed=r.readonly;emit('ready');return true;
    }catch(e){if(same())emit(['SESSION','DENIED'].includes(e.code)?'session':e.code==='CONFLICT'?'conflict':'server');o.error?.(e);return false;}
    finally{flight=false;o.changed?.(status());}
   }
