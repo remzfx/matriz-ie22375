@@ -39,6 +39,55 @@
   <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body class="text-slate-800">
+  <!-- MÁSCARA VISUAL DE MANTENIMIENTO INSTITUCIONAL (Fácil de retirar eliminando este bloque) -->
+  <div id="mascaraMantenimiento" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md overflow-y-auto" style="min-height: 100vh; min-height: 100dvh;">
+    <div class="card w-full max-w-md p-6 sm:p-8 text-center bg-white border border-slate-200/90 shadow-2xl rounded-2xl relative my-auto">
+
+      <!-- Insignia Institucional con Icono de Mantenimiento -->
+      <div class="mb-5 flex flex-col items-center">
+        <div class="relative mb-3">
+          <img src="icon-192.png" alt="Insignia IE 22375" class="w-24 h-24 sm:w-28 sm:h-28 mx-auto object-contain drop-shadow" onerror="this.onerror=null;this.src='apple-touch-icon.png'" />
+          <div class="absolute -bottom-1 -right-1 bg-amber-500 text-white p-2 rounded-full shadow-md border-2 border-white flex items-center justify-center">
+            <span class="text-base sm:text-lg leading-none" aria-hidden="true">🔧</span>
+          </div>
+        </div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+          <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          Mejoras técnicas programadas
+        </div>
+      </div>
+
+      <!-- Encabezado Institucional -->
+      <div class="space-y-1 mb-5">
+        <div class="text-[11px] font-bold tracking-widest text-sky-800 uppercase">I.E. N.° 22375 SANTA ROSA</div>
+        <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center justify-center gap-2">
+          <span>🔧</span> SISTEMA EN MANTENIMIENTO
+        </h1>
+        <p class="text-xs text-slate-500">San José de los Molinos — Ica</p>
+      </div>
+
+      <!-- Mensaje Central Solicitado -->
+      <div class="bg-slate-50 rounded-xl p-4 sm:p-5 border border-slate-200/70 mb-5 space-y-2 text-slate-700 text-sm sm:text-base leading-relaxed">
+        <p class="font-medium">
+          Estamos realizando mejoras técnicas en nuestra plataforma educativa.
+        </p>
+        <p class="text-slate-600">
+          El servicio estará disponible próximamente.
+        </p>
+        <p class="text-xs sm:text-sm font-semibold text-slate-500 pt-1">
+          Agradecemos su comprensión.
+        </p>
+      </div>
+
+      <!-- Pie Informativo -->
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+        <span>Plataforma Académica · 2026</span>
+        <button type="button" onclick="document.getElementById('mascaraMantenimiento').style.display='none'" class="text-slate-400 hover:text-slate-600 underline cursor-pointer bg-transparent border-0 p-0 text-[11px]">Acceso interno</button>
+      </div>
+
+    </div>
+  </div>
+
   <div id="viewLogin" class="shell shell-auth min-h-screen flex flex-col items-center justify-center px-4 py-10">
     <div class="w-full max-w-sm">
       <div class="text-center mb-6">
