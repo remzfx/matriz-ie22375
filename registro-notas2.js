@@ -22,6 +22,11 @@
   }
   return next;
  }
+ // An absent worked flag and an explicit true have the same existing academic meaning.
+ function readSignature(part){
+  for(const field of ['calificarEstado','competenciasEstado'])if(part[field])part[field]=Object.fromEntries(Object.entries(part[field]).filter(([,v])=>v.trabajada!==true));
+  return signature(part);
+ }
  function create(o){
   const initialBinding=o.binding(),entries=Object.fromEntries(Object.keys(fields).map(n=>[n,null]));let state='checking',flight=false,closed=false,epoch=0,legacy=false,processed=false,serverClosed=true;
   const same=()=>!closed&&o.binding()===initialBinding;
@@ -45,6 +50,12 @@
    const previousState=state;flight=true;emit('checking');
    try{
     const r=validate(await request({action:'loadnotas2'}));if(id!==epoch)return false;
+    // Validate every panel before confirmation or any application, including a manual single-panel read.
+    for(const name of Object.keys(fields)){
+     const entry=entries[name];if(!entry)continue;
+     if(r.versions[name]<entry.version)fail('STALE_READ','La lectura recibida es anterior a una versión confirmada. Datos conservados; vuelve a verificar.');
+     if(r.versions[name]===entry.version&&readSignature(panel(r.payload,name))!==readSignature(JSON.parse(entry.signature)))fail('INCONSISTENT_READ','La misma versión contiene datos contradictorios. Datos conservados; requiere verificación.');
+    }
     if(r.exists!==true&&r.exists!==false)fail('INCOMPLETE','Falta la confirmación de existencia del registro.');
     if(!r.exists&&names.some(n=>entries[n]?.hasContent||!entries[n]&&o.hasExisting?.(n)))fail('MISSING','No existe una copia remota válida. Información anterior conservada.');
     for(const name of names){const part=panel(r.payload,name),meaningful=name==='calificar'?!!(part.sessions.length||Object.keys(part.grades).length):name==='promedios'?!!(Object.keys(part.finales).length||Object.keys(part.concComp).length):!!Object.keys(part.asistencia).length;if(!meaningful&&(entries[name]?.hasContent||!entries[name]&&o.hasExisting?.(name)))fail('EMPTY','Lectura vacía inesperada. La información anterior se conserva.');}
