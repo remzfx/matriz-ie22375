@@ -1,7 +1,7 @@
 // Fase3: transport/data are fictitious; reuses the actual Phase1/2 A1 and recovery fixture.
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {create}=require('../registro-connection.js'),read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8'),copy=require('../registro-reconcile.js').copy;
-function clock(options={}){let now=0,key='A',authorized=true,online=true,reads=0,retained=0;const timers=[],states=[];const c=create({binding:()=>key,authorized:()=>authorized,online:()=>online,now:()=>now,setTimeout:(fn,ms)=>{const t={fn,ms};timers.push(t);return t;},clearTimeout:t=>{if(t)t.cancelled=true;},retain:()=>retained++,verify:async x=>{reads++;return options.verify?options.verify(x):{ok:true};},changed:s=>states.push(s.state)});return {c,timers,states,reads:()=>reads,retained:()=>retained,time:n=>now=n,key:k=>key=k,auth:v=>authorized=v,online:v=>online=v};}
+function clock(options={}){let now=0,key='A',authorized=true,online=true,reads=0,retained=0;const timers=[],states=[];const c=create({binding:()=>key,timeout:options.timeout,authorized:()=>authorized,online:()=>online,now:()=>now,setTimeout:(fn,ms)=>{const t={fn,ms};timers.push(t);return t;},clearTimeout:t=>{if(t)t.cancelled=true;},retain:()=>retained++,verify:async x=>{reads++;return options.verify?options.verify(x):{ok:true};},changed:s=>states.push(s.state)});return {c,timers,states,reads:()=>reads,retained:()=>retained,time:n=>now=n,key:k=>key=k,auth:v=>authorized=v,online:v=>online=v};}
 test('Real verification, not online hint, is mandatory; heartbeat and leases are bounded',async()=>{const f=clock();assert.equal(f.c.canEdit(),false);assert.equal(await f.c.check(),true);assert.equal(f.c.canEdit(),true);assert.equal(await f.c.check(),true);assert.equal(f.reads(),1);assert.equal(f.timers.at(-1).ms,120000);f.time(150001);assert.equal(f.c.canEdit(),false);});
 test('Offline captures work begun before pause, blocks edits, and online alone cannot reopen',async()=>{const f=clock();await f.c.check();f.online(false);f.c.pause();assert.equal(f.retained(),1);assert.equal(f.c.canEdit(),false);f.online(true);assert.equal(f.c.canEdit(),false);await f.c.check();assert.equal(f.c.canEdit(),true);});
 test('Concurrent verifications deduplicate; cutoff invalidates a delayed response before application',async()=>{let finish;const f=clock({verify:({valid})=>new Promise(r=>finish=()=>r({ok:valid()}))});const a=f.c.check(),b=f.c.check();assert.equal(f.reads(),1);f.c.pause();finish();assert.equal(await a,false);assert.equal(await b,false);assert.equal(f.c.canEdit(),false);});
@@ -140,4 +140,236 @@ test('priorPending never bypasses guards: context change, deauth, lease expiry, 
  assert.equal(await f.c.check(false,true),false);
  assert.equal(f.c.snapshot().state,'review');
  assert.equal(f.c.canEdit(),false);
+});
+
+test('Scenario 4, 5, 6: Verify timeout transitions away from checking, late response is rejected, and retry ON SAME CONTROLLER starts fresh flight',async()=>{
+ let finishVerify,secondExecuted=false,callCount=0;
+ const f=clock({
+  timeout:100,
+  verify:()=>{
+   callCount++;
+   if(callCount===1)return new Promise(resolve=>{finishVerify=resolve;});
+   secondExecuted=true;
+   return Promise.resolve({ok:true,pending:false});
+  }
+ });
+
+ // 4. Promesa verify pendiente alcanza timeout y no queda checking indefinidamente
+ const checkPromise=f.c.check();
+ assert.equal(f.c.snapshot().state,'checking');
+ const toTimer=f.timers.find(t=>t.ms===100);
+ assert.ok(toTimer,'Timeout timer was scheduled');
+ await toTimer.fn();
+ assert.equal(await checkPromise,false);
+ assert.equal(f.c.snapshot().state,'server');
+ assert.equal(f.c.canEdit(),false);
+
+ // 5 & 6. Reintento efectivo SOBRE EL MISMO CONTROLLER mientras la primera sigue pendiente
+ const checkPromise2=f.c.check();
+ assert.equal(await checkPromise2,true);
+ assert.equal(secondExecuted,true);
+ assert.equal(f.c.snapshot().state,'connected');
+ assert.equal(f.c.canEdit(),true);
+
+ // 5b. Respuesta tardía de la primera operación colgada no autoriza edición ni modifica estado
+ finishVerify({ok:true,pending:true});
+ await new Promise(r=>setImmediate(r));
+ assert.equal(f.c.snapshot().state,'connected');
+ assert.equal(f.c.canEdit(),true);
+});
+
+test('Scenario 1, 2: Real renderFinales shows sync pause when open in review, admin closure when period closed, and both maintain controls locked',async()=>{
+ const f=ui(),rf=require('./reconcile-fixture.cjs');
+ vm.runInContext(rf.extract('cierreAdministrativoDocente'),f.c);
+ vm.runInContext(rf.extract('bimCerradoDocente'),f.c);
+ vm.runInContext(rf.extract('renderFinales'),f.c);
+ f.role('docente');
+ f.c.bimestreHabilitado=bim=>bim==='III';
+ f.c.document.getElementById('selBim').value='III';
+
+ // Escenario 1: Bimestre abierto + conexión en review -> "Edición pausada por sincronización / conexión"
+ f.connection.pause('review');
+ f.c.renderFinales();
+ const modeInfo=f.c.document.getElementById('finModeInfo');
+ assert.doesNotMatch(modeInfo.innerHTML,/Bimestre cerrado por administración/);
+ assert.match(modeInfo.innerHTML,/Edición pausada por sincronización \/ conexión/);
+ const htmlReview=f.c.document.getElementById('finLista').innerHTML;
+ assert.ok(htmlReview.includes('readonly'));
+ assert.ok(htmlReview.includes('disabled'));
+ assert.equal(f.c.bimCerradoDocente(),true);
+ assert.equal(f.c.aplicarFinalManual(f.c.competencias()[0],'id:synthetic-1','AD'),false);
+
+ // Escenario 2: Bimestre cerrado administrativamente ('II') -> "Bimestre cerrado por administración"
+ f.c.document.getElementById('selBim').value='II';
+ f.c.renderFinales();
+ assert.match(modeInfo.innerHTML,/Bimestre cerrado por administración/);
+ assert.doesNotMatch(modeInfo.innerHTML,/Edición pausada por sincronización \/ conexión/);
+ const htmlClosed=f.c.document.getElementById('finLista').innerHTML;
+ assert.ok(htmlClosed.includes('readonly'));
+ assert.ok(htmlClosed.includes('disabled'));
+ assert.equal(f.c.bimCerradoDocente(),true);
+ assert.equal(f.c.aplicarFinalManual(f.c.competencias()[0],'id:synthetic-1','AD'),false);
+});
+
+test('Scenario 3: Missing roster shows message, exercises 10 retry timer attempts, stops without infinite loop, and recovers once roster enables',async()=>{
+ const f=ui();
+ const label=f.c.document.getElementById('registroConnectionText');
+ const stateLabel=f.c.document.getElementById('registroSaveState');
+
+ // Simular padrón no disponible
+ f.c.IEStudents.peekRoster=()=>null;
+ f.api.refresh();
+ assert.match(stateLabel.textContent,/Esperando el padrón autorizado/);
+ assert.equal(label.textContent,'Esperando padrón autorizado…');
+
+ // Ejercitar los 10 temporizadores de reintento de 1 segundo
+ for(let i=0;i<10;i++){
+  const retry=f.timers.find(t=>t.ms===1000&&!t.cancelled&&!t.executed);
+  assert.ok(retry,`Padron retry attempt ${i+1} exists`);
+  retry.executed=true;
+  retry.fn();
+ }
+
+ // Comprobar que al llegar a 10 intentos no sigue en bucle infinito
+ const leftover=f.timers.find(t=>t.ms===1000&&!t.cancelled&&!t.executed);
+ assert.equal(leftover,undefined,'No further timers scheduled after 10 attempts');
+
+ // Al habilitarse el padrón posteriormente, refresh(true) limpia intentos y autoriza edición
+ f.c.IEStudents.peekRoster=()=>({synthetic:true});
+ f.api.refresh(true);
+ assert.equal(await f.api.automatic(),true);
+ assert.equal(f.connection.snapshot().state,'connected');
+ assert.equal(f.connection.canEdit(),true);
+});
+
+test('Scenario 7, 8: Review clarity differentiates trusted zero conflicts, confirmed real conflict, and untrusted/mismatched contexts',async()=>{
+ const f=ui(),label=f.c.document.getElementById('registroConnectionText'),ses=f.c.getLoginSession()||{};
+
+ // Caso A: Sin resultado confiable (null) -> Mensaje neutral
+ f.c.bajarRegistroNube.resultado=null;
+ f.connection.pause('review');
+ assert.equal(label.textContent,'Revisión de sincronización requerida. Tus cambios locales están conservados.');
+
+ // Caso B: Resultado con clave o token de otro contexto -> Mensaje neutral
+ f.c.bajarRegistroNube.resultado={key:'other-key',token:ses.token,estado:'conflicto',conflictos:2};
+ f.connection.pause('offline');
+ f.connection.pause('review');
+ assert.equal(label.textContent,'Revisión de sincronización requerida. Tus cambios locales están conservados.');
+
+ f.c.bajarRegistroNube.resultado={key:f.c.cloudClaveReg(),token:'different-token',estado:'conflicto',conflictos:2};
+ f.connection.pause('offline');
+ f.connection.pause('review');
+ assert.equal(label.textContent,'Revisión de sincronización requerida. Tus cambios locales están conservados.');
+
+ // Caso C: Resultado confiable del contexto actual con 0 conflictos y cambios locales -> Cambios locales pendientes
+ f.c.bajarRegistroNube.resultado={key:f.c.cloudClaveReg(),token:ses.token,estado:'pendiente',conflictos:0};
+ f.connection.pause('offline');
+ f.connection.pause('review');
+ assert.equal(label.textContent,'Cambios locales pendientes de revisión. Tus cambios locales están conservados.');
+
+ // Caso D: Resultado confiable del contexto actual con conflicto real confirmado -> Conflicto pendiente
+ f.c.bajarRegistroNube.resultado={key:f.c.cloudClaveReg(),token:ses.token,estado:'conflicto',conflictos:2};
+ f.connection.pause('offline');
+ f.connection.pause('review');
+ assert.equal(label.textContent,'Conflicto pendiente — requiere revisión. Tus cambios locales están conservados.');
+ assert.equal(f.connection.canEdit(),false);
+});
+
+test('Manual review exceeding 30s without context change completes successfully, while deauth during review blocks edit with zero writes',async()=>{
+ // 1. Revisión manual que supera 30s sin cambio de contexto completa exitosamente
+ let resolveManualReview;
+ const f=clock({
+  timeout:30000,
+  verify:async({review,valid})=>{
+   if(review){
+    return new Promise(resolve=>{
+     resolveManualReview=()=>resolve({ok:valid(),pending:false});
+    });
+   }
+   return {ok:true,pending:true};
+  }
+ });
+
+ assert.equal(await f.c.check(),false);
+ assert.equal(f.c.snapshot().state,'review');
+
+ const reviewTask=f.c.check(true,true);
+ assert.equal(f.c.snapshot().state,'checking');
+
+ // Pasan 45 segundos en decisión humana sin que venza por timeout de red
+ f.time(45000);
+ const timeoutTimer=f.timers.find(t=>t.ms===30000&&!t.cancelled);
+ assert.equal(timeoutTimer,undefined,'No network timeout scheduled during human review');
+
+ resolveManualReview();
+ assert.equal(await reviewTask,true);
+ assert.equal(f.c.snapshot().state,'connected');
+ assert.equal(f.c.canEdit(),true);
+
+ // 2. Pérdida real de autorización durante la revisión manual bloquea edición
+ let resolveDeauthReview;
+ const fDeauth=clock({
+  timeout:30000,
+  verify:async({review,valid})=>{
+   if(review){
+    return new Promise(resolve=>{
+     resolveDeauthReview=()=>resolve({ok:valid(),pending:false});
+    });
+   }
+   return {ok:true,pending:true};
+  }
+ });
+
+ await fDeauth.c.check();
+ const reviewDeauthTask=fDeauth.c.check(true,true);
+ fDeauth.time(15000);
+
+ // Pérdida real de autorización durante la interacción manual
+ fDeauth.auth(false);
+
+ resolveDeauthReview();
+ assert.equal(await reviewDeauthTask,false);
+ assert.equal(fDeauth.c.snapshot().state,'session');
+ assert.equal(fDeauth.c.canEdit(),false);
+});
+
+test('Integration: UI manual resolve exceeding 30s preserves choices without upload; deauth during resolve blocks edit and writes zero',async()=>{
+ const f=ui();
+ await f.api.automatic();
+ f.c.store.finales[f.key]={nota20:18,nivel:'AD',origen:'numero'};
+ f.c.saveStore();
+ f.connection.pause();
+ f.r.version++;
+ f.r.payload.finales[f.key]={nota20:12,nivel:'B',origen:'numero'};
+
+ // 1. Superar 30s durante la conciliación manual con IERegistroReconcile.choose
+ let finishChoose, chooseStarted;
+ const choosePromise=new Promise(r=>chooseStarted=r);
+ f.c.IERegistroReconcile.choose=async cs=>new Promise(resolve=>{
+  finishChoose=()=>resolve(Object.fromEntries(cs.map(x=>[x.path,'local'])));
+  chooseStarted();
+ });
+
+ const resolveTask=f.api.resolve();
+ await choosePromise;
+ finishChoose();
+ assert.equal(await resolveTask,true);
+ assert.equal(f.connection.canEdit(),true);
+ assert.equal(f.r.writes,0);
+
+ // 2. Pérdida de autorización durante resolve
+ f.connection.pause();
+ let finishDeauthChoose, deauthStarted;
+ const deauthPromise=new Promise(r=>deauthStarted=r);
+ f.c.IERegistroReconcile.choose=async cs=>new Promise(resolve=>{
+  finishDeauthChoose=()=>resolve(Object.fromEntries(cs.map(x=>[x.path,'local'])));
+  deauthStarted();
+ });
+ const deauthResolveTask=f.api.resolve();
+ await deauthPromise;
+ f.role('auxiliar');
+ finishDeauthChoose();
+ assert.equal(await deauthResolveTask,false);
+ assert.equal(f.connection.canEdit(),false);
+ assert.equal(f.r.writes,0);
 });

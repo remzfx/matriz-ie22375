@@ -1035,7 +1035,7 @@
  'use strict';let active=null;
  function create(o){
   const now=o.now||Date.now,set=o.setTimeout||setTimeout,clear=o.clearTimeout||clearTimeout;
-  const interval=o.interval||120000,lease=o.lease||150000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
+  const interval=o.interval||120000,lease=o.lease||150000,timeout=o.timeout||30000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
   const online=()=>o.online?o.online():true;
   function snapshot(){return {state,validUntil:until,pending:state==='pending',retentionFailed,binding};}
   function emit(next){state=next;if(next!=='connected'&&next!=='pending')until=0;const stamp=binding+'|'+next;if(stamp!==published){published=stamp;o.changed?.(snapshot());}}
@@ -1055,18 +1055,24 @@
    const priorPending=state==='pending'||canEdit();
    const id=++epoch,key=binding;clear(timer);emit('checking');
    const same=()=>!disposed&&id===epoch&&key===o.binding();const valid=()=>same()&&o.authorized();
-   const task={};flight=task;task.promise=(async()=>{try{
-    const result=await o.verify({review,valid});if(!same())return false;
+   let toTimer=null;const task={};flight=task;task.promise=(async()=>{try{
+    const verifyPromise=o.verify({review,valid});
+    const timeoutPromise=(!review&&timeout)?new Promise((_,reject)=>{toTimer=set(()=>{if(toTimer&&toTimer.cancelled)return;reject(Object.assign(new Error('TIMEOUT'),{code:'TIMEOUT'}));},timeout);}) : null;
+    const result=timeoutPromise?await Promise.race([verifyPromise,timeoutPromise]):await verifyPromise;clear(toTimer);toTimer=null;
+    if(!same())return false;
     if(result?.code==='SESSION'||result?.code==='DENIED'){expired=true;emit('session');return false;}
     if(!o.authorized()){emit('session');return false;}
     if(result?.code==='CLOSED'){emit('readonly');return false;}
     if(!result?.ok){emit(result?.conflict?'review':result?.code==='LOCAL_STORAGE'?'review':'server');return false;}
     if(result.conflict||(result.pending&&!review&&!priorPending)){emit('review');return false;}
     until=now()+lease;attempt=0;emit(result.pending?'pending':'connected');return true;
-   }catch(e){if(valid()){if(['SESSION','DENIED'].includes(e.code)){expired=true;emit('session');}else emit(online()?'server':'offline');}return false;
-   }finally{if(flight===task){flight=null;arm(state==='connected'||state==='pending'?interval:Math.min(60000,15000*2**Math.min(attempt++,2)));}}})();return task.promise;
+   }catch(e){
+    clear(toTimer);toTimer=null;
+    if(e?.code==='TIMEOUT'){if(same()){epoch++;emit(online()?'server':'offline');}return false;}
+    if(valid()){if(['SESSION','DENIED'].includes(e?.code)){expired=true;emit('session');}else emit(online()?'server':'offline');}return false;
+   }finally{clear(toTimer);toTimer=null;if(flight===task){flight=null;arm(state==='connected'||state==='pending'?interval:Math.min(60000,15000*2**Math.min(attempt++,2)));}}})();return task.promise;
   }
-  const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},invalidate(){scope();epoch++;until=0;emit('checking');}};active=api;return api;
+  const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},invalidate(){scope();epoch++;until=0;flight=null;emit('checking');}};active=api;return api;
  }
  root.IERegistroConnection={create,canEdit:()=>!!active&&active.canEdit(),current:()=>active};
  if(typeof module!=='undefined')module.exports=root.IERegistroConnection;
@@ -3259,6 +3265,13 @@ function promGeneralAlumno(nombre, comps) {
   return { prom: prom==null?'':prom, letra: prom==null?'':numToLetter(prom), n: nums.length };
 }
 
+function cierreAdministrativoDocente() {
+  const bim = document.getElementById('selBim').value;
+  const sL = getLoginSession();
+  const esAdmin = sL && (sL.role === 'admin' || sL.user === 'admin');
+  return !bimestreHabilitado(bim) && !esAdmin;
+}
+
 function bimCerradoDocente() {
   const bim = document.getElementById('selBim').value;
   const sL = getLoginSession();
@@ -3526,9 +3539,12 @@ function renderFinales() {
   const capsPor = {};
   comps.forEach(cp => { capsPor[cp] = capsDeComp(cp); });
 
-  modeInfo.innerHTML = (bloqueado
+  const esCierreAdmin = typeof cierreAdministrativoDocente === 'function' ? cierreAdministrativoDocente() : false;
+  modeInfo.innerHTML = (esCierreAdmin
     ? '<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>'
-    : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">'+(modoCalif==='letra'?'Letras':'0–20')+' · Nota directa de Promedios prevalece · Cal = calculado desde Calificar</span>');
+    : (bloqueado
+      ? '<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">Edición pausada por sincronización / conexión</span>'
+      : '<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">'+(modoCalif==='letra'?'Letras':'0–20')+' · Nota directa de Promedios prevalece · Cal = calculado desde Calificar</span>'));
 
   let cAD=0,cA=0,cB=0,cC=0,cV=0,cTot=0;
   let head = '<th class="fin-nom">Estudiante</th>';
@@ -4109,7 +4125,10 @@ if (document.readyState !== 'loading') {
 
  function connectionState(value){
   const panel=document.getElementById('registroConnectionStatus'),label=document.getElementById('registroConnectionText'),review=document.getElementById('registroConnectionReview');
-  const labels={readonly:'Bimestre cerrado — solo lectura.',connected:'Conectado — notas verificadas.',pending:'Guardado local — pendiente de subir.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar… Sin conexión — edición pausada.',server:'Servidor no disponible — edición pausada. Estamos intentando reconectar…',session:'Sesión vencida o sin autorización — vuelve a iniciar sesión.',review:'Conflicto pendiente — requiere revisión. Tus cambios locales están conservados.'};
+  const res=bajarRegistroNube?.resultado,ses=getLoginSession()||{};
+  const currentResult=!!(res&&res.key===cloudClaveReg()&&res.token===ses.token);
+  const reviewLabel=!currentResult?'Revisión de sincronización requerida. Tus cambios locales están conservados.':(res.estado==='conflicto'&&Number.isInteger(res.conflictos)&&res.conflictos>0)?'Conflicto pendiente — requiere revisión. Tus cambios locales están conservados.':'Cambios locales pendientes de revisión. Tus cambios locales están conservados.';
+  const labels={readonly:'Bimestre cerrado — solo lectura.',connected:'Conectado — notas verificadas.',pending:'Guardado local — pendiente de subir.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar… Sin conexión — edición pausada.',server:'Servidor no disponible — edición pausada. Estamos intentando reconectar…',session:'Sesión vencida o sin autorización — vuelve a iniciar sesión.',review:reviewLabel};
   if(panel)panel.dataset.state=value.state;if(label)text(label,value.retentionFailed?'No se pudo proteger la entrada iniciada. Edición pausada: conserva esta pestaña y consulta los respaldos.':labels[value.state]);if(review)review.hidden=value.state!=='review';
   document.querySelectorAll('#registroRecoveryControls button[onclick*=".local("],#registroRecoveryControls button[onclick*=".upload("]').forEach(el=>el.disabled=!['connected','pending'].includes(value.state));
   if(tutorVisible()){if(['connected','pending'].includes(value.state))tutorRegistroController?.refresh?.();else document.querySelectorAll('#transRows input,#transRows textarea,#transRows select,#transRows button').forEach(el=>el.disabled=true);}
@@ -4254,9 +4273,19 @@ if (document.readyState !== 'loading') {
  async function offerDraft(){const draft=document.getElementById('registroDraftOffer'),undo=document.getElementById('registroUndoOffer'),binding=context();if(!guard()||!init()){if(draft)draft.hidden=true;if(undo)undo.hidden=true;return false;}const revision=draftRevision,stamp=binding+'|'+generation+'|'+revision;let memo=draftMemo.get(stamp);if(!memo||memo.until<=Date.now()){
   memo={until:Infinity,pending:(async()=>{const key=await scope(),rows=await disk.list(key);if(binding!==context()||revision!==draftRevision||!guard())return null;memo.until=rows.length?Math.min(...rows.map(r=>r.created+IERegistroDrafts.ttl)):Infinity;return selectBackups(rows,sliceRegistroArea());})()};draftMemo.set(stamp,memo);memo.pending.catch(()=>draftMemo.delete(stamp));
  }const candidates=await memo.pending;if(!candidates||binding!==context()||revision!==draftRevision||!guard())return false;if(draft)draft.hidden=!candidates.draft;if(undo)undo.hidden=!candidates.undo;return !!(candidates.draft||candidates.undo);}
- function inactive(){retryOffer(false);clearTimeout(refreshTimer);clearTimeout(timer);clearTimeout(periodicTimer);clearTimeout(expiryTimer);refreshTimer=timer=periodicTimer=expiryTimer=null;expiryToken='';for(const id of ['registroDraftOffer','registroConflictOffer','registroUndoOffer']){const el=document.getElementById(id);if(el)el.hidden=true;}if(typeof registroLocal!=='undefined'&&!registroLocal.matches()){const app=document.getElementById('viewApp');if(app)app.style.display='none';state('La cuenta cambió. Abre Registro nuevamente; las notas anteriores están conservadas.');return;}state('Inicia sesión para cargar tus notas');}
+ let padronRetryTimer=null,padronAttempts=0;
+ function clearPadronRetry(){clearTimeout(padronRetryTimer);padronRetryTimer=null;padronAttempts=0;}
+ function armPadronRetry(){
+  if(padronRetryTimer||padronAttempts>=10)return;
+  padronRetryTimer=setTimeout(()=>{
+   padronRetryTimer=null;padronAttempts++;
+   if(connection?connectionReadable():readable())queueRefresh();
+   else if(padronAttempts<10)armPadronRetry();
+  },1000);
+ }
+ function inactive(){retryOffer(false);clearPadronRetry();clearTimeout(refreshTimer);clearTimeout(timer);clearTimeout(periodicTimer);clearTimeout(expiryTimer);refreshTimer=timer=periodicTimer=expiryTimer=null;expiryToken='';for(const id of ['registroDraftOffer','registroConflictOffer','registroUndoOffer']){const el=document.getElementById(id);if(el)el.hidden=true;}if(typeof registroLocal!=='undefined'&&!registroLocal.matches()){const app=document.getElementById('viewApp');if(app)app.style.display='none';state('La cuenta cambió. Abre Registro nuevamente; las notas anteriores están conservadas.');return;}state('Inicia sesión para cargar tus notas');}
  function armExpiry(){const token=(getLoginSession()||{}).token;if(token===expiryToken)return;expiryToken=token;clearTimeout(expiryTimer);try{const claims=JSON.parse(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'))),ms=Number(claims.exp)-Date.now();if(ms>0)expiryTimer=setTimeout(()=>{track();if(!authenticated())inactive();else queueRefresh();},Math.min(ms+1,2147483647));}catch(_){} }
- function queueRefresh(force=false){track();if(connection&&!force){const current=connection.snapshot();if(current.binding===connectionContext()&&['server','offline','review','session','readonly'].includes(current.state)){clearTimeout(refreshTimer);return;}}if(!authenticated()){inactive();return;}armExpiry();if(force){consulted.delete(context());connection?.invalidate();}if(!(connection?connectionReadable():readable())){if(connection&&typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())connection.pause('readonly');state(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()?'Solo lectura':'Esperando el padrón autorizado para cargar tus notas');return;}clearTimeout(refreshTimer);const binding=context(),epoch=generation;refreshTimer=setTimeout(async()=>{refreshTimer=null;if(binding!==context()||epoch!==track())return;await (connection?connection.check():automatic());if(binding!==context()||epoch!==track()||bajarRegistroNube.resultado?.estado==='fallo')return;try{await offerDraft();}catch(_){state('No se pudo verificar el respaldo local. Conserva esta pestaña.');}},180);}
+ function queueRefresh(force=false){track();if(connection&&!force){const current=connection.snapshot();if(current.binding===connectionContext()&&['server','offline','review','session','readonly'].includes(current.state)){clearTimeout(refreshTimer);return;}}if(!authenticated()){inactive();return;}armExpiry();if(force){consulted.delete(context());connection?.invalidate();clearPadronRetry();}if(!(connection?connectionReadable():readable())){if(connection&&typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())connection.pause('readonly');const isHist=typeof registroConsultaHistorica==='function'&&registroConsultaHistorica();state(isHist?'Solo lectura':'Esperando el padrón autorizado para cargar tus notas');const label=document.getElementById('registroConnectionText');if(label&&connection?.snapshot().state==='checking')text(label,isHist?'Bimestre cerrado — solo lectura.':'Esperando padrón autorizado…');if(connection)armPadronRetry();return;}clearPadronRetry();clearTimeout(refreshTimer);const binding=context(),epoch=generation;refreshTimer=setTimeout(async()=>{refreshTimer=null;if(binding!==context()||epoch!==track())return;await (connection?connection.check():automatic());if(binding!==context()||epoch!==track()||bajarRegistroNube.resultado?.estado==='fallo')return;try{await offerDraft();}catch(_){state('No se pudo verificar el respaldo local. Conserva esta pestaña.');}},180);}
  function armPeriodic(){if(periodicTimer||!guard())return;const binding=context();periodicTimer=setTimeout(async()=>{periodicTimer=null;if(binding!==context()||!guard())return;await init()?.emergency(true);if(binding===context()&&guard()&&pendingAcademic())armPeriodic();queueRefresh();},300000);}
  function schedule(event){refreshWarning();const target=event?.target;if(!target)return;
   const field=target.closest?.('.cal-nota,.fin-nota,.academic-conclusion,.asis-input,#registroAcademicoPanel input,#registroAcademicoPanel textarea'),button=event.type==='click'&&target.closest?.('[data-val],[data-av],[data-adel],.eq-letter,[data-final-toggle],[onclick*="calificarAreaMasiva"],[onclick*="quitarAreaMasiva"],[onclick*="quitarFinalManual"],[onclick*="activarSesion"],[onclick*="borrarSesion"]');

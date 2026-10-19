@@ -5,10 +5,18 @@ const fn=(s,n)=>{const a=s.indexOf('function '+n+'(');return s.slice(a,s.indexOf
 module.exports=(s,options={})=>{s=s.replace(/\r\n/g,'\n');
  s=s.replace('<button type="button" id="registroConnectionDiagnostic">Diagnosticar sincronización</button>','');
  s=s.replace('<script src="registro-sync-diagnostic.js" defer></script><script src="registro-sync-diagnostic-ui.js" defer></script>','');
+ const cad='function cierreAdministrativoDocente() {\n  const bim = document.getElementById(\'selBim\').value;\n  const sL = getLoginSession();\n  const esAdmin = sL && (sL.role === \'admin\' || sL.user === \'admin\');\n  return !bimestreHabilitado(bim) && !esAdmin;\n}\n\n';
+ s=s.replace(cad,'');
+ const modeOld='  modeInfo.innerHTML = (bloqueado\n    ? \'<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>\'\n    : \'<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">\'+(modoCalif===\'letra\'?\'Letras\':\'0–20\')+\' · Nota directa de Promedios prevalece · Cal = calculado desde Calificar</span>\');';
+ const modeNew='  const esCierreAdmin = typeof cierreAdministrativoDocente === \'function\' ? cierreAdministrativoDocente() : false;\n  modeInfo.innerHTML = (esCierreAdmin\n    ? \'<span class="px-2 py-1 rounded-lg bg-red-50 text-red-800">Bimestre cerrado por administración</span>\'\n    : (bloqueado\n      ? \'<span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">Edición pausada por sincronización / conexión</span>\'\n      : \'<span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-800">\'+(modoCalif===\'letra\'?\'Letras\':\'0–20\')+\' · Nota directa de Promedios prevalece · Cal = calculado desde Calificar</span>\'));';
+ s=s.replace(modeNew,modeOld);
  if(!options.keepConnection){
   const curConn=fs.readFileSync(path.join(__dirname,'..','registro-connection.js'),'utf8').trim().replace(/\r\n/g,'\n');
   const oldConn=execFileSync('git',['show',base+':registro-connection.js'],{encoding:'utf8',maxBuffer:4000000}).trim().replace(/\r\n/g,'\n');
   s=s.replace('<script>\n'+curConn+'\n</script>','<script>\n'+oldConn+'\n</script>');
+  const curRec=fs.readFileSync(path.join(__dirname,'..','registro-recovery-ui.js'),'utf8').trim().replace(/\r\n/g,'\n');
+  const oldRec=execFileSync('git',['show',base+':registro-recovery-ui.js'],{encoding:'utf8',maxBuffer:4000000}).trim().replace(/\r\n/g,'\n');
+  s=s.replace(curRec,oldRec);
  }
  if(!s.includes('!previo || previo.borrado || previo.origen'))return s;
  if(!previous)previous=execFileSync('git',['show',base+':registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');

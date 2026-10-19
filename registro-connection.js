@@ -3,7 +3,7 @@
  'use strict';let active=null;
  function create(o){
   const now=o.now||Date.now,set=o.setTimeout||setTimeout,clear=o.clearTimeout||clearTimeout;
-  const interval=o.interval||120000,lease=o.lease||150000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
+  const interval=o.interval||120000,lease=o.lease||150000,timeout=o.timeout||30000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
   const online=()=>o.online?o.online():true;
   function snapshot(){return {state,validUntil:until,pending:state==='pending',retentionFailed,binding};}
   function emit(next){state=next;if(next!=='connected'&&next!=='pending')until=0;const stamp=binding+'|'+next;if(stamp!==published){published=stamp;o.changed?.(snapshot());}}
@@ -23,18 +23,24 @@
    const priorPending=state==='pending'||canEdit();
    const id=++epoch,key=binding;clear(timer);emit('checking');
    const same=()=>!disposed&&id===epoch&&key===o.binding();const valid=()=>same()&&o.authorized();
-   const task={};flight=task;task.promise=(async()=>{try{
-    const result=await o.verify({review,valid});if(!same())return false;
+   let toTimer=null;const task={};flight=task;task.promise=(async()=>{try{
+    const verifyPromise=o.verify({review,valid});
+    const timeoutPromise=(!review&&timeout)?new Promise((_,reject)=>{toTimer=set(()=>{if(toTimer&&toTimer.cancelled)return;reject(Object.assign(new Error('TIMEOUT'),{code:'TIMEOUT'}));},timeout);}) : null;
+    const result=timeoutPromise?await Promise.race([verifyPromise,timeoutPromise]):await verifyPromise;clear(toTimer);toTimer=null;
+    if(!same())return false;
     if(result?.code==='SESSION'||result?.code==='DENIED'){expired=true;emit('session');return false;}
     if(!o.authorized()){emit('session');return false;}
     if(result?.code==='CLOSED'){emit('readonly');return false;}
     if(!result?.ok){emit(result?.conflict?'review':result?.code==='LOCAL_STORAGE'?'review':'server');return false;}
     if(result.conflict||(result.pending&&!review&&!priorPending)){emit('review');return false;}
     until=now()+lease;attempt=0;emit(result.pending?'pending':'connected');return true;
-   }catch(e){if(valid()){if(['SESSION','DENIED'].includes(e.code)){expired=true;emit('session');}else emit(online()?'server':'offline');}return false;
-   }finally{if(flight===task){flight=null;arm(state==='connected'||state==='pending'?interval:Math.min(60000,15000*2**Math.min(attempt++,2)));}}})();return task.promise;
+   }catch(e){
+    clear(toTimer);toTimer=null;
+    if(e?.code==='TIMEOUT'){if(same()){epoch++;emit(online()?'server':'offline');}return false;}
+    if(valid()){if(['SESSION','DENIED'].includes(e?.code)){expired=true;emit('session');}else emit(online()?'server':'offline');}return false;
+   }finally{clear(toTimer);toTimer=null;if(flight===task){flight=null;arm(state==='connected'||state==='pending'?interval:Math.min(60000,15000*2**Math.min(attempt++,2)));}}})();return task.promise;
   }
-  const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},invalidate(){scope();epoch++;until=0;emit('checking');}};active=api;return api;
+  const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},invalidate(){scope();epoch++;until=0;flight=null;emit('checking');}};active=api;return api;
  }
  root.IERegistroConnection={create,canEdit:()=>!!active&&active.canEdit(),current:()=>active};
  if(typeof module!=='undefined')module.exports=root.IERegistroConnection;
