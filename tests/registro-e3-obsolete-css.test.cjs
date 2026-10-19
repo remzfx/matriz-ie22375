@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/\r\n/g,'\n'),before=execFileSync('git',['show','f55a680:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 const pattern=/^  \.av-(?:card|comp|meta|badge|ev|stu)(?::last-child)? \{[^\n]*\}\n/gm;
 test('E3 permits only the seven obsolete CSS rules to change from the approved HEAD',()=>{
- assert.equal((before.match(pattern)||[]).length,7);const current=read('registro.html'),left=(current.match(pattern)||[]).length;assert.equal(left,0,'all and only the obsolete rules are removed');assert.equal(current,before.replace(pattern,''));
+ assert.equal((before.match(pattern)||[]).length,7);const current=require('./notas2-boundary.cjs')('html',read('registro.html')),left=(current.match(pattern)||[]).length;assert.equal(left,0,'all and only the obsolete rules are removed');assert.equal(current,before.replace(pattern,''));
 });
 test('target classes have no HTML, executable template or external-module consumer',()=>{
  const files=execFileSync('git',['ls-files'],{encoding:'utf8'}).trim().split('\n').filter(f=>/\.(html|js)$/.test(f)&&!/^tests\/|^docs\/|^vendor\/|^preview-/.test(f));

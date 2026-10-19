@@ -17,7 +17,7 @@
     const key=model.key(c,comp,g.studentKey(al)),direct=read(p,p.finales,key,al,students);let level='';
     function number(v){if(!v||v.borrado)return null;if(v.nota20!==''&&v.nota20!=null){const n=Number(v.nota20);if(!Number.isFinite(n)||n<0||n>20)throw Error('Nota fuera de rango.');return n;}const n=grading.letterToNum(v.nivel);return n===''?null:Number(n);}
     if(direct){const n=number(direct);level=direct.nivel||(n==null?'':grading.numToLetter(n));if(!levels[level])return {pending:'Directo inválido'};}
-    else{const seen=new Set(),nums=[];for(const s of p.sessions||[]){if(!same(s,c)||s.area!==c.area||s.comp!==comp)continue;const k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp,s.capacidad,s.fecha,g.studentKey(al)].join('||');if(seen.has(k))return {pending:'Sesión duplicada'};seen.add(k);const n=number(read(p,p.grades,k,al,students));if(n!=null)nums.push(n);}if(nums.length)level=grading.numToLetter(Math.round(nums.reduce((a,b)=>a+b,0)/nums.length));}
+    else if(p.meta?.notas2?.adopted!==true){const seen=new Set(),nums=[];for(const s of p.sessions||[]){if(!same(s,c)||s.area!==c.area||s.comp!==comp)continue;const k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp,s.capacidad,s.fecha,g.studentKey(al)].join('||');if(seen.has(k))return {pending:'Sesión duplicada'};seen.add(k);const n=number(read(p,p.grades,k,al,students));if(n!=null)nums.push(n);}if(nums.length)level=grading.numToLetter(Math.round(nums.reduce((a,b)=>a+b,0)/nums.length));}
     if(!levels[level])return {pending:'Sin calificación'};
     if(model.requiresConclusion(c.nivel,level)){const conclusion=read(p,p.concComp,key,al,students);if(!conclusion||!String(conclusion.texto||'').trim())return {level,pending:'Conclusión pendiente en Registro'};}
     return {level};

@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),crypto=require('node:crypto');
-const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8'),copy=require('../registro-reconcile.js').copy;
+const read=p=>{const s=fs.readFileSync(path.join(__dirname,'..',p),'utf8');return p==='registro.html'?require('./notas2-boundary.cjs')('html',s):s;},copy=require('../registro-reconcile.js').copy;
 const sessions=new Function('require','__dirname',read('tests/a1-diagnostic-sessions.test.cjs').split('\ntest(')[0]+'\nreturn {session,cloud};')(require,__dirname);
 const dbSource=read('tests/registro-drafts.test.cjs'),start=dbSource.indexOf('function indexedDBFixture()'),end=dbSource.indexOf('\ntest(',start),makeDB=new Function('copy',dbSource.slice(start,end)+'\nreturn indexedDBFixture;')(copy);
 const flush=async()=>{for(let i=0;i<40;i++)await new Promise(r=>setImmediate(r));};

@@ -937,6 +937,7 @@ function payloadRegistroLectura_(payload, acceso, ctx) {
       return s && mismoContexto(s.nivel, s.bim, s.grado, s.seccion, s.area);
     }) : [],
     grades: mapaContexto(payload.grades, true), finales: mapaContexto(payload.finales, true),
+    ...(payload.calificarEstado ? {calificarEstado: mapaContexto(payload.calificarEstado, true)} : {}),
     concComp: mapaContexto(payload.concComp, true), competenciasEstado: mapaContexto(payload.competenciasEstado, true), modeloAcademico: payload.modeloAcademico,
     concArea: mapaContexto(payload.concArea, true), asistencia: mapaContexto(payload.asistencia, false),
     asisFechas: mapaContexto(payload.asisFechas, false, true), asisFechasEstado: mapaContexto(payload.asisFechasEstado, false),

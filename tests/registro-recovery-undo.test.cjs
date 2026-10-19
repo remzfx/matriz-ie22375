@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8'),copy=require('../registro-reconcile.js').copy;
+const read=p=>{const s=fs.readFileSync(path.join(__dirname,'..',p),'utf8');return p==='registro.html'?require('./notas2-boundary.cjs')('html',s):s;},copy=require('../registro-reconcile.js').copy;
 const fixture=new Function('require','__dirname',read('tests/registro-recovery-ui.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname);
 const el=(f,id)=>f.c.document.getElementById(id);
 function timed(){let now=1800000000000;const f=fixture(null,{prepare(c){c.Date=class extends Date{static now(){return now;}};}});f.tick=()=>now+=1000;return f;}

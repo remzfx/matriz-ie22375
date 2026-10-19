@@ -1,6 +1,6 @@
 // Actual A1/B1, synthetic EPT/III, memory cloud, explicit fake deadlines. No external data.
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{execFileSync}=require('node:child_process');
-const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8'),copy=require('../registro-reconcile.js').copy;
+const read=p=>{const s=fs.readFileSync(path.join(__dirname,'..',p),'utf8');return p==='registro.html'?require('./notas2-boundary.cjs')('html',s):s;},copy=require('../registro-reconcile.js').copy;
 const ept=new Function('require','__dirname',read('tests/registro-empty-ept.test.cjs').split('\ntest(')[0]+'\nreturn ept;')(require,__dirname);
 const before=execFileSync('git',['show','ca2db13b518795c20268de35fc75394a0b7902b6:registro-recovery-ui.js'],{encoding:'utf8'});
 const status=f=>f.c.document.getElementById('registroSaveState').textContent;

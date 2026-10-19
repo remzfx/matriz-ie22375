@@ -43,7 +43,7 @@ test('external APIs preserve observable persistence, ownership, connection and d
 
 test('missing mandatory connection dependency never grants editing from a cached authorization',()=>{
  const code=require('./reconcile-fixture.cjs').extract('registroSoloLectura');
- const c=vm.createContext({});vm.runInContext(code,c);
+ const c=vm.createContext({document:{documentElement:{dataset:{notas2:'1'}}}});vm.runInContext(code,c);
  assert.equal(c.registroSoloLectura(),true);
  c.IERegistroConnection={canEdit:()=>false};assert.equal(c.registroSoloLectura(),true);
 });
@@ -52,7 +52,7 @@ test('recovery remains strict after adding the dependency guard',()=>{
  const code=entries.find(s=>s.src==='registro-recovery-ui.js').code;
  const probe=code.replace('let service,','__syntheticUndeclaredProbe=1;let service,');
  assert.notEqual(probe,code);
- assert.throws(()=>vm.runInNewContext(probe,{}),/__syntheticUndeclaredProbe is not defined/);
+ assert.throws(()=>vm.runInNewContext(probe,{document:{documentElement:{dataset:{}}}}),/__syntheticUndeclaredProbe is not defined/);
 });
 
 for(const missing of [...modules,'registro-evaluation.js','registro-grading.js'])test('failed '+missing+' is controlled, never enables editing and preserves every synthetic storage key',()=>{

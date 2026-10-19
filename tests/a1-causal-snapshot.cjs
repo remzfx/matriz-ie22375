@@ -9,6 +9,7 @@ const added=`      // Comparar cada representación con su misma ruta, incluyend
       // requieren revisar el conjunto; no decidir por marcas de tiempo.`;
 module.exports=(file,source)=>{
  if(['primaria.html','secundaria.html'].includes(file))return require('./b2-snapshot.cjs').restoreUtilities(file,source);
+ if(file==='matrix-registry-import.js')return require('./notas2-boundary.cjs')('matrix',source);
  if(file==='sw.js')return require('./phase2-boundary.cjs').sw(source);
  if(file==='apps-script/Codigo.js')return require('./registro-phase1-snapshot.cjs').backend(source);
  if(file!=='registro-reconcile.js')return source;

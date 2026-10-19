@@ -3219,13 +3219,13 @@ function historicoContextoIgual(row,c){
 function historicoPayloadAcotado(payload,c){
  if(!payload||typeof payload!=='object'||Array.isArray(payload))throw Error('Registro histórico inválido.');
  const clave=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||'),aula=[c.nivel,c.bim,c.grado,c.seccion].join('||'),out={sessions:[],meta:{}};
- for(const name of ['grades','finales','concComp','competenciasEstado','concArea','capsSel','asistencia','asisFechas','asisFechasEstado']){
+ for(const name of ['grades','finales','concComp','competenciasEstado','calificarEstado','concArea','capsSel','asistencia','asisFechas','asisFechasEstado']){
    out[name]={};const map=payload[name];if(map!=null&&(typeof map!=='object'||Array.isArray(map)))throw Error('Mapa histórico inválido.');
    Object.entries(map||{}).forEach(([key,value])=>{const shared=['asistencia','asisFechas','asisFechasEstado'].includes(name),pref=shared?aula:clave;if(key===pref||key.startsWith(pref+'||'))out[name][key]=JSON.parse(JSON.stringify(value));});
  }
  if(payload.sessions!=null&&!Array.isArray(payload.sessions))throw Error('Sesiones históricas inválidas.');
  out.sessions=(payload.sessions||[]).filter(row=>historicoContextoIgual(row,c)).map(row=>JSON.parse(JSON.stringify(row)));
- const aliases=payload.meta?.studentAliases||{};out.meta[clave]={studentAliases:JSON.parse(JSON.stringify(aliases))};out.studentAliases={[[c.nivel,c.grado,c.seccion].join('||')]:JSON.parse(JSON.stringify(aliases))};return out;
+ const aliases=payload.meta?.studentAliases||{};out.meta[clave]={studentAliases:JSON.parse(JSON.stringify(aliases)),...(payload.meta?.notas2?{notas2:JSON.parse(JSON.stringify(payload.meta.notas2))}:{})};out.studentAliases={[[c.nivel,c.grado,c.seccion].join('||')]:JSON.parse(JSON.stringify(aliases))};return out;
 }
 async function leerRegistroHistorico(c,token){
  const actual=()=>IEStudents.validToken()===token&&(getLoginSession()||{}).token===token;
@@ -3279,6 +3279,7 @@ function comparativoNotaAnterior(payload,c,comp,al,roster){
  const leer=(map,key)=>IEStudentIdentity.leer(map,key,al,aliases,unique);
  const f=leer(payload.finales,pref+'||'+studentKey(al));
  if(f){const letra=f.nivel||(f.nota20!==''&&f.nota20!=null?numToLetter(f.nota20):'');if(['AD','A','B','C'].includes(letra))return letra;}
+ if(payload.meta?.[[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')]?.notas2?.adopted===true)return '';
  const nums=[];
  (payload.sessions||[]).filter(x=>historicoContextoIgual(x,c)&&x.comp===comp).forEach(x=>{
   const key=[pref,x.capacidad,x.fecha,studentKey(al)].join('||'),g=leer(payload.grades,key);if(!g)return;
