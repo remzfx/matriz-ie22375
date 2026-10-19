@@ -5,7 +5,7 @@
  if(!model||!root.IERegistroConnection){registroDependenciaFallida();return;}
  const clients=new Map();let memoryLoaded=false,protectedDisk=null,painting=false,timer=null,connection,activeKey='',lastEditable=false;
  const copy=x=>JSON.parse(JSON.stringify(x));
- const currentPanel=()=>document.getElementById('panelAsistencia')?.classList.contains('on')?'asistencia':document.getElementById('panelCalificar')?.classList.contains('on')?'calificar':'promedios';
+ const currentPanel=()=>document.getElementById('panelAsistencia')?.classList.contains('on')?'asistencia':document.getElementById('panelCalificar')?.classList.contains('on')?'calificar':document.getElementById('panelAvance')?.classList.contains('on')?'resumen':'promedios';
  const binding=()=>cloudClaveReg()+'|'+((getLoginSession()||{}).token||'');
  const tutor=()=>document.getElementById('registroTutorPanel')?.hidden===false;
  function authorized(){const s=getLoginSession()||{};return !!(s.token&&['admin','docente'].includes(s.role)&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&padronBimestre===ctxBase().bim&&tokenPadron===s.token&&areaActual&&areas().includes(areaActual)&&registroLocal.matches());}
@@ -55,8 +55,9 @@
   if(label&&typeof IERegistroTransversales!=='undefined'&&IERegistroTransversales.current()?.dirty)label.textContent+=' · Aportes transversales pendientes.';
   const save=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.save()"]'),process=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.process()"]'),down=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.download()"]');
   if(save){save.disabled=!canEdit(pane);save.querySelector('span').textContent=pane==='asistencia'?'Guardar local':'Guardar';}
-  if(process){process.hidden=tutor();process.querySelector('span').textContent=pane==='asistencia'?'Subir Nube':'Procesar a Promedios';process.disabled=!connection?.canEdit()||!s||s.busy||s.readonly||readonly();}
+  if(process){process.hidden=tutor()||(pane!=='calificar'&&pane!=='asistencia');process.querySelector('span').textContent=pane==='asistencia'?'Subir Nube':'Procesar a Promedios';process.disabled=!connection?.canEdit()||!s||s.busy||s.readonly||readonly();}
   if(down)down.disabled=!authorized()||!!s?.busy||tutor();
+  const retryBtn=document.getElementById('registroRetryOffer');if(retryBtn){const connState=lastConnectionState||connection?.snapshot?.()?.state;const isNotesPane=pane==='calificar'||pane==='promedios';retryBtn.hidden=!(isNotesPane&&(connState==='server'||connState==='offline'));}
   if(!canEdit())document.querySelectorAll('#stuList button,#finLista button,#finLista input,#finLista textarea,#finLista select,#asisLista button').forEach(el=>{if(el.tagName==='BUTTON'||el.type==='checkbox'||el.tagName==='SELECT')el.disabled=true;else el.readOnly=true;});
   const edit=canEdit();if(edit!==lastEditable&&!painting){lastEditable=edit;render();}
  }
@@ -74,7 +75,89 @@
  }
  function setWorked(comp,active){if(!canEdit()||!competencias().includes(comp))return false;const key=prefijoReg()+comp;if(worked(comp,'calificar')===active)return false;store.calificarEstado=store.calificarEstado||{};store.calificarEstado[key]={trabajada:active,ts:Date.now()};paint();return true;}
  function refresh(force=false){if(painting)return;const key=binding();if(key!==activeKey){activeKey=key;connection?.invalidate();}clearTimeout(timer);timer=setTimeout(()=>connection?.check(false,force),30);paint();}
- connection=IERegistroConnection.create({binding:()=>binding()+(tutor()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:''),authorized:()=>tutor()?!!getLoginSession()?.token:authorized(),readonly,retain:()=>{if(canEdit())collect();},online:()=>navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',changed:value=>{const box=document.getElementById('registroConnectionStatus'),text=document.getElementById('registroConnectionText');if(box)box.dataset.state=value.state;if(text)text.textContent=({connected:'Conectado — notas verificadas.',pending:'Conectado — cambios sin guardar.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',readonly:'Bimestre cerrado — solo lectura.',review:'Conflicto pendiente — consulta la nube antes de guardar.'})[value.state];if(!['connected','pending'].includes(value.state))get()?.pause();paint();},verify:async({valid})=>{
+ let lastConnectionState=null;
+ function ensureSyncIndicator(){
+  if(typeof document==='undefined'||!document.createElement)return null;
+  let ind=document.getElementById('hdrSyncIndicator');
+  if(ind)return ind;
+  const hdr=document.getElementById('appHdr');
+  if(!hdr)return null;
+  ind=document.createElement('span');
+  ind.id='hdrSyncIndicator';
+  ind.className='sync-indicator inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium ml-2 align-middle';
+  ind.setAttribute('role','status');
+  ind.setAttribute('aria-label','Estado de sincronización');
+  ind.style.cssText='cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:4px;vertical-align:middle;';
+  ind.innerHTML='<svg class="sync-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="vertical-align:middle;"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg><span class="sync-dot" style="width:6px;height:6px;border-radius:50%;display:inline-block;background-color:#38bdf8;"></span>';
+  ind.onclick=()=>{
+   if(window.IERegistroSyncDiagnosticUI&&ind.dataset.state&&['offline','server','session','review'].includes(ind.dataset.state)){
+    window.IERegistroSyncDiagnosticUI.run();
+   }else if(typeof toast==='function'){
+    const text=document.getElementById('registroConnectionText')?.textContent||'Conectado';
+    toast(text);
+   }
+  };
+  const titleDiv=hdr.querySelector('#hdrTitulo')?.previousElementSibling;
+  if(titleDiv){
+   titleDiv.style.display='inline-flex';
+   titleDiv.style.alignItems='center';
+   titleDiv.appendChild(ind);
+  }else{
+   hdr.querySelector('.shell')?.appendChild(ind);
+  }
+  return ind;
+ }
+ function updateSyncIndicator(state,message){
+  const ind=ensureSyncIndicator();
+  if(!ind)return;
+  ind.dataset.state=state;
+  ind.title=message||state;
+  const dot=ind.querySelector('.sync-dot');
+  if(!dot)return;
+  if(state==='connected'){
+   ind.style.color='#6ee7b7';dot.style.backgroundColor='#10b981';dot.style.animation='none';
+  }else if(state==='pending'){
+   ind.style.color='#fde68a';dot.style.backgroundColor='#f59e0b';dot.style.animation='none';
+  }else if(state==='checking'){
+   ind.style.color='#7dd3fc';dot.style.backgroundColor='#0284c7';dot.style.animation='pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite';
+  }else if(state==='offline'||state==='server'){
+   ind.style.color='#fca5a5';dot.style.backgroundColor='#ef4444';dot.style.animation='none';
+  }else if(state==='session'||state==='review'){
+   ind.style.color='#fdba74';dot.style.backgroundColor='#f97316';dot.style.animation='none';
+  }else{
+   ind.style.color='#94a3b8';dot.style.backgroundColor='#64748b';dot.style.animation='none';
+  }
+ }
+ function ensureSecondaryDiagnostic(){
+  if(typeof document==='undefined'||!document.createElement)return;
+  const datosPanel=document.getElementById('registroDatosPanel');
+  if(datosPanel&&!document.getElementById('btnSecondaryDiagnosticWrap')){
+   const div=document.createElement('div');
+   div.id='btnSecondaryDiagnosticWrap';
+   div.className='mt-2 pt-2 border-t border-slate-200 flex justify-end';
+   div.innerHTML='<button type="button" id="btnSecondaryDiagnostic" class="text-[11px] text-slate-400 hover:text-slate-700 underline" onclick="if(window.IERegistroSyncDiagnosticUI)window.IERegistroSyncDiagnosticUI.run();">Diagnosticar sincronización</button>';
+   datosPanel.appendChild(div);
+  }
+  const box=document.getElementById('registroConnectionStatus');
+  const diagBtn=document.getElementById('registroConnectionDiagnostic');
+  if(box&&diagBtn&&!document.getElementById('registroDiagDetails')){
+   const details=document.createElement('details');
+   details.id='registroDiagDetails';
+   details.className='w-full text-xs text-slate-600 mt-1';
+   const summary=document.createElement('summary');
+   summary.className='cursor-pointer text-slate-700 font-medium hover:underline py-0.5';
+   summary.textContent='Opciones de diagnóstico y soporte';
+   const content=document.createElement('div');
+   content.className='flex flex-wrap gap-2 pt-1';
+   details.appendChild(summary);
+   details.appendChild(content);
+   const backupsBtn=document.getElementById('registroConnectionBackups');
+   if(backupsBtn)content.appendChild(backupsBtn);
+   content.appendChild(diagBtn);
+   box.appendChild(details);
+  }
+ }
+ connection=IERegistroConnection.create({binding:()=>binding()+(tutor()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:''),authorized:()=>tutor()?!!getLoginSession()?.token:authorized(),readonly,retain:()=>{if(canEdit())collect();},online:()=>navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',changed:value=>{const box=document.getElementById('registroConnectionStatus'),text=document.getElementById('registroConnectionText');if(box){box.dataset.state=value.state;const isErrorOrConflict=['offline','server','session','review'].includes(value.state);box.style.display=isErrorOrConflict?'flex':'none';}const statusMap={connected:'Conectado — notas verificadas.',pending:'Conectado — cambios sin guardar.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',readonly:'Bimestre cerrado — solo lectura.',review:'Conflicto pendiente — consulta la nube antes de guardar.'};const msg=statusMap[value.state]||value.state;if(text)text.textContent=msg;updateSyncIndicator(value.state,msg);if(value.state==='connected'&&(lastConnectionState===null||lastConnectionState!=='connected')){if(typeof toast==='function')toast('Notas verificadas');}lastConnectionState=value.state;if(!['connected','pending'].includes(value.state))get()?.pause();const retryBtn=document.getElementById('registroRetryOffer');if(retryBtn){const isNotesPane=['calificar','promedios'].includes(currentPanel());retryBtn.hidden=!(isNotesPane&&(value.state==='server'||value.state==='offline'));}paint();},verify:async({valid})=>{
   if(tutor())return tutorRegistroController?.verifyConnection?await tutorRegistroController.verifyConnection({valid,review:false}):{ok:false};
   if(!await sincronizarPeriodosNube(true)||!valid())return {ok:false};const c=get();if(!c)return {ok:false,code:'SESSION'};const initialized=c.status().panels.calificar.version!==null,ok=await c.load({verify:initialized});if(!valid())return {ok:false};const s=c.status();if(ok)render();return {ok,code:s.state==='session'?'SESSION':ok&&s.readonly?'CLOSED':undefined,conflict:s.state==='conflict',pending:false};
  }});
@@ -83,8 +166,16 @@
  root.IERegistroRecovery={refresh,automatic:()=>connection.check(),resolve:()=>connection.check(true,true),local:save,upload:()=>currentPanel()==='asistencia'?uploadAttendance():save(),recover:download};
  document.addEventListener('DOMContentLoaded',()=>{
   const review=document.getElementById('registroConnectionReview');if(review){review.textContent='Verificar conexión';review.onclick=()=>connection.check(true,true);}
-  for(const id of ['registroConflictOffer','registroUndoOffer','registroDraftOffer','registroLegacyReview','registroConnectionBackups']){const el=document.getElementById(id);if(el)el.hidden=true;}
-  const retry=document.getElementById('registroRetryOffer');if(retry){retry.hidden=false;retry.onclick=()=>connection.check(true,true);}
+  ensureSyncIndicator();ensureSecondaryDiagnostic();
+  const toastEl=document.getElementById('toast');
+  if(toastEl&&typeof MutationObserver!=='undefined'){
+   toastEl.style.display=toastEl.classList.contains('hidden')?'none':'block';
+   new MutationObserver(()=>{toastEl.style.display=toastEl.classList.contains('hidden')?'none':'block';}).observe(toastEl,{attributes:true,attributeFilter:['class']});
+  }
+  const initBox=document.getElementById('registroConnectionStatus');if(initBox&&!['offline','server','session','review'].includes(initBox.dataset.state))initBox.style.display='none';
+  for(const id of ['registroConflictOffer','registroUndoOffer','registroDraftOffer','registroLegacyReview']){const el=document.getElementById(id);if(el)el.hidden=true;}
+  const retry=document.getElementById('registroRetryOffer');if(retry){retry.hidden=true;retry.onclick=()=>connection.check(true,true);}
+   document.querySelectorAll('#registroAccionesAcademicas button').forEach(b=>b.addEventListener('click',()=>paint()));
   const block=e=>{if(canEdit())return;const write=e.target?.closest?.('.cal-nota,.fin-nota,.academic-conclusion,.asis-input,[data-val],[data-av],[data-adel],[data-delfecha],[data-an],[data-final-toggle],.fin-bulk-actions');if(write){e.preventDefault();e.stopImmediatePropagation();}};
   for(const type of ['beforeinput','click','change'])document.addEventListener(type,block,true);
   document.addEventListener('input',()=>{paint();});document.addEventListener('change',()=>refresh());document.addEventListener('click',()=>paint());document.addEventListener('ie22375:registro-ready',()=>refresh());
