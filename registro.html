@@ -893,7 +893,7 @@
           <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#fee2e2;color:#991b1b" data-reg-write onclick="IERegistroNotas2UI.download()"><svg class="registro-action-icon" data-icon="cloud-download" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 13v8m-4-4 4 4 4-4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Bajar Nube</span></button>
           <button id="registroConflictOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.resolve()"><svg class="registro-action-icon" data-icon="git-compare" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="18" cy="6" r="3"/><path d="M18 9v9m-12-3V6m-3 3 3-3 3 3m6 6 3 3 3-3"/><circle cx="6" cy="18" r="3"/></svg><span>Revisar diferencias</span></button>
           <button type="button" class="btn btn-primary text-[11px] !py-2 !px-2 whitespace-nowrap" data-reg-write onclick="IERegistroNotas2UI.save()"><svg class="registro-action-icon" data-icon="save" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.2 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.8a2 2 0 0 0-.6-1.4l-3.8-3.8a2 2 0 0 0-1.4-.6Z"/><path d="M17 21v-7H7v7M7 3v5h8"/></svg><span>Guardar</span></button>
-          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="IERegistroRecovery.upload()"><svg class="registro-action-icon" data-icon="cloud-upload" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21v-8m-4 4 4-4 4 4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Subir Nube</span></button>
+          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#16a34a;color:#fff" onclick="IERegistroNotas2UI.process()"><svg class="registro-action-icon" data-icon="cloud-upload" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21v-8m-4 4 4-4 4 4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Procesar a Promedios</span></button>
           <button id="registroUndoOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.undo()"><svg class="registro-action-icon" data-icon="undo-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></svg><span>Deshacer recuperación</span></button>
           <button id="registroDraftOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.drafts()"><svg class="registro-action-icon" data-icon="history" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 2.5-6.2L3 8M3 3v5h5m4-1v5l4 2"/></svg><span>Recuperar borrador</span></button>
           <button id="registroRetryOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.refresh(true)"><svg class="registro-action-icon" data-icon="refresh-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 0 1 15.4-6.4L21 8m0-5v5h-5m5 4a9 9 0 0 1-15.4 6.4L3 16m5 0H3v5"/></svg><span>Reintentar notas</span></button>
@@ -2913,7 +2913,7 @@ function prepararImpresion(opciones) {
  if((typeof registroLocal!=='undefined'&&!registroLocal.matches())||(typeof areas==='function'&&!areas().includes(c.area))){toast('No se puede imprimir un contexto sin autorización vigente.');return;}
  const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
  const year=cfg&&Number.isInteger(Number(cfg.anio))&&Number(cfg.anio)>=2000&&Number(cfg.anio)<=2100?String(cfg.anio):'No configurado';
- const html=IECalificarPrint.build({context:c,students:alumnos,competences:competencias(),sessions:store.sessions,from:opciones.desde,to:opciones.hasta,mode:modoCalif,year,teacher:document.getElementById('inpDocente').value.trim()||'No registrado',studentKey,readGrade:key=>leerNota(store.grades,key),toLetter:numToLetter,calculated:notaDesdeSesiones,direct:notaDirectaAlumno,worked:competenciaTrabajada,exact:numeroExactoComp});
+ const html=IECalificarPrint.build({context:c,students:alumnos,competences:competencias(),sessions:store.sessions,from:opciones.desde,to:opciones.hasta,mode:modoCalif,year,teacher:document.getElementById('inpDocente').value.trim()||'No registrado',studentKey,readGrade:key=>leerNota(store.grades,key),toLetter:numToLetter,calculated:notaDesdeSesiones,direct:notaDirectaAlumno,worked:typeof IERegistroNotas2UI!=='undefined'?(comp)=>IERegistroNotas2UI.worked(comp,'calificar'):competenciaTrabajada,exact:numeroExactoComp});
  if(!html){alert(opciones.desde||opciones.hasta?'No hay sesiones guardadas en el periodo elegido.':'No hay competencias disponibles para imprimir.');return;}
  document.getElementById('printArea').innerHTML=html;
  window.print();
@@ -2979,7 +2979,7 @@ function finalKey(comp, nombre) {
 function notaDirectaAlumno(comp, nombre) {
   return IERegistroGrading.direct(leerNota(store.finales,finalKey(comp,nombre)),IERegistroEvaluacion);
 }
-function competenciaTrabajada(comp,c=ctxBase()){if(typeof IERegistroNotas2UI!=='undefined'&&!registroHistoricoProyectando)return IERegistroNotas2UI.worked(comp,undefined,c);const k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');return !store.competenciasEstado||!store.competenciasEstado[k]||store.competenciasEstado[k].trabajada!==false;}
+function competenciaTrabajada(comp,c=ctxBase()){if(typeof IERegistroNotas2UI!=='undefined')return IERegistroNotas2UI.worked(comp,undefined,c);const k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');return !store.competenciasEstado||!store.competenciasEstado[k]||store.competenciasEstado[k].trabajada!==false;}
 function concCompAlumno(comp,nombre){return ((leerNota(store.concComp||{},finalKey(comp,nombre))||{}).texto||'').trim();}
 function baselineAcademica(){if(typeof IERegistroAcademico==='undefined')return null;store.academicSync=store.academicSync||{};const key=cloudClaveReg();if(!store.academicSync[key])store.academicSync[key]={version:null,baseline:IERegistroAcademico.canonical(sliceRegistroArea())};return store.academicSync[key];}
 function dirtyAcademico(){const b=baselineAcademica();dirty=!b||IERegistroAcademico.canonical(sliceRegistroArea())!==b.baseline;}
@@ -3094,7 +3094,7 @@ async function prepararVersionAcademica(options){
 }
 
 function notaCompAlumno(comp, nombre) {
-  const worked=typeof IERegistroNotas2UI!=='undefined'&&!registroHistoricoProyectando?IERegistroNotas2UI.worked(comp,'promedios'):typeof competenciaTrabajada!=='function'||competenciaTrabajada(comp);
+  const worked=typeof IERegistroNotas2UI!=='undefined'?IERegistroNotas2UI.worked(comp,'promedios'):typeof competenciaTrabajada!=='function'||competenciaTrabajada(comp);
   if(!worked)return IERegistroGrading.effective(false,null,null,IERegistroEvaluacion);
   const direct=notaDirectaAlumno(comp,nombre);
   if(typeof IERegistroNotas2UI!=='undefined'&&IERegistroNotas2UI.officialOnly()&&!direct.letra)return IERegistroGrading.effective(true,direct,{nota:'',letra:''},IERegistroEvaluacion);
@@ -3114,6 +3114,7 @@ function bimCerradoDocente() {
   const bim = document.getElementById('selBim').value;
   const sL = getLoginSession();
   const esAdmin = sL && (sL.role === 'admin' || sL.user === 'admin');
+  if(typeof IERegistroNotas2UI!=='undefined')return !bimestreHabilitado(bim);
   return registroSoloLectura() || (!bimestreHabilitado(bim) && !esAdmin);
 }
 
@@ -3365,7 +3366,7 @@ function renderFinales() {
     const capsTxt = caps.length
       ? caps.map(x => (x.fecha?x.fecha.slice(5)+' · ':'') + x.capacidad).join('<br>')
       : 'Sin capacidades aún';
-    head += '<th><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" '+(competenciaTrabajada(cp)?'checked':'')+' '+(bloqueado?'disabled':'')+'><span>'+escapeRegistro(cp)+'</span></label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
+    head += '<th><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" title="Configuración de Calificar; se aplica a Promedios al Procesar" '+((typeof IERegistroNotas2UI!=='undefined'?IERegistroNotas2UI.worked(cp,'calificar'):competenciaTrabajada(cp))?'checked':'')+' '+(bloqueado?'disabled':'')+'><span>'+escapeRegistro(cp)+'</span></label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
   });
 
   const rows = alumnos.map((al, i) => {

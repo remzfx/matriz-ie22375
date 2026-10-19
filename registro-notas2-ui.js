@@ -39,7 +39,7 @@
   if(JSON.stringify(next)!==JSON.stringify(protectedDisk)){registroLocal.write(JSON.stringify(next));protectedDisk=next;}
 
  }
- function officialOnly(){if(registroHistoricoProyectando)return !!metaRegistro()?.notas2;const state=get()?.status();return !!state&&state.panels.promedios.version!==null&&(!state.legacy||state.processed);}
+ function officialOnly(){if(registroHistoricoProyectando)return metaRegistro()?.notas2?.adopted===true;const state=get()?.status();return !!state&&state.panels.promedios.version!==null&&(!state.legacy||state.processed);}
  function worked(comp,panel=currentPanel(),c=ctxBase()){
   const key=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');const map=panel==='calificar'?(store.calificarEstado||store.competenciasEstado):store.competenciasEstado;return !map||map[key]?.trabajada!==false;
  }
@@ -50,8 +50,9 @@
   if(label&&typeof IERegistroTransversales!=='undefined'&&IERegistroTransversales.current()?.dirty)label.textContent+=' · Aportes transversales pendientes.';
   const save=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.save()"]'),process=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.process()"]'),down=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.download()"]');
   if(save){save.disabled=!canEdit(pane);save.querySelector('span').textContent=pane==='asistencia'?'Guardar local':'Guardar';}
-  if(process){process.hidden=pane==='asistencia'||tutor();process.disabled=!connection?.canEdit()||!s||s.busy||s.readonly||readonly();}
+  if(process){process.hidden=tutor();process.querySelector('span').textContent=pane==='asistencia'?'Subir Nube':'Procesar a Promedios';process.disabled=!connection?.canEdit()||!s||s.busy||s.readonly||readonly();}
   if(down)down.disabled=!authorized()||!!s?.busy||tutor();
+  if(!canEdit())document.querySelectorAll('#stuList button,#finLista button,#finLista input,#finLista textarea,#finLista select,#asisLista button').forEach(el=>{if(el.tagName==='BUTTON'||el.type==='checkbox'||el.tagName==='SELECT')el.disabled=true;else el.readOnly=true;});
   const edit=canEdit();if(edit!==lastEditable&&!painting){lastEditable=edit;render();}
  }
  async function save(){
@@ -63,14 +64,14 @@
  }
  async function uploadAttendance(){const client=get();if(!client||!canEdit('asistencia'))return false;guardarAsistencia();const ok=await client.save('asistencia');if(ok)toast('Asistencia confirmada por el servidor.');return ok;}
  async function download(){const client=get();if(!client)return false;if(canEdit())collect();const ok=await client.load({manual:true,panel:currentPanel()});if(ok){render();toast('Se restauró la última versión confirmada.');}return ok;}
- async function process(){const client=get();if(!client||!connection?.canEdit()||readonly())return false;if(!confirm('Procesar a Promedios reemplazará las notas anteriores, incluidos los directos, de las competencias trabajadas en esta área y bimestre. Sin evidencias quedarán vacías. Las conclusiones se conservan. No se guardará en nube. ¿Continuar?'))return false;
+ async function process(){if(currentPanel()==='asistencia')return uploadAttendance();const client=get();if(!client||!connection?.canEdit()||readonly())return false;if(!confirm('Procesar a Promedios reemplazará las notas anteriores, incluidos los directos, de las competencias trabajadas en esta área y bimestre. Sin evidencias quedarán vacías. Las conclusiones se conservan. No se guardará en nube. ¿Continuar?'))return false;if(!connection.canEdit())return false;if(canEdit())collect();
   const ok=client.process({context:ctxBase(),competencies:competencias(),students:estudiantes().map(studentKey),now:Date.now,calculate:(p,comp,id)=>IERegistroGrading.calculated(IERegistroGrading.sessionsFor(p.sessions,ctxBase(),comp).map(s=>leerNota(p.grades,[s.nivel,s.bim,s.grado,s.seccion,s.area,s.comp,s.capacidad,s.fecha,id].join('||'))),IERegistroEvaluacion)});if(ok){showPanel('fin');render();toast('Promedios procesados. Pendientes de Guardar.');}return ok;
  }
  function setWorked(comp,active){if(!canEdit()||!competencias().includes(comp))return false;const key=prefijoReg()+comp;if(worked(comp,'calificar')===active)return false;store.calificarEstado=store.calificarEstado||{};store.calificarEstado[key]={trabajada:active,ts:Date.now()};paint();return true;}
  function refresh(force=false){if(painting)return;const key=binding();if(key!==activeKey){activeKey=key;connection?.invalidate();}clearTimeout(timer);timer=setTimeout(()=>connection?.check(false,force),30);paint();}
  connection=IERegistroConnection.create({binding:()=>binding()+(tutor()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:''),authorized:()=>tutor()?!!getLoginSession()?.token:authorized(),readonly,retain:()=>{if(canEdit())collect();},online:()=>navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',changed:value=>{const box=document.getElementById('registroConnectionStatus'),text=document.getElementById('registroConnectionText');if(box)box.dataset.state=value.state;if(text)text.textContent=({connected:'Conectado — notas verificadas.',pending:'Conectado — cambios sin guardar.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',readonly:'Bimestre cerrado — solo lectura.',review:'Conflicto pendiente — consulta la nube antes de guardar.'})[value.state];if(!['connected','pending'].includes(value.state))get()?.pause();paint();},verify:async({valid})=>{
   if(tutor())return tutorRegistroController?.verifyConnection?await tutorRegistroController.verifyConnection({valid,review:false}):{ok:false};
-  if(!await sincronizarPeriodosNube(true)||!valid())return {ok:false};const c=get();if(!c)return {ok:false,code:'SESSION'};const initialized=c.status().panels.calificar.version!==null,ok=await c.load({verify:initialized});if(!valid())return {ok:false};const s=c.status();if(ok)render();return {ok,code:s.readonly?'CLOSED':s.state==='session'?'SESSION':undefined,conflict:s.state==='conflict',pending:false};
+  if(!await sincronizarPeriodosNube(true)||!valid())return {ok:false};const c=get();if(!c)return {ok:false,code:'SESSION'};const initialized=c.status().panels.calificar.version!==null,ok=await c.load({verify:initialized});if(!valid())return {ok:false};const s=c.status();if(ok)render();return {ok,code:s.state==='session'?'SESSION':ok&&s.readonly?'CLOSED':undefined,conflict:s.state==='conflict',pending:false};
  }});
  const api={save,download,process,collect,worked,setWorked,canEdit,officialOnly,persist,refresh,keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
  // Existing tutor controls call this API only to verify their connection, never to write academic notes.
