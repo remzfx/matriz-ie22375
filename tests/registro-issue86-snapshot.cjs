@@ -3,6 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const base=require('node:child_process').execFileSync('git',['show','8d2c1dbf8254f3c9757f7ae97a0479eb4fa5c794:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 const fn=(s,n)=>{const a=s.indexOf('function '+n+'(');return s.slice(a,s.indexOf('\n}',a)+2);};
 module.exports=source=>{
+ source=require('./notas2-frontend-boundary.cjs')('html',source);
  source=require('./registro-bulk-correction-snapshot.cjs')(source);
  let s=source.replace(/\r\n/g,'\n');
  const start=s.indexOf('  /* Issue86: presentación adaptable;'),end=s.indexOf('  /* Fin Issue86 adaptable. */',start);if(start>=0){const block=s.slice(start,end+'  /* Fin Issue86 adaptable. */\n'.length);assert.equal(crypto.createHash('sha256').update(block).digest('hex'),'e6cd28636bfd385fd7b0a259a4a6adee4963a133d5766e4362e764f7edb2bbb5','Exact presentation-only extension');s=s.replace(block,'');}if(!s.includes('/* Vista integral de Calificar:'))return s;
