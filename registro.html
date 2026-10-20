@@ -1060,7 +1060,7 @@ function registroDependenciaFallida(){
    if(disposed)return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
    if(!o.authorized()){emit(o.readonly?.()?'readonly':'session');return false;}
    if(!online()){pause('offline');return false;}
-   if(flight)return flight.promise;if(!force&&!review&&canEdit())return true;
+   if(flight){const p=flight.promise;if(!force&&!review&&binding===o.binding())return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit())return true;
    try{if(canEdit())o.retain?.();}catch(e){retentionFailed=true;emit('review');return false;}
    const priorPending=state==='pending'||canEdit();
    const id=++epoch,key=binding;clear(timer);emit('checking');
@@ -1074,7 +1074,7 @@ function registroDependenciaFallida(){
     if(result.conflict||(result.pending&&!review&&!priorPending)){emit('review');return false;}
     until=now()+lease;attempt=0;emit(result.pending?'pending':'connected');return true;
    }catch(e){if(valid()){if(['SESSION','DENIED'].includes(e.code)){expired=true;emit('session');}else emit(online()?'server':'offline');}return false;
-   }finally{if(flight===task){flight=null;arm(state==='connected'||state==='pending'?interval:Math.min(60000,15000*2**Math.min(attempt++,2)));}}})();return task.promise;
+   }finally{if(flight===task){flight=null;if(!disposed&&(binding!==o.binding()||(id!==epoch&&state==='checking'))){check(false,false);}else arm(state==='connected'||state==='pending'?interval:Math.min(60000,15000*2**Math.min(attempt++,2)));}}})();return task.promise;
   }
   const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},invalidate(){scope();epoch++;until=0;emit('checking');}};active=api;return api;
  }

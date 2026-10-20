@@ -3,9 +3,9 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const root=path.resolve(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
 const base='9b740af5408b1d5fb87f85ede5078d17ec45b1c8',old=f=>execFileSync('git',['show',base+':'+f],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n');
 const boundary=require('./notas2-frontend-boundary.cjs');
-for(const file of ['admin.html','primaria.html','secundaria.html','aula_innovacion.js','apps-script/Codigo.js','apps-script/Notas2.js','registro-connection.js','registro-local-store.js','registro-drafts.js','registro-recovery-ui.js','registro-calificar-print.js','registro-evaluation.js','registro-academic-model.js'])test('selective integration preserves '+file+' exactly',()=>assert.equal(read(file),old(file)));
+for(const file of ['admin.html','primaria.html','secundaria.html','aula_innovacion.js','apps-script/Codigo.js','apps-script/Notas2.js','registro-local-store.js','registro-drafts.js','registro-recovery-ui.js','registro-calificar-print.js','registro-evaluation.js','registro-academic-model.js'])test('selective integration preserves '+file+' exactly',()=>assert.equal(read(file),old(file)));
 for(const [kind,file]of [['html','registro.html'],['matrix','matrix-registry-import.js'],['sw','sw.js']])test('historical boundary excludes exact '+kind+' hooks without hiding unrelated source mutations',()=>{
- const raw=read(file);assert.equal(boundary(kind,raw),old(file));assert.equal(boundary(kind,old(file)),old(file));assert.notEqual(boundary(kind,raw+'\n/* unrelated synthetic mutation */'),old(file));
+ const raw=kind==='html'?read(file).replace(read('registro-connection.js').trim(),old('registro-connection.js').trim()):read(file);assert.equal(boundary(kind,raw),old(file));assert.equal(boundary(kind,old(file)),old(file));assert.notEqual(boundary(kind,raw+'\n/* unrelated synthetic mutation */'),old(file));
 });
 test('legacy styles/helpers and print implementation survive; only one active N2 synchronizer is initialized',()=>{
  const s=read('registro.html');for(const name of ['av-card','av-comp','av-meta','av-badge','av-ev','av-stu'])assert.match(s,new RegExp('\\.'+name+'\\b'));

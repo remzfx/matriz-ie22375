@@ -16,7 +16,7 @@
 
  function buildDialogContent(report){
   if(report?.model==='notas2'){
-   const labels={ready:'Disponible',checking:'Verificando',conflict:'Conflicto CAS: usa Bajar Nube para revisar la recuperación',server:'Error académico: no se confirmó la operación',offline:'Sin conexión',session:'Sesión inválida'};
+   const labels={ready:'Disponible',checking:'Verificando',conflict:'Conflicto CAS: usa Bajar Nube para revisar la recuperación',server:'Error académico: no se confirmó la operación',offline:'Sin conexión',session:'Sesión inválida',readonly:'Solo lectura'};
    const rows=Object.entries(report.panels||{}).map(([name,p])=>'<li>'+escapeHtml(name)+': versión confirmada '+escapeHtml(p.version==null?'sin confirmar':String(p.version))+' · '+(p.pending?'Cambios sin guardar':'Sin cambios pendientes')+'</li>').join('');
    const details='<p><strong>Padrón:</strong> '+escapeHtml(report.roster?.message||'Sin confirmación disponible')+'</p><p>'+escapeHtml(report.saveSummary||'')+'</p>';
    return details+'<p><strong>Notas 2.0 · '+escapeHtml(labels[report.state]||report.state)+'</strong></p><p>Conexión: '+escapeHtml(report.connection||'desconocida')+(report.readonly?' · Solo lectura':'')+'</p><ul>'+rows+'</ul><p>Estado local de las últimas confirmaciones por panel. Este diagnóstico no certifica la versión actual del servidor ni consulta el registro anterior. Los errores o conflictos requieren recuperación explícita; no se descartan cambios desde este diálogo.</p>';
@@ -247,7 +247,8 @@
   try {
    if(root.IERegistroNotas2UI){
     const state=root.IERegistroNotas2UI.current()?.status();
-    report=state?{model:'notas2',readOnly:true,state:state.state,readonly:state.readonly,connection:root.IERegistroConnection?.current()?.snapshot()?.state,panels:state.panels}:{model:'notas2',readOnly:true,state:'session',panels:{}};
+    const connState=root.IERegistroConnection?.current()?.snapshot()?.state;
+    report=state?{model:'notas2',readOnly:true,state:state.state,readonly:state.readonly,connection:connState,panels:state.panels}:{model:'notas2',readOnly:true,state:connState==='readonly'?'readonly':'session',readonly:connState==='readonly',connection:connState,panels:{}};
     const rosterRetry=document.getElementById('retryRoster');
     report.roster={message:document.getElementById('studentsStatus')?.textContent||'',retryable:rosterRetry?.hidden===false,busy:!!rosterRetry?.disabled};
     report.saveSummary=document.getElementById('registroSaveState')?.textContent||'';
