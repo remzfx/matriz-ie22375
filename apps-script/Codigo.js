@@ -937,6 +937,7 @@ function payloadRegistroLectura_(payload, acceso, ctx) {
       return s && mismoContexto(s.nivel, s.bim, s.grado, s.seccion, s.area);
     }) : [],
     grades: mapaContexto(payload.grades, true), finales: mapaContexto(payload.finales, true),
+    ...(payload.calificarEstado ? {calificarEstado: mapaContexto(payload.calificarEstado, true)} : {}),
     concComp: mapaContexto(payload.concComp, true), competenciasEstado: mapaContexto(payload.competenciasEstado, true), modeloAcademico: payload.modeloAcademico,
     concArea: mapaContexto(payload.concArea, true), asistencia: mapaContexto(payload.asistencia, false),
     asisFechas: mapaContexto(payload.asisFechas, false, true), asisFechasEstado: mapaContexto(payload.asisFechasEstado, false),
@@ -2033,6 +2034,7 @@ function doPost(e) {
     }
     const body = JSON.parse(e.postData.contents);
     const action = String(body.action || 'saveArea').toLowerCase();
+    if (['loadnotas2','savenotas2'].includes(action)) return responder_(notas2Ruta_(body));
     if (['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','confirmtransversaltutor','confirmtransversalaip','revisartransversal','procesartransversales','loadtransversalexport'].includes(action)) return responder_(transversalesRuta_(body));
 
     if (['loadreg', 'loadnivel', 'load', 'loadasis', 'loadasisstats', 'loadasisperiodos', 'asisprotocol', 'loadaip', 'loadtpl', 'loadtplstatus', 'loadwa', 'loadperiodos', 'classroom', 'ping'].indexOf(action) >= 0) {
@@ -2101,6 +2103,7 @@ function doPost(e) {
         const previous=fila<0?[0,'{}']:sh.getRange(fila,8,1,2).getValues()[0];
         const prevVersion=Number(previous[0])||0;
         let prev={};if(fila>=0){try{prev=JSON.parse(String(previous[1]||'{}'));}catch(e){return responder_({ok:false,code:'CONFLICT',error:'Registro previo ilegible. Revise antes de guardar.'});}}
+        if(prev.meta&&prev.meta.notas2)return responder_({ok:false,code:'NOTAS2_REQUIRED',error:'Este registro requiere Notas 2.0; no se modificó.'});
         const nuevo=body.modeloAcademico===1||prev.modeloAcademico===1||['concComp','competenciasEstado'].some(field=>Object.keys((body.payload||{})[field]||{}).length>0);
         if(nuevo&&(body.modeloAcademico!==1||body.version==null||Number(body.version)!==prevVersion))return responder_({ok:false,code:'CONFLICT',error:'El registro cambió. Baje y revise antes de guardar.',version:prevVersion});
         const payload=Object.assign({},body.payload||{});
