@@ -15,6 +15,12 @@
  }
 
  function buildDialogContent(report){
+  if(report?.model==='notas2'){
+   const labels={ready:'Disponible',checking:'Verificando',conflict:'Conflicto CAS: usa Bajar Nube para revisar la recuperación',server:'Error académico: no se confirmó la operación',offline:'Sin conexión',session:'Sesión inválida'};
+   const rows=Object.entries(report.panels||{}).map(([name,p])=>'<li>'+escapeHtml(name)+': versión confirmada '+escapeHtml(p.version==null?'sin confirmar':String(p.version))+' · '+(p.pending?'Cambios sin guardar':'Sin cambios pendientes')+'</li>').join('');
+   const details='<p><strong>Padrón:</strong> '+escapeHtml(report.roster?.message||'Sin confirmación disponible')+'</p><p>'+escapeHtml(report.saveSummary||'')+'</p>';
+   return details+'<p><strong>Notas 2.0 · '+escapeHtml(labels[report.state]||report.state)+'</strong></p><p>Conexión: '+escapeHtml(report.connection||'desconocida')+(report.readonly?' · Solo lectura':'')+'</p><ul>'+rows+'</ul><p>Estado local de las últimas confirmaciones por panel. Este diagnóstico no certifica la versión actual del servidor ni consulta el registro anterior. Los errores o conflictos requieren recuperación explícita; no se descartan cambios desde este diálogo.</p>';
+  }
   const p = report?.period || {};
   const c = report?.connection || {};
   const conf = report?.conflicts || {};
@@ -169,6 +175,21 @@
   const actions = document.createElement('div');
   actions.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap;border-top:1px solid #e2e8f0;padding-top:12px;';
 
+  if(report?.model==='notas2'&&typeof root.IERegistroRecovery?.resolve==='function'){
+   const retry = document.createElement('button');
+   retry.type='button';retry.textContent='Reintentar conexión';
+   retry.style.cssText='min-height:44px;padding:8px 16px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;font-weight:600;font-size:12px;cursor:pointer;';
+   retry.onclick=async()=>{retry.disabled=true;try{await root.IERegistroRecovery.resolve();await run();}finally{retry.disabled=false;}};
+   actions.appendChild(retry);
+  }
+
+  if(report?.model==='notas2'&&report.roster?.retryable&&typeof root.reintentarPadronRegistro==='function'){
+   const retryRoster=document.createElement('button');retryRoster.type='button';retryRoster.textContent='Reintentar padrón';retryRoster.disabled=!!report.roster.busy;
+   retryRoster.style.cssText='min-height:44px;padding:8px 16px;border-radius:6px;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;';
+   retryRoster.onclick=async()=>{retryRoster.disabled=true;try{await root.reintentarPadronRegistro();await run();}finally{retryRoster.disabled=false;}};
+   actions.appendChild(retryRoster);
+  }
+
   const copyBtn = document.createElement('button');
   copyBtn.type = 'button';
   copyBtn.textContent = 'Copiar informe para soporte';
@@ -224,10 +245,16 @@
   }
   let report;
   try {
-   if(typeof root.IERegistroSyncDiagnostic === 'undefined' || typeof root.IERegistroSyncDiagnostic.runPage !== 'function'){
+   if(root.IERegistroNotas2UI){
+    const state=root.IERegistroNotas2UI.current()?.status();
+    report=state?{model:'notas2',readOnly:true,state:state.state,readonly:state.readonly,connection:root.IERegistroConnection?.current()?.snapshot()?.state,panels:state.panels}:{model:'notas2',readOnly:true,state:'session',panels:{}};
+    const rosterRetry=document.getElementById('retryRoster');
+    report.roster={message:document.getElementById('studentsStatus')?.textContent||'',retryable:rosterRetry?.hidden===false,busy:!!rosterRetry?.disabled};
+    report.saveSummary=document.getElementById('registroSaveState')?.textContent||'';
+   }else if(typeof root.IERegistroSyncDiagnostic === 'undefined' || typeof root.IERegistroSyncDiagnostic.runPage !== 'function'){
     throw {code:'MODULE_MISSING'};
    }
-   report = await root.IERegistroSyncDiagnostic.runPage();
+   if(!report)report = await root.IERegistroSyncDiagnostic.runPage();
   } catch(e) {
    report = {schema:1,readOnly:true,status:'unavailable',code:safeErrorCode(e?.code)};
   } finally {

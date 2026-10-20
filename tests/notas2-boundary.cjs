@@ -12,4 +12,6 @@ edits.html=[["for(const name of ['grades','finales','concComp','competenciasEsta
 edits.html=[["out.meta[clave]={studentAliases:JSON.parse(JSON.stringify(aliases)),...(payload.meta?.notas2?{notas2:JSON.parse(JSON.stringify(payload.meta.notas2))}:{})};","out.meta[clave]={studentAliases:JSON.parse(JSON.stringify(aliases))};"]].concat(edits.html||[]);
 edits.html=[[" if(payload.meta?.[[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')]?.notas2?.adopted===true)return '';\n const nums=[];\n (payload.sessions||[]).filter(x=>historicoContextoIgual(x,c)&&x.comp===comp)"," const nums=[];\n (payload.sessions||[]).filter(x=>historicoContextoIgual(x,c)&&x.comp===comp)"]].concat(edits.html||[]);
 edits.matrix=[["    else if(p.meta?.notas2?.adopted!==true){const seen=new Set(),nums=[];","    else{const seen=new Set(),nums=[];"]];
+// Intentional standalone fallback; behavior is covered by the browser connection integration.
+edits.html.unshift(['  .hidden { display: none !important; }\n','']);
 module.exports=(kind,source)=>{let s=source.replace(/\r\n/g,'\n');for(const [current,old]of edits[kind]||[])s=s.replace(current,old);return s;};
