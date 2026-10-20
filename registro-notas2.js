@@ -6,7 +6,7 @@
  function fail(code,message){const e=Error(message);e.code=code;throw e;}
  function stable(value){if(Array.isArray(value))return value.map(stable);if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).filter(k=>k!=='ts').sort().map(k=>[k,stable(value[k])]));return value;}
  const signature=value=>JSON.stringify(stable(value));
- function panel(payload,name){if(!fields[name])fail('PANEL','Panel académico inválido.');return Object.fromEntries(fields[name].map(f=>[f,copy(payload[f]||(f==='sessions'?[]:{}))]));}
+ function panel(payload,name){if(!fields[name])fail('PANEL','Panel académico inválido.');const res=Object.fromEntries(fields[name].map(f=>[f,copy(payload[f]||(f==='sessions'?[]:{}))]));if(name==='calificar'&&res.capsSel)res.capsSel=Object.fromEntries(Object.entries(res.capsSel).filter(([,v])=>Array.isArray(v)&&v.length>0));return res;}
  function validPayload(p){return p&&typeof p==='object'&&!Array.isArray(p)&&Array.isArray(p.sessions)&&Object.values(fields).flat().filter(f=>f!=='sessions').every(f=>p[f]&&typeof p[f]==='object'&&!Array.isArray(p[f]))&&p.sessions.every(s=>s&&typeof s==='object'&&!Array.isArray(s))&&['grades','finales','concComp','competenciasEstado','calificarEstado'].every(f=>Object.values(p[f]).every(v=>v&&typeof v==='object'&&!Array.isArray(v)));}
  function process(payload,o){
   const next=copy(payload),prefix=[o.context.nivel,o.context.bim,o.context.grado,o.context.seccion,o.context.area].join('||')+'||';

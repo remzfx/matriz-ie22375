@@ -1127,6 +1127,7 @@ const CAPS_CNEB = {
 
 let nivel = null;
 let areaActual = null;
+let contextoActivoRegistro = null;
 let modoCalif = 'letra';
 let dirty = false; // hay cambios sin guardar
 let sesionActiva = null; // { fecha, unidad, comp, capacidad }
@@ -1605,6 +1606,11 @@ async function cambiarBimestreRegistro() {
   if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   const sel = document.getElementById('selBim'), solicitado = sel.value;
   if (padronBimestre) {
+    if (padronBimestre !== solicitado && typeof confirmarSalidaContexto === 'function' && !confirmarSalidaContexto('cambiar de bimestre')) {
+      sel.value = padronBimestre;
+      actualizarBotonesContextoRegistro();
+      return;
+    }
     sel.value = padronBimestre;
     if (guardarTodo() === false && !registroSoloLectura()) return;
     sel.value = solicitado;
@@ -1984,6 +1990,7 @@ async function entrarNivel(n) {
   }
 
   nivel = n;
+  if (typeof contextoActivoRegistro !== 'undefined') contextoActivoRegistro = null;
   loadStore();
   cargarDocentesAdminLocal();
   refrescarDocentesAdminRegistro();
@@ -2083,6 +2090,18 @@ function llenarAulasPadron(n) {
   if (lista.some(a => String(a.grado) === selGrado.value && a.seccion === anteriorSeccion)) document.getElementById('selSeccion').value = anteriorSeccion;
 }
 function onGrado(options) {
+  options = options || {};
+  const selG = document.getElementById('selGrado');
+  const nuevoG = selG ? parseInt(selG.value, 10) : NaN;
+  const prevCtx = typeof contextoActivoRegistro !== 'undefined' ? contextoActivoRegistro : null;
+  const prevG = prevCtx ? prevCtx.grado : null;
+  if (!options.forzar && !options.sinContexto && prevG && nuevoG && nuevoG !== prevG) {
+    if (typeof confirmarSalidaContexto === 'function' && !confirmarSalidaContexto('cambiar de grado')) {
+      selG.value = String(prevG);
+      actualizarBotonesContextoRegistro();
+      return;
+    }
+  }
   if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   const bd = loadBD();
   const g = parseInt(document.getElementById('selGrado').value, 10);
@@ -2100,7 +2119,7 @@ function onGrado(options) {
   document.getElementById('wrapSeccion').style.display = (secs.length <= 1 && nivel==='primaria') ? 'none' : 'block';
   pintarBotonesContextoRegistro('seccion');
   pintarBotonesContextoRegistro('grado');
-  if (!options || !options.sinContexto) onContexto();
+  if (!options || !options.sinContexto) onContexto({ cambioDeGrado: true });
 }
 
 function actualizarUnidades() {
@@ -2113,6 +2132,20 @@ function onContexto(options) {
   actualizarUnidades();
   if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
   options = options || {};
+
+  const ctxCheck = ctxBase();
+  const prevCtx = typeof contextoActivoRegistro !== 'undefined' ? contextoActivoRegistro : null;
+  const prevSec = prevCtx ? prevCtx.seccion : null;
+  const prevGra = prevCtx ? prevCtx.grado : null;
+  const prevBim = prevCtx ? prevCtx.bim : null;
+  const esCambioSoloSeccion = !options.forzar && !options.cambioDeGrado && !options.cambioDeBimestre && !options.cambioDeArea && prevBim === ctxCheck.bim && prevGra === ctxCheck.grado && prevSec && ctxCheck.seccion && ctxCheck.seccion !== prevSec;
+  if (esCambioSoloSeccion) {
+    if (typeof confirmarSalidaContexto === 'function' && !confirmarSalidaContexto('cambiar de sección')) {
+      document.getElementById('selSeccion').value = prevSec;
+      actualizarBotonesContextoRegistro();
+      return;
+    }
+  }
 
   if (document.getElementById('selBim').value !== padronBimestre) {
     if (!options.localOnly) cambiarBimestreRegistro();
@@ -2156,6 +2189,9 @@ function onContexto(options) {
   if (!options.localOnly) consultarEstadoSiagie();
   sincronizarEdicionRegistro();
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.load();
+  if (typeof contextoActivoRegistro !== 'undefined') {
+    contextoActivoRegistro = { nivel: c.nivel, bim: c.bim, grado: c.grado, seccion: c.seccion, area: c.area };
+  }
 }
 
 function guardarMeta() {
@@ -2236,13 +2272,14 @@ function setArea(a) {
     toast('Esta área no está asignada al docente en el aula seleccionada');
     return;
   }
+  if (a !== areaActual && typeof confirmarSalidaContexto === 'function' && !confirmarSalidaContexto('cambiar de área')) return;
   if(tutorRegistroController){if(!tutorRegistroController.canLeave())return;tutorRegistroController.clear();tutorRegistroController=null;}
   document.getElementById('registroTutorPanel').hidden=true;document.getElementById('registroAcademicoPanel').hidden=false;document.getElementById('registroAcademicFooter').hidden=false;
   areaActual = a;
   renderAreas();
   fillComps();
   actualizarDocenteResponsable();
-  onContexto();
+  onContexto({ cambioDeArea: true });
 }
 
 function fillComps() {
@@ -4031,7 +4068,46 @@ function configurarAccesosAppsMoviles() {
   });
 }
 
+function confirmarSalidaContexto(accionTexto) {
+  // Select change events run after the DOM already contains the requested context.
+  // Inspect and collect the still-visible previous context before evaluating its pending state.
+  const anterior = contextoActivoRegistro;
+  const selects = ['selGrado', 'selSeccion', 'selBim'].map(id => document.getElementById(id));
+  const solicitados = selects.map(el => el?.value);
+  const areaSolicitada = areaActual;
+  try {
+    if (anterior) {
+      [anterior.grado, anterior.seccion, anterior.bim].forEach((value, i) => {
+        if (selects[i]) selects[i].value = String(value);
+      });
+      areaActual = anterior.area;
+    }
+  if (typeof IERegistroNotas2UI !== 'undefined') {
+    let valid = true;
+    if (typeof IERegistroNotas2UI.canEdit === 'function' && IERegistroNotas2UI.canEdit()) {
+      if (typeof IERegistroNotas2UI.collect === 'function') {
+        try { valid = IERegistroNotas2UI.collect(true); } catch (_) { valid = false; }
+      }
+    }
+    const pendientes = typeof IERegistroNotas2UI.pendingPanels === 'function' ? IERegistroNotas2UI.pendingPanels() : [];
+    const hayCambios = pendientes.length > 0 || !valid;
+    if (hayCambios) {
+      const pId = typeof IERegistroNotas2UI.panel === 'function' ? IERegistroNotas2UI.panel() : (typeof panelActivoRegistro === 'function' ? panelActivoRegistro() : '');
+      const panelActualNombre = pId === 'calificar' || pId === 'cal' ? 'Calificar' : pId === 'promedios' || pId === 'fin' ? 'Promedios' : pId === 'asistencia' || pId === 'as' ? 'Asistencia' : '';
+      const lista = pendientes.length > 0 ? pendientes.join(', ') : (panelActualNombre || 'el registro');
+      const accion = accionTexto || 'cambiar de contexto';
+      return confirm('Hay cambios sin guardar en: ' + lista + '.\n\n¿Deseas ' + accion + ' sin guardar? Los cambios no confirmados en la nube no se guardarán automáticamente.');
+    }
+  }
+  return true;
+  } finally {
+    selects.forEach((el, i) => { if (el) el.value = solicitados[i]; });
+    areaActual = areaSolicitada;
+  }
+}
+
 function volverHome() {
+  if (typeof confirmarSalidaContexto === 'function' && !confirmarSalidaContexto('salir')) return;
   guardarTodo();
   var perm = nivelPermitido();
   // Si solo tiene un nivel, no mostrar menú de elección: salir al index
@@ -4040,6 +4116,7 @@ function volverHome() {
     location.href = 'index.html';
     return;
   }
+  if (typeof contextoActivoRegistro !== 'undefined') contextoActivoRegistro = null;
   document.getElementById('viewApp').classList.add('hidden');
   document.getElementById('viewHome').classList.remove('hidden');
   nivel = null;
