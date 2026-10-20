@@ -115,22 +115,23 @@ function createTestHarness(initialPane = 'calificar') {
   };
 }
 
-// 1. Error en Calificar: visible
-test('1. Error de servidor u offline en Calificar: «Reintentar notas» es visible', () => {
+// Notas 2.0 keeps retry in the diagnostic, never the habitual footer.
+// 1. Error en Calificar: oculto
+test('1. Error de servidor u offline en Calificar: «Reintentar notas» permanece en diagnóstico', () => {
   const harness = createTestHarness('calificar');
   harness.simulateState('server');
-  assert.equal(harness.elements.registroRetryOffer.hidden, false, 'Debe ser visible ante error de servidor en Calificar');
+  assert.equal(harness.elements.registroRetryOffer.hidden, true, 'Debe permanecer fuera del pie ante error de servidor en Calificar');
   harness.simulateState('offline');
-  assert.equal(harness.elements.registroRetryOffer.hidden, false, 'Debe ser visible ante offline en Calificar');
+  assert.equal(harness.elements.registroRetryOffer.hidden, true, 'Debe permanecer fuera del pie ante offline en Calificar');
 });
 
 // 2. Error en Promedios: visible
-test('2. Error de servidor u offline en Promedios: «Reintentar notas» es visible', () => {
+test('2. Error de servidor u offline en Promedios: «Reintentar notas» permanece en diagnóstico', () => {
   const harness = createTestHarness('promedios');
   harness.simulateState('server');
-  assert.equal(harness.elements.registroRetryOffer.hidden, false, 'Debe ser visible ante error de servidor en Promedios');
+  assert.equal(harness.elements.registroRetryOffer.hidden, true, 'Debe permanecer fuera del pie ante error de servidor en Promedios');
   harness.simulateState('offline');
-  assert.equal(harness.elements.registroRetryOffer.hidden, false, 'Debe ser visible ante offline en Promedios');
+  assert.equal(harness.elements.registroRetryOffer.hidden, true, 'Debe permanecer fuera del pie ante offline en Promedios');
 });
 
 // 3. Error en Resumen: oculto
@@ -166,7 +167,7 @@ test('5. Estado normal (connected / pending) en cualquier pestaña: «Reintentar
 test('6. Recuperación exitosa tras error: «Reintentar notas» se oculta automáticamente', () => {
   const harness = createTestHarness('calificar');
   harness.simulateState('server');
-  assert.equal(harness.elements.registroRetryOffer.hidden, false, 'Visible inicialmente con error');
+  assert.equal(harness.elements.registroRetryOffer.hidden, true, 'Oculto en el pie también con error');
   harness.simulateState('connected');
   assert.equal(harness.elements.registroRetryOffer.hidden, true, 'Oculto automáticamente tras recuperación exitosa');
 });
