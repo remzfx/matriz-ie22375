@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-notas2="1">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
@@ -10,6 +10,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
+  .hidden { display: none !important; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
   .session-evaluation-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);column-gap:12px;row-gap:10px;align-items:start;}
   .session-evaluation-grid>div{min-width:0;}
@@ -608,9 +609,18 @@
 /* Fin Fase3 conexión. */
 </style>
   <script src="login-bridge.js"></script>
+<script>
+function registroDependenciaFallida(){
+  const status=document.getElementById('registroConnectionStatus'),label=document.getElementById('registroConnectionText');
+  if(status)status.dataset.state='server';
+  if(label)label.textContent='No se pudo cargar un componente de Registro. Edición pausada; tus notas locales están conservadas. Vuelve a abrir Registro cuando haya conexión.';
+  if(typeof IERegistroConnection!=='undefined')IERegistroConnection.current()?.dispose();
+  document.querySelectorAll('[data-reg-write],[data-reg-cloud],#registroRecoveryControls button,.cal-nota,.fin-nota,.academic-conclusion,.asis-input').forEach(el=>el.disabled=true);
+}
+</script>
 <script src="students.js"></script>
 <script src="student-identity.js"></script>
-<script src="academic-identity.js" defer></script><script src="registro-reconcile.js" defer></script><script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script><script src="registro-evaluation.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script><script src="registro-sync-diagnostic.js" defer></script><script src="registro-sync-diagnostic-ui.js" defer></script>
+<script src="registro-notas2.js"></script><script src="academic-identity.js" defer></script><script src="registro-reconcile.js" defer></script><script src="registro-academic-model.js" defer></script><script src="conclusion-suggestions.js" defer></script><script src="registro-evaluation.js"></script><script src="registro-grading.js"></script><script src="transversales-client.js"></script><script src="registro-transversales.js"></script><script src="registro-sync-diagnostic.js" defer></script><script src="registro-sync-diagnostic-ui.js" defer></script>
   <link rel="stylesheet" href="layout-shells.css" />
 </head>
 <body class="min-h-screen text-slate-800">
@@ -897,10 +907,10 @@
       <p id="registroLegacyWarning" hidden class="text-xs text-amber-800 p-2">Hay datos anteriores sin propietario verificable. Se conservan intactos; consulta con Admin para revisarlos. <button id="registroLegacyReview" hidden style="display:none;min-height:44px" type="button" class="btn btn-ghost" onclick="IERegistroRecovery.legacy()">Revisar datos anteriores · Admin</button></p>
       <div id="registroRecoveryControls">
         <div class="registro-recovery-actions" role="group" aria-label="Acciones de notas · desplázate horizontalmente para ver más" tabindex="0">
-          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#fee2e2;color:#991b1b" data-reg-write onclick="IERegistroRecovery.recover()"><svg class="registro-action-icon" data-icon="cloud-download" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 13v8m-4-4 4 4 4-4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Recuperar Nube</span></button>
+          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#fee2e2;color:#991b1b" data-reg-write onclick="IERegistroNotas2UI.download()"><svg class="registro-action-icon" data-icon="cloud-download" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 13v8m-4-4 4 4 4-4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Bajar Nube</span></button>
           <button id="registroConflictOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.resolve()"><svg class="registro-action-icon" data-icon="git-compare" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="18" cy="6" r="3"/><path d="M18 9v9m-12-3V6m-3 3 3-3 3 3m6 6 3 3 3-3"/><circle cx="6" cy="18" r="3"/></svg><span>Revisar diferencias</span></button>
-          <button type="button" class="btn btn-primary text-[11px] !py-2 !px-2 whitespace-nowrap" data-reg-write onclick="IERegistroRecovery.local()"><svg class="registro-action-icon" data-icon="save" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.2 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.8a2 2 0 0 0-.6-1.4l-3.8-3.8a2 2 0 0 0-1.4-.6Z"/><path d="M17 21v-7H7v7M7 3v5h8"/></svg><span>Guardar</span></button>
-          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#16a34a;color:#fff" data-reg-cloud onclick="IERegistroRecovery.upload()"><svg class="registro-action-icon" data-icon="cloud-upload" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21v-8m-4 4 4-4 4 4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Subir Nube</span></button>
+          <button type="button" class="btn btn-primary text-[11px] !py-2 !px-2 whitespace-nowrap" data-reg-write onclick="IERegistroNotas2UI.save()"><svg class="registro-action-icon" data-icon="save" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.2 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.8a2 2 0 0 0-.6-1.4l-3.8-3.8a2 2 0 0 0-1.4-.6Z"/><path d="M17 21v-7H7v7M7 3v5h8"/></svg><span>Guardar</span></button>
+          <button type="button" class="btn text-[11px] !py-2 !px-2 whitespace-nowrap" style="background:#16a34a;color:#fff" onclick="IERegistroNotas2UI.process()"><svg class="registro-action-icon" data-icon="cloud-upload" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 21v-8m-4 4 4-4 4 4"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg><span>Procesar a Promedios</span></button>
           <button id="registroUndoOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.undo()"><svg class="registro-action-icon" data-icon="undo-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></svg><span>Deshacer recuperación</span></button>
           <button id="registroDraftOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" data-reg-write onclick="IERegistroRecovery.drafts()"><svg class="registro-action-icon" data-icon="history" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 2.5-6.2L3 8M3 3v5h5m4-1v5l4 2"/></svg><span>Recuperar borrador</span></button>
           <button id="registroRetryOffer" type="button" hidden class="btn btn-ghost text-[11px] !py-2 !px-2" onclick="IERegistroRecovery.refresh(true)"><svg class="registro-action-icon" data-icon="refresh-cw" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 0 1 15.4-6.4L21 8m0-5v5h-5m5 4a9 9 0 0 1-15.4 6.4L3 16m5 0H3v5"/></svg><span>Reintentar notas</span></button>
@@ -1073,6 +1083,10 @@
 })(typeof window==='undefined'?globalThis:window);
 </script>
 <script>
+/* Dependencias obligatorias de la integración Notas 2.0. */
+if(typeof IERegistroLocalStore==='undefined'||typeof IERegistroConnection==='undefined'||typeof IERegistroEvaluacion==='undefined'||typeof IERegistroGrading==='undefined'){
+  registroDependenciaFallida();throw Error('Registro pausado: falta una dependencia obligatoria.');
+}
 const registroLocal = IERegistroLocalStore.create(localStorage,getLoginSession);
 const NOTAS_KEY = registroLocal.key;
 const EST_PRIM = {"Personal Social":{"competencias":["Construye su Identidad","Convive y participa democráticamente","Construye interpretaciones históricas","Gestiona responsablemente el espacio y el ambiente","Gestiona responsablemente los recursos económicos"]},"Educación Física":{"competencias":["Se desenvuelve de manera autónoma a través de su motricidad","Asume una vida saludable","Interactúa a través de sus habilidades sociomotrices"]},"Comunicación":{"competencias":["Se comunica oralmente en su lengua materna","Lee diversos tipos de textos escritos en su lengua materna","Escribe diversos tipos de textos en su lengua materna"]},"Arte y Cultura":{"competencias":["Aprecia de manera crítica manifestaciones artístico-culturales","Crea proyectos artísticos desde los lenguajes artísticos"]},"Matemática":{"competencias":["Resuelve problemas de cantidad","Resuelve problemas de regularidad, equivalencia y cambio","Resuelve problemas de forma, movimiento y localización","Resuelve problemas de gestión de datos e incertidumbre"]},"Ciencia y Tecnología":{"competencias":["Indaga mediante métodos científicos para construir sus conocimientos","Explica el mundo físico basándose en conocimientos sobre los seres vivos, materia y energía, biodiversidad, Tierra y universo","Diseña y construye soluciones tecnológicas para resolver problemas de su entorno"]},"Educación Religiosa":{"competencias":["Construye su identidad como persona humana, amada por Dios, digna, libre y trascendente, comprendiendo la doctrina de su propia religión, abierto al diálogo con las que le son cercanas","Asume la experiencia el encuentro personal y comunitario con Dios en su proyecto de vida en coherencia con su creencia religiosa"]},"Competencias Transversales":{"competencias":["Se desenvuelven en entornos virtuales generados por las TIC","Gestiona su aprendizaje de manera autónoma"]}};
@@ -1143,6 +1157,7 @@ let bdEstudiantes = IEStudents.empty();
 let cargandoEstudiantes = false;
 function loadBD() { return bdEstudiantes; }
 function loadStore() {
+  if(typeof IERegistroNotas2UI!=='undefined'&&registroLocal.matches()&&IERegistroNotas2UI.keepMemory())return;
   if(typeof registroLocal!=='undefined'&&!registroLocal.matches())throw Error('La cuenta cambió. Abre Registro nuevamente; las notas anteriores están conservadas.');
   try {
     const raw = typeof registroLocal!=='undefined'?registroLocal.read():localStorage.getItem(NOTAS_KEY);
@@ -1160,6 +1175,7 @@ function loadStore() {
   if (!store.studentAliases) store.studentAliases = {};
 }
 function saveStore() {
+  if(document.documentElement?.dataset?.notas2==='1'){if(typeof IERegistroNotas2UI!=='undefined')IERegistroNotas2UI.persist();return;}
   store._ts = Date.now();
   if(typeof registroLocal!=='undefined')registroLocal.write(JSON.stringify(store));
   else localStorage.setItem(NOTAS_KEY, JSON.stringify(store));
@@ -1277,6 +1293,7 @@ function mergeRegistroPayload(p) {
   return n;
 }
 async function subirRegistroNube() {
+  if(typeof IERegistroNotas2UI!=='undefined')return IERegistroNotas2UI.save();
   if(document.getElementById('registroTutorPanel')?.hidden===false){toast('Envía las decisiones desde el módulo del Tutor.');return false;}
   if(typeof IERegistroAcademico==='undefined'||typeof IERegistroReconcile==='undefined'){toast('No se cargó el modelo académico. El borrador local se conserva; reintenta antes de enviar.');return false;}
   if (subirRegistroNube.pending) return subirRegistroNube.pending;
@@ -1357,6 +1374,7 @@ async function subirRegistroNube() {
   try { return await tarea; } finally { subirRegistroNube.pending=null; }
 }
 async function bajarRegistroNube(options) {
+  if(typeof IERegistroNotas2UI!=='undefined')return IERegistroNotas2UI.download();
   options=options||{};bajarRegistroNube.resultado=null;
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())return cargarRegistroHistorico();
   if(!nivel||!areaActual){toast('Elija nivel y área');return false;}
@@ -1472,6 +1490,7 @@ function metaRegistro() {
 }
 let padronBimestre = '', solicitudPadron = 0, padronVerificadoServidor = false, tokenPadron = '', vencimientoCachePadron;
 function registroSoloLectura() {
+  if(document.documentElement?.dataset?.notas2==='1'&&(typeof IERegistroNotas2UI==='undefined'||!IERegistroNotas2UI.canEdit()))return true;
   if(typeof IERegistroConnection!=='undefined'&&!IERegistroConnection.canEdit())return true;
   if(typeof registroLocal!=='undefined'&&!registroLocal.matches())return true;
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica())return true;
@@ -2174,6 +2193,7 @@ function competenciasParaEvaluar(){
   return competencias().concat(typeof IERegistroTransversales!=='undefined'&&IERegistroTransversales.eligible()?Object.values(IERegistroEvaluacion.COMP):[]);
 }
 async function guardarRegistroIntegrado(options){
+  if(typeof IERegistroNotas2UI!=='undefined')return options?.soloLocal?IERegistroNotas2UI.collect():IERegistroNotas2UI.save();
   if(document.getElementById('registroTutorPanel')?.hidden===false){toast('Guarda la decisión desde el módulo del Tutor.');return false;}
   if(registroSoloLectura()||bimCerradoDocente())return false;
   const invalidas=Array.from(document.querySelectorAll('.cal-nota,.fin-nota')).some(inp=>{if(inp.dataset?.registroContexto&&inp.dataset.registroContexto!==cloudClaveReg())return false;const root=inp.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return false;return !inp.readOnly&&inp.value!==''&&(!Number.isFinite(Number(inp.value))||Number(inp.value)<0||Number(inp.value)>20);});
@@ -2266,7 +2286,7 @@ function capacidadElegida() {
   return v.trim();
 }
 function onCompChange() {
-  if (sesionActiva && hayNotasPendientes()) {
+  if (typeof IERegistroNotas2UI==='undefined' && sesionActiva && hayNotasPendientes()) {
     if (confirm('Hay notas en la sesión actual.\n¿Desea guardar antes de cambiar de competencia?')) {
       guardarTodo();
       toast('Guardado');
@@ -2343,7 +2363,7 @@ function activarSesion() {
   if (!capacidad) { alert('Elige una capacidad oficial o escribe una personalizada'); return; }
 
   // Si ya hay sesión distinta con notas, preguntar guardar
-  if (sesionActiva && hayNotasPendientes()) {
+  if (typeof IERegistroNotas2UI==='undefined' && sesionActiva && hayNotasPendientes()) {
     const misma = sesionActiva.fecha === fecha && sesionActiva.comp === comp && sesionActiva.capacidad === capacidad;
     if (!misma) {
       if (confirm('Hay notas en otra sesión.\n¿Desea guardar antes de cambiar de capacidad/competencia?')) {
@@ -2422,11 +2442,12 @@ function confirmarEdicionNumerica(inp,comp,id,previo,n,cap) {
   inp.value=previo.origen==='letra'?'':pad2(previo.nota20);
   return false;
 }
-function recolectarPantalla() {
-  document.querySelectorAll(".academic-conclusion").forEach(el=>{const root=el.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return;setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value);});
+function recolectarPantalla(panel) {
+  document.querySelectorAll(".academic-conclusion").forEach(el=>{if(panel&&panel!=='promedios')return;const root=el.closest?.('#finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return;setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),el.value);});
   if (registroSoloLectura() || bimCerradoDocente()) return false;
   try { const active=document.activeElement,root=active?.closest?.('#finLista');if(active&&active.blur&&(!active.dataset?.registroContexto||active.dataset.registroContexto===cloudClaveReg())&&(!root?.dataset?.registroContexto||root.dataset.registroContexto===cloudClaveReg()))active.blur(); } catch (e) {}
   document.querySelectorAll('.cal-nota').forEach(inp => {
+    if(panel&&panel!=='calificar')return;
     if (inp.dataset.registroContexto && inp.dataset.registroContexto !== cloudClaveReg()) return;
     if (inp.readOnly) return;
     const nombre = decodeURIComponent(inp.dataset.nom || '');
@@ -2446,6 +2467,7 @@ function recolectarPantalla() {
     else {store.grades[k] = Object.assign({},store.grades[k]||{},{nota20:n,nivel:numToLetter(n),origen:'numero',ts:Date.now()});delete store.grades[k].borrado;}
   });
   document.querySelectorAll('#finLista [data-fin][data-comp]').forEach(cell => {
+    if(panel&&panel!=='promedios')return;
     const root=document.getElementById('finLista');if(root?.dataset?.registroContexto&&root.dataset.registroContexto!==cloudClaveReg())return;
     const inp = cell.querySelector('.fin-nota');
     if (!inp || inp.readOnly) return;
@@ -2462,11 +2484,12 @@ function recolectarPantalla() {
     const n = Math.round(nraw);
     store.finales[k] = { nota20: n, nivel: numToLetter(n), origen: 'numero', ts: Date.now() };
   });
-  if (typeof guardarAsistencia === 'function') {
+  if ((!panel||panel==='asistencia')&&typeof guardarAsistencia === 'function') {
     try { guardarAsistencia(); } catch (e) {}
   }
 }
 function guardarTodo() {
+  if(typeof IERegistroNotas2UI!=='undefined')return IERegistroNotas2UI.collect();
   if (registroSoloLectura()) return false;
   if (!padronBimestre || document.getElementById('selBim').value !== padronBimestre) return false;
   try {
@@ -2529,7 +2552,7 @@ function renderSesiones() {
     if (del) { borrarSesionFecha(del.dataset.delfecha); return; }
     const b = ev.target.closest('button[data-fecha]');
     if (!b) return;
-    if (sesionActiva && hayNotasPendientes()) {
+    if (typeof IERegistroNotas2UI==='undefined' && sesionActiva && hayNotasPendientes()) {
       if (confirm('Hay notas en pantalla.\n¿Desea guardar antes de cambiar de fecha?')) {
         guardarTodo();
         toast('Guardado');
@@ -3057,7 +3080,7 @@ function prepararImpresion(opciones) {
  if((typeof registroLocal!=='undefined'&&!registroLocal.matches())||(typeof areas==='function'&&!areas().includes(c.area))){toast('No se puede imprimir un contexto sin autorización vigente.');return;}
  const cfg=typeof loadPeriodosAdmin==='function'?loadPeriodosAdmin():null;
  const year=cfg&&Number.isInteger(Number(cfg.anio))&&Number(cfg.anio)>=2000&&Number(cfg.anio)<=2100?String(cfg.anio):'No configurado';
- const html=IECalificarPrint.build({context:c,students:alumnos,competences:competencias(),sessions:store.sessions,from:opciones.desde,to:opciones.hasta,mode:modoCalif,year,teacher:document.getElementById('inpDocente').value.trim()||'No registrado',studentKey,readGrade:key=>leerNota(store.grades,key),toLetter:numToLetter,calculated:notaDesdeSesiones,direct:notaDirectaAlumno,worked:competenciaTrabajada,exact:numeroExactoComp});
+ const html=IECalificarPrint.build({context:c,students:alumnos,competences:competencias(),sessions:store.sessions,from:opciones.desde,to:opciones.hasta,mode:modoCalif,year,teacher:document.getElementById('inpDocente').value.trim()||'No registrado',studentKey,readGrade:key=>leerNota(store.grades,key),toLetter:numToLetter,calculated:notaDesdeSesiones,direct:notaDirectaAlumno,worked:typeof IERegistroNotas2UI!=='undefined'?(comp)=>IERegistroNotas2UI.worked(comp,'calificar'):competenciaTrabajada,exact:numeroExactoComp});
  if(!html){alert(opciones.desde||opciones.hasta?'No hay sesiones guardadas en el periodo elegido.':'No hay competencias disponibles para imprimir.');return;}
  document.getElementById('printArea').innerHTML=html;
  window.print();
@@ -3127,12 +3150,12 @@ function notaDirectaAlumno(comp, nombre) {
   const letra = f.nivel || (nota!=='' ? numToLetter(nota) : '');
   return { nota, letra };
 }
-function competenciaTrabajada(comp,c=ctxBase()){const k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');return !store.competenciasEstado||!store.competenciasEstado[k]||store.competenciasEstado[k].trabajada!==false;}
+function competenciaTrabajada(comp,c=ctxBase()){if(typeof IERegistroNotas2UI!=='undefined')return IERegistroNotas2UI.worked(comp,undefined,c);const k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');return !store.competenciasEstado||!store.competenciasEstado[k]||store.competenciasEstado[k].trabajada!==false;}
 function concCompAlumno(comp,nombre){return ((leerNota(store.concComp||{},finalKey(comp,nombre))||{}).texto||'').trim();}
 function baselineAcademica(){if(typeof IERegistroAcademico==='undefined')return null;store.academicSync=store.academicSync||{};const key=cloudClaveReg();if(!store.academicSync[key])store.academicSync[key]={version:null,baseline:IERegistroAcademico.canonical(sliceRegistroArea())};return store.academicSync[key];}
 function dirtyAcademico(){const b=baselineAcademica();dirty=!b||IERegistroAcademico.canonical(sliceRegistroArea())!==b.baseline;}
 function setConclusionAcademica(comp,id,text){if(registroSoloLectura()||bimCerradoDocente()||!competenciaTrabajada(comp))return false;baselineAcademica();store.concComp=store.concComp||{};const k=finalKey(comp,id),v=String(text).trim();if(v.length>2000){toast('Máximo 2000 caracteres por conclusión');return false;}if(v===concCompAlumno(comp,id))return false;store.concComp[k]={texto:v,ts:Date.now()};saveStore();dirtyAcademico();return true;}
-function setCompetenciaTrabajada(comp,activa){if(registroSoloLectura()||bimCerradoDocente()||!competencias().includes(comp))return false;const c=ctxBase(),k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');if(competenciaTrabajada(comp)===activa)return false;
+function setCompetenciaTrabajada(comp,activa){if(typeof IERegistroNotas2UI!=='undefined')return IERegistroNotas2UI.setWorked(comp,activa);if(registroSoloLectura()||bimCerradoDocente()||!competencias().includes(comp))return false;const c=ctxBase(),k=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');if(competenciaTrabajada(comp)===activa)return false;
  const datos=(store.sessions||[]).some(x=>x.nivel===c.nivel&&x.bim===c.bim&&String(x.grado)===String(c.grado)&&x.seccion===c.seccion&&x.area===c.area&&x.comp===comp)||[store.finales||{},store.concComp||{}].some(map=>Object.keys(map).some(x=>x.startsWith(k+'||')));
  if(!activa&&datos&&!confirm('Esta competencia ya tiene información registrada. Sus evidencias, notas y conclusiones se conservarán, pero no se utilizarán ni se enviarán al SIAGIE durante este bimestre. ¿Continuar?'))return false;
  baselineAcademica();store.competenciasEstado=store.competenciasEstado||{};store.competenciasEstado[k]={trabajada:activa,ts:Date.now()};saveStore();dirtyAcademico();fillComps();renderStudents();renderFinales();if(document.getElementById('panelAvance').classList.contains('on'))renderAvance();return true;
@@ -3242,9 +3265,11 @@ async function prepararVersionAcademica(options){
 }
 
 function notaCompAlumno(comp, nombre) {
-  if(typeof competenciaTrabajada==='function'&&!competenciaTrabajada(comp))return {nota:'',letra:'',src:''};
+  const worked=typeof IERegistroNotas2UI!=='undefined'?IERegistroNotas2UI.worked(comp,'promedios'):typeof competenciaTrabajada!=='function'||competenciaTrabajada(comp);
+  if(!worked)return {nota:'',letra:'',src:''};
   const dir = notaDirectaAlumno(comp, nombre);
   if (dir.letra) return { nota: dir.nota!==''?dir.nota:letterToNum(dir.letra), letra: dir.letra, src: 'P' };
+  if(typeof IERegistroNotas2UI!=='undefined'&&IERegistroNotas2UI.officialOnly())return {nota:'',letra:'',src:''};
   const ev = notaDesdeSesiones(comp, nombre);
   if (ev.nota !== '' && ev.nota != null) return { nota: ev.nota, letra: ev.letra, src: 'C' };
   return { nota:'', letra:'', src:'' };
@@ -3263,6 +3288,7 @@ function bimCerradoDocente() {
   const bim = document.getElementById('selBim').value;
   const sL = getLoginSession();
   const esAdmin = sL && (sL.role === 'admin' || sL.user === 'admin');
+  if(typeof IERegistroNotas2UI!=='undefined')return !bimestreHabilitado(bim);
   return registroSoloLectura() || (!bimestreHabilitado(bim) && !esAdmin);
 }
 
@@ -3390,13 +3416,13 @@ function historicoContextoIgual(row,c){
 function historicoPayloadAcotado(payload,c){
  if(!payload||typeof payload!=='object'||Array.isArray(payload))throw Error('Registro histórico inválido.');
  const clave=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||'),aula=[c.nivel,c.bim,c.grado,c.seccion].join('||'),out={sessions:[],meta:{}};
- for(const name of ['grades','finales','concComp','competenciasEstado','concArea','capsSel','asistencia','asisFechas','asisFechasEstado']){
+ for(const name of ['grades','finales','concComp','competenciasEstado','calificarEstado','concArea','capsSel','asistencia','asisFechas','asisFechasEstado']){
    out[name]={};const map=payload[name];if(map!=null&&(typeof map!=='object'||Array.isArray(map)))throw Error('Mapa histórico inválido.');
    Object.entries(map||{}).forEach(([key,value])=>{const shared=['asistencia','asisFechas','asisFechasEstado'].includes(name),pref=shared?aula:clave;if(key===pref||key.startsWith(pref+'||'))out[name][key]=JSON.parse(JSON.stringify(value));});
  }
  if(payload.sessions!=null&&!Array.isArray(payload.sessions))throw Error('Sesiones históricas inválidas.');
  out.sessions=(payload.sessions||[]).filter(row=>historicoContextoIgual(row,c)).map(row=>JSON.parse(JSON.stringify(row)));
- const aliases=payload.meta?.studentAliases||{};out.meta[clave]={studentAliases:JSON.parse(JSON.stringify(aliases))};out.studentAliases={[[c.nivel,c.grado,c.seccion].join('||')]:JSON.parse(JSON.stringify(aliases))};return out;
+ const aliases=payload.meta?.studentAliases||{};out.meta[clave]={studentAliases:JSON.parse(JSON.stringify(aliases)),...(payload.meta?.notas2?{notas2:JSON.parse(JSON.stringify(payload.meta.notas2))}:{})};out.studentAliases={[[c.nivel,c.grado,c.seccion].join('||')]:JSON.parse(JSON.stringify(aliases))};return out;
 }
 async function leerRegistroHistorico(c,token){
  const actual=()=>IEStudents.validToken()===token&&(getLoginSession()||{}).token===token;
@@ -3450,6 +3476,7 @@ function comparativoNotaAnterior(payload,c,comp,al,roster){
  const leer=(map,key)=>IEStudentIdentity.leer(map,key,al,aliases,unique);
  const f=leer(payload.finales,pref+'||'+studentKey(al));
  if(f){const letra=f.nivel||(f.nota20!==''&&f.nota20!=null?numToLetter(f.nota20):'');if(['AD','A','B','C'].includes(letra))return letra;}
+ if(payload.meta?.[[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')]?.notas2?.adopted===true)return '';
  const nums=[];
  (payload.sessions||[]).filter(x=>historicoContextoIgual(x,c)&&x.comp===comp).forEach(x=>{
   const key=[pref,x.capacidad,x.fecha,studentKey(al)].join('||'),g=leer(payload.grades,key);if(!g)return;
@@ -3537,7 +3564,7 @@ function renderFinales() {
     const capsTxt = caps.length
       ? caps.map(x => (x.fecha?x.fecha.slice(5)+' · ':'') + x.capacidad).join('<br>')
       : 'Sin capacidades aún';
-    head += '<th><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" '+(competenciaTrabajada(cp)?'checked':'')+' '+(bloqueado?'disabled':'')+'><span>'+escapeRegistro(cp)+'</span></label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
+    head += '<th><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" title="Configuración de Calificar; se aplica a Promedios al Procesar" '+((typeof IERegistroNotas2UI!=='undefined'?IERegistroNotas2UI.worked(cp,'calificar'):competenciaTrabajada(cp))?'checked':'')+' '+(bloqueado?'disabled':'')+'><span>'+escapeRegistro(cp)+'</span></label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
   });
 
   const rows = alumnos.map((al, i) => {
@@ -4079,10 +4106,12 @@ if (document.readyState !== 'loading') {
 })(typeof window==='undefined'?globalThis:window);
 
 </script>
+<script src="registro-notas2-ui.js" onerror="registroDependenciaFallida()"></script>
 <script>
 /* Adaptador frontend: operaciones explícitas y timers exclusivamente locales. */
 (function(){
- 'use strict';let service,timer,lastDisk,refreshTimer,periodicTimer,expiryTimer,expiryToken='';const observed=new Map();try{lastDisk=localStorage.getItem(NOTAS_KEY);}catch(_){}
+ 'use strict';
+ if(document.documentElement?.dataset?.notas2==='1'){if(typeof IERegistroNotas2UI==='undefined')registroDependenciaFallida();return;}let service,timer,lastDisk,refreshTimer,periodicTimer,expiryTimer,expiryToken='';const observed=new Map();try{lastDisk=localStorage.getItem(NOTAS_KEY);}catch(_){}
  const copy=x=>IERegistroReconcile.copy(x),context=()=>{const s=getLoginSession()||{};return cloudClaveReg()+'|'+(s.token||'')+'|'+(s.user||'')+'|'+(s.role||'');};
  function authenticated(){const s=getLoginSession();return !!(s?.token&&['admin','docente'].includes(s.role)&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&(typeof registroLocal==='undefined'||registroLocal.matches()));}
  function text(el,value){if(el&&el.textContent!==value)el.textContent=value;}
