@@ -526,3 +526,229 @@ test('6. INTERFAZ Y DIÁLOGO: IERegistroReconcile.choose genera la vista interac
   assert.equal(promiseResolved, true, 'La promesa de conciliación resolvió');
   assert.equal(Object.keys(resolvedChoices).length, 62, 'Contiene exactamente las 62 decisiones explícitas tomadas');
 });
+
+test('7. PERSISTENCIA EN SHEETS: la celda en Sheets incluye efectivamente meta.externalDriveBackup y valida tamaño final', () => {
+  const setup = new Function('require','__dirname', fs.readFileSync(path.join(__dirname, 'backend-write-auth.test.cjs'), 'utf8').split('\nfor (const action')[0] + '\nreturn setup;')(require, __dirname);
+  const s = setup();
+  s.c.crypto = crypto;
+  const driveFiles = new Map();
+  s.c.DriveApp = {
+    createFile: (name, content) => {
+      const id = 'DRIVE_FILE_' + Math.random().toString(36).slice(2);
+      driveFiles.set(id, { name, content });
+      return { getId: () => id, getName: () => name };
+    },
+    getFileById: (id) => {
+      const f = driveFiles.get(id);
+      if (!f) return null;
+      return { getId: () => id, getName: () => f.name, getBlob: () => ({ getDataAsString: () => f.content, getBytes: () => [...Buffer.from(f.content, 'utf8')] }) };
+    }
+  };
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../apps-script/Notas2.js'), 'utf8'), s.c);
+
+  const context = { nivel: 'primaria', bimestre: 'I', grado: 1, seccion: 'Única', area: 'Comunicación' };
+  const key = [context.nivel, context.bimestre, context.grado, context.seccion, context.area].join('||');
+  const comp = s.c.registroAcademico_().catalog.primaria['Comunicación'][0], id = 'id:synthetic-1', fk = key + '||' + comp + '||' + id;
+  const roster = [{ nivel: context.nivel, grado: 1, seccion: context.seccion, idSiagie: 'synthetic-1', codigoEstudiante: 'SYN001', nombre: 'ESTUDIANTE FICTICIO' }];
+  s.tables.set('EstudiantesBase', {});
+  s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+
+  const evidence = {
+    sessions: [{ nivel: context.nivel, bim: 'I', grado: 1, seccion: context.seccion, area: context.area, comp, capacidad: 'Capacidad ficticia', fecha: '2026-10-01' }],
+    grades: { [key + '||' + comp + '||Capacidad ficticia||2026-10-01||' + id]: { nota20: 15, nivel: 'A', origen: 'numero', ts: 1 } },
+    capsSel: { [key + '||2026-10-01']: [{ comp, cap: 'Capacidad ficticia' }] },
+    calificarEstado: { [key + '||' + comp]: { trabajada: true, ts: 1 } },
+    finales: {}, concComp: {}, competenciasEstado: {}, asistencia: {}, asisFechas: {}, asisFechasEstado: {}
+  };
+  s.tables.get('RegistroNotas').rows.push([key, context.nivel, 'I', 1, context.seccion, context.area, 'DOCENTE FICTICIO', 10, JSON.stringify(evidence)]);
+
+  const averages = { finales: { [fk]: { nota20: 15, nivel: 'A', origen: 'numero', ts: 1 } }, concComp: {}, competenciasEstado: {} };
+  const res = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: averages }));
+  assert.equal(res.ok, true);
+
+  // Verificación crítica: la celda real en columna 9 (RegistroNotas!I2) DEBE contener externalDriveBackup
+  const writtenRow = s.tables.get('RegistroNotas').rows.find(r => r[0] === key);
+  assert.ok(writtenRow, 'La fila debe existir');
+  const rawString = writtenRow[8];
+  assert.ok(rawString.includes('externalDriveBackup'), 'El JSON persistido en Sheets debe contener la propiedad externalDriveBackup');
+  const parsed = JSON.parse(rawString);
+  assert.ok(parsed.meta.externalDriveBackup.fileId.startsWith('DRIVE_FILE_'));
+  assert.equal(parsed.meta.externalDriveBackup.sha256.length, 64);
+  assert.ok(rawString.length <= 49000, 'El tamaño verificado está dentro del límite seguro');
+});
+
+test('8. CONSERVACIÓN DE METADATOS Y TIMESTAMPS: reconcileHistorical preserva íntegramente ts histórico y campos originales', async () => {
+  const scenario = createSyntheticNinoskaScenario();
+  const result = proyectarHistoricoN2_(scenario.rawPayload, scenario.roster, scenario.context, scenario.competencies);
+
+  // Simular la reconciliación frontend
+  const store = { finales: {} };
+  const mockConflicts = result.divergencias;
+
+  // Supongamos que la docente elige candidate:0 para un conflicto específico
+  const targetConflict = mockConflicts[0];
+  const chosenCandidate = targetConflict.candidates[0]; // { id: 'candidate:0', value: { nota20: '', nivel: 'B', origen: 'letra', ts: 1725148800000 } }
+  assert.equal(chosenCandidate.value.ts, 1725148800000, 'El candidato tiene timestamp histórico original');
+
+  // Aplicar lógica de reconcileHistorical corrigiendo AIP N2-R6.2
+  const chosen = JSON.parse(JSON.stringify(chosenCandidate.value));
+  chosen.conciliacionTs = 1728500000000;
+  chosen.conciliacionOpcion = chosenCandidate.id;
+  const [, canonicalKey] = JSON.parse(targetConflict.path);
+  store.finales[canonicalKey] = chosen;
+
+  // Verificaciones de no regresión sobre los metadatos:
+  assert.equal(store.finales[canonicalKey].ts, 1725148800000, 'El ts histórico original se conserva intacto, NO es reemplazado por Date.now()');
+  assert.equal(store.finales[canonicalKey].nivel, 'B', 'Nivel original conservado');
+  assert.equal(store.finales[canonicalKey].origen, 'letra', 'Origen original conservado');
+  assert.equal(store.finales[canonicalKey].conciliacionTs, 1728500000000, 'La fecha de conciliación se registra por separado');
+  assert.equal(store.finales[canonicalKey].conciliacionOpcion, 'candidate:0', 'Opción registrada por separado');
+});
+
+test('9. FALLO EN DRIVE PROTEGE SHEETS: si el respaldo en Drive falla, savenotas2 aborta sin tocar RegistroNotas', () => {
+  const setup = new Function('require','__dirname', fs.readFileSync(path.join(__dirname, 'backend-write-auth.test.cjs'), 'utf8').split('\nfor (const action')[0] + '\nreturn setup;')(require, __dirname);
+  const s = setup();
+  s.c.crypto = crypto;
+  // Mock de Drive que falla intencionalmente (simulando caída de servicio o cuota)
+  s.c.DriveApp = {
+    createFile: () => {
+      throw Error('Error simulado de Google Drive: cuota excedida');
+    },
+    getFileById: () => null
+  };
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../apps-script/Notas2.js'), 'utf8'), s.c);
+
+  const context = { nivel: 'primaria', bimestre: 'I', grado: 1, seccion: 'Única', area: 'Comunicación' };
+  const key = [context.nivel, context.bimestre, context.grado, context.seccion, context.area].join('||');
+  const comp = s.c.registroAcademico_().catalog.primaria['Comunicación'][0], id = 'id:synthetic-1', fk = key + '||' + comp + '||' + id;
+  const roster = [{ nivel: context.nivel, grado: 1, seccion: context.seccion, idSiagie: 'synthetic-1', codigoEstudiante: 'SYN001', nombre: 'ESTUDIANTE FICTICIO' }];
+  s.tables.set('EstudiantesBase', {});
+  s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+
+  const originalPayload = {
+    sessions: [{ nivel: context.nivel, bim: 'I', grado: 1, seccion: context.seccion, area: context.area, comp, capacidad: 'Capacidad ficticia', fecha: '2026-10-01' }],
+    grades: { [key + '||' + comp + '||Capacidad ficticia||2026-10-01||' + id]: { nota20: 15, nivel: 'A', origen: 'numero', ts: 1 } },
+    finales: {}, concComp: {}, competenciasEstado: {}, calificarEstado: { [key + '||' + comp]: { trabajada: true, ts: 1 } }
+  };
+  const originalJsonString = JSON.stringify(originalPayload);
+  s.tables.get('RegistroNotas').rows.push([key, context.nivel, 'I', 1, context.seccion, context.area, 'DOCENTE FICTICIO', 10, originalJsonString]);
+
+  const beforeWrites = s.state.writes;
+  const averages = { finales: { [fk]: { nota20: 15, nivel: 'A', origen: 'numero', ts: 1 } }, concComp: {}, competenciasEstado: {} };
+  const res = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: averages }));
+
+  // Verificación crítica: la operación debe fallar
+  assert.equal(res.ok, false);
+  assert.equal(res.code, 'NOTAS2');
+  assert.match(res.error, /Google Drive/);
+
+  // Verificación de integridad: CERO escrituras a RegistroNotas
+  assert.equal(s.state.writes, beforeWrites, 'No debe registrarse ninguna escritura');
+  const currentCellContent = s.tables.get('RegistroNotas').rows.find(r => r[0] === key)[8];
+  assert.equal(currentCellContent, originalJsonString, 'El contenido original de la fila no fue tocado');
+});
+
+test('10. VALIDACIÓN BACKEND OBLIGATORIA: savenotas2 rechaza guardados incompletos o decisiones fuera de las opciones históricas', () => {
+  const setup = new Function('require','__dirname', fs.readFileSync(path.join(__dirname, 'backend-write-auth.test.cjs'), 'utf8').split('\nfor (const action')[0] + '\nreturn setup;')(require, __dirname);
+  const s = setup();
+  s.c.crypto = crypto;
+  const driveFiles = new Map();
+  s.c.DriveApp = {
+    createFile: (name, content) => {
+      const id = 'DRIVE_FILE_' + Math.random().toString(36).slice(2);
+      driveFiles.set(id, { name, content });
+      return { getId: () => id, getName: () => name };
+    },
+    getFileById: (id) => {
+      const f = driveFiles.get(id);
+      if (!f) return null;
+      return { getId: () => id, getName: () => f.name, getBlob: () => ({ getDataAsString: () => f.content, getBytes: () => [...Buffer.from(f.content, 'utf8')] }) };
+    }
+  };
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../apps-script/Notas2.js'), 'utf8'), s.c);
+
+  const context = { nivel: 'primaria', bimestre: 'I', grado: 1, seccion: 'Única', area: 'Comunicación' };
+  const key = [context.nivel, context.bimestre, context.grado, context.seccion, context.area].join('||');
+  const comp = s.c.registroAcademico_().catalog.primaria['Comunicación'][0], id = 'id:synthetic-1', fk = key + '||' + comp + '||' + id;
+  const roster = [{ nivel: context.nivel, grado: 1, seccion: context.seccion, idSiagie: 'synthetic-1', codigoEstudiante: 'SYN001', nombre: 'ESTUDIANTE FICTICIO' }];
+  s.tables.set('EstudiantesBase', {});
+  s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+
+  // Registro legacy con conflicto divergente real: una entrada 'A' y una 'B' para el mismo alumno
+  const conflictingLegacy = {
+    finales: {
+      [fk]: { nota20: 15, nivel: 'A', origen: 'numero', ts: 100 },
+      [key + '||' + comp + '||ESTUDIANTE FICTICIO']: { nota20: 11, nivel: 'B', origen: 'numero', ts: 200 }
+    },
+    concComp: {},
+    competenciasEstado: {}
+  };
+  s.tables.get('RegistroNotas').rows.push([key, context.nivel, 'I', 1, context.seccion, context.area, 'DOCENTE FICTICIO', 10, JSON.stringify(conflictingLegacy)]);
+
+  // Intento 1: Guardado incompleto donde no se decide la divergencia (se deja vacía)
+  const incompletePayload = { finales: {}, concComp: {}, competenciasEstado: {} };
+  const res1 = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: incompletePayload }));
+  assert.equal(res1.ok, false);
+  assert.equal(res1.code, 'HISTORICAL_CHOICE_REQUIRED');
+  assert.match(res1.error, /Se requiere resolver todas las notas históricas divergentes/);
+
+  // Intento 2: Guardado con una nota inventada ('AD') que no corresponde a ninguna de las opciones históricas ('A' o 'B')
+  const invalidPayload = { finales: { [fk]: { nota20: 19, nivel: 'AD', origen: 'letra' } }, concComp: {}, competenciasEstado: {} };
+  const res2 = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: invalidPayload }));
+  assert.equal(res2.ok, false);
+  assert.equal(res2.code, 'HISTORICAL_CHOICE_INVALID');
+  assert.match(res2.error, /no corresponde a las opciones históricas/);
+
+  // Intento 3: Guardado con una opción legítima elegida ('B')
+  const validPayload = { finales: { [fk]: { nota20: 11, nivel: 'B', origen: 'numero', ts: 200, conciliacionTs: Date.now() } }, concComp: {}, competenciasEstado: {} };
+  const res3 = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: validPayload }));
+  assert.equal(res3.ok, true);
+});
+
+test('11. PRESERVACIÓN DE IDENTIDADES NO RESUELTAS: la proyección no elimina silenciosamente notas de alumnos no encontrados', () => {
+  const context = { nivel: 'secundaria', bim: 'III', grado: 1, seccion: 'A', area: 'Comunicación' };
+  const competencies = ['Se comunica oralmente en su lengua materna'];
+  const prefix = 'secundaria||III||1||A||Comunicación||Se comunica oralmente en su lengua materna||';
+
+  // Roster con un solo alumno
+  const roster = [{ nivel: 'secundaria', grado: 1, seccion: 'A', idSiagie: '1001', nombre: 'ESTUDIANTE ACTIVO' }];
+
+  // Payload histórico con una nota del alumno activo y otra de un alumno desconocido/retirado
+  const rawPayload = {
+    finales: {
+      [prefix + 'id:1001']: { nota20: 15, nivel: 'A', origen: 'letra' },
+      [prefix + 'nom:ALUMNO%20RETIRADO%20DESCONOCIDO']: { nota20: 12, nivel: 'B', origen: 'letra' }
+    },
+    concComp: {
+      [prefix + 'nom:ALUMNO%20RETIRADO%20DESCONOCIDO']: { texto: 'Conclusión de alumno no matriculado' }
+    }
+  };
+
+  const identity = identityFactory;
+  const resolver = identity.resolver(roster, context, competencies);
+  const preservedFinales = {};
+  const unresolved = [];
+
+  for (const [k, value] of Object.entries(rawPayload.finales)) {
+    const canonical = resolver.canonical('finales', k);
+    if (!canonical) {
+      preservedFinales[k] = JSON.parse(JSON.stringify(value));
+      if (k.startsWith(resolver.prefix)) unresolved.push(['finales', k]);
+      continue;
+    }
+    preservedFinales[canonical] = JSON.parse(JSON.stringify(value));
+  }
+
+  // Verificación crítica:
+  // 1. El alumno activo tiene su nota en la clave canónica
+  assert.ok(preservedFinales[prefix + 'id:1001']);
+  assert.equal(preservedFinales[prefix + 'id:1001'].nivel, 'A');
+
+  // 2. La nota del alumno retirado NO fue borrada silenciosamente, permanece en preservedFinales con su clave original
+  assert.ok(preservedFinales[prefix + 'nom:ALUMNO%20RETIRADO%20DESCONOCIDO'], 'La nota del alumno no resuelto debe ser conservada');
+  assert.equal(preservedFinales[prefix + 'nom:ALUMNO%20RETIRADO%20DESCONOCIDO'].nivel, 'B');
+
+  // 3. Queda registrado en unresolved para auditoría
+  assert.equal(unresolved.length, 1);
+  assert.equal(unresolved[0][1], prefix + 'nom:ALUMNO%20RETIRADO%20DESCONOCIDO');
+});

@@ -23,9 +23,13 @@ module.exports = source => {
     s = s.replace(curBlock, target1);
   }
 
-  // Strip legacy promedios Drive backup
-  const b2 = "    if(legacy&&body.panel==='promedios'){\n      const previousRaw=row?String(values[8]):JSON.stringify(previous);\n      const backup=respaldarRegistroDrive_(key,previousRaw);\n      next.meta=Object.assign({},next.meta||{},{externalDriveBackup:backup});\n    }\n";
-  if (s.includes(b2)) s = s.replace(b2, '');
+  // Strip legacy promedios validation and Drive backup
+  const b2Start = "    if(legacy&&body.panel==='promedios'&&hist&&hist.divergencias.length){\n";
+  const b2End = "    const raw=JSON.stringify(next);";
+  if (s.includes(b2Start) && s.includes(b2End)) {
+    const curB2 = s.slice(s.indexOf(b2Start), s.indexOf(b2End));
+    s = s.replace(curB2, '');
+  }
 
   // Strip enforceResolved
   s = s.replace("    const candidate=projected(next,true).payload;\n", "    const candidate=projected(next);\n");
