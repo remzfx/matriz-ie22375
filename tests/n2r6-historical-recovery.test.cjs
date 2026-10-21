@@ -552,6 +552,7 @@ test('7. PERSISTENCIA EN SHEETS: la celda en Sheets incluye efectivamente meta.e
   const roster = [{ nivel: context.nivel, grado: 1, seccion: context.seccion, idSiagie: 'synthetic-1', codigoEstudiante: 'SYN001', nombre: 'ESTUDIANTE FICTICIO' }];
   s.tables.set('EstudiantesBase', {});
   s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+  s.c.bimestreAbierto_ = b => ['I', 'III'].includes(b);
 
   const evidence = {
     sessions: [{ nivel: context.nivel, bim: 'I', grado: 1, seccion: context.seccion, area: context.area, comp, capacidad: 'Capacidad ficticia', fecha: '2026-10-01' }],
@@ -624,6 +625,7 @@ test('9. FALLO EN DRIVE PROTEGE SHEETS: si el respaldo en Drive falla, savenotas
   const roster = [{ nivel: context.nivel, grado: 1, seccion: context.seccion, idSiagie: 'synthetic-1', codigoEstudiante: 'SYN001', nombre: 'ESTUDIANTE FICTICIO' }];
   s.tables.set('EstudiantesBase', {});
   s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+  s.c.bimestreAbierto_ = b => ['I', 'III'].includes(b);
 
   const originalPayload = {
     sessions: [{ nivel: context.nivel, bim: 'I', grado: 1, seccion: context.seccion, area: context.area, comp, capacidad: 'Capacidad ficticia', fecha: '2026-10-01' }],
@@ -673,6 +675,7 @@ test('10. VALIDACIÓN BACKEND OBLIGATORIA: savenotas2 rechaza guardados incomple
   const roster = [{ nivel: context.nivel, grado: 1, seccion: context.seccion, idSiagie: 'synthetic-1', codigoEstudiante: 'SYN001', nombre: 'ESTUDIANTE FICTICIO' }];
   s.tables.set('EstudiantesBase', {});
   s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+  s.c.bimestreAbierto_ = b => ['I', 'III'].includes(b);
 
   // Registro legacy con conflicto divergente real: una entrada 'A' y una 'B' para el mismo alumno
   const conflictingLegacy = {
@@ -778,6 +781,7 @@ test('12. REFUERZO HISTORICAL_CHOICE_INVALID: backend no acepta coincidencias su
   const roster = [{ nivel: context.nivel, grado: 1, seccion: context.seccion, idSiagie: 'synthetic-1', codigoEstudiante: 'SYN001', nombre: 'ESTUDIANTE FICTICIO' }];
   s.tables.set('EstudiantesBase', {});
   s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+  s.c.bimestreAbierto_ = b => ['I', 'III'].includes(b);
 
   const conflictingLegacy = {
     finales: {
@@ -844,6 +848,7 @@ test('13. PRESERVACIÓN DE METADATOS EN COINCIDENCIAS HISTÓRICAS: proyectarHist
   const roster = [{ nivel: context.nivel, grado: 1, seccion: context.seccion, idSiagie: 'synthetic-1', codigoEstudiante: 'SYN001', nombre: 'ESTUDIANTE FICTICIO' }];
   s.tables.set('EstudiantesBase', {});
   s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+  s.c.bimestreAbierto_ = b => ['I', 'III'].includes(b);
 
   // Registro histórico con una coincidencia de dos entradas para el mismo alumno y nivel coincidente 'A'
   const coincidentLegacy = {
@@ -984,4 +989,181 @@ test('14. DECISIÓN PARCIAL EN CLIENTE: resolver un subconjunto no borra conflic
   const saveSuccess = await client.save('promedios');
   assert.equal(saveSuccess, false, 'El guardado parcial debe ser rechazado');
   assert.equal(client.status().historicalConflicts.length, 1, 'El conflicto pendiente sigue disponible para revisión');
+});
+
+test('15. INTEGRACIÓN REAL CON DATOS SINTÉTICOS: guardado confirmado, recarga canónica de 90 notas, 0 conflictos, 20 conclusiones y límite de tamaño', () => {
+  const setup = new Function('require','__dirname', fs.readFileSync(path.join(__dirname, 'backend-write-auth.test.cjs'), 'utf8').split('\nfor (const action')[0] + '\nreturn setup;')(require, __dirname);
+  const s = setup();
+  s.c.crypto = crypto;
+  const driveFiles = new Map();
+  s.c.DriveApp = {
+    createFile: (name, content) => {
+      const id = 'DRIVE_FILE_' + Math.random().toString(36).slice(2);
+      driveFiles.set(id, { name, content });
+      return { getId: () => id, getName: () => name };
+    },
+    getFileById: (id) => {
+      const f = driveFiles.get(id);
+      if (!f) return null;
+      return { getId: () => id, getName: () => f.name, getBlob: () => ({ getDataAsString: () => f.content, getBytes: () => [...Buffer.from(f.content, 'utf8')] }) };
+    }
+  };
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../apps-script/Notas2.js'), 'utf8'), s.c);
+
+  // Contexto exacto: Secundaria, III Bimestre, 1.° A, Comunicación
+  const context = { nivel: 'secundaria', bimestre: 'III', grado: 1, seccion: 'A', area: 'Comunicación' };
+  const key = [context.nivel, context.bimestre, context.grado, context.seccion, context.area].join('||');
+  const comps = s.c.registroAcademico_().catalog.secundaria['Comunicación'];
+  assert.equal(comps.length, 3, 'Comunicación debe tener 3 competencias');
+
+  // Padrón oficial de 30 estudiantes
+  const roster = [];
+  for (let i = 1; i <= 30; i++) {
+    roster.push({
+      nivel: 'secundaria', grado: 1, seccion: 'A',
+      idSiagie: 'SIAGIE_' + String(i).padStart(3, '0'),
+      codigoEstudiante: 'COD_' + String(i).padStart(3, '0'),
+      nombre: 'ESTUDIANTE ' + String(i).padStart(3, '0'),
+      orden: i
+    });
+  }
+  s.tables.set('EstudiantesBase', {});
+  s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+  s.c.bimestreAbierto_ = b => ['I', 'III'].includes(b);
+
+  // Asignar área Comunicación y aula 1|A al docente de secundaria
+  const cfg = s.c.obtenerDocentesConfig_();
+  const dSec = cfg.docentes.find(d => d.user === 'test-secondary');
+  if (dSec) {
+    dSec.areas = dSec.areas || [];
+    if (!dSec.areas.includes('Comunicación')) dSec.areas.push('Comunicación');
+    dSec.aulas = dSec.aulas || [];
+    if (!dSec.aulas.includes('1|A')) dSec.aulas.push('1|A');
+    dSec.asignaciones = dSec.asignaciones || {};
+    dSec.asignaciones['Comunicación'] = ['1|A'];
+    s.c.obtenerDocentesConfig_ = () => cfg;
+  }
+
+  // Construir registro legacy con 180 entradas en finales:
+  // 90 combinaciones (30 alumnos x 3 competencias).
+  // 28 coincidencias académicas y 62 divergencias de nivel.
+  // 20 conclusiones descriptivas en concComp.
+  const conflictingLegacy = {
+    finales: {},
+    concComp: {},
+    competenciasEstado: {}
+  };
+
+  let pairCount = 0;
+  for (const st of roster) {
+    for (const cp of comps) {
+      pairCount++;
+      const canKey = key + '||' + cp + '||id:' + st.idSiagie;
+      const nomKey = key + '||' + cp + '||nom:' + encodeURIComponent(st.nombre);
+      if (pairCount <= 28) {
+        // Coincidencia académica: mismo nivel 'A' en ambas claves
+        conflictingLegacy.finales[canKey] = { nota20: 16, nivel: 'A', origen: 'numero', ts: 1000 + pairCount };
+        conflictingLegacy.finales[nomKey] = { nota20: 15, nivel: 'A', origen: 'numero', ts: 2000 + pairCount };
+      } else {
+        // Divergencia de logro: 'A' vs 'B'
+        conflictingLegacy.finales[canKey] = { nota20: 15, nivel: 'A', origen: 'numero', ts: 1000 + pairCount };
+        conflictingLegacy.finales[nomKey] = { nota20: 11, nivel: 'B', origen: 'numero', ts: 2000 + pairCount };
+      }
+      if (pairCount <= 20) {
+        conflictingLegacy.concComp[nomKey] = { texto: 'Conclusión descriptiva para estudiante ' + st.orden + ' en ' + cp, ts: 3000 + pairCount };
+      }
+    }
+  }
+
+  assert.equal(Object.keys(conflictingLegacy.finales).length, 180, 'Debe haber 180 entradas en finales');
+  assert.equal(Object.keys(conflictingLegacy.concComp).length, 20, 'Debe haber 20 conclusiones');
+
+  const initialJson = JSON.stringify(conflictingLegacy);
+  s.tables.get('RegistroNotas').rows.push([key, context.nivel, 'III', 1, context.seccion, context.area, 'DOCENTE FICTICIO', 10, initialJson]);
+
+  // 1. Carga inicial: loadnotas2
+  const read1 = s.post(s.body('loadnotas2', { ...context, token: s.secondary }));
+  assert.equal(read1.ok, true);
+  assert.equal(read1.legacy, true);
+  assert.equal(read1.historicalConflicts.length, 62, 'Debe detectar exactamente 62 divergencias');
+  assert.equal(read1.historicalCoincidences.length, 28, 'Debe detectar exactamente 28 coincidencias');
+  assert.equal(Object.keys(read1.payload.concComp).length, 20, 'Debe proyectar las 20 conclusiones');
+
+  // 2. Preparar el payload de reconciliación
+  const savePayload = {
+    finales: {},
+    concComp: JSON.parse(JSON.stringify(read1.payload.concComp)),
+    competenciasEstado: {}
+  };
+
+  // Coincidencias: mantener nivel coincidente (la proyección simplificada tiene nivel)
+  for (const coin of read1.historicalCoincidences) {
+    savePayload.finales[coin.canonicalKey] = { nivel: coin.nivel, origen: 'letra' };
+  }
+
+  // Divergencias: decisión explícita humana en cada una (elegimos candidato 0)
+  for (const div of read1.historicalConflicts) {
+    const chosenCand = div.candidates[0];
+    const val = JSON.parse(JSON.stringify(chosenCand.value));
+    val.conciliacionTs = Date.now();
+    val.conciliacionOpcion = chosenCand.id;
+    savePayload.finales[div.canonicalKey] = val;
+  }
+
+  assert.equal(Object.keys(savePayload.finales).length, 90, 'El payload de guardado debe tener las 90 evaluaciones canónicas');
+
+  // 3. Guardado confirmado: savenotas2
+  const saveRes = s.post(s.body('savenotas2', { ...context, token: s.secondary, panel: 'promedios', version: 10, payload: savePayload }));
+  assert.equal(saveRes.ok, true, 'El guardado debe ser exitoso');
+  assert.equal(saveRes.panel, 'promedios');
+  assert.equal(saveRes.legacy, false, 'El estado legacy debe quedar desactivado tras adoptar Notas 2.0');
+  assert.equal(saveRes.historicalConflicts.length, 0, 'No debe devolver conflictos antiguos en la respuesta');
+  assert.equal(saveRes.historicalCoincidences.length, 0, 'No debe devolver coincidencias antiguas como pendientes');
+
+  // 4. Recarga posterior con loadnotas2
+  const reloadRes = s.post(s.body('loadnotas2', { ...context, token: s.secondary }));
+  assert.equal(reloadRes.ok, true);
+  assert.equal(reloadRes.legacy, false, 'El registro adoptado no es legacy');
+  assert.equal(reloadRes.historicalConflicts.length, 0, 'Cero conflictos pendientes tras recarga');
+  assert.equal(reloadRes.historicalCoincidences.length, 0, 'Cero coincidencias pendientes tras recarga');
+  assert.equal(Object.keys(reloadRes.payload.finales).length, 90, 'Debe recargar exactamente 90 evaluaciones canónicas');
+
+  // Verificar que todas las 90 evaluaciones son canónicas id:
+  for (const k of Object.keys(reloadRes.payload.finales)) {
+    assert.match(k, /\|\|id:SIAGIE_\d{3}$/, 'Cada clave en finales debe ser canónica id:');
+  }
+
+  // Conservación de las 20 conclusiones descriptivas
+  assert.equal(Object.keys(reloadRes.payload.concComp).length, 20, 'Las 20 conclusiones descriptivas deben conservarse íntegras');
+  for (const [k, v] of Object.entries(reloadRes.payload.concComp)) {
+    assert.match(k, /\|\|id:SIAGIE_\d{3}$/, 'Cada clave en concComp debe ser canónica');
+    assert.match(v.texto, /Conclusión descriptiva para estudiante \d+/, 'El texto de la conclusión debe conservarse intacto');
+  }
+
+  // 5. Rechazo seguro si el JSON final supera el límite de Google Sheets (SIZE > 49000)
+  const currentVersion = reloadRes.versions.promedios;
+  const oversizedPayload = {
+    finales: JSON.parse(JSON.stringify(reloadRes.payload.finales)),
+    concComp: JSON.parse(JSON.stringify(reloadRes.payload.concComp)),
+    competenciasEstado: {}
+  };
+  // Expandir conclusiones descriptivas con textos válidos de 1800 caracteres por alumno
+  for (let i = 1; i <= 30; i++) {
+    const concKey = key + '||' + comps[0] + '||id:SIAGIE_' + String(i).padStart(3, '0');
+    oversizedPayload.concComp[concKey] = { texto: 'A'.repeat(1800) };
+  }
+
+  const currentRowBeforeOversized = s.tables.get('RegistroNotas').rows.find(r => r[0] === key);
+  const cellContentBeforeOversized = currentRowBeforeOversized[8];
+  const writesBeforeOversized = s.state.writes;
+
+  const sizeRes = s.post(s.body('savenotas2', { ...context, token: s.secondary, panel: 'promedios', version: currentVersion, payload: oversizedPayload }));
+  assert.equal(sizeRes.ok, false, 'Debe rechazar el guardado sobredimensionado');
+  assert.equal(sizeRes.code, 'SIZE', 'El código de error debe ser SIZE');
+  assert.match(sizeRes.error, /supera el límite seguro/);
+
+  // Verificación crítica de integridad: la fila original NO fue modificada
+  const currentRowAfterOversized = s.tables.get('RegistroNotas').rows.find(r => r[0] === key);
+  assert.equal(currentRowAfterOversized[8], cellContentBeforeOversized, 'La celda en Sheets no debe ser alterada si excede el tamaño');
+  assert.equal(s.state.writes, writesBeforeOversized, 'No debe haber escrituras en Sheets');
 });
