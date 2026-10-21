@@ -238,3 +238,110 @@ test('7. Aislamiento entre grados, áreas y bimestres', () => {
   assert.equal(resClosedBim.ok, false);
   assert.equal(resClosedBim.code, 'CLOSED');
 });
+
+test('8. Conservar intactos los borradores locales de Calificar y Asistencia cuando se recupera Promedios desde legacy', async () => {
+  const core = require('../registro-notas2.js');
+  let appliedPayload = null;
+
+  const localCalificarDraft = { 'secundaria||III||1||A||Comunicación||comp||cap||2026-10-01||id:1001': { nota20: 16 } };
+  const localAsistenciaDraft = { 'secundaria||III||1||A||Comunicación||2026-10-01||id:1001': { marca: 'A' } };
+
+  const client = core.create({
+    key: 'secundaria||III||1||A||Comunicación',
+    binding: () => 'binding-key',
+    authorized: () => true,
+    readonly: () => false,
+    capture: () => ({
+      sessions: [{ id: 'sess-1' }],
+      grades: localCalificarDraft,
+      finales: {},
+      concComp: {},
+      competenciasEstado: {},
+      asistencia: localAsistenciaDraft
+    }),
+    apply: p => { appliedPayload = p; },
+    request: async () => ({
+      ok: true,
+      notas2: 1,
+      exists: true,
+      legacy: true,
+      readonly: false,
+      key: 'secundaria||III||1||A||Comunicación',
+      versions: { calificar: 0, promedios: 1728000000000, asistencia: 0 },
+      at: { calificar: null, promedios: 1728000000000, asistencia: null },
+      payload: {
+        sessions: [],
+        grades: {},
+        capsSel: {},
+        calificarEstado: {},
+        finales: { 'secundaria||III||1||A||Comunicación||comp||id:1001': { nota20: '', nivel: 'A', origen: 'letra' } },
+        concComp: {},
+        competenciasEstado: {},
+        asistencia: {},
+        asisFechas: {},
+        asisFechasEstado: {}
+      }
+    }),
+    hasExisting: name => name === 'calificar' || name === 'asistencia'
+  });
+
+  const ok = await client.load();
+  assert.equal(ok, true, 'client.load() debe ser exitoso al recuperar Promedios');
+  assert.equal(client.status().state, 'ready');
+  assert.ok(appliedPayload !== null);
+  // Promedios sí se recupera
+  assert.equal(appliedPayload.finales['secundaria||III||1||A||Comunicación||comp||id:1001'].nivel, 'A');
+  // Calificar y Asistencia locales no son sobreescritos por los arrays/objetos vacíos del payload remoto
+  assert.equal(appliedPayload.grades, undefined, 'Borrador de calificar no debe ser pisado');
+  assert.equal(appliedPayload.sessions, undefined, 'Sesiones de calificar no deben ser pisadas');
+  assert.equal(appliedPayload.asistencia, undefined, 'Borrador de asistencia no debe ser pisado');
+});
+
+test('9. Conserva la protección EMPTY original para registros no legacy, incluso con versión 0', async () => {
+  const core = require('../registro-notas2.js');
+  let errorCode = null;
+
+  const client = core.create({
+    key: 'secundaria||III||1||A||Comunicación',
+    binding: () => 'binding-key',
+    authorized: () => true,
+    readonly: () => false,
+    capture: () => ({
+      sessions: [],
+      grades: { 'secundaria||III||1||A||Comunicación||comp||cap||2026-10-01||id:1001': { nota20: 14 } },
+      finales: {},
+      concComp: {},
+      competenciasEstado: {},
+      asistencia: {}
+    }),
+    apply: () => { assert.fail('No debe llamar apply si falló EMPTY'); },
+    error: err => { errorCode = err.code; },
+    request: async () => ({
+      ok: true,
+      notas2: 1,
+      exists: true,
+      legacy: false, // NO legacy
+      readonly: false,
+      key: 'secundaria||III||1||A||Comunicación',
+      versions: { calificar: 0, promedios: 0, asistencia: 0 }, // Versión 0
+      at: { calificar: null, promedios: null, asistencia: null },
+      payload: {
+        sessions: [],
+        grades: {},
+        capsSel: {},
+        calificarEstado: {},
+        finales: {},
+        concComp: {},
+        competenciasEstado: {},
+        asistencia: {},
+        asisFechas: {},
+        asisFechasEstado: {}
+      }
+    }),
+    hasExisting: name => name === 'calificar'
+  });
+
+  const ok = await client.load();
+  assert.equal(ok, false, 'client.load() debe retornar false cuando falla EMPTY');
+  assert.equal(errorCode, 'EMPTY', 'Debe fallar con código EMPTY protegiendo el borrador local');
+});
