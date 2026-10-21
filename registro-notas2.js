@@ -58,7 +58,7 @@
     }
     if(r.exists!==true&&r.exists!==false)fail('INCOMPLETE','Falta la confirmación de existencia del registro.');
     if(!r.exists&&names.some(n=>entries[n]?.hasContent||!entries[n]&&o.hasExisting?.(n)))fail('MISSING','No existe una copia remota válida. Información anterior conservada.');
-    for(const name of names){const part=panel(r.payload,name),meaningful=name==='calificar'?!!(part.sessions.length||Object.keys(part.grades).length):name==='promedios'?!!(Object.keys(part.finales).length||Object.keys(part.concComp).length):!!Object.keys(part.asistencia).length;if(!meaningful&&(entries[name]?.hasContent||!entries[name]&&o.hasExisting?.(name)))fail('EMPTY','Lectura vacía inesperada. La información anterior se conserva.');}
+    for(const name of names){const part=panel(r.payload,name),meaningful=name==='calificar'?!!(part.sessions.length||Object.keys(part.grades).length):name==='promedios'?!!(Object.keys(part.finales).length||Object.keys(part.concComp).length):!!Object.keys(part.asistencia).length;if(!meaningful&&(entries[name]?.hasContent||!entries[name]&&o.hasExisting?.(name)&&(!r.legacy||name==='promedios')&&r.versions[name]>0))fail('EMPTY','Lectura vacía inesperada. La información anterior se conserva.');}
     if(options.manual&&!await o.confirm?.({panels:names,at:r.at})){emit(previousState);return false;}readable();if(id!==epoch)return false;
     serverClosed=r.readonly;legacy=r.legacy;
     const changed=options.verify&&names.some(n=>pending(n)&&r.versions[n]!==entries[n].version);
