@@ -195,8 +195,10 @@
    const candidate=c.candidates?.find(x=>x.id===choiceId);if(!candidate)continue;
    const [field,canonicalKey]=JSON.parse(c.path);
    if(field==='finales'){
-    const v=candidate.value;store.finales[canonicalKey]={nivel:v.nivel,origen:v.origen||'letra',ts:Date.now()};
-    if(v.nota20!==undefined&&v.nota20!==''&&v.origen==='numero')store.finales[canonicalKey].nota20=v.nota20;
+    const chosen=JSON.parse(JSON.stringify(candidate.value));
+    chosen.conciliacionTs=Date.now();
+    chosen.conciliacionOpcion=candidate.id||candidate.label;
+    store.finales[canonicalKey]=chosen;
     count++;
    }
   }

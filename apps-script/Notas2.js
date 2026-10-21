@@ -25,8 +25,9 @@ function notas2Ruta_(body) {
     const identity=academicIdentityFactory();
     function proyectarHistorico_(payload){
       const p=JSON.parse(JSON.stringify(payload||{})),resolver=identity.resolver(roster.estudiantes,context,competencies,p.meta&&p.meta.studentAliases),groups=new Map(),finalesMap=p.finales||{},unresolved=[];
-      for(const [k,value]of Object.entries(finalesMap)){const canonical=resolver.canonical('finales',k);if(!canonical){if(k.startsWith(resolver.prefix))unresolved.push(['finales',k]);continue;}const path=JSON.stringify(['finales',canonical]);if(!groups.has(path))groups.set(path,[]);groups.get(path).push({key:k,value:value});}
-      const coincidencias=[],divergencias=[];p.finales={};
+      const preservedFinales={};
+      for(const [k,value]of Object.entries(finalesMap)){const canonical=resolver.canonical('finales',k);if(!canonical){preservedFinales[k]=JSON.parse(JSON.stringify(value));if(k.startsWith(resolver.prefix))unresolved.push(['finales',k]);continue;}const path=JSON.stringify(['finales',canonical]);if(!groups.has(path))groups.set(path,[]);groups.get(path).push({key:k,value:value});}
+      const coincidencias=[],divergencias=[];p.finales=preservedFinales;
       for(const [path,records]of groups.entries()){
         const [,canonicalKey]=JSON.parse(path);
         if(records.length===1){p.finales[canonicalKey]=JSON.parse(JSON.stringify(records[0].value));continue;}
@@ -73,12 +74,20 @@ function notas2Ruta_(body) {
     const now=Date.now(),version=Math.max(now,oldVersion+1);if(!Number.isSafeInteger(version))throw Error('Versión fuera de rango.');versions[body.panel]=version;at[body.panel]=now;
     next.modeloAcademico=1;next.meta=Object.assign({},oldMeta,{docente:permission.docente,notas2:{schema:1,adopted:!!protocol?.adopted||body.panel==='promedios'||!legacy,calificar:{version:versions.calificar,at:at.calificar},promedios:{version:versions.promedios,at:at.promedios},asistencia:{version:versions.asistencia,at:at.asistencia}}});
     // Existing history is retained byte-for-byte as data. No new upload-history or archive rows.
-    const raw=JSON.stringify(next);if(raw.length>49000)return {ok:false,code:'SIZE',error:'El registro supera el límite seguro; no se borraron antecedentes.'};
+    if(legacy&&body.panel==='promedios'&&hist&&hist.divergencias.length){
+      for(const div of hist.divergencias){
+        const chosen=next.finales&&next.finales[div.canonicalKey];
+        if(!chosen||chosen.borrado===true)return {ok:false,code:'HISTORICAL_CHOICE_REQUIRED',error:'Se requiere resolver todas las notas históricas divergentes antes de guardar.'};
+        const validCandidate=div.records.some(r=>identity.equal(r.value,chosen)||(chosen.origen==='letra'&&r.value?.nivel===chosen.nivel)||(chosen.origen==='numero'&&r.value?.nota20===chosen.nota20));
+        if(!validCandidate)return {ok:false,code:'HISTORICAL_CHOICE_INVALID',error:'La decisión para '+div.canonicalKey+' no corresponde a las opciones históricas.'};
+      }
+    }
     if(legacy&&body.panel==='promedios'){
       const previousRaw=row?String(values[8]):JSON.stringify(previous);
       const backup=respaldarRegistroDrive_(key,previousRaw);
       next.meta=Object.assign({},next.meta||{},{externalDriveBackup:backup});
     }
+    const raw=JSON.stringify(next);if(raw.length>49000)return {ok:false,code:'SIZE',error:'El registro supera el límite seguro; no se borraron antecedentes.'};
     const target=sh||asegurarReg_(),targetRow=row||target.getLastRow()+1;
     target.getRange(targetRow,1,1,9).setValues([[key,ctx.nivel,ctx.bimestre,ctx.grado,ctx.seccion,ctx.area,permission.docente,version,raw]]);
     row=targetRow;
