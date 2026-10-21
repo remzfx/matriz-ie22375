@@ -28,10 +28,10 @@
   return signature(part);
  }
  function create(o){
-  const initialBinding=o.binding(),entries=Object.fromEntries(Object.keys(fields).map(n=>[n,null]));let state='checking',flight=false,closed=false,epoch=0,legacy=false,processed=false,serverClosed=true;
+  const initialBinding=o.binding(),entries=Object.fromEntries(Object.keys(fields).map(n=>[n,null]));let state='checking',flight=false,closed=false,epoch=0,legacy=false,processed=false,serverClosed=true,historicalConflicts=[],historicalCoincidences=[];
   const same=()=>!closed&&o.binding()===initialBinding;
   const pending=name=>!!entries[name]&&signature(panel(o.capture(),name))!==entries[name].signature;
-  function status(){return {state,busy:flight,legacy,processed,readonly:serverClosed,panels:Object.fromEntries(Object.keys(fields).map(n=>[n,{pending:pending(n),version:entries[n]?.version??null,at:entries[n]?.at??null}]))};}
+  function status(){return {state,busy:flight,legacy,processed,readonly:serverClosed,historicalConflicts:copy(historicalConflicts),historicalCoincidences:copy(historicalCoincidences),panels:Object.fromEntries(Object.keys(fields).map(n=>[n,{pending:pending(n),version:entries[n]?.version??null,at:entries[n]?.at??null}]))};}
   function emit(next){state=next;o.changed?.(status());}
   function readable(){if(!same()||!o.authorized())fail('SESSION','La sesión o el contexto cambió.');}
   async function request(body){
@@ -50,6 +50,8 @@
    const previousState=state;flight=true;emit('checking');
    try{
     const r=validate(await request({action:'loadnotas2'}));if(id!==epoch)return false;
+    historicalConflicts=Array.isArray(r.historicalConflicts)?copy(r.historicalConflicts):[];
+    historicalCoincidences=Array.isArray(r.historicalCoincidences)?copy(r.historicalCoincidences):[];
     // Validate every panel before confirmation or any application, including a manual single-panel read.
     for(const name of Object.keys(fields)){
      const entry=entries[name];if(!entry)continue;
@@ -85,7 +87,7 @@
    finally{flight=false;o.changed?.(status());}
   }
   function processToAverages(options){if(flight||state!=='ready'||!same()||!o.authorized()||o.readonly()||serverClosed)return false;const before=o.capture(),next=process(before,options);o.apply(panel(next,'promedios'));processed=true;o.changed?.(status());return true;}
-  return {load,save,process:processToAverages,pending,status,canEdit:(name)=>state==='ready'&&!flight&&same()&&o.authorized()&&!o.readonly()&&!serverClosed&&(!legacy||name==='asistencia'||name==='promedios'),pause(){epoch++;emit('offline');},close(){closed=true;epoch++;emit('session');}};
+  return {load,save,process:processToAverages,pending,status,clearHistoricalConflicts(){historicalConflicts=[];o.changed?.(status());},canEdit:(name)=>state==='ready'&&!flight&&same()&&o.authorized()&&!o.readonly()&&!serverClosed&&(!legacy||name==='asistencia'||name==='promedios'),pause(){epoch++;emit('offline');},close(){closed=true;epoch++;emit('session');}};
  }
  const api={fields,panel,signature,validPayload,process,create};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.IERegistroNotas2=api;
