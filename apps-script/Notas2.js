@@ -28,25 +28,38 @@ function notas2Ruta_(body) {
       const preservedFinales={};
       for(const [k,value]of Object.entries(finalesMap)){const canonical=resolver.canonical('finales',k);if(!canonical){preservedFinales[k]=JSON.parse(JSON.stringify(value));if(k.startsWith(resolver.prefix))unresolved.push(['finales',k]);continue;}const path=JSON.stringify(['finales',canonical]);if(!groups.has(path))groups.set(path,[]);groups.get(path).push({key:k,value:value});}
       const coincidencias=[],divergencias=[];p.finales=preservedFinales;
+      const viewFinales=JSON.parse(JSON.stringify(preservedFinales));
       for(const [path,records]of groups.entries()){
         const [,canonicalKey]=JSON.parse(path);
-        if(records.length===1){p.finales[canonicalKey]=JSON.parse(JSON.stringify(records[0].value));continue;}
+        if(records.length===1){const rec=JSON.parse(JSON.stringify(records[0].value));p.finales[canonicalKey]=rec;viewFinales[canonicalKey]=JSON.parse(JSON.stringify(rec));continue;}
         const hasBorrado=records.some(r=>r.value&&r.value.borrado===true),levels=new Set(records.map(r=>r.value&&r.value.nivel).filter(Boolean));
         if(!hasBorrado&&levels.size===1){
           const nivelCoincidente=[...levels][0],numScores=records.map(r=>r.value&&r.value.nota20).filter(s=>s!==''&&s!=null&&Number.isFinite(Number(s)));
           const escalaIncompatible=numScores.some(score=>(score>=18?'AD':score>=14?'A':score>=11?'B':'C')!==nivelCoincidente);
-          if(!escalaIncompatible){coincidencias.push({path:path,canonicalKey:canonicalKey,nivel:nivelCoincidente,records:JSON.parse(JSON.stringify(records))});p.finales[canonicalKey]={nivel:nivelCoincidente,origen:'letra'};continue;}
+          if(!escalaIncompatible){
+            const primary=JSON.parse(JSON.stringify(records[0].value||{}));
+            const secondary=JSON.parse(JSON.stringify(records[1]?.value||{}));
+            const integro=Object.assign({},secondary,primary,{
+              nivel:nivelCoincidente,
+              fuentesHistoricas:records.map(r=>({key:r.key,value:JSON.parse(JSON.stringify(r.value))}))
+            });
+            p.finales[canonicalKey]=integro;
+            viewFinales[canonicalKey]={nivel:nivelCoincidente,origen:'letra'};
+            coincidencias.push({path:path,canonicalKey:canonicalKey,nivel:nivelCoincidente,records:JSON.parse(JSON.stringify(records)),integro:JSON.parse(JSON.stringify(integro)),simplificado:{nivel:nivelCoincidente,origen:'letra'}});
+            continue;
+          }
         }
         const parts=canonicalKey.split('||'),comp=parts[5],tail=parts[parts.length-1],student=roster.estudiantes.find(al=>'id:'+encodeURIComponent(al.idSiagie)===tail);
         divergencias.push({path:path,canonicalKey:canonicalKey,student:student?{nombre:student.nombre,orden:student.orden,idSiagie:student.idSiagie}:null,competencia:comp,records:JSON.parse(JSON.stringify(records)),candidates:records.map((r,idx)=>({id:'candidate:'+idx,label:'Opción '+(idx+1),origenClave:r.key,value:JSON.parse(JSON.stringify(r.value))}))});
       }
       if(p.concComp){const conc={};for(const [k,v]of Object.entries(p.concComp)){const can=resolver.canonical('concComp',k);if(can)conc[can]=JSON.parse(JSON.stringify(v));else if(k.startsWith(resolver.prefix))unresolved.push(['concComp',k]);}p.concComp=conc;}
-      return {payload:p,coincidencias:coincidencias,divergencias:divergencias,unresolved:unresolved};
+      const viewPayload=JSON.parse(JSON.stringify(p));viewPayload.finales=viewFinales;
+      return {payload:p,viewPayload:viewPayload,coincidencias:coincidencias,divergencias:divergencias,unresolved:unresolved};
     }
     const hist=legacy?proyectarHistorico_(previous):null;
     function projected(payload,enforceResolved){const result=identity.project(payload,roster.estudiantes,context,competencies);if(result.conflicts.length||(enforceResolved&&result.unresolved.length))throw Error(result.conflicts.length?'Notas históricas ambiguas: requieren revisión explícita.':'Identidades históricas pendientes de revisión.');return result;}
     function view(payload){
-      const proj=(hist&&!save)?{payload:hist.payload,unresolved:hist.unresolved}:projected(payload,false),p=payloadRegistroLectura_(proj.payload,{sesion:{role:permission.role}},ctx);
+      const proj=(hist&&!save)?{payload:hist.viewPayload,unresolved:hist.unresolved}:projected(payload,false),p=payloadRegistroLectura_(proj.payload,{sesion:{role:permission.role}},ctx);
       for(const f of Object.values(fields).flat())if(p[f]===undefined)p[f]=f==='sessions'?[]:{};
       p.calificarEstado=JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(payload.calificarEstado||p.competenciasEstado||{}).filter(([k])=>k.startsWith(prefix)))));
       model.validate(p,context);notas2Validar_(p,context,competencies);if(proj.unresolved.length)p.meta=Object.assign({},p.meta||{},{unresolvedIdentities:proj.unresolved});
@@ -78,8 +91,17 @@ function notas2Ruta_(body) {
       for(const div of hist.divergencias){
         const chosen=next.finales&&next.finales[div.canonicalKey];
         if(!chosen||chosen.borrado===true)return {ok:false,code:'HISTORICAL_CHOICE_REQUIRED',error:'Se requiere resolver todas las notas históricas divergentes antes de guardar.'};
-        const validCandidate=div.records.some(r=>identity.equal(r.value,chosen)||(chosen.origen==='letra'&&r.value?.nivel===chosen.nivel)||(chosen.origen==='numero'&&r.value?.nota20===chosen.nota20));
-        if(!validCandidate)return {ok:false,code:'HISTORICAL_CHOICE_INVALID',error:'La decisión para '+div.canonicalKey+' no corresponde a las opciones históricas.'};
+        const hasDecision=Number.isFinite(chosen.conciliacionTs)&&chosen.conciliacionTs>0&&typeof chosen.conciliacionOpcion==='string'&&chosen.conciliacionOpcion.trim()!=='';
+        const matchedCandidate=hasDecision&&div.candidates.find(cand=>coincideCandidatoHistorico_(cand,chosen));
+        if(!matchedCandidate)return {ok:false,code:'HISTORICAL_CHOICE_INVALID',error:'La decisión para '+div.canonicalKey+' no corresponde al candidato histórico concreto.'};
+      }
+    }
+    if(legacy&&body.panel==='promedios'&&hist&&hist.coincidencias.length){
+      for(const coin of hist.coincidencias){
+        const submitted=next.finales&&next.finales[coin.canonicalKey];
+        if(submitted&&submitted.borrado!==true&&(submitted.nivel===coin.nivel||!submitted.nivel)){
+          next.finales[coin.canonicalKey]=JSON.parse(JSON.stringify(coin.integro));
+        }
       }
     }
     if(legacy&&body.panel==='promedios'){
@@ -136,4 +158,23 @@ function respaldarRegistroDrive_(k,raw){
   const verify=drive.getFileById(id).getBlob().getDataAsString();
   if(calcularSha256Hex_(verify)!==sha256||byteLengthUtf8_(verify)!==bytes)throw Error('Fallo crítico en verificación de integridad del respaldo en Drive.');
   return {ok:true,fileId:id,fileName:name,sha256:sha256,bytes:bytes,fechaUtc:new Date(now).toISOString()};
+}
+
+function coincideCandidatoHistorico_(cand,chosen){
+  if(!cand||!cand.value||typeof cand.value!=='object'||!chosen||typeof chosen!=='object')return false;
+  if(chosen.conciliacionOpcion!==cand.id&&chosen.conciliacionOpcion!==cand.label)return false;
+  const allowedExtra=new Set(['conciliacionTs','conciliacionOpcion']);
+  for(const k of Object.keys(chosen)){
+    if(!allowedExtra.has(k)&&!Object.prototype.hasOwnProperty.call(cand.value,k))return false;
+  }
+  for(const k of Object.keys(cand.value)){
+    if(!Object.prototype.hasOwnProperty.call(chosen,k))return false;
+    const cv=cand.value[k],jv=chosen[k];
+    if(cv&&typeof cv==='object'){
+      if(JSON.stringify(cv)!==JSON.stringify(jv))return false;
+    } else if(cv!==jv){
+      return false;
+    }
+  }
+  return true;
 }
