@@ -66,7 +66,7 @@ function notas2Ruta_(body) {
       // Read-only projection; never insert or persist a legacy record here.
       return p;
     }
-    function reply(payload){return {ok:true,notas2:1,key:key,exists:!!row,legacy:legacy,readonly:!bimestreAbierto_(ctx.bimestre),versions:versions,at:at,historicalConflicts:hist?.divergencias||[],historicalCoincidences:hist?.coincidencias||[],payload:view(payload)};}
+    function reply(payload){return {ok:true,notas2:1,key:key,exists:!!row,legacy:legacy,readonly:!bimestreAbierto_(ctx.bimestre),versions:versions,at:at,historicalConflicts:(!save&&hist)?(hist.divergencias||[]):[],historicalCoincidences:(!save&&hist)?(hist.coincidencias||[]):[],payload:view(payload)};}
     if(!save)return reply(previous);
     if(!bimestreAbierto_(ctx.bimestre))return {ok:false,code:'CLOSED',readonly:true,error:'Bimestre cerrado o bloqueado.'};
     if(!Number.isSafeInteger(body.version)||body.version!==versions[body.panel])return {ok:false,code:'CONFLICT',error:'Otra computadora confirmó una versión posterior. Baje y revise antes de guardar.'};
