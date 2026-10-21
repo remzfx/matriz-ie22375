@@ -189,7 +189,7 @@
   const roster=typeof estudiantes==='function'?estudiantes():[];
   const choices=await (root.IERegistroReconcile?.choose||IERegistroReconcile.choose)(conflicts,()=>client.status().state!=='closed',{roster});
   if(!choices)return false;
-  store.finales=store.finales||{};let count=0;
+  store.finales=store.finales||{};let count=0;const resolvedPaths=[];
   for(const c of conflicts){
    const choiceId=choices[c.path];if(!choiceId)continue;
    const candidate=c.candidates?.find(x=>x.id===choiceId);if(!candidate)continue;
@@ -200,9 +200,14 @@
     chosen.conciliacionOpcion=candidate.id||candidate.label;
     store.finales[canonicalKey]=chosen;
     count++;
+    resolvedPaths.push(c.path);
    }
   }
-  client.clearHistoricalConflicts?.();
+  if(resolvedPaths.length===conflicts.length){
+   client.clearHistoricalConflicts?.();
+  }else if(resolvedPaths.length>0){
+   client.clearHistoricalConflicts?.(resolvedPaths);
+  }
   render();paint();
   if(typeof toast==='function')toast(count+' calificaciones históricas seleccionadas. Guarde Promedios para confirmar.');
   return true;

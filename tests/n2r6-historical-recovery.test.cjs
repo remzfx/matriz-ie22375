@@ -697,10 +697,10 @@ test('10. VALIDACIÓN BACKEND OBLIGATORIA: savenotas2 rechaza guardados incomple
   const res2 = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: invalidPayload }));
   assert.equal(res2.ok, false);
   assert.equal(res2.code, 'HISTORICAL_CHOICE_INVALID');
-  assert.match(res2.error, /no corresponde a las opciones históricas/);
+  assert.match(res2.error, /no corresponde al candidato histórico concreto/);
 
   // Intento 3: Guardado con una opción legítima elegida ('B')
-  const validPayload = { finales: { [fk]: { nota20: 11, nivel: 'B', origen: 'numero', ts: 200, conciliacionTs: Date.now() } }, concComp: {}, competenciasEstado: {} };
+  const validPayload = { finales: { [fk]: { nota20: 11, nivel: 'B', origen: 'numero', ts: 200, conciliacionTs: Date.now(), conciliacionOpcion: 'candidate:1' } }, concComp: {}, competenciasEstado: {} };
   const res3 = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: validPayload }));
   assert.equal(res3.ok, true);
 });
@@ -751,4 +751,237 @@ test('11. PRESERVACIÓN DE IDENTIDADES NO RESUELTAS: la proyección no elimina s
   // 3. Queda registrado en unresolved para auditoría
   assert.equal(unresolved.length, 1);
   assert.equal(unresolved[0][1], prefix + 'nom:ALUMNO%20RETIRADO%20DESCONOCIDO');
+});
+
+test('12. REFUERZO HISTORICAL_CHOICE_INVALID: backend no acepta coincidencias superficiales ni auditoría inventada', () => {
+  const setup = new Function('require','__dirname', fs.readFileSync(path.join(__dirname, 'backend-write-auth.test.cjs'), 'utf8').split('\nfor (const action')[0] + '\nreturn setup;')(require, __dirname);
+  const s = setup();
+  s.c.crypto = crypto;
+  const driveFiles = new Map();
+  s.c.DriveApp = {
+    createFile: (name, content) => {
+      const id = 'DRIVE_FILE_' + Math.random().toString(36).slice(2);
+      driveFiles.set(id, { name, content });
+      return { getId: () => id, getName: () => name };
+    },
+    getFileById: (id) => {
+      const f = driveFiles.get(id);
+      if (!f) return null;
+      return { getId: () => id, getName: () => f.name, getBlob: () => ({ getDataAsString: () => f.content, getBytes: () => [...Buffer.from(f.content, 'utf8')] }) };
+    }
+  };
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../apps-script/Notas2.js'), 'utf8'), s.c);
+
+  const context = { nivel: 'primaria', bimestre: 'I', grado: 1, seccion: 'Única', area: 'Comunicación' };
+  const key = [context.nivel, context.bimestre, context.grado, context.seccion, context.area].join('||');
+  const comp = s.c.registroAcademico_().catalog.primaria['Comunicación'][0], id = 'id:synthetic-1', fk = key + '||' + comp + '||' + id;
+  const roster = [{ nivel: context.nivel, grado: 1, seccion: context.seccion, idSiagie: 'synthetic-1', codigoEstudiante: 'SYN001', nombre: 'ESTUDIANTE FICTICIO' }];
+  s.tables.set('EstudiantesBase', {});
+  s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+
+  const conflictingLegacy = {
+    finales: {
+      [fk]: { nota20: 15, nivel: 'A', origen: 'numero', ts: 100 },
+      [key + '||' + comp + '||ESTUDIANTE FICTICIO']: { nota20: 11, nivel: 'B', origen: 'numero', ts: 200 }
+    },
+    concComp: {},
+    competenciasEstado: {}
+  };
+  s.tables.get('RegistroNotas').rows.push([key, context.nivel, 'I', 1, context.seccion, context.area, 'DOCENTE FICTICIO', 10, JSON.stringify(conflictingLegacy)]);
+
+  // Caso 1: Coincide el nivel ('A') pero la nota numérica fue alterada (16 en vez de 15) -> DEBE RECHAZARSE
+  const alteredNum = { finales: { [fk]: { nota20: 16, nivel: 'A', origen: 'numero', ts: 100, conciliacionTs: Date.now(), conciliacionOpcion: 'candidate:0' } }, concComp: {}, competenciasEstado: {} };
+  const r1 = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: alteredNum }));
+  assert.equal(r1.ok, false);
+  assert.equal(r1.code, 'HISTORICAL_CHOICE_INVALID');
+
+  // Caso 2: Auditoría cliente inconsistente (dice candidate:0 pero envía la nota de candidate:1) -> DEBE RECHAZARSE
+  const forgedAudit = { finales: { [fk]: { nota20: 11, nivel: 'B', origen: 'numero', ts: 200, conciliacionTs: Date.now(), conciliacionOpcion: 'candidate:0' } }, concComp: {}, competenciasEstado: {} };
+  const r2 = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: forgedAudit }));
+  assert.equal(r2.ok, false);
+  assert.equal(r2.code, 'HISTORICAL_CHOICE_INVALID');
+
+  // Caso 3: Campo alterado de timestamp histórico -> DEBE RECHAZARSE
+  const alteredTs = { finales: { [fk]: { nota20: 15, nivel: 'A', origen: 'numero', ts: 999999, conciliacionTs: Date.now(), conciliacionOpcion: 'candidate:0' } }, concComp: {}, competenciasEstado: {} };
+  const r3 = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: alteredTs }));
+  assert.equal(r3.ok, false);
+  assert.equal(r3.code, 'HISTORICAL_CHOICE_INVALID');
+
+  // Caso 4: Propiedad inventada no histórica -> DEBE RECHAZARSE
+  const inventedProp = { finales: { [fk]: { nota20: 15, nivel: 'A', origen: 'numero', ts: 100, campoExtra: 'inventado', conciliacionTs: Date.now(), conciliacionOpcion: 'candidate:0' } }, concComp: {}, competenciasEstado: {} };
+  const r4 = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: inventedProp }));
+  assert.equal(r4.ok, false);
+  assert.equal(r4.code, 'HISTORICAL_CHOICE_INVALID');
+
+  // Caso 5: Elección legítima del candidato 0 con datos históricos exactos y decisión explícita -> ACEPTADO
+  const valid = { finales: { [fk]: { nota20: 15, nivel: 'A', origen: 'numero', ts: 100, conciliacionTs: Date.now(), conciliacionOpcion: 'candidate:0' } }, concComp: {}, competenciasEstado: {} };
+  const r5 = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: valid }));
+  assert.equal(r5.ok, true);
+});
+
+test('13. PRESERVACIÓN DE METADATOS EN COINCIDENCIAS HISTÓRICAS: proyectarHistorico_ no degrada metadatos en persistencia', () => {
+  const setup = new Function('require','__dirname', fs.readFileSync(path.join(__dirname, 'backend-write-auth.test.cjs'), 'utf8').split('\nfor (const action')[0] + '\nreturn setup;')(require, __dirname);
+  const s = setup();
+  s.c.crypto = crypto;
+  const driveFiles = new Map();
+  s.c.DriveApp = {
+    createFile: (name, content) => {
+      const id = 'DRIVE_FILE_' + Math.random().toString(36).slice(2);
+      driveFiles.set(id, { name, content });
+      return { getId: () => id, getName: () => name };
+    },
+    getFileById: (id) => {
+      const f = driveFiles.get(id);
+      if (!f) return null;
+      return { getId: () => id, getName: () => f.name, getBlob: () => ({ getDataAsString: () => f.content, getBytes: () => [...Buffer.from(f.content, 'utf8')] }) };
+    }
+  };
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../apps-script/Notas2.js'), 'utf8'), s.c);
+
+  const context = { nivel: 'primaria', bimestre: 'I', grado: 1, seccion: 'Única', area: 'Comunicación' };
+  const key = [context.nivel, context.bimestre, context.grado, context.seccion, context.area].join('||');
+  const comp = s.c.registroAcademico_().catalog.primaria['Comunicación'][0], id = 'id:synthetic-1', fk = key + '||' + comp + '||' + id;
+  const roster = [{ nivel: context.nivel, grado: 1, seccion: context.seccion, idSiagie: 'synthetic-1', codigoEstudiante: 'SYN001', nombre: 'ESTUDIANTE FICTICIO' }];
+  s.tables.set('EstudiantesBase', {});
+  s.c.leerPadronEstudiantes_ = () => ({ estudiantes: roster });
+
+  // Registro histórico con una coincidencia de dos entradas para el mismo alumno y nivel coincidente 'A'
+  const coincidentLegacy = {
+    finales: {
+      [fk]: { nota20: 16, nivel: 'A', origen: 'numero', ts: 1000 },
+      [key + '||' + comp + '||ESTUDIANTE FICTICIO']: { nota20: 15, nivel: 'A', origen: 'numero', ts: 2000 }
+    },
+    concComp: {},
+    competenciasEstado: {}
+  };
+  s.tables.get('RegistroNotas').rows.push([key, context.nivel, 'I', 1, context.seccion, context.area, 'DOCENTE FICTICIO', 10, JSON.stringify(coincidentLegacy)]);
+
+  // 1. Lectura: verificar que la respuesta separa la representación simplificada para visualización
+  const readRes = s.post(s.body('loadnotas2', { ...context, token: s.primary }));
+  assert.equal(readRes.ok, true);
+  // Visualización: simple y limpia
+  assert.deepEqual(readRes.payload.finales[fk], { nivel: 'A', origen: 'letra' });
+  // Metadatos íntegros en coincidencias históricas reportadas
+  assert.equal(readRes.historicalCoincidences.length, 1);
+  const coin = readRes.historicalCoincidences[0];
+  assert.equal(coin.integro.nivel, 'A');
+  assert.ok(Array.isArray(coin.integro.fuentesHistoricas));
+  assert.equal(coin.integro.fuentesHistoricas.length, 2);
+  assert.equal(coin.integro.fuentesHistoricas[0].value.nota20, 16);
+  assert.equal(coin.integro.fuentesHistoricas[1].value.nota20, 15);
+
+  // 2. Guardado en Promedios: la persistencia almacena el registro íntegro con ambas fuentes, no solo {nivel, origen:'letra'}
+  const savePayload = { finales: { [fk]: { nivel: 'A', origen: 'letra' } }, concComp: {}, competenciasEstado: {} };
+  const saveRes = s.post(s.body('savenotas2', { ...context, token: s.primary, panel: 'promedios', version: 10, payload: savePayload }));
+  assert.equal(saveRes.ok, true);
+
+  const rowSaved = s.tables.get('RegistroNotas').rows.find(r => r[0] === key);
+  const parsedSaved = JSON.parse(rowSaved[8]);
+  assert.ok(parsedSaved.finales[fk].fuentesHistoricas, 'Debe persistirse el registro íntegro con fuentes históricas');
+  assert.equal(parsedSaved.finales[fk].fuentesHistoricas.length, 2);
+  assert.ok(parsedSaved.meta.externalDriveBackup, 'Debe existir el respaldo verificado en Drive');
+});
+
+test('14. DECISIÓN PARCIAL EN CLIENTE: resolver un subconjunto no borra conflictos pendientes ni permite guardado incompleto', async () => {
+  const context = { nivel: 'primaria', bimestre: 'I', grado: 1, seccion: 'Única', area: 'Comunicación' };
+  const key = [context.nivel, context.bimestre, context.grado, context.seccion, context.area].join('||');
+  const comp = 'Comunicación';
+
+  // Simular dos conflictos históricos
+  const path1 = JSON.stringify(['finales', key + '||' + comp + '||id:1']);
+  const path2 = JSON.stringify(['finales', key + '||' + comp + '||id:2']);
+  const conflict1 = {
+    path: path1,
+    candidates: [
+      { id: 'candidate:0', label: 'Opción 1', value: { nivel: 'A', origen: 'letra', ts: 100 } },
+      { id: 'candidate:1', label: 'Opción 2', value: { nivel: 'B', origen: 'letra', ts: 200 } }
+    ]
+  };
+  const conflict2 = {
+    path: path2,
+    candidates: [
+      { id: 'candidate:0', label: 'Opción 1', value: { nivel: 'B', origen: 'letra', ts: 300 } },
+      { id: 'candidate:1', label: 'Opción 2', value: { nivel: 'C', origen: 'letra', ts: 400 } }
+    ]
+  };
+
+  const clientModule = require(path.join(__dirname, '../registro-notas2.js'));
+  let storeState = {
+    sessions: [], grades: {}, capsSel: {}, calificarEstado: {}, finales: {}, concComp: {}, competenciasEstado: {}, asistencia: {}, asisFechas: {}, asisFechasEstado: {}
+  };
+
+  const fakeTransport = async (body) => {
+    if (body.action === 'loadnotas2') {
+      return {
+        ok: true, notas2: 1, key, exists: true, readonly: false, legacy: true,
+        versions: { calificar: 1, promedios: 1, asistencia: 1 },
+        at: { calificar: 100, promedios: 100, asistencia: 100 },
+        historicalConflicts: [conflict1, conflict2],
+        historicalCoincidences: [],
+        payload: { ...storeState }
+      };
+    }
+    if (body.action === 'savenotas2') {
+      // Backend rechaza si falta decidir conflict2
+      if (!body.payload.finales[key + '||' + comp + '||id:2']) {
+        return { ok: false, code: 'HISTORICAL_CHOICE_REQUIRED', error: 'Se requiere resolver todas las notas históricas divergentes antes de guardar.' };
+      }
+      return {
+        ok: true, notas2: 1, key, readonly: false, legacy: false, panel: 'promedios',
+        versions: { calificar: 1, promedios: 2, asistencia: 1 },
+        at: { calificar: 100, promedios: 200, asistencia: 100 },
+        payload: { ...storeState, finales: body.payload.finales }
+      };
+    }
+  };
+
+  const client = clientModule.create({
+    binding: () => 'test-binding',
+    authorized: () => true,
+    readonly: () => false,
+    key,
+    capture: () => storeState,
+    apply: (p) => { Object.assign(storeState, p); },
+    request: fakeTransport
+  });
+
+  await client.load();
+  assert.equal(client.status().historicalConflicts.length, 2, 'Debe haber 2 conflictos al inicio');
+
+  // Resolver parcialmente SOLO el conflicto 1
+  const choices = { [path1]: 'candidate:0' };
+  const conflicts = client.status().historicalConflicts;
+  const resolvedPaths = [];
+
+  for (const c of conflicts) {
+    const choiceId = choices[c.path];
+    if (!choiceId) continue;
+    const candidate = c.candidates?.find(x => x.id === choiceId);
+    if (!candidate) continue;
+    const [field, canonicalKey] = JSON.parse(c.path);
+    if (field === 'finales') {
+      const chosen = JSON.parse(JSON.stringify(candidate.value));
+      chosen.conciliacionTs = Date.now();
+      chosen.conciliacionOpcion = candidate.id || candidate.label;
+      storeState.finales[canonicalKey] = chosen;
+      resolvedPaths.push(c.path);
+    }
+  }
+
+  // Comportamiento de reconcileHistorical ante decisión parcial
+  assert.equal(resolvedPaths.length, 1);
+  if (resolvedPaths.length === conflicts.length) {
+    client.clearHistoricalConflicts();
+  } else if (resolvedPaths.length > 0) {
+    client.clearHistoricalConflicts(resolvedPaths);
+  }
+
+  // Verificación crítica: el conflicto 2 NO fue borrado
+  assert.equal(client.status().historicalConflicts.length, 1, 'El conflicto pendiente NO debe ser eliminado');
+  assert.equal(client.status().historicalConflicts[0].path, path2);
+
+  // Intentar guardar promedios con decisión incompleta: debe fallar y conservar el conflicto
+  const saveSuccess = await client.save('promedios');
+  assert.equal(saveSuccess, false, 'El guardado parcial debe ser rechazado');
+  assert.equal(client.status().historicalConflicts.length, 1, 'El conflicto pendiente sigue disponible para revisión');
 });
