@@ -117,4 +117,4 @@ const edits={
   ]
  ]
 };
-module.exports=(kind,source)=>{let s=source.replace(/\r\n/g,'\n');if(kind==='html')s=require('./n2g22-context-boundary.cjs')(s);for(const [current,original]of edits[kind]||[]){if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique N2-G.18B hook');s=s.replace(current,original);}}return s;};
+module.exports=(kind,source)=>{let s=source.replace(/\r\n/g,'\n');if(kind==='html')s=require('./n2r3-frontend-boundary.cjs')(require('./n2g22-context-boundary.cjs')(s));for(const [current,original]of edits[kind]||[]){if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique N2-G.18B hook');s=s.replace(current,original);}}return s;};

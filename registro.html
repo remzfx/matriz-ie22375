@@ -3613,7 +3613,7 @@ function renderFinales() {
       const ofi = notaCompAlumno(cp, studentKey(al));
       let nota='', letra='';
       const original = leerNota(store.finales, finalKey(cp, studentKey(al))) || {};
-      if (dir.nota !== '' && dir.nota != null) { nota = original.origen==='letra'?'':dir.nota; letra = dir.letra; }
+      if (dir.letra || (dir.nota !== '' && dir.nota != null)) { nota = original.origen==='letra'?'':(dir.nota !== '' && dir.nota != null ? dir.nota : ''); letra = dir.letra; }
       if (ofi.letra==='AD') cAD++; else if (ofi.letra==='A') cA++; else if (ofi.letra==='B') cB++; else if (ofi.letra==='C') cC++;
       if (ofi.letra) cV++;
       cTot++;

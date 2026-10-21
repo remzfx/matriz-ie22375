@@ -23,12 +23,12 @@ function notas2Ruta_(body) {
     const model=registroAcademico_(),competencies=(model.catalog[ctx.nivel]||{})[ctx.area];
     if(!competencies)return {ok:false,code:'CONTEXT',error:'Área académica inválida.'};
     const identity=academicIdentityFactory();
-    function projected(payload){const result=identity.project(payload,roster.estudiantes,context,competencies);if(result.conflicts.length||result.unresolved.length)throw Error('Identidades históricas pendientes de revisión.');return result.payload;}
+    function projected(payload,enforceResolved){const result=identity.project(payload,roster.estudiantes,context,competencies);if(result.conflicts.length||(enforceResolved&&result.unresolved.length))throw Error(result.conflicts.length?'Notas históricas ambiguas: requieren revisión explícita.':'Identidades históricas pendientes de revisión.');return result;}
     function view(payload){
-      const p=payloadRegistroLectura_(projected(payload),{sesion:{role:permission.role}},ctx);
+      const proj=projected(payload,false),p=payloadRegistroLectura_(proj.payload,{sesion:{role:permission.role}},ctx);
       for(const f of Object.values(fields).flat())if(p[f]===undefined)p[f]=f==='sessions'?[]:{};
       p.calificarEstado=JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(payload.calificarEstado||p.competenciasEstado||{}).filter(([k])=>k.startsWith(prefix)))));
-      model.validate(p,context);notas2Validar_(p,context,competencies);
+      model.validate(p,context);notas2Validar_(p,context,competencies);if(proj.unresolved.length)p.meta=Object.assign({},p.meta||{},{unresolvedIdentities:proj.unresolved});
       // Read-only projection; never insert or persist a legacy record here.
       return p;
     }
@@ -46,7 +46,7 @@ function notas2Ruta_(body) {
     }
     if(body.panel==='calificar')for(const [k,v]of Object.entries(next.calificarEstado))if(!competencies.includes(k.slice(prefix.length))||!v||typeof v.trabajada!=='boolean')throw Error('Estado de competencia inválido.');
     // Do not replace historical/other-panel data to canonicalize them implicitly.
-    const candidate=projected(next);
+    const candidate=projected(next,true).payload;
     for(const f of fields[body.panel].filter(f=>f!=='calificarEstado'))if(!identity.equal(candidate[f]||{},next[f]||{}))throw Error('La identidad enviada no coincide con el padrón autorizado.');
     model.validate(next,context);notas2Validar_(next,context,competencies);
     if(body.panel!=='asistencia'&&ctx.nivel==='secundaria'&&permission.role==='docente')validarTransversalesObligatorias_(ctx,permission);
@@ -69,7 +69,7 @@ function notas2Validar_(payload,context,competencies){
   if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Nota académica inválida.');
   if(v.borrado===true)continue;
   if(v.origen!==undefined&&!['letra','numero'].includes(v.origen))throw Error('Modo de nota inválido.');
-  const hasNumber=v.nota20!==''&&v.nota20!=null,level=v.nivel;
+  const hasNumber=v.nota20!==''&&v.nota20!=null,level=typeof v.nivel==='string'?v.nivel.toUpperCase():v.nivel;if(!hasNumber&&(!level||level===''))continue;
   if(hasNumber&&(!Number.isFinite(Number(v.nota20))||Number(v.nota20)<0||Number(v.nota20)>20))throw Error('Nota fuera de 0–20.');
   if(level!==undefined&&level!==''&&!['AD','A','B','C'].includes(level))throw Error('Nivel de logro inválido.');
   if(!hasNumber&&!['AD','A','B','C'].includes(level))throw Error('Nota sin valor.');
