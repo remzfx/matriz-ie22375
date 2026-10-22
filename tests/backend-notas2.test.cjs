@@ -2,6 +2,7 @@
 // Production doPost, authorization, identity and protocol; all Sheets/services are synthetic.
 // No frontend modules, network, browser profile or production credentials are used.
 const {test}=require('node:test');
+const crypto=require('node:crypto');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
@@ -15,7 +16,22 @@ const fields={calificar:['sessions','grades','capsSel','calificarEstado'],promed
 const empty=panel=>Object.fromEntries(fields[panel].map(f=>[f,f==='sessions'?[]:{}]));
 const grade=(nota20=15,nivel='A')=>({nota20,nivel,origen:'numero',ts:1});
 function fixture(secondary=false){
- const s=setup();vm.runInContext(read('apps-script/Notas2.js'),s.c);
+ const s=setup();
+ s.c.crypto=crypto;
+ const driveFiles=new Map();
+ s.c.DriveApp={
+  createFile:(name,content)=>{
+   const id='DRIVE_FILE_'+Math.random().toString(36).slice(2);
+   driveFiles.set(id,{name,content});
+   return {getId:()=>id,getName:()=>name};
+  },
+  getFileById:(id)=>{
+   const f=driveFiles.get(id);
+   if(!f)return null;
+   return {getId:()=>id,getName:()=>f.name,getBlob:()=>({getDataAsString:()=>f.content,getBytes:()=>[...Buffer.from(f.content,'utf8')]})};
+  }
+ };
+ vm.runInContext(read('apps-script/Notas2.js'),s.c);
  const context=secondary?{nivel:'secundaria',bimestre:'I',grado:1,seccion:'A',area:'Matemática'}:{nivel:'primaria',bimestre:'I',grado:1,seccion:'Única',area:'Comunicación'};
  const key=[context.nivel,context.bimestre,context.grado,context.seccion,context.area].join('||');
  const comp=s.c.registroAcademico_().catalog[context.nivel][context.area][0],id='id:synthetic-1',fk=key+'||'+comp+'||'+id;
@@ -140,7 +156,7 @@ test('historical identity projection reads verified name aliases without rewriti
 
 test('ambiguous historical identity values require review instead of selecting a grade',()=>{
  const s=fixture();s.seed({finales:{[s.fk]:grade(),[s.key+'||'+s.comp+'||ESTUDIANTE FICTICIO']:grade(12,'B')}});
- const r=s.unchanged(()=>s.request('loadnotas2'));assert.equal(r.ok,false);assert.equal(r.payload,undefined);
+ const r=s.unchanged(()=>s.request('loadnotas2'));assert.equal(r.ok,true);assert.equal(r.historicalConflicts?.length,1);assert.equal(r.payload.finales[s.fk],undefined);
 });
 
 test('legacy Calificar cannot be adopted by writing evidence; explicit Promedios save is required',()=>{

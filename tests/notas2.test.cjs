@@ -5,7 +5,22 @@ const read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8'),copy=x=>JSON.p
 const evaluationContext=vm.createContext({window:{}});vm.runInContext(read('registro-evaluation.js'),evaluationContext);const math=evaluationContext.window.IERegistroEvaluacion;
 const setup=new Function('require','__dirname',read('tests/backend-write-auth.test.cjs').split('\nfor (const action')[0]+'\nreturn setup;')(require,__dirname);
 const empty=()=>Object.fromEntries(Object.values(core.fields).flat().map(f=>[f,f==='sessions'?[]:{}]));
-function server(){const s=setup();vm.runInContext(read('apps-script/Notas2.js'),s.c);s.tables.set('EstudiantesBase',{});s.c.leerPadronEstudiantes_=()=>({estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',idSiagie:'synthetic-1',codigoEstudiante:'S1',nombre:'ESTUDIANTE FICTICIO'}]});const ctx={nivel:'primaria',bim:'I',grado:'1',seccion:'Única',area:'Comunicación'},key=['primaria','I','1','Única','Comunicación'].join('||'),comp=s.c.registroAcademico_().catalog.primaria['Comunicación'][0],id='id:synthetic-1',fk=key+'||'+comp+'||'+id;
+function server(){const s=setup();
+ s.c.crypto=require('node:crypto');
+ const driveFiles=new Map();
+ s.c.DriveApp={
+  createFile:(name,content)=>{
+   const id='DRIVE_FILE_'+Math.random().toString(36).slice(2);
+   driveFiles.set(id,{name,content});
+   return {getId:()=>id,getName:()=>name};
+  },
+  getFileById:(id)=>{
+   const f=driveFiles.get(id);
+   if(!f)return null;
+   return {getId:()=>id,getName:()=>f.name,getBlob:()=>({getDataAsString:()=>f.content,getBytes:()=>[...Buffer.from(f.content,'utf8')]})};
+  }
+ };
+ vm.runInContext(read('apps-script/Notas2.js'),s.c);s.tables.set('EstudiantesBase',{});s.c.leerPadronEstudiantes_=()=>({estudiantes:[{nivel:'primaria',grado:1,seccion:'Única',idSiagie:'synthetic-1',codigoEstudiante:'S1',nombre:'ESTUDIANTE FICTICIO'}]});const ctx={nivel:'primaria',bim:'I',grado:'1',seccion:'Única',area:'Comunicación'},key=['primaria','I','1','Única','Comunicación'].join('||'),comp=s.c.registroAcademico_().catalog.primaria['Comunicación'][0],id='id:synthetic-1',fk=key+'||'+comp+'||'+id;
  return {...s,ctx,key,comp,id,fk,request:(body,extra={})=>s.post({...s.body(body.action),token:s.primary,...body,...extra}),payload:()=>JSON.parse(s.tables.get('RegistroNotas').rows[1][8])};}
 function pc(s,extra={}){let data=empty(),binding='synthetic-session',readonly=false,calls=[],errors=[];const client=core.create({key:s.key,binding:()=>binding,authorized:()=>true,readonly:()=>readonly,capture:()=>copy(data),apply:p=>{data={...data,...copy(p)};},request:async body=>{calls.push(copy(body));return s.request(body);},confirm:async()=>true,error:e=>errors.push(e.code),...extra});return {client,calls,errors,get data(){return data;},set(p,n){data[p][s.fk]=n;},bind:v=>binding=v,readonly:v=>readonly=v};}
 const direct=n=>({nota20:n,nivel:math.numToLetter(n),origen:'numero',ts:1});

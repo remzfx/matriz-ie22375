@@ -140,8 +140,10 @@ test('4. Identidades ambiguas: conflicto real requiere revisión explícita', ()
 
   f.seed(payload);
   const res = f.request('loadnotas2');
-  assert.equal(res.ok, false);
-  assert.equal(res.error, 'Notas históricas ambiguas: requieren revisión explícita.');
+  assert.equal(res.ok, true);
+  assert.equal(res.historicalConflicts?.length, 1);
+  assert.equal(res.payload.finales[f.key + '||' + c1 + '||id:1001'], undefined);
+  assert.equal(res.historicalConflicts[0].candidates.length, 2);
 });
 
 test('5. Bloqueo EMPTY entre paneles: registro legacy con calificar vacío carga promedios sin error', async () => {

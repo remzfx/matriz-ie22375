@@ -51,7 +51,7 @@
  function canEdit(panel=currentPanel()){if(panel==='resumen')return false;if(tutor())return !!connection?.canEdit();const c=get();if(c?.status()?.state==='conflict')return false;return !!connection?.canEdit()&&!!c?.canEdit(panel);}
  function render(){if(tutor()){if(connection?.canEdit())tutorRegistroController?.refresh?.();else document.querySelectorAll('#transRows input,#transRows textarea,#transRows select,#transRows button').forEach(el=>el.disabled=true);return;}if(painting)return;painting=true;try{renderSesiones();renderStudents();if(currentPanel()==='promedios')renderFinales();if(document.getElementById('panelAvance')?.classList.contains('on'))renderAvance();if(currentPanel()==='asistencia')renderAsistencia();sincronizarEdicionRegistro();}finally{painting=false;}}
  function paint(){
-  const s=get()?.status(),pane=currentPanel(),label=document.getElementById('registroSaveState');if(label&&s){label.textContent=['calificar','promedios'].map(n=>{const p=s.panels[n];return (n==='calificar'?'Calificar':'Promedios')+': '+(p.pending?'Cambios sin guardar':p.at?'Guardado '+new Date(p.at).toLocaleString('es-PE'):'Sin guardado confirmado');}).join(' · ')+(s.legacy?' · Consulta histórica: Procesar y Guardar Promedios para iniciar Notas 2.0.':'');}
+  const s=get()?.status(),pane=currentPanel(),label=document.getElementById('registroSaveState');if(label&&s){label.textContent=['calificar','promedios'].map(n=>{const p=s.panels[n];return (n==='calificar'?'Calificar':'Promedios')+': '+(p.pending?'Cambios sin guardar':p.at?'Guardado '+new Date(p.at).toLocaleString('es-PE'):'Sin guardado confirmado');}).join(' · ')+(s.legacy?' · Consulta histórica: Procesar y Guardar Promedios para iniciar Notas 2.0.':'');if(s.historicalConflicts?.length)label.textContent+=' · '+s.historicalConflicts.length+' notas históricas pendientes de decisión explícita.';}
   if(label&&typeof IERegistroTransversales!=='undefined'&&IERegistroTransversales.current()?.dirty)label.textContent+=' · Aportes transversales pendientes.';
   const connState=connection?.snapshot?.()?.state||'checking';
   const paneNames={calificar:'Calificar',promedios:'Promedios',asistencia:'Asistencia',resumen:'Resumen'};
@@ -75,6 +75,8 @@
   if(process){process.hidden=tutor()||(pane!=='calificar'&&pane!=='asistencia');process.querySelector('span').textContent=pane==='asistencia'?'Subir Nube':'Procesar a Promedios';process.disabled=!connection?.canEdit()||!s||s.busy||s.readonly||readonly()||isConflict;}
   if(down){down.disabled=isResumen||!authorized()||!!s?.busy||tutor();down.hidden=isResumen;}
   const retryBtn=document.getElementById('registroRetryOffer');if(retryBtn)retryBtn.hidden=true; // Recovery is available from the cloud diagnostic.
+  const histConflicts=s?.historicalConflicts||[];const conflictBtn=document.getElementById('registroConflictOffer');
+  if(conflictBtn){if(histConflicts.length>0&&pane==='promedios'){conflictBtn.hidden=false;conflictBtn.style.display='inline-flex';const txt=conflictBtn.querySelector('span');if(txt)txt.textContent='Revisar notas históricas ('+histConflicts.length+')';conflictBtn.onclick=()=>reconcileHistorical();}else if(!isConflict){conflictBtn.hidden=true;conflictBtn.style.display='none';}}
   if(!canEdit())document.querySelectorAll('#stuList button,#finLista button,#finLista input,#finLista textarea,#finLista select,#asisLista button').forEach(el=>{if(el.tagName==='BUTTON'||el.type==='checkbox'||el.tagName==='SELECT')el.disabled=true;else el.readOnly=true;});
   const edit=canEdit();if(edit!==lastEditable&&!painting){lastEditable=edit;render();}
  }
@@ -181,9 +183,38 @@
  }});
  function pendingPanels(){const s=get()?.status();if(!s)return [];const names={calificar:'Calificar',promedios:'Promedios',asistencia:'Asistencia'};const list=[];for(const [name,p] of Object.entries(s.panels)){const isDirty=p.pending||(name==='calificar'&&typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty);if(isDirty)list.push(names[name]||name);}return list;}
  function hasPending(){return pendingPanels().length>0;}
- const api={save,download,process,collect,worked,setWorked,canEdit,officialOnly,persist,refresh,pendingPanels,hasPending,activePending:()=>{const pane=currentPanel();return pane==='resumen'?false:pane==='calificar'?(!!get()?.status()?.panels.calificar?.pending||(typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty)):!!get()?.status()?.panels[pane]?.pending;},keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
+ async function reconcileHistorical(){
+  const client=get();if(!client)return false;const s=client.status();const conflicts=s.historicalConflicts||[];
+  if(!conflicts.length){if(typeof toast==='function')toast('No hay conflictos históricos pendientes.');return true;}
+  const roster=typeof estudiantes==='function'?estudiantes():[];
+  const choices=await (root.IERegistroReconcile?.choose||IERegistroReconcile.choose)(conflicts,()=>client.status().state!=='closed',{roster});
+  if(!choices)return false;
+  store.finales=store.finales||{};let count=0;const resolvedPaths=[];
+  for(const c of conflicts){
+   const choiceId=choices[c.path];if(!choiceId)continue;
+   const candidate=c.candidates?.find(x=>x.id===choiceId);if(!candidate)continue;
+   const [field,canonicalKey]=JSON.parse(c.path);
+   if(field==='finales'){
+    const chosen=JSON.parse(JSON.stringify(candidate.value));
+    chosen.conciliacionTs=Date.now();
+    chosen.conciliacionOpcion=candidate.id||candidate.label;
+    store.finales[canonicalKey]=chosen;
+    count++;
+    resolvedPaths.push(c.path);
+   }
+  }
+  if(resolvedPaths.length===conflicts.length){
+   client.clearHistoricalConflicts?.();
+  }else if(resolvedPaths.length>0){
+   client.clearHistoricalConflicts?.(resolvedPaths);
+  }
+  render();paint();
+  if(typeof toast==='function')toast(count+' calificaciones históricas seleccionadas. Guarde Promedios para confirmar.');
+  return true;
+ }
+ const api={save,download,process,collect,worked,setWorked,canEdit,officialOnly,persist,refresh,pendingPanels,hasPending,reconcileHistorical,activePending:()=>{const pane=currentPanel();return pane==='resumen'?false:pane==='calificar'?(!!get()?.status()?.panels.calificar?.pending||(typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty)):!!get()?.status()?.panels[pane]?.pending;},keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
  // Existing tutor controls call this API only to verify their connection, never to write academic notes.
- root.IERegistroRecovery={refresh,automatic:()=>connection.check(),resolve:()=>{connection.invalidate();return connection.check(true,true);},local:save,upload:()=>currentPanel()==='asistencia'?uploadAttendance():save(),recover:download};
+ root.IERegistroRecovery={refresh,automatic:()=>connection.check(),resolve:()=>{const s=get()?.status();if(s?.historicalConflicts?.length)return reconcileHistorical();connection.invalidate();return connection.check(true,true);},local:save,upload:()=>currentPanel()==='asistencia'?uploadAttendance():save(),recover:download};
  document.addEventListener('DOMContentLoaded',()=>{
   const review=document.getElementById('registroConnectionReview');if(review){review.textContent='Verificar conexión';review.onclick=()=>connection.check(true,true);}
   ensureSyncIndicator();ensureSecondaryDiagnostic();
