@@ -19,16 +19,54 @@ function academicResetStatistics_(sheet){
  if(sheet.rows.slice(1).some(row=>row.some(v=>!blank(v))))throw Error('Hoja '+sheet.name+' no clasificada: contiene datos; requiere revisión protegida.');
  return {kind:'headers-only-derived-statistics',columns:header.length,dataRows:0};
 }
+function academicResetNoAttendance_(value){
+ if(value&&typeof value==='object')for(const [k,v]of Object.entries(value)){if(/^asis|asistencia/i.test(k))throw Error('Asistencia en almacén académico; requiere clasificación.');academicResetNoAttendance_(v);}
+}
+function academicResetLegacyMatrix_(raw){
+ const p=academicResetJson_(raw),known=['bimestre','grado','seccion','totalEstudiantes','nombreDocente','areaActual','datos'];
+ if(Object.keys(p).some(k=>!known.includes(k))||known.some(k=>!Object.prototype.hasOwnProperty.call(p,k)))throw Error('Campo de matriz Estados no inventariado.');
+ if(!['I','II','III','IV'].includes(p.bimestre)||['grado','seccion','nombreDocente','areaActual'].some(k=>typeof p[k]!=='string')||!Number.isSafeInteger(p.totalEstudiantes)||p.totalEstudiantes<0)throw Error('Contexto de matriz Estados no clasificado.');
+ const object=v=>v&&typeof v==='object'&&!Array.isArray(v);academicResetNoAttendance_(p);
+ if(!object(p.datos))throw Error('Datos de matriz Estados no clasificados.');
+ for(const aula of Object.values(p.datos)){
+  if(!object(aula))throw Error('Aula de matriz Estados no clasificada.');
+  for(const area of Object.values(aula)){
+   if(!object(area))throw Error('Área de matriz Estados no clasificada.');
+   for(const counts of Object.values(area))if(!object(counts)||Object.keys(counts).length!==4||['inicio','proceso','previsto','destacado'].some(k=>!Number.isSafeInteger(counts[k])||counts[k]<0))throw Error('Conteos de matriz Estados no clasificados.');
+  }
+ }
+ return {...p,datos:{}};
+}
+function academicResetTransversalPayloads_(rows,col){
+ const parts=new Map(),commits=[],result=[],used=new Set();
+ for(const row of rows){
+  if(row.every(v=>v===''))continue;const p=academicResetJson_(row[col]);
+  if(p._ieTransversalParte===1){
+   const key=String(row[0]);if(parts.has(key)||typeof p.data!=='string'||Object.keys(p).some(k=>!['_ieTransversalParte','data'].includes(k)))throw Error('Fragmento transversal inválido o duplicado.');parts.set(key,{row,data:p.data});
+  }else if(p._ieTransversalBloque===1){
+   if(!Number.isSafeInteger(p.partes)||p.partes<1||p.partes>512||Object.keys(p).some(k=>!['_ieTransversalBloque','partes'].includes(k)))throw Error('Bloque transversal inválido.');commits.push({row,p});
+  }else result.push(p);
+ }
+ for(const {row,p}of commits){
+  const joined=[];for(let i=0;i<p.partes;i++){
+   const key=String(row[0])+'||@parte||'+row[col-1]+'||'+i,part=parts.get(key);
+   if(!part||used.has(key)||JSON.stringify(part.row.slice(1,col))!==JSON.stringify(row.slice(1,col)))throw Error('Bloque transversal incompleto o inconsistente.');used.add(key);joined.push(part.data);
+  }
+  result.push(academicResetJson_(joined.join('')));
+ }
+ if(used.size!==parts.size)throw Error('Fragmento transversal huérfano.');return result;
+}
 function academicResetProtected_(snapshot){
  const gradingOnly=['RegistroHistorialAcademico','TransversalesAportes','TransversalesConsolidado','TransversalesProcesado'];
- return academicResetHash_(snapshot.sheets.filter(s=>s.name!=='AcademicResetControl').map(s=>({name:s.name,id:s.id,formulas:s.formulas,rows:gradingOnly.includes(s.name)?[s.rows[0]]:s.name==='EstadosAreas'?s.rows.map((r,i)=>i?r.slice(0,9):r):s.name==='RegistroNotas'?s.rows.map((r,i)=>i?[...r.slice(0,7),Object.fromEntries(IEAcademicReset.attendance.map(k=>[k,academicResetJson_(r[8])[k]])),academicResetJson_(r[8]).meta?.studentAliases,academicResetJson_(r[8]).meta?.docente]:r):s.rows})));
+ return academicResetHash_(snapshot.sheets.filter(s=>s.name!=='AcademicResetControl').map(s=>({name:s.name,id:s.id,formulas:s.formulas,rows:gradingOnly.includes(s.name)?[s.rows[0]]:s.name==='Estados'?s.rows.map((r,i)=>i?[...r.slice(0,2),academicResetLegacyMatrix_(r[2]),...r.slice(3)]:r):s.name==='EstadosAreas'?s.rows.map((r,i)=>i?r.slice(0,9):r):s.name==='RegistroNotas'?s.rows.map((r,i)=>i?[...r.slice(0,7),Object.fromEntries(IEAcademicReset.attendance.map(k=>[k,academicResetJson_(r[8])[k]])),academicResetJson_(r[8]).meta?.studentAliases,academicResetJson_(r[8]).meta?.docente]:r):s.rows})));
 }
 function academicResetPlan_(snapshot,epoch,now){
  if(!/^[a-f0-9]{32}$/.test(epoch)||!Number.isSafeInteger(now)||now<=0)throw Error('Generación inválida.');
  const requests=[],counts={},classifications={},driveIds=new Set(),keys=new Set();
  const cell=v=>({userEnteredValue:typeof v==='number'?{numberValue:v}:{stringValue:String(v)}});
  function put(sh,row,col,values){requests.push({updateCells:{range:{sheetId:sh.id,startRowIndex:row,endRowIndex:row+1,startColumnIndex:col,endColumnIndex:col+values.length},rows:[{values:values.map(cell)}],fields:'userEnteredValue'}});}
- function noAttendance(value){if(value&&typeof value==='object'){for(const [k,v]of Object.entries(value)){if(IEAcademicReset.attendance.includes(k)||/^asis|asistencia/i.test(k))throw Error('Asistencia en almacén académico; requiere clasificación.');noAttendance(v);}}}
+ const noAttendance=academicResetNoAttendance_;
+ function schema(sh,header){if(header.some((v,i)=>sh.rows[0]?.[i]!==v)||sh.rows.some(row=>row.slice(header.length).some(v=>v!=='')))throw Error('Esquema de '+sh.name+' inesperado.');}
  for(const sh of snapshot.sheets){
   counts[sh.name]=0;
   if(sh.name==='RegistroNotas'){
@@ -40,27 +78,32 @@ function academicResetPlan_(snapshot,epoch,now){
     if(!Number.isSafeInteger(version)||version<0||row[0]!==row.slice(1,6).join('||'))throw Error('Clave o versión inválida.');
     if(keys.has(row[0]))throw Error('Filas duplicadas: clasificar asistencia antes de continuar.');keys.add(row[0]);
     if(p.meta?.externalDriveBackup?.fileId)driveIds.add(p.meta.externalDriveBackup.fileId);
+    for(const panel of ['calificar','promedios','asistencia']){const confirm=p.meta?.notas2?.[panel];if(confirm&&(!Number.isSafeInteger(confirm.version)||confirm.version<0||confirm.version>=Number.MAX_SAFE_INTEGER||confirm.at!=null&&!Number.isFinite(confirm.at)))throw Error('Confirmación de versión inválida.');}
     const v=Math.max(now,version+1,...Object.values(p.meta?.notas2||{}).filter(v=>v&&typeof v==='object').map(v=>Number(v.version)||0).map(v=>v+1)),next=IEAcademicReset.registration(p,epoch,v,version),raw=JSON.stringify(next);
+    if(!Number.isSafeInteger(v))throw Error('Versión de reinicio inválida.');
     if(raw.length>49000)throw Error('Registro supera el límite de celda.');
     put(sh,r,7,[v,raw]);counts[sh.name]++;
    }
+  }else if(sh.name==='Estados'){
+   schema(sh,['nivel','actualizado','json']);
+   for(let r=1;r<sh.rows.length;r++){const row=sh.rows[r];if(row.every(v=>v===''))continue;if(!['primaria','secundaria'].includes(row[0]))throw Error('Nivel de matriz Estados no clasificado.');put(sh,r,2,[JSON.stringify(academicResetLegacyMatrix_(row[2]))]);counts[sh.name]++;}
   }else if(sh.name==='EstadosAreas'){
-   if(sh.rows[0]?.[9]!=='json')throw Error('Esquema de matriz inesperado.');
+   schema(sh,['clave','nivel','bimestre','grado','seccion','area','docente','totalEstudiantes','actualizado','json']);
    for(let r=1;r<sh.rows.length;r++){if(sh.rows[r].every(v=>v===''))continue;const p=academicResetJson_(sh.rows[r][9]);noAttendance(p);put(sh,r,9,['{}']);counts[sh.name]++;}
   }else if(['RegistroHistorialAcademico','TransversalesAportes','TransversalesConsolidado','TransversalesProcesado'].includes(sh.name)){
    // These sheets contain only grading. Never clear an unrecognized mixed schema.
    const col=sh.name==='RegistroHistorialAcademico'?6:sh.name==='TransversalesAportes'?8:6;
-   if(sh.rows[0]?.[col]!=='json')throw Error('Esquema histórico/transversal inesperado.');
+   schema(sh,sh.name==='RegistroHistorialAcademico'?['id','clave','version','parte','total','sha256','json']:sh.name==='TransversalesAportes'?['clave','bimestre','grado','seccion','areaOrigen','docente','user','ts','json']:['clave','bimestre','grado','seccion','versionAportes','ts','json']);
    if(sh.name==='RegistroHistorialAcademico'){
     // History chunks must be reconstructed before examining their contents.
     const groups={};for(const row of sh.rows.slice(1)){if(row.every(v=>v===''))continue;if(typeof row[col]!=='string'||!row[col].startsWith('j:'))throw Error('Historial no verificable.');const key=JSON.stringify(row.slice(0,3));(groups[key]||(groups[key]=[])).push(row);}
-    for(const rows of Object.values(groups)){rows.sort((a,b)=>a[3]-b[3]);if(rows.length!==rows[0][4]||rows.some((r,i)=>r[3]!==i||r[4]!==rows.length))throw Error('Historial incompleto.');noAttendance(JSON.parse(rows.map(r=>r[col].slice(2)).join('')));}
-   }else for(const row of sh.rows.slice(1))if(!row.every(v=>v===''))noAttendance(academicResetJson_(row[col]));
+    for(const rows of Object.values(groups)){rows.sort((a,b)=>a[3]-b[3]);if(rows.length!==rows[0][4]||rows.some((r,i)=>r[3]!==i||r[4]!==rows.length||r[5]!==rows[0][5]))throw Error('Historial incompleto.');const raw=rows.map(r=>r[col].slice(2)).join('');if(calcularSha256Hex_(raw)!==rows[0][5]||calcularSha256Hex_(JSON.stringify([rows[0][1],rows[0][2],raw]))!==rows[0][0])throw Error('No se verificó la integridad del historial.');const history=JSON.parse(raw);if(!Array.isArray(history))throw Error('Historial no clasificado.');noAttendance(history);}
+   }else for(const value of academicResetTransversalPayloads_(sh.rows.slice(1),col))noAttendance(value);
    if(sh.rows.length>1)requests.push({repeatCell:{range:{sheetId:sh.id,startRowIndex:1,endRowIndex:sh.rows.length,startColumnIndex:0,endColumnIndex:col+1},cell:{},fields:'userEnteredValue'}});
    counts[sh.name]=sh.rows.length-1;
   }else if(sh.name==='PRIMARIA'||sh.name==='SECUNDARIA'){
    classifications[sh.name]=academicResetStatistics_(sh); // No mutation or request for either sheet.
-  }else if(sh.name!=='AcademicResetControl'&&!/asis/i.test(sh.name)&&/nota|calific|registro|matriz|^(primaria|secundaria)$/i.test(sh.name)){
+  }else if(!['AcademicResetControl','EstudiantesBase','DocentesAcceso','ConfigSistema','AsistenciaIngreso','SiagiePlantillas','AipPlan','WhatsappGrupos'].includes(sh.name)){
    throw Error('Hoja histórica no clasificada. No ejecutar hasta verificar su esquema.');
   }
  }
