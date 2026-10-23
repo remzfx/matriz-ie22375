@@ -7,7 +7,7 @@ const additions=[
  "        if(prev.meta&&prev.meta.notas2)return responder_({ok:false,code:'NOTAS2_REQUIRED',error:'Este registro requiere Notas 2.0; no se modificó.'});\n"
 ];
 module.exports=source=>{
- let s=source.replace(/\r\n/g,'\n');
+ let s=require('./academic-reset-boundary.cjs')('apps-script/Codigo.js',source);
  if(!additions.some(line=>s.includes(line)))return s;
  for(const line of additions){assert.equal(s.split(line).length,2,'Exact N2-G.18A backend hook, once only');s=s.replace(line,'');}
  return s;

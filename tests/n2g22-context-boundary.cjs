@@ -43,4 +43,4 @@ const edits=[
     "    location.href = 'index.html';\n    return;\n  }\n  document.getElementById('viewApp').classList.add('hidden');\n  document.getElementById('viewHome').classList.remove('hidden');\n  nivel = null;\n"
   ]
 ];
-module.exports=source=>{let s=require('./n2r3-frontend-boundary.cjs')(source.replace(/\r\n/g,'\n'));for(const [current,previous] of edits){if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique N2-G.22 hook');s=s.replace(current,previous);}}return s;};
+module.exports=source=>{let s=require('./n2r3-frontend-boundary.cjs')(require('./academic-reset-boundary.cjs')('registro.html',source));for(const [current,previous] of edits){if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique N2-G.22 hook');s=s.replace(current,previous);}}return s;};

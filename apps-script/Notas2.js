@@ -10,6 +10,7 @@ function notas2Ruta_(body) {
   if(save&&!Object.prototype.hasOwnProperty.call(fields,body.panel))return {ok:false,code:'PANEL',error:'Panel inválido.'};
   const lock=LockService.getScriptLock();if(save)lock.waitLock(30000);
   try{
+    if(save){const resetStopped=academicResetGuard_(body);if(resetStopped)return resetStopped;}
     const ss=SpreadsheetApp.getActiveSpreadsheet(),sh=ss.getSheetByName('RegistroNotas');let row=0,values;
     if(sh&&sh.getLastRow()>1){const rows=sh.getRange(2,1,sh.getLastRow()-1,9).getValues();for(let i=0;i<rows.length;i++)if(String(rows[i][0])===key){if(row)return {ok:false,code:'READ_CORRUPT',error:'Registro duplicado; requiere revisión.'};row=i+2;values=rows[i];}}
     let previous={};if(row){try{previous=JSON.parse(String(values[8]));if(!previous||typeof previous!=='object'||Array.isArray(previous))throw Error();}catch(e){return {ok:false,code:'READ_CORRUPT',error:'Registro ilegible; no se reemplazó información.'};}}

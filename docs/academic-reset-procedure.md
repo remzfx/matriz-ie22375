@@ -1,0 +1,77 @@
+# Reinicio administrativo de calificaciones — preparado, NO ejecutado
+
+Este cambio sustituye el alcance N2-R8 limitado a cinco aulas: la autorización vigente incluye todas las calificaciones, docentes, áreas y periodos. No hay excepciones para notas de docentes concretos. No se han consultado ni modificado calificaciones reales para desarrollar o probar esta intervención.
+
+## Inventario y separación
+
+| Almacén / ruta | Tratamiento preparado | Datos conservados |
+| --- | --- | --- |
+| `RegistroNotas`, `loadreg`, `loadnotas2`, `savenotas2`, `savereg` | Vaciar `sessions`, `grades`, `finales`, `concComp`, `concArea`, `capsSel`, `calificarEstado`, `competenciasEstado`; retirar historial y referencias de respaldo académico. Actualizar exclusivamente H/I. | Filas A:G, docente, aliases e identidades; `asistencia`, `asisFechas`, `asisFechasEstado` íntegros; confirmación CAS previa de asistencia. |
+| `Estados` legado | Validar encabezado `nivel, actualizado, json` y el JSON institucional de siete campos. Vaciar únicamente `datos` (conteos numéricos de cuatro niveles), en C. | A:B, contexto, docente, matrícula y selección. Campos desconocidos o asistencia detienen todo el plan. |
+| `EstadosAreas`, `loadnivel/load`, `saveArea` | Vaciar JSON de conteos académicos en J, nunca borrar filas. | Identificación de área/aula/docente, matrícula y demás columnas. |
+| `PRIMARIA`, `SECUNDARIA` | Clasificación explícita `headers-only-derived-statistics` únicamente con encabezados institucionales exactos, sin datos ni fórmulas. Cero peticiones de escritura sobre estas hojas. | Hojas completas, encabezados y huellas de valores/fórmulas. Cualquier contenido nuevo detiene el procedimiento, aunque parezca estadístico. |
+| `RegistroHistorialAcademico` | Validar encabezados completos, reconstruir fragmentos y verificar hashes antes de retirar los datos de las filas académicas. No crear otro historial. | Encabezado; se aborta si aparece asistencia, fragmentos incompletos o esquema desconocido. |
+| `TransversalesAportes`, `TransversalesConsolidado`, `TransversalesProcesado` | Validar encabezados completos y reconstruir bloques fragmentados; rechazar fragmentos incompletos, duplicados o huérfanos. Retirar aportes, decisiones, conclusiones y snapshots derivados. | Encabezados. Tutorías, asignaciones y política en Config/Docentes permanecen intactas. |
+| Archivos `RESPALDO_HISTORICO_22375_...` y referencias `externalDriveBackup` | Inventariar archivos verificables por contexto y huella. Sanear contenido **en el mismo archivo**, conservando asistencia e identidades si existen. | No se crean archivos alternativos, copias de descartados ni nuevas fuentes recuperables. Un archivo no clasificable detiene el plan. |
+| local/sessionStorage `ie22375_registro_notas_v2` y variantes `:owner:`, `matriz_IE22375`, `matriz_SEC_IE22375` y variantes | Sanear solo campos académicos de la generación anterior. Vaciar conteos `datos` de matrices. Sanear baselines y JSON de borradores. | Usuarios, sesión, padrón, fechas, marcas, justificaciones, configuraciones y asignaciones. Nunca `clear()`. |
+| IndexedDB `ie22375_emergency_v1/drafts` | Sanear snapshots de generaciones anteriores, manteniendo asistencia contenida. Filtrar recuperación por generación. | BD, scopes, identidades e información de asistencia. No eliminar bases de otros módulos. |
+| Notas 2.0 en memoria / páginas antiguas | Una generación autenticada nueva exige saneamiento y recarga antes de reenviar cualquier petición académica. Escrituras antiguas se rechazan en servidor. | Consultas y escrituras de asistencia independientes; no se generan subidas por navegar. |
+| `AsistenciaIngreso`, sus historiales/cierres, `EstudiantesBase`, `DocentesAcceso`, `ConfigSistema`, `SiagiePlantillas`, AIP/WhatsApp y otras hojas protegidas | No hay instrucciones de escritura sobre ellas. Se comparan huellas de integridad. | Todo su contenido, incluidas credenciales y cierres. Las plantillas SIAGIE siguen siendo los originales; no se restauran sus notas automáticamente. |
+
+Cualquier hoja no inventariada (independientemente de su nombre), una columna desconocida, metadatos no clasificados o filas duplicadas que puedan mezclar asistencia **detienen** la preparación. No se asume su contenido ni se autoriza su borrado por nombre. La clasificación de esos casos debe revisarse antes de ejecutar; el procedimiento no contiene un interruptor para ignorar el fallo.
+
+### Inspección institucional de PRIMARIA y SECUNDARIA — 23 de octubre de 2026
+
+Lectura mediante el conector de Google Sheets del [documento institucional Matriz IE 22375 - Datos](https://docs.google.com/spreadsheets/d/1yGI1MNJjgsnzDZtfm_INlCT5lSQJeqw_q58G76xTGyc/edit), sin ejecutar Apps Script ni funciones administrativas. Metadatos antes de consultar rangos; valores en modo `FORMULA` para detectar también fórmulas cuyo resultado visible fuese vacío.
+
+| Hoja | Rango completo inspeccionado | Encabezado exacto y orden | Resultado |
+| --- | --- | --- | --- |
+| `PRIMARIA` (gid 0) | `A1:Z997` | `timestamp, bimestre, grado, area, docente, n_estudiantes, competencia, logro, cantidad, porcentaje, clave` | Una fila devuelta: encabezado A:K; 0 celdas con contenido posterior y 0 fórmulas. |
+| `SECUNDARIA` (gid 1041386157) | `A1:Z995` | `timestamp, bimestre, grado, seccion, area, docente, n_estudiantes, competencia, logro, cantidad, porcentaje, clave` | Una fila devuelta: encabezado A:L; 0 celdas con contenido posterior y 0 fórmulas. |
+
+La estructura representa conteos/porcentajes agregados por competencia y logro, con identificación de contexto/docente; no define notas individuales por estudiante. **Estado real observado: únicamente encabezados**, sin calificaciones persistentes ni estadísticas pobladas. Es una estructura heredada: el backend vigente utiliza `HOJA_AREAS = 'EstadosAreas'` para las matrices (`asegurarHoja_`, `loadnivel/load`, `saveArea`), no estas dos hojas. No se deduce de ello autorización para ignorar contenido futuro.
+
+El inventario ahora registra la clasificación, columnas y `dataRows:0` en el resumen del dry-run. Solo admite los encabezados exactos en su orden y celdas vacías adicionales; rechaza encabezados alterados, tablas pobladas, datos protegidos, contenido fuera de las columnas previstas, fórmulas incluso invisibles y ausencia de inventario de fórmulas. No intenta clasificar o borrar filas futuras por heurística. Una aprobación queda invalidada si cambia el inventario; las fórmulas se incluyen también en la huella protegida de estas hojas.
+
+La reproducción local del procedimiento administrativo usa estos encabezados no personales y servicios Sheets/Drive simulados: el dry-run se completa con ambas hojas y no muta hojas/archivos ni propone escribir en ellas. **No se ha ejecutado el dry-run Apps Script contra producción** ni se ha certificado el inventario completo de archivos privados reales. El propietario deberá efectuar la preparación de solo lectura y revisar el resumen antes de cualquier autorización de ejecución.
+
+### Inventario adicional detectado en la auditoría final
+
+La inspección de solo lectura del 23 de octubre encontró también `Estados!A1:Z1000`: encabezado `nivel, actualizado, json` y una fila. Su JSON contiene `bimestre`, `grado`, `seccion`, `totalEstudiantes`, `nombreDocente`, `areaActual` y `datos`; este último usa la estructura aula → área → competencia → conteos `inicio/proceso/previsto/destacado`. No se incorporaron identidades, valores ni calificaciones reales a pruebas o documentación. El plan ahora contempla esa fuente derivada, sin borrar filas ni contexto, y la huella protegida excluye exclusivamente sus conteos reconocidos. Una estructura distinta exige clasificación independiente.
+
+El inventario deja de inferir seguridad por el nombre de una hoja: solo se preservan automáticamente las hojas protegidas conocidas (`EstudiantesBase`, `DocentesAcceso`, `ConfigSistema`, `AsistenciaIngreso`, `SiagiePlantillas`, `AipPlan`, `WhatsappGrupos`, más el control de operación). Las demás requieren una clasificación explícita entre las fuentes académicas documentadas; una hoja adicional de asistencia o de cualquier otra función también detiene el plan, sin modificarla. Antes de descartar un campo académico o historial, el modelo busca asistencia anidada, incluso en snapshots serializados conocidos; si aparece, se detiene sin descartarla. No crea un historial alternativo para resolverla automáticamente.
+
+## Barreras e integridad
+
+- `academicstate` solo devuelve generación/fase a sesiones autorizadas; no cambia datos.
+- El control nuevo `AcademicResetControl` se publica atómicamente junto a las modificaciones de Sheets, con fase `blocked`. Su manifiesto contiene IDs/huellas, nunca notas descartadas.
+- Todos los escritores académicos comparten el ScriptLock con la operación. El control se consulta después de tomarlo. `savereg` legacy queda bloqueado después del reinicio, incluso si adjunta una generación nueva. Calificar/Promedios nuevos requieren generación válida, además del CAS, autorización y cierre existentes.
+- `savenotas2` del panel asistencia mantiene su CAS y no necesita una generación académica. `saveasis` y cierres independientes no se cambian.
+- Después del batch se comprueban los datos protegidos. Se sanean los archivos históricos y se verifica cada resultado. Solo entonces se marca `complete`.
+- Si hay respuesta perdida o interrupción, no hay reintento automático. La reanudación explícita con la misma generación revisa huellas y completa archivos; **no repite la eliminación de Sheets**. Si la asistencia cambió legítimamente durante una interrupción, la certificación se detiene para revisión, sin sobrescribirla.
+- Ejecutar de nuevo una generación ya completada es un no-op: no borra notas nuevas.
+- Los clientes antiguos y pestañas con generaciones anteriores no pueden resubir notas. El lector local nuevo rechaza entradas antiguas reescritas por otra pestaña. Los nuevos borradores llevan generación.
+
+## Procedimiento futuro — requiere revisión y autorización adicional para ejecutarse
+
+1. Revisar PR/CI, inventario de persistencias y prueba de conservación de asistencia. Confirmar alcance institucional completo. No reutilizar scripts N2-R8 anteriores ni el Excel de cinco aulas como instrucciones de esta operación.
+2. Coordinar mantenimiento y cerrar sesiones académicas de escritura. Impedir ediciones manuales concurrentes de Sheets y herramientas externas ajenas al ScriptLock. No abrir ningún bimestre cerrado.
+3. Publicar backend compatible y frontend/SW v26 coordinados, **solo cuando el usuario lo autorice**. El frontend requiere `academicstate`; el backend requiere `AcademicReset.js` y `AcademicResetModel.js`. Retirar rutas desplegadas antiguas que permitan escribir sin la barrera. Conservar ID de implementación.
+4. El propietario del Spreadsheet, desde el editor de su Apps Script vinculado, debe poder autorizar `SpreadsheetApp`, Drive y `UrlFetchApp`/`ScriptApp`. El proyecto debe tener disponible Google Sheets API. La operación usa su REST `spreadsheets.batchUpdate`, no requiere agregar el servicio avanzado al manifiesto. Un rechazo HTTP detiene la operación sin reintentos.
+5. Ejecutar **solo** `prepararLimpiezaCalificaciones_()` en una función local del editor y revisar su resumen: `mode:dry-run`, `epoch`, `at`, `fingerprint`, `filesFingerprint`, `counts`, `classifications`, `files`. Para `PRIMARIA` y `SECUNDARIA`, comprobar `headers-only-derived-statistics`, 11/12 columnas y `dataRows:0`. No imprimir JSON académicos ni credenciales. Preparar no publica control ni altera hojas/Drive.
+6. Si el inventario detecta cualquier fuente no clasificada, **detenerse** y revisarla; no eliminar campos a mano para eludir la comprobación. Clasificar también exportaciones externas/otros orígenes y despliegues viejos que estén fuera del repositorio antes de afirmar una retirada exhaustiva.
+7. Con autorización expresa de ejecución posterior, llamar en el editor a `ejecutarLimpiezaCalificaciones_({...resumenAprobado, confirmation:'ELIMINAR SOLO CALIFICACIONES'})`. No hay endpoint HTTP de borrado. Si cambió cualquier huella, no se ejecuta el batch.
+8. Verificar `ok:true` y `AcademicResetControl.phase === complete`. Abrir un contexto de prueba autorizado: el cliente retira notas locales antiguas y recarga una vez; Calificar, Promedios y Registro Oficial quedan vacíos. Confirmar conteos/huellas de asistencia sin exponer datos individuales. Guardar una nota nueva solo en contexto de prueba autorizado y por acción explícita.
+9. Si se perdió la respuesta, **consultar primero el control**. Si está `blocked`, el propietario puede reanudar expresamente la misma aprobación tras revisar las huellas; no generar otro reinicio. Si está `complete`, repetir es no-op. Si no existe, repetir únicamente después de revisar el error del batch y obtener de nuevo un plan válido.
+
+## Límites y reversión
+
+Las pruebas son sintéticas, con servicios Sheets/Drive simulados; no certifican permisos OAuth ni el Spreadsheet real. Un navegador cerrado conserva físicamente su almacenamiento hasta que abra el cliente nuevo; entretanto el servidor rechaza sus subidas. No se pueden borrar remotamente perfiles personales ni garantizar borrado forense de revisiones propias de Google Drive. No se crean nuevas copias académicas; las revisiones del proveedor y exportaciones fuera del alcance requieren gestión administrativa separada.
+
+Antes de ejecutar puede revertirse el PR completo. **Después de ejecutar no debe restaurarse un backend anterior ni retirar la barrera de generación**: permitiría reintroducir notas. La eliminación de calificaciones no tiene restauración automática ni un respaldo nuevo por diseño. Si surge un fallo, mantener `blocked`, conservar asistencia/identidades y corregir hacia adelante; no reconstruir notas desde descartados. El propietario conserva sus mecanismos externos de administración, sin que este código publique o adopte fuentes antiguas.
+
+## Validación automatizada
+
+Pruebas focalizadas: modelos reales de limpieza, plan por celdas, ejecutor administrativo real con Sheets/Drive simulados, cliente/Storage reales en VM, IndexedDB simulado, doble ejecución, respuestas perdidas, fallos de archivos y cambios protegidos, CAS/permisos/cierres, lectores históricos y Service Worker. Las fronteras históricas de pruebas eliminan solo los hooks exactos de este cambio; las nuevas regresiones ejecutan los archivos actuales sin eliminarlos. El CI completo verifica el mismo commit del PR.
+
+Resultado local del 23 de octubre de 2026: **2.898 aprobadas, 0 fallidas, 0 omitidas**, incluidas 105 regresiones de reinicio (25 añadidas en la auditoría final). `node scripts/check-source.cjs`: 198 archivos JS/GS, 36 scripts inline y 89 dependencias locales. `git diff --check` satisfactorio. En esta auditoría se repitieron las 8 comprobaciones, todas aprobadas, en Edge headless a 1366 y 390 px, con perfiles temporales, datos ficticios y rutas externas bloqueadas. Las comprobaciones de navegador usan archivos de producción y respuestas simuladas; no son pruebas reales de Google Sheets. Estado de CI: consultar el HEAD exacto del PR, no inferirlo de estos resultados locales.
