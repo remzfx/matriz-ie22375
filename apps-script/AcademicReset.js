@@ -5,16 +5,27 @@
 function academicResetJson_(raw){const p=JSON.parse(String(raw));if(!p||typeof p!=='object'||Array.isArray(p))throw Error('JSON académico inválido.');return p;}
 function academicResetHash_(value){return calcularSha256Hex_(JSON.stringify(value));}
 function academicResetSnapshot_(){
- const ss=SpreadsheetApp.getActiveSpreadsheet(),sheets=ss.getSheets().map(sh=>({name:sh.getName(),id:sh.getSheetId(),rows:sh.getDataRange().getValues()}));
+ const ss=SpreadsheetApp.getActiveSpreadsheet(),sheets=ss.getSheets().map(sh=>{const name=sh.getName(),range=sh.getDataRange(),sheet={name,id:sh.getSheetId(),rows:range.getValues()};if(name==='PRIMARIA'||name==='SECUNDARIA')sheet.formulas=range.getFormulas();return sheet;});
  return {id:ss.getId(),sheets};
+}
+function academicResetStatistics_(sheet){
+ // Institutional legacy aggregate tables inspected read-only, 2026-10-23.
+ // Only the verified headers-only state is classified. Populated tables require review.
+ const header=['timestamp','bimestre','grado',...(sheet.name==='SECUNDARIA'?['seccion']:[]),'area','docente','n_estudiantes','competencia','logro','cantidad','porcentaje','clave'];
+ const blank=v=>v===''||v===null||v===undefined,actual=sheet.rows[0]||[];
+ if(header.some((value,i)=>actual[i]!==value)||actual.slice(header.length).some(v=>!blank(v)))throw Error('Hoja '+sheet.name+' no clasificada: encabezado institucional inesperado.');
+ if(!Array.isArray(sheet.formulas))throw Error('Hoja '+sheet.name+' no clasificada: falta inventario de fórmulas.');
+ if(sheet.formulas.some(row=>row.some(v=>!blank(v))))throw Error('Hoja '+sheet.name+' no clasificada: contiene fórmulas; requiere revisión.');
+ if(sheet.rows.slice(1).some(row=>row.some(v=>!blank(v))))throw Error('Hoja '+sheet.name+' no clasificada: contiene datos; requiere revisión protegida.');
+ return {kind:'headers-only-derived-statistics',columns:header.length,dataRows:0};
 }
 function academicResetProtected_(snapshot){
  const gradingOnly=['RegistroHistorialAcademico','TransversalesAportes','TransversalesConsolidado','TransversalesProcesado'];
- return academicResetHash_(snapshot.sheets.filter(s=>s.name!=='AcademicResetControl').map(s=>({name:s.name,id:s.id,rows:gradingOnly.includes(s.name)?[s.rows[0]]:s.name==='EstadosAreas'?s.rows.map((r,i)=>i?r.slice(0,9):r):s.name==='RegistroNotas'?s.rows.map((r,i)=>i?[...r.slice(0,7),Object.fromEntries(IEAcademicReset.attendance.map(k=>[k,academicResetJson_(r[8])[k]])),academicResetJson_(r[8]).meta?.studentAliases,academicResetJson_(r[8]).meta?.docente]:r):s.rows})));
+ return academicResetHash_(snapshot.sheets.filter(s=>s.name!=='AcademicResetControl').map(s=>({name:s.name,id:s.id,formulas:s.formulas,rows:gradingOnly.includes(s.name)?[s.rows[0]]:s.name==='EstadosAreas'?s.rows.map((r,i)=>i?r.slice(0,9):r):s.name==='RegistroNotas'?s.rows.map((r,i)=>i?[...r.slice(0,7),Object.fromEntries(IEAcademicReset.attendance.map(k=>[k,academicResetJson_(r[8])[k]])),academicResetJson_(r[8]).meta?.studentAliases,academicResetJson_(r[8]).meta?.docente]:r):s.rows})));
 }
 function academicResetPlan_(snapshot,epoch,now){
  if(!/^[a-f0-9]{32}$/.test(epoch)||!Number.isSafeInteger(now)||now<=0)throw Error('Generación inválida.');
- const requests=[],counts={},driveIds=new Set(),keys=new Set();
+ const requests=[],counts={},classifications={},driveIds=new Set(),keys=new Set();
  const cell=v=>({userEnteredValue:typeof v==='number'?{numberValue:v}:{stringValue:String(v)}});
  function put(sh,row,col,values){requests.push({updateCells:{range:{sheetId:sh.id,startRowIndex:row,endRowIndex:row+1,startColumnIndex:col,endColumnIndex:col+values.length},rows:[{values:values.map(cell)}],fields:'userEnteredValue'}});}
  function noAttendance(value){if(value&&typeof value==='object'){for(const [k,v]of Object.entries(value)){if(IEAcademicReset.attendance.includes(k)||/^asis|asistencia/i.test(k))throw Error('Asistencia en almacén académico; requiere clasificación.');noAttendance(v);}}}
@@ -47,6 +58,8 @@ function academicResetPlan_(snapshot,epoch,now){
    }else for(const row of sh.rows.slice(1))if(!row.every(v=>v===''))noAttendance(academicResetJson_(row[col]));
    if(sh.rows.length>1)requests.push({repeatCell:{range:{sheetId:sh.id,startRowIndex:1,endRowIndex:sh.rows.length,startColumnIndex:0,endColumnIndex:col+1},cell:{},fields:'userEnteredValue'}});
    counts[sh.name]=sh.rows.length-1;
+  }else if(sh.name==='PRIMARIA'||sh.name==='SECUNDARIA'){
+   classifications[sh.name]=academicResetStatistics_(sh); // No mutation or request for either sheet.
   }else if(sh.name!=='AcademicResetControl'&&!/asis/i.test(sh.name)&&/nota|calific|registro|matriz|^(primaria|secundaria)$/i.test(sh.name)){
    throw Error('Hoja histórica no clasificada. No ejecutar hasta verificar su esquema.');
   }
@@ -54,7 +67,7 @@ function academicResetPlan_(snapshot,epoch,now){
  let control=snapshot.sheets.find(s=>s.name==='AcademicResetControl');
  if(!control){let id=1932237500;while(snapshot.sheets.some(s=>s.id===id))id++;control={id,name:'AcademicResetControl'};requests.push({addSheet:{properties:{sheetId:id,title:control.name,gridProperties:{rowCount:2,columnCount:5}}}});}
  put(control,0,0,['schema','epoch','at','phase','files']);put(control,1,0,[1,epoch,now,'blocked','[]']);
- return {requests,counts,keys:[...keys],driveIds:[...driveIds],fingerprint:academicResetHash_(snapshot)};
+ return {requests,counts,classifications,keys:[...keys],driveIds:[...driveIds],fingerprint:academicResetHash_(snapshot)};
 }
 function academicResetArchiveJson_(raw){const p=academicResetJson_(raw),next=IEAcademicReset.registration(p,'00000000000000000000000000000000',1);delete next.meta.notas2;if(p.meta?.notas2?.asistencia)next.meta.notas2={schema:p.meta.notas2.schema,asistencia:JSON.parse(JSON.stringify(p.meta.notas2.asistencia))};return JSON.stringify(next);}
 function academicResetFiles_(plan){
@@ -69,7 +82,7 @@ function academicResetOwner_(){const active=Session.getActiveUser().getEmail(),e
 function prepararLimpiezaCalificaciones_(){
  academicResetOwner_();const current=academicResetState_();if(current.epoch)return {ok:true,alreadyApplied:true,epoch:current.epoch};
  const epoch=Utilities.getUuid().replace(/-/g,''),now=Date.now(),snapshot=academicResetSnapshot_(),plan=academicResetPlan_(snapshot,epoch,now),files=academicResetFiles_(plan);
- return {ok:true,mode:'dry-run',epoch,at:now,fingerprint:plan.fingerprint,filesFingerprint:academicResetHash_(files.map(f=>({id:f.id,hash:f.hash}))),counts:plan.counts,files:files.length};
+ return {ok:true,mode:'dry-run',epoch,at:now,fingerprint:plan.fingerprint,filesFingerprint:academicResetHash_(files.map(f=>({id:f.id,hash:f.hash}))),counts:plan.counts,classifications:plan.classifications,files:files.length};
 }
 function ejecutarLimpiezaCalificaciones_(approval){
  academicResetOwner_();if(!approval||approval.confirmation!=='ELIMINAR SOLO CALIFICACIONES')throw Error('Confirmación explícita requerida.');
