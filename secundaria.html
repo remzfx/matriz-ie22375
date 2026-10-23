@@ -1128,7 +1128,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     <button onclick="subirNube()" class="bg-emerald-500/90 hover:bg-emerald-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition" title="Guardar en Google Sheets">
                         <i class="fas fa-cloud-upload-alt"></i> Nube Subir
                     </button>
-                    <button onclick="bajarNube()" class="bg-sky-500/90 hover:bg-sky-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition" title="Cargar desde Google Sheets">
+                    <button onclick="bajarNube()" class="bg-sky-500/90 hover:bg-sky-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition" title="Descargar datos con sesión válida, incluso en bimestres cerrados (solo lectura)">
                         <i class="fas fa-cloud-download-alt"></i> Nube Bajar
                     </button>
                     <button onclick="limpiarTodo()" class="bg-red-500/80 hover:bg-red-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition">
@@ -4164,6 +4164,10 @@ window.__IE_gradoOK = function(gradoVal) {
         }
 
         async function bajarNube() {
+            if (!(window.__IE_SES && window.__IE_SES.token)) {
+                mostrarToast('Inicia sesión para consultar los datos de la nube.', 'error');
+                return;
+            }
             if (!confirm('¿Traer de la nube las áreas de este nivel?\n\nSe combinan con lo local: cada área de la nube actualiza solo esa área.')) return;
             try {
                 mostrarToast('Descargando áreas de la nube...', 'success');
@@ -4217,7 +4221,7 @@ window.__IE_gradoOK = function(gradoVal) {
                     if (typeof renderizarCompetencias === 'function') renderizarCompetencias();
                     if (typeof crearGraficosExposicion === 'function') crearGraficosExposicion();
                 }
-                mostrarToast('Combinadas ' + n + ' área(s). N° est.: ' + (totRes.aplicados || 0) + ' de nube, ' + (totRes.respetados || 0) + ' locales más recientes', 'success');
+                mostrarToast('Descargadas ' + n + ' área(s) de la nube para consulta' + (periodoSoloLecturaActual() ? ' · Bimestre cerrado, solo lectura' : ''), 'success');
             } catch (err) {
                 console.error(err);
                 mostrarToast('Error al bajar: ' + (err.message || err), 'error');

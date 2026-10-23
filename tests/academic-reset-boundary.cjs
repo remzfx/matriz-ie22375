@@ -87,6 +87,12 @@ const edits={
   ]
  ],
  "secundaria.html": [
+  ["<button onclick=\"bajarNube()\" class=\"bg-sky-500/90 hover:bg-sky-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition\" title=\"Descargar datos con sesión válida, incluso en bimestres cerrados (solo lectura)\">",
+   "<button onclick=\"bajarNube()\" class=\"bg-sky-500/90 hover:bg-sky-500 px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition\" title=\"Cargar desde Google Sheets\">"],
+  ["async function bajarNube() {\n            if (!(window.__IE_SES && window.__IE_SES.token)) {\n                mostrarToast('Inicia sesión para consultar los datos de la nube.', 'error');\n                return;\n            }\n",
+   "async function bajarNube() {\n"],
+  ["mostrarToast('Descargadas ' + n + ' área(s) de la nube para consulta' + (periodoSoloLecturaActual() ? ' · Bimestre cerrado, solo lectura' : ''), 'success');",
+   "mostrarToast('Combinadas ' + n + ' área(s). N° est.: ' + (totRes.aplicados || 0) + ' de nube, ' + (totRes.respetados || 0) + ' locales más recientes', 'success');"],
   [
    "<script src=\"academic-reset.js\"></script>\n<script src=\"academic-reset-client.js\"></script>\n",
    ""
