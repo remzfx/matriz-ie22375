@@ -122,8 +122,19 @@ function academicResetFiles_(plan){
 }
 // Only spreadsheet owner in the Apps Script editor. No token or user-supplied role grants access.
 function academicResetOwner_(){const active=Session.getActiveUser().getEmail(),effective=Session.getEffectiveUser().getEmail(),owner=DriveApp.getFileById(SpreadsheetApp.getActiveSpreadsheet().getId()).getOwner().getEmail();if(!active||active!==effective||active!==owner)throw Error('Solo el propietario en el editor puede preparar/ejecutar.');}
+// Metadata-only readiness check; never invokes a batch, creates a sheet or exposes tokens.
+function verificarServicioLimpiezaCalificaciones_(){
+ academicResetOwner_();
+ const error='Sheets v4 no disponible. Habilita Google Sheets API v4 en Servicios de Apps Script, guarda y verifica autorización. No se ejecutó limpieza; no reintentar escrituras automáticamente.';
+ if(typeof Sheets==='undefined'||!Sheets.Spreadsheets||typeof Sheets.Spreadsheets.get!=='function'||typeof Sheets.Spreadsheets.batchUpdate!=='function')throw Error(error);
+ const id=SpreadsheetApp.getActiveSpreadsheet().getId();let result;
+ try{result=Sheets.Spreadsheets.get(id,{fields:'spreadsheetId'});}catch(_){throw Error(error);}
+ if(!result||result.spreadsheetId!==id)throw Error(error);
+ return {ok:true,mode:'read-only',service:'Sheets v4'};
+}
 function prepararLimpiezaCalificaciones_(){
  academicResetOwner_();const current=academicResetState_();if(current.epoch)return {ok:true,alreadyApplied:true,epoch:current.epoch};
+ verificarServicioLimpiezaCalificaciones_();
  const epoch=Utilities.getUuid().replace(/-/g,''),now=Date.now(),snapshot=academicResetSnapshot_(),plan=academicResetPlan_(snapshot,epoch,now),files=academicResetFiles_(plan);
  return {ok:true,mode:'dry-run',epoch,at:now,fingerprint:plan.fingerprint,filesFingerprint:academicResetHash_(files.map(f=>({id:f.id,hash:f.hash}))),counts:plan.counts,classifications:plan.classifications,files:files.length};
 }
@@ -132,6 +143,7 @@ function ejecutarLimpiezaCalificaciones_(approval){
  const lock=LockService.getScriptLock();lock.waitLock(30000);
  try{
   const current=academicResetState_();if(current.epoch){if(current.epoch!==approval.epoch)throw Error('Otra operación ya fue aplicada.');if(current.phase==='complete')return {ok:true,alreadyApplied:true,epoch:current.epoch};return academicResetFinishFiles_(current);}
+  verificarServicioLimpiezaCalificaciones_();
   const snapshot=academicResetSnapshot_(),plan=academicResetPlan_(snapshot,approval.epoch,approval.at),files=academicResetFiles_(plan);
   if(plan.fingerprint!==approval.fingerprint||academicResetHash_(files.map(f=>({id:f.id,hash:f.hash})))!==approval.filesFingerprint)throw Error('Cambió el inventario. Sin ejecución.');
   const controlId=plan.requests.find(r=>r.addSheet)?.addSheet?.properties.sheetId||snapshot.sheets.find(s=>s.name==='AcademicResetControl').id;
@@ -140,9 +152,8 @@ function ejecutarLimpiezaCalificaciones_(approval){
   plan.requests.push({updateCells:{range:{sheetId:controlId,startRowIndex:1,endRowIndex:2,startColumnIndex:4,endColumnIndex:5},rows:[{values:[{userEnteredValue:{stringValue:JSON.stringify(manifest)}}]}],fields:'userEnteredValue'}});
   // Block automatic restorers BEFORE destroying any archive. Marker and all grading rows are
   // committed together by one atomic Sheets batch. Existing assistance cells are never targeted.
-  const url='https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(snapshot.id)+':batchUpdate';
-  const response=UrlFetchApp.fetch(url,{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},payload:JSON.stringify({requests:plan.requests}),muteHttpExceptions:true});
-  if(response.getResponseCode()!==200)throw Error('No se confirmó la transacción. No reintentar automáticamente; verificar el marcador.');
+  let response;try{response=Sheets.Spreadsheets.batchUpdate({requests:plan.requests},snapshot.id);}catch(_){throw Error('No se confirmó la transacción. No reintentar automáticamente; verificar el marcador.');}
+  if(!response||response.spreadsheetId!==snapshot.id)throw Error('No se confirmó la transacción. No reintentar automáticamente; verificar el marcador.');
   if(academicResetState_().epoch!==approval.epoch)throw Error('No se verificó el marcador.');
   return academicResetFinishFiles_(academicResetState_());
  }finally{lock.releaseLock();}

@@ -6,6 +6,11 @@
         "userSymbol": "Classroom",
         "version": "v1",
         "serviceId": "classroom"
+      },
+      {
+        "userSymbol": "Sheets",
+        "version": "v4",
+        "serviceId": "sheets"
       }
     ]
   },
