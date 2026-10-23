@@ -13,6 +13,7 @@
     const candidate=start(),transport=candidate&&(candidate.ready()||await candidate.whenReady())?candidate:null;
     if(token!==global.IEStudents.validToken())throw new Error('La sesión cambió.');
     const body=Object.assign({},data,{action,token});
+    if(transport&&global.IEAcademicResetClient){const epoch=await global.IEAcademicResetClient.accept(await transport.transversales({action:'academicstate',token}));if(token!==global.IEStudents.validToken())throw new Error('La sesión cambió.');if(epoch)body.academicEpoch=epoch;}
     const result=transport?await transport.transversales(body):await global.IEStudents.fetchJSON(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),cache:'no-store'});
     if(token!==global.IEStudents.validToken())throw new Error('La sesión cambió.');
     if(!result||!result.ok){const e=new Error(result&&result.error||'No se pudo cargar transversales.');e.code=result&&result.code;if(e.code==='SESSION')global.IEStudents.clear();throw e;}

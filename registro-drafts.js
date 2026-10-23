@@ -6,9 +6,10 @@
   let connection;
   async function db(){if(!indexedDB)throw Error('IndexedDB no disponible. Conserva esta pestaña.');if(!connection)connection=new Promise((resolve,reject)=>{const r=indexedDB.open('ie22375_emergency_v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('drafts',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(Error('No se pudo abrir el respaldo local.'));r.onblocked=()=>reject(Error('Respaldo local bloqueado.'));});return connection;}
   async function run(mode,fn){const d=await db();return new Promise((resolve,reject)=>{const t=d.transaction('drafts',mode);let result;const r=fn(t.objectStore('drafts'));r.onsuccess=()=>result=r.result;r.onerror=()=>reject(Error('No se pudo leer/escribir el respaldo.'));t.oncomplete=()=>resolve(result);t.onabort=t.onerror=()=>reject(Error('No se confirmó el respaldo persistente.'));});}
-  async function list(scope){return (await run('readonly',s=>s.getAll())).filter(r=>r.scope===scope&&now()-r.created<ttl).sort((a,b)=>b.created-a.created);}
+  async function list(scope){const epoch=root.IEAcademicResetClient?.epoch();return (await run('readonly',s=>s.getAll())).filter(r=>(!epoch||r.academicEpoch===epoch)&&r.scope===scope&&now()-r.created<ttl).sort((a,b)=>b.created-a.created);}
   async function put(scope,snapshot,kind='emergency'){
    const created=now(),record={id:scope+'|'+created+'|'+Math.random().toString(36).slice(2),scope,created,kind,snapshot:copy(snapshot)};
+   const epoch=root.IEAcademicResetClient?.epoch();if(epoch)record.academicEpoch=epoch;
    await run('readwrite',s=>s.put(record));const read=await run('readonly',s=>s.get(record.id));if(JSON.stringify(read)!==JSON.stringify(record))throw Error('No se verificó el respaldo persistente.');
    const all=await run('readonly',s=>s.getAll()),own=all.filter(r=>r.scope===scope).sort((a,b)=>b.created-a.created);
    // Solo borra snapshots de esta base dedicada, nunca notas oficiales/localStorage.

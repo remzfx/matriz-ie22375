@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f
 const base='9b740af5408b1d5fb87f85ede5078d17ec45b1c8',old=f=>execFileSync('git',['show',base+':'+f],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n');
 const boundary=require('./notas2-frontend-boundary.cjs'),stripBackend=require('./n2r3-backend-boundary.cjs');
 for(const file of ['admin.html','primaria.html','secundaria.html','aula_innovacion.js','apps-script/Codigo.js','apps-script/Notas2.js','registro-local-store.js','registro-drafts.js','registro-recovery-ui.js','registro-calificar-print.js','registro-evaluation.js','registro-academic-model.js'])test('selective integration preserves '+file+' exactly',()=>{
- const raw=file==='apps-script/Notas2.js'?stripBackend(read(file)):read(file);
+ const current=require('./academic-reset-boundary.cjs')(file,read(file));const raw=file==='apps-script/Notas2.js'?stripBackend(current):current;
  assert.equal(raw,old(file));
 });
 for(const [kind,file]of [['html','registro.html'],['matrix','matrix-registry-import.js'],['sw','sw.js']])test('historical boundary excludes exact '+kind+' hooks without hiding unrelated source mutations',()=>{
@@ -30,17 +30,17 @@ test('matrix importer preserves historical calculation but adopted rows cannot i
 const setup=new Function('require','__dirname',read('tests/service-worker-static.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname);
 const coupled=['registro.html','registro-notas2.js','registro-notas2-ui.js','registro-grading.js','registro-sync-diagnostic.js','registro-sync-diagnostic-ui.js','matrix-registry-import.js'];
 const serve=s=>s.network(async req=>{const file=new URL(req.url).pathname.split('/').at(-1)||'index.html',js=file.endsWith('.js'),css=file.endsWith('.css');return new Response(fs.existsSync(path.join(root,file))?read(file):'<html>synthetic</html>',{headers:{'Content-Type':js?'application/javascript':css?'text/css':'text/html'}});});
-test('v21 to v25 atomically installs exact N2 resources, retains historical resources and removes only application caches',async()=>{
+test('v21 to v26 atomically installs exact N2 resources, retains historical resources and removes only application caches',async()=>{
  const s=setup();s.cache('matriz-ie22375-v21');s.cache('unrelated-user-cache');serve(s);await s.dispatch('install');assert.deepEqual(s.lifecycle,['skipWaiting']);
  assert.equal(s.stores.has('matriz-ie22375-v21'),true);await s.dispatch('activate');assert.equal(s.stores.has('matriz-ie22375-v21'),false);assert.equal(s.stores.has('unrelated-user-cache'),true);
  s.offline();for(const file of coupled.concat('aula_innovacion.js')){const r=await s.dispatch('fetch',{request:s.request(file)});assert.equal(r.status,200);assert.equal(await r.text(),read(file));assert.match(r.headers.get('content-type'),file.endsWith('.js')?/javascript/:/html/);}
 });
-for(const file of coupled)test('failed v25 install of '+file+' leaves installed v21 available',async()=>{
+for(const file of coupled)test('failed v26 install of '+file+' leaves installed v21 available',async()=>{
  const s=setup();const previous=s.cache('matriz-ie22375-v21');await previous.put(s.request('index.html'),new Response('previous synthetic page',{headers:{'Content-Type':'text/html'}}));
  s.network(async req=>{if(req.url.endsWith('/'+file))throw Error('Synthetic unavailable asset');return new Response(req.url.endsWith('.js')?'/* JS */':'<html>static</html>',{headers:{'Content-Type':req.url.endsWith('.js')?'application/javascript':'text/html'}});});
  await assert.rejects(s.dispatch('install'));assert.equal(s.lifecycle.includes('skipWaiting'),false);assert.equal(s.stores.has('matriz-ie22375-v21'),true);assert.equal(await (await previous.match(s.request('index.html'))).text(),'previous synthetic page');
 });
-test('v25 retains network-first, seven-day TTL, all main resources and private POST exclusion',async()=>{
+test('v26 retains network-first, seven-day TTL, all main resources and private POST exclusion',async()=>{
  const config=s=>{const c={self:{registration:{scope:'https://fiction.invalid/'},addEventListener(){}},URL};vm.runInNewContext(s+'\nglobalThis.result={files:PRECACHE,ttl:MAX_STATIC_AGE_MS};',c);return c.result;};const before=config(old('sw.js')),after=config(read('sw.js'));
  assert.equal(after.ttl,before.ttl);for(const f of before.files)assert.ok(after.files.includes(f));
  const s=setup();serve(s);await s.dispatch('install');const count=s.calls.length;assert.equal(await s.dispatch('fetch',{request:new Request('https://academic.invalid/exec',{method:'POST',body:'synthetic'})}),undefined);assert.equal(s.calls.length,count);

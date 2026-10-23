@@ -25,7 +25,7 @@ module.exports=source=>{
 module.exports.reviewed=source=>{
  let s=module.exports(source);
  for(const name of ['registro-drafts.js','registro-recovery-ui.js']){
-  const raw=fs.readFileSync(path.join(__dirname,'..',name),'utf8');const current=(name==='registro-recovery-ui.js'?require('./phase2-boundary.cjs').recovery(raw):raw).replace(/\r\n/g,'\n');
+  const raw=require('./academic-reset-boundary.cjs')(name,fs.readFileSync(path.join(__dirname,'..',name),'utf8'));const current=(name==='registro-recovery-ui.js'?require('./phase2-boundary.cjs').recovery(raw):raw).replace(/\r\n/g,'\n');
   const previous=require('node:child_process').execFileSync('git',['show','e3243fe74a0aee6981f8173835f4cb183b3622df:'+name],{encoding:'utf8'}).replace(/\r\n/g,'\n');
   assert.equal(s.split(current).length,2,'Exact PR84 adapter before historical icon comparison');s=s.replace(current,previous);
  }

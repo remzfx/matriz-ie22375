@@ -425,7 +425,7 @@ function studentsBridgeCargar(body) {
   return estudiantesRuta_({action:'loadstudents',token:body.token,bimestre:body.bimestre || ''});
 }
 
-function transversalesBridgeEjecutar(body) { return transversalesRuta_(body || {}); }
+function transversalesBridgeEjecutar(body) { return body?.action==='academicstate'?academicResetRead_(body):transversalesRuta_(body || {}); }
 function loginBridgeVista_(p) {
   const origins = ['https://matriz.biblioteca360.com','https://biblioteca360.com','https://www.biblioteca360.com','https://remzfx.github.io'];
   if (origins.indexOf(p.parentOrigin) < 0 || !/^[a-f0-9]{32}$/.test(String(p.nonce || ''))) return responder_({ok:false,error:'Bridge inválido.'});
@@ -1629,6 +1629,7 @@ function transversalesRuta_(body) {
   const escritura=!action.startsWith('load'),lock=escritura?LockService.getScriptLock():null;
   if(lock)lock.waitLock(5000);
   try {
+    if(escritura){const resetStopped=academicResetGuard_(body);if(resetStopped)return resetStopped;}
     const acceso=sesionLectura_(body.token,['admin','docente']);
     if(!acceso||(acceso.docente&&acceso.docente.nivel!=='secundaria'))return {ok:false,code:'SESSION',error:'Sesión inválida o sin autorización transversal.'};
     const admin=acceso.sesion.role==='admin',config=obtenerDocentesConfigLectura_();
@@ -2027,13 +2028,32 @@ function archivarHistorialAcademico_(payload,clave,version) {
   leerBloqueHistorialAcademico_(clave,ref,sh); // No active pointer until the entire archive is durable and verified.
 }
 
+// Academic reset fence: read directly, never from a potentially stale cache.
+function academicResetRead_(body){if(!sesionLectura_(body.token,['admin','docente']))return {ok:false,code:'SESSION',error:'Sesión inválida.'};return {ok:true,academicReset:1,...academicResetState_()};}
+function academicResetState_(){
+ const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('AcademicResetControl');if(!sh)return {epoch:null,phase:null};
+ const row=sh.getRange(2,1,1,4).getValues()[0];
+ if(row[0]!==1||!/^[a-f0-9]{32}$/.test(row[1])||!['blocked','complete'].includes(row[3]))throw Error('Control académico inválido. Escritura pausada.');
+ return {epoch:row[1],phase:row[3]};
+}
+function academicResetGuard_(body){
+ // The attendance panel cannot carry grades and keeps its original CAS version.
+ if(String(body.action).toLowerCase()==='savenotas2'&&body.panel==='asistencia')return null;
+ const s=academicResetState_();if(!s.epoch)return null;
+ const legacy=String(body.action).toLowerCase()==='savereg';
+ return s.phase!=='complete'||legacy||body.academicEpoch!==s.epoch?{ok:false,code:'ACADEMIC_RESET',error:'Se reinició el registro académico. Vuelve a abrir el módulo; no se subieron datos anteriores.'}:null;
+}
 function doPost(e) {
+  let academicMatrixLock;
   try {
     if (!e || !e.postData || !e.postData.contents) {
       return responder_({ ok: false, error: 'Sin datos' });
     }
     const body = JSON.parse(e.postData.contents);
     const action = String(body.action || 'saveArea').toLowerCase();
+    if(action==='academicstate'){
+      return responder_(academicResetRead_(body));
+    }
     if (['loadnotas2','savenotas2'].includes(action)) return responder_(notas2Ruta_(body));
     if (['loadtransversales','loadtransversalesaulas','savetransversalaporte','savetransversalfinal','confirmtransversaltutor','confirmtransversalaip','revisartransversal','procesartransversales','loadtransversalexport'].includes(action)) return responder_(transversalesRuta_(body));
 
@@ -2097,6 +2117,7 @@ function doPost(e) {
       }
       const lock=LockService.getScriptLock();lock.waitLock(30000);
       try {
+        const resetStopped=academicResetGuard_(body);if(resetStopped)return responder_(resetStopped);
         const clave=[nivelR,bimestre,grado,seccion,area].join('||'),sh=asegurarReg_();
         let fila=-1;const last=sh.getLastRow();
         if(last>=2){const claves=sh.getRange(2,1,last-1,1).getValues();for(let i=0;i<claves.length;i++)if(String(claves[i][0])===clave){fila=i+2;break;}}
@@ -2303,6 +2324,7 @@ function doPost(e) {
     const docente = permiso.docente;
     const totalEstudiantes = body.totalEstudiantes || '';
     const competencias = body.competencias || {};
+    {const lock=LockService.getScriptLock();lock.waitLock(30000);academicMatrixLock=lock;const stopped=academicResetGuard_(body);if(stopped)return responder_(stopped);}
 
     if (!bimestreAbierto_(bimestre)) {
       return responder_({
@@ -2356,6 +2378,7 @@ function doPost(e) {
   } catch (err) {
     return responder_({ ok: false, error: String(err) });
   }
+  finally {if(academicMatrixLock)academicMatrixLock.releaseLock();}
 }
 
 function listarClassroom_() {

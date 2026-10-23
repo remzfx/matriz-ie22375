@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<script src="academic-reset.js"></script>
+<script src="academic-reset-client.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0369a1" />
@@ -1454,6 +1456,7 @@ window.__IE_gradoOK = function(gradoVal) {
         ];
 
         let estado = {
+            ...(typeof IEAcademicResetClient!=='undefined'&&IEAcademicResetClient.epoch()?{academicEpoch:IEAcademicResetClient.epoch()}:{}),
             bimestre: "I",
             grado: "PRIMERO",
             seccion: "UNICA",

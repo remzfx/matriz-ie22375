@@ -51,7 +51,8 @@ function fixture(secondary=false){
 test('N2-G.18A source is the reviewed protocol and exactly the three approved dispatch/read/legacy hooks',()=>{
  const approved='857011a45287682f289ffad2c1bf946bc1dfee23',stripBackend=require('./n2r3-backend-boundary.cjs');
  for(const file of ['apps-script/Notas2.js','apps-script/Codigo.js']){
-  const raw=file==='apps-script/Notas2.js'?stripBackend(read(file)):read(file);
+  const current=require('./academic-reset-boundary.cjs')(file,read(file));
+  const raw=file==='apps-script/Notas2.js'?stripBackend(current):current;
   assert.equal(raw.replace(/\r\n/g,'\n'),execFileSync('git',['show',approved+':'+file],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n'));
  }
 });
