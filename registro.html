@@ -3635,13 +3635,13 @@ function renderFinales() {
         const L = letra || ofi.letra || '';
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" aria-pressed="'+(L===v)+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
-          (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400" title="Calculado desde Calificar; no es una nota directa">Cal '+ev.letra+'</div>' : '') +
+          (ev.letra ? '<div class="text-[10px] text-slate-400" title="Calculado desde Calificar; no es una nota directa">Cal: '+ev.letra+'</div>' : '') +
           '</div>';
       } else {
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
           '<button type="button" class="eq-letter final-level-toggle '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'" data-final-toggle="'+encC+'" data-alumno="'+encN+'" '+(lock||registroSoloLectura()||!letra?'disabled':'')+' title="Quitar la nota directa; conservar evidencias" aria-label="Quitar nota directa '+escapeRegistro(letra||'')+'">'+(letra||ofi.letra||'—')+'</button>' +
-          (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400" title="Calculado desde Calificar; no es una nota directa">Cal '+(numeroExactoComp(cp,studentKey(al))?pad2(ev.nota)+' · ':'')+ev.letra+'</div>' : '') +
+          (ev.letra ? '<div class="text-[10px] text-slate-400" title="Calculado desde Calificar; no es una nota directa">Cal: '+ev.letra+(numeroExactoComp(cp,studentKey(al))?' · '+pad2(ev.nota):'')+'</div>' : '') +
           '</div>';
       }
       grade=(typeof comparativoLinea==='function'?comparativoLinea(cp,studentKey(al)):'')+grade;
