@@ -1138,11 +1138,12 @@ let sesionActiva = null; // { fecha, unidad, comp, capacidad }
 let notas = {}; // key alumno -> { nivel, nota20, conclusion }
 let store = { sessions: [], grades: {}, meta: {}, ...(typeof IEAcademicResetClient!=='undefined'&&IEAcademicResetClient.epoch()?{academicEpoch:IEAcademicResetClient.epoch()}:{}) };
 
-function toast(msg) {
+function toast(msg, duration = 1600) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 1600);
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => el.classList.add('hidden'), duration);
 }
 
 function numToLetter(n) {
