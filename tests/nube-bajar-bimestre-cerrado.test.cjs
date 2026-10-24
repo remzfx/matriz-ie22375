@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const src=fs.readFileSync(path.join(__dirname,'..','secundaria.html'),'utf8');
+const src=fs.readFileSync(path.join(__dirname,'..','secundaria.html'),'utf8').replace(/\r\n/g,'\n');
 const start=src.indexOf('        async function bajarNube() {');
 const end=src.indexOf('\n\n\n        // ============================================\n        // TOAST',start);
 assert.ok(start>0&&end>start,'Se debe localizar exactamente la función real de descarga');
