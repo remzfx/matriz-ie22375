@@ -27,10 +27,17 @@
   for(const field of ['calificarEstado','competenciasEstado'])if(part[field])part[field]=Object.fromEntries(Object.entries(part[field]).filter(([,v])=>v.trabajada!==true));
   return signature(part);
  }
+ // Compare UI-equivalent representations only for pending state. Keep confirmed
+ // signatures, payloads and CAS/read validation exact and independent per panel.
+ function pendingSignature(part){
+  for(const selection of Object.values(part.capsSel||{}))if(Array.isArray(selection))for(const item of selection)if(item&&item.comp&&item.cap&&item.origen==='academica')delete item.origen;
+  if(part.asisFechas)part.asisFechas=Object.fromEntries(Object.entries(part.asisFechas).filter(([,v])=>!Array.isArray(v)||v.length>0));
+  return readSignature(part);
+ }
  function create(o){
   const initialBinding=o.binding(),entries=Object.fromEntries(Object.keys(fields).map(n=>[n,null]));let state='checking',flight=false,closed=false,epoch=0,legacy=false,processed=false,serverClosed=true,historicalConflicts=[],historicalCoincidences=[];
   const same=()=>!closed&&o.binding()===initialBinding;
-  const pending=name=>!!entries[name]&&signature(panel(o.capture(),name))!==entries[name].signature;
+  const pending=name=>!!entries[name]&&pendingSignature(panel(o.capture(),name))!==pendingSignature(JSON.parse(entries[name].signature));
   function status(){return {state,busy:flight,legacy,processed,readonly:serverClosed,historicalConflicts:copy(historicalConflicts),historicalCoincidences:copy(historicalCoincidences),panels:Object.fromEntries(Object.keys(fields).map(n=>[n,{pending:pending(n),version:entries[n]?.version??null,at:entries[n]?.at??null}]))};}
   function emit(next){state=next;o.changed?.(status());}
   function readable(){if(!same()||!o.authorized())fail('SESSION','La sesión o el contexto cambió.');}
