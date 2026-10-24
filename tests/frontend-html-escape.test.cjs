@@ -16,7 +16,7 @@ function page(file,names,extra={}){
 
 for(const value of ['Muñoz, Ángela O\'Neil', '& < > " \'', sample])test('Admin teacher render encodes text and ID while Edit/Delete retain the original value: '+value.slice(0,12),()=>{
  const edits=[],deletes=[],d={id:value,nombre:value,user:value,nivel:value,pass:'synthetic-not-a-real-credential',asignaciones:{[value]:[value+'|A']},tutorAulas:[value],aportesTransversales:{[value]:[value]}};
- const p=page('admin.html',['escapeConsulta','renderDocentes'],{loadDocentes:()=>[d],editarDocente:id=>edits.push(id),eliminarDocente:id=>deletes.push(id)});
+ const p=page('admin.html',['escapeConsulta','tokenSesionAdmin','compararDocentesNube','consultarDocentesNube','subirDocentesNube','bajarDocentesNube','actualizarConteoDocentes','renderDocentes'],{loadDocentes:()=>[d],editarDocente:id=>edits.push(id),eliminarDocente:id=>deletes.push(id)});
  p.c.renderDocentes();const html=p.el('docLista').innerHTML;safe(html,value);
  const id=attrs(html.match(/<div[^>]*data-doc-id[^>]*>/)[0])['data-doc-id'];assert.equal(id,value);
  const row={getAttribute:()=>id};
@@ -26,7 +26,7 @@ for(const value of ['Muñoz, Ángela O\'Neil', '& < > " \'', sample])test('Admin
 });
 for(const nivel of ['primaria','secundaria'])test('Teacher fallback areas/grades/classrooms are encoded: '+nivel,()=>{
  const d={id:'synthetic',user:sample,nivel,grados:[sample],areas:[sample],aulas:[sample+'|B'],tutorAulas:[],aportesTransversales:{}};
- const p=page('admin.html',['escapeConsulta','renderDocentes'],{loadDocentes:()=>[d]});p.c.renderDocentes();safe(p.el('docLista').innerHTML);
+ const p=page('admin.html',['escapeConsulta','tokenSesionAdmin','compararDocentesNube','consultarDocentesNube','subirDocentesNube','bajarDocentesNube','actualizarConteoDocentes','renderDocentes'],{loadDocentes:()=>[d]});p.c.renderDocentes();safe(p.el('docLista').innerHTML);
 });
 test('SIAGIE template status encodes all five dynamic fields without changing the read request',async()=>{
  const item={nivel:sample,bimestre:sample,grado:sample,seccion:sample,filename:sample+'.xlsx'},calls=[];

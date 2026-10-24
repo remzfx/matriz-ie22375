@@ -216,7 +216,7 @@ for (const [file, name, action] of [
     const token = admin ? s.admin : secondary ? s.secondary : s.primary;
     const requests = [];
     const responses = [];
-    const storage = {getItem: () => JSON.stringify({token}), setItem() {}};
+    const storage = {getItem: () => JSON.stringify({token,...(admin?{role:'admin'}:{})}), setItem() {}};
     const context = vm.createContext({
       sessionStorage: storage, localStorage: storage,
       window: {__IE_SES: {token}}, getLoginSession: () => ({token}),
@@ -249,12 +249,17 @@ for (const [file, name, action] of [
     if(name==='subirRegistroNube')Object.assign(context,{IERegistroAcademico:{canonical:JSON.stringify},baselineAcademica:()=>({version:0,baseline:'not-synchronized'}),prepararVersionAcademica:async()=>true,informeSiagie:()=>({ok:true}),saveStore:()=>{},dirtyAcademico:()=>{}});
     if(name==='subirRegistroNube')require('./reconcile-fixture.cjs').mockUpload(context,context.baselineAcademica());
     if (admin) new vm.Script(clientFunction(file, 'tokenSesionAdmin')).runInContext(context);
+    if(name==='subirDocentesNube'){
+      context.confirm=()=>true;
+      for(const helper of ['sesionSincronizacionDocentes','compararDocentesNube','actualizarConteoDocentes','mensajeDocentesNube','consultarDocentesNube','bajarDocentesNube'])new vm.Script(clientFunction(file,helper)).runInContext(context);
+    }
     new vm.Script(clientFunction(file, name)).runInContext(context);
     await context[name](secondary ? 'Matemática' : 'Comunicación');
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0].action, action);
-    assert.equal(requests[0].token, token);
-    assert.equal(responses[0].ok, true);
+    assert.equal(requests.length,name==='subirDocentesNube'?2:1);
+    if(name==='subirDocentesNube'){assert.equal(requests[0].action,'loaddoc');assert.equal(responses[0].ok,true);}
+    assert.equal(requests.at(-1).action, action);
+    assert.equal(requests.at(-1).token, token);
+    assert.equal(responses.at(-1).ok, true);
   });
 }
 

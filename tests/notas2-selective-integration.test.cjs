@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f
 const base='9b740af5408b1d5fb87f85ede5078d17ec45b1c8',old=f=>execFileSync('git',['show',base+':'+f],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n');
 const boundary=require('./notas2-frontend-boundary.cjs'),stripBackend=require('./n2r3-backend-boundary.cjs');
 for(const file of ['admin.html','primaria.html','secundaria.html','aula_innovacion.js','apps-script/Codigo.js','apps-script/Notas2.js','registro-local-store.js','registro-drafts.js','registro-recovery-ui.js','registro-calificar-print.js','registro-evaluation.js','registro-academic-model.js'])test('selective integration preserves '+file+' exactly',()=>{
- const current=require('./academic-reset-boundary.cjs')(file,read(file));const raw=file==='apps-script/Notas2.js'?stripBackend(current):current;
+ const current=require('./academic-reset-boundary.cjs')(file,file==='admin.html'?require('./admin-docentes-sync-boundary.cjs')(read(file)):read(file));const raw=file==='apps-script/Notas2.js'?stripBackend(current):current;
  assert.equal(raw,old(file));
 });
 for(const [kind,file]of [['html','registro.html'],['matrix','matrix-registry-import.js'],['sw','sw.js']])test('historical boundary excludes exact '+kind+' hooks without hiding unrelated source mutations',()=>{
