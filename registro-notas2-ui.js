@@ -61,7 +61,7 @@
   const isConflict=s?.state==='conflict'||connState==='review';
   const rosterRetry=document.getElementById('retryRoster'),rosterError=rosterRetry?.hidden===false;
   const errorState=['session','server','offline'].find(state=>connState===state||s?.state===state)||(rosterError?'server':null);
-  const isReadonly=connState==='readonly'||s?.readonly||readonly();
+  const isReadonly=connState==='readonly'||(s?.panels.promedios.version!=null&&s.readonly)||readonly();
   let effectiveState='connected',effectiveMsg='Conectado — notas verificadas.';
   if(isConflict){effectiveState='review';effectiveMsg='Conflicto de versiones — consulta la nube antes de guardar.';}
   else if(errorState){effectiveState=errorState;const statusMap={offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.'};effectiveMsg=statusMap[errorState];}
@@ -70,6 +70,9 @@
   else if(activePending){effectiveState='pending';effectiveMsg='Conectado — cambios sin guardar.';}
   else{effectiveState='connected';effectiveMsg=otherPending.length>0?'Conectado — '+(paneNames[pane]||'Notas')+' al día. ('+otherPending.join(', ')+' con cambios sin guardar).':'Conectado — notas verificadas.';}
   updateSyncIndicator(effectiveState,effectiveMsg,otherPending);
+  const loading=document.getElementById('finContextLoading'),verification=document.getElementById('finContextStatus');
+  if(loading)loading.textContent=effectiveState==='checking'?'Verificando datos…':effectiveMsg;
+  if(verification)verification.hidden=pane!=='promedios'||!!loading||effectiveState!=='checking';
   const save=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.save()"]'),process=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.process()"]'),down=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.download()"]');
   const isResumen=pane==='resumen';if(save){save.disabled=isResumen||!canEdit(pane)||isConflict;save.hidden=isResumen;save.querySelector('span').textContent=pane==='asistencia'?'Guardar local':'Guardar';}
   if(process){process.hidden=tutor()||(pane!=='calificar'&&pane!=='asistencia');process.querySelector('span').textContent=pane==='asistencia'?'Subir Nube':'Procesar a Promedios';process.disabled=!connection?.canEdit()||!s||s.busy||s.readonly||readonly()||isConflict;}
@@ -78,7 +81,7 @@
   const histConflicts=s?.historicalConflicts||[];const conflictBtn=document.getElementById('registroConflictOffer');
   if(conflictBtn){if(histConflicts.length>0&&pane==='promedios'){conflictBtn.hidden=false;conflictBtn.style.display='inline-flex';const txt=conflictBtn.querySelector('span');if(txt)txt.textContent='Revisar notas históricas ('+histConflicts.length+')';conflictBtn.onclick=()=>reconcileHistorical();}else if(!isConflict){conflictBtn.hidden=true;conflictBtn.style.display='none';}}
   if(!canEdit())document.querySelectorAll('#stuList button,#finLista button,#finLista input,#finLista textarea,#finLista select,#asisLista button').forEach(el=>{if(el.tagName==='BUTTON'||el.type==='checkbox'||el.tagName==='SELECT')el.disabled=true;else el.readOnly=true;});
-  const edit=canEdit();if(edit!==lastEditable&&!painting){lastEditable=edit;render();}
+  const edit=canEdit(),finBox=document.getElementById('finLista'),contextChanged=pane==='promedios'&&!!finBox&&finBox.dataset?.registroContexto!==cloudClaveReg();if((edit!==lastEditable||contextChanged)&&!painting){lastEditable=edit;if(edit||contextChanged)render();}
  }
  async function save(){
   const client=get(),pane=currentPanel();if(pane==='resumen'||!client||!canEdit(pane))return false;

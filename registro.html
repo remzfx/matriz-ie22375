@@ -770,6 +770,7 @@ function registroDependenciaFallida(){
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
               <div class="fin-header-aux">
                 <div class="fin-mode-info" id="finModeInfo"></div>
+                <span id="finContextStatus" role="status" class="text-xs text-slate-500" hidden>Verificando datos…</span>
                 <div id="finResumen"></div>
               </div>
             </div>
@@ -3584,6 +3585,12 @@ function renderFinales() {
   if(!box.dataset)box.dataset={};box.dataset.registroContexto=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||');
   const res = document.getElementById('finResumen');
   const modeInfo = document.getElementById('finModeInfo');
+  // A new context has no confirmed selection yet; never render provisional academic columns.
+  if(typeof IERegistroNotas2UI!=='undefined'&&!registroHistoricoProyectando&&IERegistroNotas2UI.current()?.status()?.panels.promedios.version==null){
+    box.setAttribute?.('aria-busy','true');box.innerHTML='<p id="finContextLoading" role="status" class="text-sm text-slate-500 p-3">Verificando datos…</p>';
+    res.innerHTML='';modeInfo.innerHTML='';const stats=document.getElementById('finEstadisticas');if(stats)stats.innerHTML='';return;
+  }
+  box.setAttribute?.('aria-busy','false');
   const bloqueado = bimCerradoDocente();
   const alumnos = estudiantes();
   const estadisticas = document.getElementById('finEstadisticas');
