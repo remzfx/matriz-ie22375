@@ -74,6 +74,8 @@ function notas2Ruta_(body) {
     if(legacy&&body.panel==='calificar')return {ok:false,code:'LEGACY_REVIEW',error:'Consulte el registro histórico; procese y guarde Promedios explícitamente antes de editar Calificar con Notas 2.0.'};
     const input=body.payload;if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(f=>!fields[body.panel].includes(f))||fields[body.panel].some(f=>!Object.prototype.hasOwnProperty.call(input,f)))return {ok:false,code:'PAYLOAD',error:'El guardado debe contener únicamente el panel seleccionado completo.'};
     const next=JSON.parse(JSON.stringify(previous));
+    // Freeze the previous Calificar view before Promedios changes its own worked flags.
+    if(body.panel==='promedios'&&previous.calificarEstado==null)next.calificarEstado=JSON.parse(JSON.stringify(previous.competenciasEstado||{}));
     for(const f of fields[body.panel]){
       const v=input[f];if(f==='sessions'){if(!Array.isArray(v)||v.some(s=>[s.nivel,s.bim,s.grado,s.seccion,s.area].join('||')!==key))throw Error('Sesiones de otro contexto.');}
       else if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).some(k=>body.panel==='asistencia'?(f==='asisFechas'?k!==[ctx.nivel,ctx.bimestre,ctx.grado,ctx.seccion].join('||'):!k.startsWith([ctx.nivel,ctx.bimestre,ctx.grado,ctx.seccion].join('||')+'||')):!k.startsWith(prefix)))throw Error('Mapa académico de otro contexto.');
