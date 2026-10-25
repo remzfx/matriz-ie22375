@@ -145,7 +145,7 @@ function setupMultiContextFixture() {
         g.connectionConfig = o;
         return {
           canEdit: () => editable,
-          check: async () => {},
+          check: async () => !!(await o.verify({valid:()=>true,review:false})).ok,
           invalidate() {}
         };
       }
@@ -157,6 +157,7 @@ function setupMultiContextFixture() {
   g.fetch = async (url, opts) => {
     const b = JSON.parse(opts.body);
     requests.push(b);
+if(b.action==='academicstate')return {ok:true,text:async()=>JSON.stringify({ok:true,academicReset:1,epoch:null,phase:'idle'})};
     const reqKey = [b.nivel, b.bimestre, b.grado, b.seccion, b.area].join('||');
     const db = databases[reqKey];
 

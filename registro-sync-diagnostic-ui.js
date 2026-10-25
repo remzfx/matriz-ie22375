@@ -246,7 +246,7 @@
   let report;
   try {
    if(root.IERegistroNotas2UI){
-    const state=root.IERegistroNotas2UI.current()?.status();
+    const state=root.IERegistroNotas2UI.status?.()||root.IERegistroNotas2UI.current()?.status();
     const connState=root.IERegistroConnection?.current()?.snapshot()?.state;
     report=state?{model:'notas2',readOnly:true,state:state.state,readonly:state.readonly,connection:connState,panels:state.panels}:{model:'notas2',readOnly:true,state:connState==='readonly'?'readonly':'session',readonly:connState==='readonly',connection:connState,panels:{}};
     const rosterRetry=document.getElementById('retryRoster');
