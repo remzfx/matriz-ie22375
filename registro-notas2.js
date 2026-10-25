@@ -84,7 +84,7 @@
     serverClosed=r.readonly;legacy=r.legacy;
     const changed=options.verify&&names.some(n=>pending(n)&&r.versions[n]!==entries[n].version);
     if(changed){emit('conflict');return false;}
-    const apply=names.filter(n=>(!options.verify||!pending(n))&&(!r.legacy||n==='promedios'||(!entries[n]?.hasContent&&!o.hasExisting?.(n))));
+    const apply=names.filter(n=>(!options.verify||!pending(n))&&(!r.legacy||n==='promedios'||(!entries[n]?.hasContent&&!o.hasExisting?.(n)))&&!o.deferReadPanel?.(n));
     const updates=Object.assign({},...apply.map(n=>panel(r.payload,n)));
     // Apply is a synchronous atomic adapter; no partial DOM/persistence work here.
     if(apply.length){o.beforeApply?.();o.apply(copy(updates));}
@@ -106,7 +106,7 @@
    finally{flight=false;o.changed?.(status());}
   }
   function processToAverages(options){if(flight||state!=='ready'||!same()||!o.authorized()||o.readonly()||serverClosed)return false;const before=o.capture(),next=process(before,options);o.apply(panel(next,'promedios'));processed=true;o.changed?.(status());return true;}
-  return {load,save,process:processToAverages,pending,status,clearHistoricalConflicts(resolvedPaths){if(Array.isArray(resolvedPaths)){const set=new Set(resolvedPaths);historicalConflicts=historicalConflicts.filter(c=>!set.has(c.path));}else{historicalConflicts=[];}o.changed?.(status());},canEdit:(name)=>state==='ready'&&!flight&&same()&&o.authorized()&&!o.readonly()&&!serverClosed&&(!legacy||name==='asistencia'||name==='promedios'),pause(){epoch++;emit('offline');},close(){closed=true;epoch++;emit('session');}};
+  return {load,save,process:processToAverages,pending,status,clearHistoricalConflicts(resolvedPaths){if(Array.isArray(resolvedPaths)){const set=new Set(resolvedPaths);historicalConflicts=historicalConflicts.filter(c=>!set.has(c.path));}else{historicalConflicts=[];}o.changed?.(status());},canEdit:(name)=>!!entries[name]&&state==='ready'&&!flight&&same()&&o.authorized()&&!o.readonly()&&!serverClosed&&(!legacy||name==='asistencia'||name==='promedios'),pause(){epoch++;emit('offline');},close(){closed=true;epoch++;emit('session');}};
  }
  const api={fields,panel,signature,validPayload,validateRead,process,create};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.IERegistroNotas2=api;

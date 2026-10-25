@@ -208,6 +208,19 @@
     if (!base.inicializada) { clear(); throw new Error('Base privada no inicializada. Admin debe completar la inicialización SIAGIE.'); }
     return base;
   }
+  // Background roster inspection must not invalidate the visible roster or publish a cache entry.
+  async function readRoster(bimestre) {
+    if (!['I','II','III','IV'].includes(bimestre)) throw error('CONTEXT','Bimestre inválido.');
+    const token=validToken(),epoch=authorizationEpoch;
+    if (!token || !['admin','docente'].includes(session()?.role)) throw error('SESSION','Sesión no autorizada.');
+    const response=await studentsResponse({bimestre},token,null);
+    if (validToken()!==token || epoch!==authorizationEpoch) throw error('SESSION','La sesión cambió.');
+    if (!response || typeof response.ok!=='boolean') throw error('INVALID_RESPONSE','Respuesta de padrón inválida.');
+    if (!response.ok) throw error(response.code||'SERVER','No se confirmó el padrón solicitado.');
+    if (!Array.isArray(response.estudiantes) || response.bimestre!==bimestre) throw error('INVALID_RESPONSE','Padrón de otro contexto o incompleto.');
+    if (response.inicializada!==true || response.padronInicializado!==true) throw error('ROSTER_MISSING','No existe padrón confirmado de ese bimestre.');
+    return toBase(response);
+  }
   if (!document.body && typeof document.addEventListener === 'function') document.addEventListener('DOMContentLoaded',startBridge,{once:true});
   else startBridge();
   global.IEStudents = {empty: empty, peek: () => peek('students:actual'),
@@ -221,6 +234,7 @@
       return readOnce();
     },
     inspect: () => request('loadstudents'),
+    readRoster: readRoster,
     loadRoster: bimestre => {
       if (!['I','II','III','IV'].includes(bimestre)) return Promise.reject(new Error('Bimestre inválido.'));
       return readOnce({bimestre: bimestre});

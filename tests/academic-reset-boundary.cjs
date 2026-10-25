@@ -125,4 +125,4 @@ const edits={
   ]
  ]
 };
-module.exports=(file,source)=>{let s=require('./registro-continuity-stage1-boundary.cjs')(file,require('./notas2-prefetch-boundary.cjs')(file,source));for(const [next,previous]of edits[file]||[]){if(s.includes(next)){assert.equal(s.split(next).length,2,'Reset hook occurs once');s=s.replace(next,previous);}}return s;};
+module.exports=(file,source)=>{let s=require('./registro-continuity-stage1-boundary.cjs')(file,require('./notas2-prefetch-boundary.cjs')(file,require('./notas2-progressive-boundary.cjs')(file,source)));for(const [next,previous]of edits[file]||[]){if(s.includes(next)){assert.equal(s.split(next).length,2,'Reset hook occurs once');s=s.replace(next,previous);}}return s;};
