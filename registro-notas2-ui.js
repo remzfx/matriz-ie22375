@@ -9,6 +9,7 @@
  const currentPanel=()=>document.getElementById('panelAsistencia')?.classList.contains('on')?'asistencia':document.getElementById('panelCalificar')?.classList.contains('on')?'calificar':document.getElementById('panelAvance')?.classList.contains('on')?'resumen':'promedios';
  const binding=()=>{const s=getLoginSession()||{};return [cloudClaveReg(),s.token||'',s.user||'',s.role||''].join('|');};
  const owner=()=>{const s=getLoginSession()||{};return [s.token||'',s.user||'',s.role||''].join('|');};
+ const receiptGuards=new Map();let prefetch=null;
  const tutor=()=>document.getElementById('registroTutorPanel')?.hidden===false;
  function authorized(){const s=getLoginSession()||{};return !!(s.token&&['admin','docente'].includes(s.role)&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&padronBimestre===ctxBase().bim&&tokenPadron===s.token&&areaActual&&areas().includes(areaActual)&&registroLocal.matches());}
  function readonly(){return esVistaAdmin()||!bimestreHabilitado(ctxBase().bim)||registroConsultaHistorica();}
@@ -28,11 +29,45 @@
    notas={};loadCapsElegidas();
   }
  }
- async function request(body,options){
-  const c=ctxBase(),session=getLoginSession()||{},response=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},cache:'no-store',signal:options.signal,body:JSON.stringify({...body,token:session.token,nivel:c.nivel,bimestre:c.bim,grado:c.grado,seccion:c.seccion,area:c.area,docente:session.nombre||''})});
+ function captureContext(c){
+  const prefix=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||'),aula=[c.nivel,c.bim,c.grado,c.seccion].join('||'),p={};
+  for(const [name,list]of Object.entries(model.fields))for(const field of list){
+   if(field==='sessions')p[field]=(store.sessions||[]).filter(s=>[s.nivel,s.bim,s.grado,s.seccion,s.area].join('||')===prefix);
+   else p[field]=Object.fromEntries(Object.entries(store[field]||{}).filter(([k,v])=>(name==='asistencia'?(k===aula||k.startsWith(aula+'||')):k.startsWith(prefix+'||'))&&(!Array.isArray(v)||v.length)));
+  }return p;
+ }
+ function candidates(){
+  if(!root.IERegistroNotas2Prefetch||!root.IERegistroAcademico||!authorized()||tutor())return [];
+  const c=ctxBase();return IERegistroNotas2Prefetch.enumerate(getLoginSession(),{[c.bim]:(bdEstudiantes[c.nivel]?.estudiantes||[])},IERegistroAcademico.catalog);
+ }
+ async function requestFor(c,session,body,options,background=false){
+  if(owner()!==[session.token||'',session.user||'',session.role||''].join('|')){const e=Error('La sesión cambió antes de la lectura.');e.code='SESSION';throw e;}
+  const actor=owner(),init={method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},cache:'no-store',signal:options.signal,body:JSON.stringify({...body,token:session.token,nivel:c.nivel,bimestre:c.bim,grado:c.grado,seccion:c.seccion,area:c.area,docente:session.nombre||''})};
+  const response=await (background?root.IEAcademicResetClient.readOnly(CLOUD_API_URL,init):fetch(CLOUD_API_URL,init));
+  if(owner()!==actor){const e=Error('La sesión cambió.');e.code='SESSION';throw e;}
   let data;try{data=JSON.parse(await response.text());}catch(_){const e=Error('Respuesta del servidor inválida. Edición pausada.');e.code='INVALID_RESPONSE';throw e;}
   if(!response.ok){const e=Error('No se pudo confirmar el servidor (HTTP '+response.status+').');e.code=response.status===401||response.status===403?'SESSION':'HTTP';throw e;}return data;
  }
+ async function request(body,options){
+  const c=Object.freeze({...ctxBase()}),session={...getLoginSession()},key=binding();receiptGuards.delete(key);
+  if(body.action==='loadnotas2'&&prefetch){
+   prefetch.select(c);
+   if(clients.get(key)?.status().panels.calificar.version==null){const reserved=await prefetch.acquire(c);if(reserved){receiptGuards.set(key,reserved.signature);return reserved.response;}}
+  }
+  return requestFor(c,session,body,options);
+ }
+ function startPrefetch(){
+  if(!prefetch||!canEdit()||get()?.status().legacy||!root.IEAcademicResetClient?.readOnly)return;
+  prefetch.resume();prefetch.start(ctxBase(),candidates());
+ }
+ if(root.IERegistroNotas2Prefetch)prefetch=IERegistroNotas2Prefetch.create({
+  identity:()=>JSON.stringify([owner(),getLoginSession()?.permisosVersion,CLOUD_API_URL,root.IEAcademicResetClient?.epoch?.()||null]),
+  allowed:c=>candidates().some(x=>IERegistroNotas2Prefetch.key(x)===IERegistroNotas2Prefetch.key(c)),
+  localSignature:c=>model.signature(captureContext(c)),hasLocal:c=>Object.values(captureContext(c)).some(v=>Object.keys(v).length),
+  read:(c,signal)=>requestFor(c,{...getLoginSession()},{action:'loadnotas2'},{signal},true),
+  validate:(r,c)=>{model.validateRead(r,IERegistroNotas2Prefetch.key(c));const roster=(bdEstudiantes[c.nivel]?.estudiantes||[]).filter(a=>Number(a.grado)===Number(c.grado)&&a.seccion===c.seccion);IERegistroAcademico.validate(copy(r.payload),c);const resolved=IEAcademicIdentity.project(r.payload,roster,c,IERegistroAcademico.catalog[c.nivel][c.area]);if(resolved.conflicts.length||resolved.unresolved.length)throw Error('Identidades pendientes de revisión.');return r;},
+  denied:e=>connection?.pause(e.code==='ACADEMIC_RESET'?'server':'session')
+ });
  async function verifyPermission(valid){
   const key=binding(),actor=owner(),session=getLoginSession()||{},controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
   try{
@@ -65,7 +100,7 @@
  }
  function get(){
   if(!authorized()||tutor())return null;const key=binding();if(!activeKey)activeKey=key;
-  if(!clients.has(key))clients.set(key,model.create({key:cloudClaveReg(),binding,authorized,readonly,capture,apply,request,hasExisting:name=>(name==='calificar'?['grades']:name==='promedios'?['finales','concComp']:['asistencia']).some(f=>Object.keys(capture()[f]||{}).length),confirm:async info=>confirm('Bajar Nube reemplazará los cambios sin guardar de '+info.panels.join(', ')+'. Última confirmación: '+Object.values(info.at).filter(Boolean).map(x=>new Date(x).toLocaleString('es-PE')).join(', ')+'. ¿Continuar?'),changed:()=>{if(key===binding())paint();},error:e=>{if(key!==binding())return;toast(e.message);if(['SESSION','DENIED'].includes(e.code))retirarVerificacionNube((getLoginSession()||{}).token,ctxBase().bim,{code:e.code});}}));
+  if(!clients.has(key))clients.set(key,model.create({key:cloudClaveReg(),binding,authorized,readonly,capture,apply,request,beforeApply:()=>{const expected=receiptGuards.get(key);receiptGuards.delete(key);if(expected!==undefined&&(expected!==model.signature(captureContext(ctxBase()))||screenPending('calificar')||screenPending('promedios'))){const e=Error('El borrador cambió. La precarga no reemplazó datos locales.');e.code='PREFETCH_LOCAL';throw e;}},hasExisting:name=>(name==='calificar'?['grades']:name==='promedios'?['finales','concComp']:['asistencia']).some(f=>Object.keys(capture()[f]||{}).length),confirm:async info=>confirm('Bajar Nube reemplazará los cambios sin guardar de '+info.panels.join(', ')+'. Última confirmación: '+Object.values(info.at).filter(Boolean).map(x=>new Date(x).toLocaleString('es-PE')).join(', ')+'. ¿Continuar?'),changed:()=>{if(key===binding())paint();},error:e=>{receiptGuards.delete(key);if(key!==binding())return;toast(e.message);if(['SESSION','DENIED'].includes(e.code))retirarVerificacionNube((getLoginSession()||{}).token,ctxBase().bim,{code:e.code});}}));
   return clients.get(key);
  }
  function collect(silent=false){const pane=currentPanel();if(!canEdit(pane))return false;const selector=pane==='calificar'?'.cal-nota':pane==='promedios'?'#finLista .fin-nota':'.asis-input';if(pane!=='asistencia'&&Array.from(document.querySelectorAll(selector)).some(el=>!el.readOnly&&el.value!==''&&(!Number.isFinite(Number(el.value))||Number(el.value)<0||Number(el.value)>20))){if(!silent)toast('Corrige las notas inválidas antes de guardar.');return false;}recolectarPantalla(pane);return true;}
@@ -120,6 +155,7 @@
  async function save(){
   const client=get(),pane=currentPanel();if(pane==='resumen'||!client||!canEdit(pane))return false;
   if(pane==='asistencia'){guardarAsistencia();persist();toast('Asistencia guardada localmente.');return true;}
+  prefetch?.select(ctxBase());
   if(save.pending)return false;save.pending=true;const key=binding();try{
   if(!await connection.check(false,true)||key!==binding()||pane!==currentPanel()||client!==get()||!canEdit(pane))return false;
   if(!collect())return false;if(pane==='calificar')saveCapsElegidas();
@@ -134,7 +170,7 @@
   const ok=client.process({context:ctxBase(),competencies:competencias(),students:estudiantes().map(studentKey),now:Date.now,calculate:(p,comp,id)=>IERegistroGrading.calculated(IERegistroGrading.sessionsFor(p.sessions,ctxBase(),comp).map(s=>leerNota(p.grades,[s.nivel,s.bim,s.grado,s.seccion,s.area,s.comp,s.capacidad,s.fecha,id].join('||'))),IERegistroEvaluacion)});if(ok){showPanel('fin');render();toast('Promedios procesados. Pendientes de Guardar.');}return ok;
  }
  function setWorked(comp,active){const pane=currentPanel();if(!['calificar','promedios'].includes(pane)||!canEdit(pane)||!competencias().includes(comp)||typeof active!=='boolean')return false;const key=prefijoReg()+comp,field=pane==='calificar'?'calificarEstado':'competenciasEstado';if(worked(comp,pane)===active)return false;store[field]=store[field]||{};store[field][key]={trabajada:active,ts:Date.now()};if(pane==='promedios')renderFinales();paint();return true;}
- function refresh(force=false){if(painting)return;const key=binding();if(activeKey&&key!==activeKey){activeKey=key;lastConnectionState=null;if(connection?.select)connection.select();else connection?.invalidate();}else if(!activeKey){activeKey=key;}clearTimeout(timer);timer=setTimeout(()=>connection?.check(false,force),30);paint();}
+ function refresh(force=false){if(painting)return;const key=binding();if(activeKey&&key!==activeKey){activeKey=key;lastConnectionState=null;prefetch?.select(ctxBase());if(connection?.select)connection.select();else connection?.invalidate();}else if(!activeKey){activeKey=key;}clearTimeout(timer);timer=setTimeout(()=>connection?.check(false,force),30);paint();}
  let lastConnectionState=null;
  function ensureSyncIndicator(){
   if(typeof document==='undefined'||!document.createElement)return null;
@@ -212,7 +248,7 @@
    box.appendChild(details);
   }
  }
- connection=IERegistroConnection.create({owner,binding:()=>binding()+(tutor()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:''),authorized:()=>{if(tutor())return !!getLoginSession()?.token;if(esVistaAdmin()){const s=getLoginSession()||{};return !!(s.token&&s.role==='admin'&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&padronBimestre===ctxBase().bim&&tokenPadron===s.token&&registroLocal.matches());}return authorized();},readonly,allowed:()=>tutor()?!esVistaAdmin()&&bimestreHabilitado(document.getElementById('transBim')?.value):!readonly(),retain:()=>{if(canEdit())collect();},online:()=>navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',changed:value=>{const box=document.getElementById('registroConnectionStatus'),text=document.getElementById('registroConnectionText');if(box){box.dataset.state=value.state;box.style.display='none';}const statusMap={connected:'Conectado — notas verificadas.',pending:'Conectado — cambios sin guardar.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',readonly:esVistaAdmin()?'Vista Administrador — solo lectura.':'Bimestre cerrado — solo lectura.',review:'Conflicto de versiones — consulta la nube antes de guardar.'};const msg=statusMap[value.state]||value.state;if(text)text.textContent=msg;lastConnectionState=value.state;/* Connectivity gates editing without changing academic errors, CAS or in-flight epochs. */const retryBtn=document.getElementById('registroRetryOffer');if(retryBtn)retryBtn.hidden=true;paint();},verify:async({valid,review})=>{
+ connection=IERegistroConnection.create({owner,binding:()=>binding()+(tutor()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:''),authorized:()=>{if(tutor())return !!getLoginSession()?.token;if(esVistaAdmin()){const s=getLoginSession()||{};return !!(s.token&&s.role==='admin'&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&padronBimestre===ctxBase().bim&&tokenPadron===s.token&&registroLocal.matches());}return authorized();},readonly,allowed:()=>tutor()?!esVistaAdmin()&&bimestreHabilitado(document.getElementById('transBim')?.value):!readonly(),retain:()=>{if(canEdit())collect();},online:()=>navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',changed:value=>{const box=document.getElementById('registroConnectionStatus'),text=document.getElementById('registroConnectionText');if(box){box.dataset.state=value.state;box.style.display='none';}const statusMap={connected:'Conectado — notas verificadas.',pending:'Conectado — cambios sin guardar.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',readonly:esVistaAdmin()?'Vista Administrador — solo lectura.':'Bimestre cerrado — solo lectura.',review:'Conflicto de versiones — consulta la nube antes de guardar.'};const msg=statusMap[value.state]||value.state;if(text)text.textContent=msg;lastConnectionState=value.state;/* Connectivity gates editing without changing academic errors, CAS or in-flight epochs. */const retryBtn=document.getElementById('registroRetryOffer');if(retryBtn)retryBtn.hidden=true;paint();if(value.state==='connected'||value.state==='pending')startPrefetch();},verify:async({valid,review})=>{
   if(tutor())return tutorRegistroController?.verifyConnection?await tutorRegistroController.verifyConnection({valid,review:false}):{ok:false};
   const [periods,permission]=await Promise.all([sincronizarPeriodosNube(true),verifyPermission(valid)]);if(permission.code==='SESSION')return permission;if(!valid())return {ok:false};if(!permission.ok)return permission;if(!periods)return {ok:false};
   if(esVistaAdmin())return {ok:true,code:'CLOSED',pending:false};
@@ -253,7 +289,7 @@
   if(typeof toast==='function')toast(count+' calificaciones históricas seleccionadas. Guarde Promedios para confirmar.');
   return true;
  }
- const api={save,download,process,collect,screenPending,status:viewStatus,worked,setWorked,canEdit,officialOnly,persist,refresh,pendingPanels,hasPending,reconcileHistorical,activePending:()=>{const pane=currentPanel();return pane==='resumen'?false:pane==='calificar'?(!!get()?.status()?.panels.calificar?.pending||(typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty)):!!get()?.status()?.panels[pane]?.pending;},keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
+ const api={prefetchStatus:()=>prefetch?.stats()||null,save,download,process,collect,screenPending,status:viewStatus,worked,setWorked,canEdit,officialOnly,persist,refresh,pendingPanels,hasPending,reconcileHistorical,activePending:()=>{const pane=currentPanel();return pane==='resumen'?false:pane==='calificar'?(!!get()?.status()?.panels.calificar?.pending||(typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty)):!!get()?.status()?.panels[pane]?.pending;},keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
  // Existing tutor controls call this API only to verify their connection, never to write academic notes.
  root.IERegistroRecovery={refresh,automatic:()=>connection.check(),resolve:()=>{const s=get()?.status();if(s?.historicalConflicts?.length)return reconcileHistorical();connection.invalidate();return connection.check(true,true);},local:save,upload:()=>currentPanel()==='asistencia'?uploadAttendance():save(),recover:download};
  document.addEventListener('DOMContentLoaded',()=>{
@@ -273,7 +309,7 @@
   const block=e=>{if(canEdit())return;const write=e.target?.closest?.('.cal-nota,.fin-nota,.academic-conclusion,.asis-input,[data-val],[data-av],[data-adel],[data-delfecha],[data-an],[data-final-toggle],.fin-bulk-actions');if(write){e.preventDefault();e.stopImmediatePropagation();}};
   for(const type of ['beforeinput','click','change'])document.addEventListener(type,block,true);
   document.addEventListener('input',()=>{paint();});document.addEventListener('change',()=>refresh());document.addEventListener('click',()=>paint());document.addEventListener('ie22375:registro-ready',()=>refresh());
-  window.addEventListener('offline',()=>connection.pause('offline'));window.addEventListener('online',()=>refresh(true));window.addEventListener('focus',()=>refresh());window.addEventListener('storage',e=>{if(e.key==='ie22375_session_v1')connection.pause('session');});
+  window.addEventListener('offline',()=>{prefetch?.pause();connection.pause('offline');});window.addEventListener('online',()=>refresh(true));window.addEventListener('focus',()=>refresh());window.addEventListener('storage',e=>{if(e.key==='ie22375_session_v1'){prefetch?.pause();connection.pause('session');}});
   const footer=document.getElementById('registroAcademicFooter');if(footer&&typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{const main=document.querySelector('main');if(main)main.style.paddingBottom=(footer.hidden?0:footer.getBoundingClientRect().height+12)+'px';}).observe(footer);
   window.addEventListener('beforeunload',e=>{if(api.hasPending()){e.preventDefault();e.returnValue='';return '';}});
   refresh();

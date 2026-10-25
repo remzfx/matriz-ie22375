@@ -8,6 +8,19 @@
  const signature=value=>JSON.stringify(stable(value));
  function panel(payload,name){if(!fields[name])fail('PANEL','Panel académico inválido.');const res=Object.fromEntries(fields[name].map(f=>[f,copy(payload[f]||(f==='sessions'?[]:{}))]));if(name==='calificar'&&res.capsSel)res.capsSel=Object.fromEntries(Object.entries(res.capsSel).filter(([,v])=>Array.isArray(v)&&v.length>0));return res;}
  function validPayload(p){return p&&typeof p==='object'&&!Array.isArray(p)&&Array.isArray(p.sessions)&&Object.values(fields).flat().filter(f=>f!=='sessions').every(f=>p[f]&&typeof p[f]==='object'&&!Array.isArray(p[f]))&&p.sessions.every(s=>s&&typeof s==='object'&&!Array.isArray(s))&&['grades','finales','concComp','competenciasEstado','calificarEstado'].every(f=>Object.values(p[f]).every(v=>v&&typeof v==='object'&&!Array.isArray(v)));}
+ function validateResponse(r,key){
+  if(!r||r.ok!==true)fail(r?.code||'SERVER',r?.error||'No se confirmó la operación.');
+  if(r.notas2!==1||typeof r.readonly!=='boolean'||typeof r.legacy!=='boolean'||r.key!==key||!validPayload(r.payload)||!Object.keys(fields).every(n=>Number.isSafeInteger(r.versions?.[n])&&r.versions[n]>=0&&(r.at?.[n]===null||Number.isFinite(r.at?.[n]))))fail('INCOMPLETE','Respuesta académica incompleta; no se reemplazaron datos.');
+  return r;
+ }
+ function validateRead(r,key){
+  validateResponse(r,key);if(r.exists!==true&&r.exists!==false)fail('INCOMPLETE','Falta la confirmación de existencia del registro.');
+  const parts=key.split('||'),aula=parts.slice(0,4).join('||'),prefix=key+'||';
+  for(const name of Object.keys(fields))for(const field of fields[name]){
+   if(field==='sessions'){if(r.payload.sessions.some(s=>[s.nivel,s.bim,s.grado,s.seccion,s.area].join('||')!==key))fail('CONTEXT','Sesiones de otro contexto.');}
+   else if(Object.keys(r.payload[field]).some(k=>name==='asistencia'?(field==='asisFechas'?k!==aula:!k.startsWith(aula+'||')):!k.startsWith(prefix)))fail('CONTEXT','Datos de otro contexto.');
+  }return r;
+ }
  function process(payload,o){
   const next=copy(payload),prefix=[o.context.nivel,o.context.bim,o.context.grado,o.context.seccion,o.context.area].join('||')+'||';
   next.finales=next.finales||{};next.competenciasEstado=next.competenciasEstado||{};
@@ -47,8 +60,7 @@
    finally{clearTimeout(timer);}
   }
   function validate(r){
-   if(!r||r.ok!==true)fail(r?.code||'SERVER',r?.error||'No se confirmó la operación.');
-   if(r.notas2!==1||typeof r.readonly!=='boolean'||typeof r.legacy!=='boolean'||r.key!==o.key||!validPayload(r.payload)||!Object.keys(fields).every(n=>Number.isSafeInteger(r.versions?.[n])&&r.versions[n]>=0&&(r.at?.[n]===null||Number.isFinite(r.at?.[n]))))fail('INCOMPLETE','Respuesta académica incompleta; no se reemplazaron datos.');
+   validateResponse(r,o.key);
    readable();return r;
   }
   async function load(options={}){
@@ -75,7 +87,7 @@
     const apply=names.filter(n=>(!options.verify||!pending(n))&&(!r.legacy||n==='promedios'||(!entries[n]?.hasContent&&!o.hasExisting?.(n))));
     const updates=Object.assign({},...apply.map(n=>panel(r.payload,n)));
     // Apply is a synchronous atomic adapter; no partial DOM/persistence work here.
-    if(apply.length)o.apply(copy(updates));
+    if(apply.length){o.beforeApply?.();o.apply(copy(updates));}
     for(const name of apply)entries[name]={version:r.versions[name],at:r.at[name],signature:signature(panel(r.payload,name)),hasContent:name==='calificar'?!!(r.payload.sessions.length||Object.keys(r.payload.grades).length):name==='promedios'?!!(Object.keys(r.payload.finales).length||Object.keys(r.payload.concComp).length):!!Object.keys(r.payload.asistencia).length};
     emit('ready');return true;
    }catch(e){if(same())emit(['SESSION','DENIED'].includes(e.code)?'session':e.code==='CONFLICT'?'conflict':'server');o.error?.(e);return false;}
@@ -96,6 +108,6 @@
   function processToAverages(options){if(flight||state!=='ready'||!same()||!o.authorized()||o.readonly()||serverClosed)return false;const before=o.capture(),next=process(before,options);o.apply(panel(next,'promedios'));processed=true;o.changed?.(status());return true;}
   return {load,save,process:processToAverages,pending,status,clearHistoricalConflicts(resolvedPaths){if(Array.isArray(resolvedPaths)){const set=new Set(resolvedPaths);historicalConflicts=historicalConflicts.filter(c=>!set.has(c.path));}else{historicalConflicts=[];}o.changed?.(status());},canEdit:(name)=>state==='ready'&&!flight&&same()&&o.authorized()&&!o.readonly()&&!serverClosed&&(!legacy||name==='asistencia'||name==='promedios'),pause(){epoch++;emit('offline');},close(){closed=true;epoch++;emit('session');}};
  }
- const api={fields,panel,signature,validPayload,process,create};
+ const api={fields,panel,signature,validPayload,validateRead,process,create};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.IERegistroNotas2=api;
 })(typeof window==='undefined'?globalThis:window);

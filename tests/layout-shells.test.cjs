@@ -51,10 +51,10 @@ test('Photochecks retains shell-wide while upgrading A4 print and high-resolutio
 test('SW changes only static version and shared stylesheet entry, preserving API transport and cache policy',()=>{
  const sw=require('./notas2-frontend-boundary.cjs')('sw',read('sw.js')).replace(/\r\n/g,'\n').replace(" './matrix-registry-import.js',",'');assert.match(sw,/CACHE_PREFIX \+ 'v21'/);assert.match(sw,/'\.\/layout-shells.css'/);assert.equal(sw.replace(", './academic-identity.js'",'').replace(", './registro-reconcile.js'",'').replace("CACHE_PREFIX + 'v21'","CACHE_PREFIX + 'v13'").replace("'./layout-shells.css', ",''),original('sw.js'));
 });
-test('v26 installs actual shared CSS and serves it offline without caching external Apps Script POST',async()=>{
+test('v27 installs actual shared CSS and serves it offline without caching external Apps Script POST',async()=>{
  const setup=new Function('require','__dirname',read('tests/service-worker-static.test.cjs').split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname),s=setup(),css=read('layout-shells.css');
  s.network(async req=>new Response(req.url.endsWith('.css')?css:req.url.endsWith('.js')?'/* JS */':'<html>static</html>',{headers:{'Content-Type':req.url.endsWith('.css')?'text/css':req.url.endsWith('.js')?'application/javascript':'text/html'}}));
- s.cache('matriz-ie22375-v13');await s.dispatch('install');await s.dispatch('activate');assert.equal(s.stores.has('matriz-ie22375-v13'),false);assert.equal(s.stores.has('matriz-ie22375-v26'),true);
+ s.cache('matriz-ie22375-v13');await s.dispatch('install');await s.dispatch('activate');assert.equal(s.stores.has('matriz-ie22375-v13'),false);assert.equal(s.stores.has('matriz-ie22375-v27'),true);
  s.offline();const response=await s.dispatch('fetch',{request:s.request('layout-shells.css')});assert.equal(await response.text(),css);assert.equal(response.headers.get('Content-Type'),'text/css');
- const req=new Request('https://script.google.com/macros/s/synthetic/exec',{method:'POST',body:'synthetic'});assert.equal(await s.dispatch('fetch',{request:req}),undefined);assert.equal(await s.cache('matriz-ie22375-v26').match(req),undefined);
+ const req=new Request('https://script.google.com/macros/s/synthetic/exec',{method:'POST',body:'synthetic'});assert.equal(await s.dispatch('fetch',{request:req}),undefined);assert.equal(await s.cache('matriz-ie22375-v27').match(req),undefined);
 });
