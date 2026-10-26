@@ -1,6 +1,6 @@
 /* Service Worker — respaldo estático versionado, siempre network-first. */
 const CACHE_PREFIX = 'matriz-ie22375-';
-const CACHE = CACHE_PREFIX + 'v28';
+const CACHE = CACHE_PREFIX + 'v29';
 const MAX_STATIC_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const PRECACHE = [
   './academic-reset.js', './academic-reset-client.js',

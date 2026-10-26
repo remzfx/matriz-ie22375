@@ -2134,6 +2134,9 @@ function actualizarUnidades() {
  sel.value=IERegistroAcademico.unitsForBim(bim).includes(Number(prev))&&prev!==''?prev:'';
 }
 function onContexto(options) {
+  if(typeof IERegistroNotas2UI!=='undefined'&&IERegistroNotas2UI.saving?.()){
+    const previous=IERegistroNotas2UI.savingContext?.()||window.__prevCtx;if(previous){for(const [id,value]of [['selGrado',previous.grado],['selSeccion',previous.seccion],['selBim',previous.bim]]){const el=document.getElementById(id);if(el)el.value=String(value);}areaActual=previous.area;actualizarBotonesContextoRegistro();}return false;
+  }
   actualizarBotonesContextoRegistro();
   actualizarUnidades();
   if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
@@ -3151,6 +3154,7 @@ function aplicarModoAdminRegistro() {
   showPanel('av');
 }
 function showPanel(which) {
+  if(typeof IERegistroNotas2UI!=='undefined'&&IERegistroNotas2UI.saving?.())return false;
   if (esVistaAdmin() && which !== 'av') which = 'av';
   const cal = document.getElementById('panelCalificar');
   const av = document.getElementById('panelAvance');
@@ -4099,6 +4103,7 @@ function confirmarSalidaContexto(accionTexto) {
       areaActual = anterior.area;
     }
   if (typeof IERegistroNotas2UI !== 'undefined') {
+    if(IERegistroNotas2UI.saving?.()){toast('Espere a que termine el guardado antes de cambiar de contexto.');return false;}
     if(!IERegistroNotas2UI.canEdit()&&['calificar','promedios'].some(p=>IERegistroNotas2UI.screenPending?.(p))){toast('Hay una edición en pantalla sin confirmar. Regresa a su panel o verifica la conexión antes de cambiar de contexto.');return false;}
     let valid = true;
     if (typeof IERegistroNotas2UI.canEdit === 'function' && IERegistroNotas2UI.canEdit()) {

@@ -1,8 +1,36 @@
+/* One reusable, presentation-only save dialog. No transport or storage access. */
+(function(root){
+ 'use strict';
+ let dialog,icon,message,detail,closeButton,previousFocus,sequence=0,pending=false;
+ function mount(){
+  if(dialog||typeof document.createElement!=='function'||!document.head||!document.body)return;
+  const style=document.createElement('style');style.textContent='#academicSaveDialog{box-sizing:border-box;position:fixed;inset:0;margin:auto;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid #e2e8f0;border-radius:20px;padding:28px 24px;background:#fff;color:#0f172a;font:inherit;text-align:center;box-shadow:0 18px 60px #0f172a26}#academicSaveDialog::backdrop{background:#0f172a70}#academicSaveDialog [data-save-icon]{display:block;box-sizing:border-box;width:44px;height:44px;margin:0 auto 18px;border:4px solid #dbeafe;border-top-color:#0284c7;border-radius:50%;animation:academicSaveSpin 1s linear infinite}#academicSaveDialog[data-state="success"] [data-save-icon]{border:0;animation:none;color:#15803d;background:#f0fdf4;font-size:34px;line-height:44px}#academicSaveDialog[data-state="unconfirmed"] [data-save-icon]{border:0;animation:none;color:#a16207;background:#fffbeb;font-size:30px;line-height:44px}#academicSaveDialog h2{font-size:18px;line-height:1.5;font-weight:700;margin:0;overflow-wrap:anywhere;outline:none}#academicSaveDialog p{font-size:14px;line-height:1.5;color:#475569;margin:12px 0}#academicSaveDialog button{font:inherit;min-height:44px;margin-top:8px;padding:10px 24px;border:0;border-radius:10px;background:#075985;color:white;cursor:pointer}#academicSaveDialog button:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}@keyframes academicSaveSpin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#academicSaveDialog [data-save-icon]{animation-duration:2.5s}}';document.head.appendChild(style);
+  dialog=document.createElement('dialog');dialog.id='academicSaveDialog';dialog.setAttribute('aria-labelledby','academicSaveMessage');dialog.setAttribute('aria-describedby','academicSaveDetail');
+  icon=document.createElement('span');icon.dataset.saveIcon='';icon.setAttribute('aria-hidden','true');
+  message=document.createElement('h2');message.id='academicSaveMessage';message.tabIndex=-1;
+  detail=document.createElement('p');detail.id='academicSaveDetail';detail.setAttribute('role','status');detail.setAttribute('aria-live','polite');
+  closeButton=document.createElement('button');closeButton.type='button';closeButton.textContent='Continuar';closeButton.onclick=()=>{if(!pending)dialog.close();};
+  dialog.addEventListener('cancel',e=>{if(pending)e.preventDefault();});document.addEventListener('keydown',e=>{if(dialog.open&&e.key==='Tab'){e.preventDefault();(pending?message:closeButton).focus();}},true);
+  dialog.addEventListener('close',()=>{if(previousFocus?.isConnected&&!previousFocus.disabled)previousFocus.focus();});
+  dialog.append(icon,message,detail,closeButton);document.body.appendChild(dialog);
+ }
+ function begin(){
+  if(pending)return null;pending=true;const id=++sequence;try{mount();}catch(e){pending=false;throw e;}if(!dialog)return id;
+  previousFocus=document.activeElement;dialog.dataset.state='pending';dialog.setAttribute('aria-busy','true');icon.textContent='';message.textContent='Guardando datos... Espere, no cierre ni cambie de grado';detail.textContent='Estamos guardando las notas en la nube.';closeButton.hidden=true;
+  if(!dialog.open)dialog.showModal();message.focus();return id;
+ }
+ function finish(id,confirmed){
+  if(id!==sequence||!pending)return;pending=false;if(!dialog)return;
+  dialog.dataset.state=confirmed?'success':'unconfirmed';dialog.setAttribute('aria-busy','false');icon.textContent=confirmed?'✓':'!';message.textContent=confirmed?'¡Guardado confirmado en la nube!':'Guardado no confirmado. Sus cambios locales están protegidos';detail.textContent=confirmed?'Las notas se guardaron correctamente en la nube.':'No se reenviará automáticamente. Consulte el diagnóstico antes de reintentar.';closeButton.hidden=false;closeButton.focus();
+ }
+ root.IEAcademicSaveFeedback={begin,finish,focus:()=>{if(dialog?.open)(pending?message:closeButton).focus();},busy:()=>pending};
+})(window);
 /* Integración Notas 2.0: una sesión volátil por ámbito; nunca crea borradores persistentes. */
 (function(root){
  'use strict';
  const model=root.IERegistroNotas2;
  if(!model||!root.IERegistroConnection){registroDependenciaFallida();return;}
+ let criticalSaveContext=null;
  const clients=new Map();let memoryLoaded=false,protectedDisk=null,painting=false,timer=null,connection,activeKey='',renderedPaused=false,lastView='';
  const pausedControls=new WeakMap();
  const copy=x=>JSON.parse(JSON.stringify(x));
@@ -188,14 +216,20 @@
  async function save(){
   const client=get(),pane=currentPanel();if(pane==='resumen'||!client||!canEdit(pane))return false;
   if(pane==='asistencia'){guardarAsistencia();persist();toast('Asistencia guardada localmente.');return true;}
-  prefetch?.hold('save');
-  if(save.pending)return false;save.pending=true;const key=binding();try{
+  if(save.pending)return false;save.pending=true;criticalSaveContext=copy(ctxBase());prefetch?.hold('save');let notice,confirmed=false;const key=binding();try{
+  notice=root.IEAcademicSaveFeedback.begin();
   if(!await connection.check(false,true)||key!==binding()||pane!==currentPanel()||client!==get()||!canEdit(pane))return false;
-  if(!collect())return false;if(pane==='calificar')saveCapsElegidas();
+  if(!collect())return false;if(pane==='calificar')saveCapsElegidas();root.IEAcademicSaveFeedback.focus();
   if(client.status().legacy&&pane==='promedios'&&!client.pending(pane)&&!client.status().processed){toast('No hay cambios pendientes para guardar en Promedios.');return false;}
   const adapter=typeof IERegistroTransversales==='undefined'?null:IERegistroTransversales;if(adapter){try{adapter.capture();}catch(e){toast(e.message);return false;}}
-  const ok=await client.save(pane);let transOK=true;if(ok&&adapter?.current()?.dirty){try{transOK=await adapter.save();}catch(_){transOK=false;}}if(ok){if(pane==='promedios'&&transOK)toast('Promedios guardados exitosamente',3000);else toast('Guardado confirmado por el servidor: '+(pane==='calificar'?'Calificar':'Promedios')+'.'+(!transOK?' Aportes transversales pendientes; conserva esta pestaña.':''));}paint();return ok&&transOK;
-  }finally{save.pending=false;prefetch?.release('save');paint();}
+  const ok=await client.save(pane);let transOK=true;
+  const sameOperation=()=>key===binding()&&pane===currentPanel()&&client===get();
+  if(ok&&sameOperation()&&adapter?.current()?.dirty){try{transOK=await adapter.save();}catch(_){transOK=false;}}
+  confirmed=ok&&transOK&&sameOperation()&&!client.pending(pane);
+  if(confirmed){if(pane==='promedios')toast('Promedios guardados exitosamente',3000);else toast('Guardado confirmado por el servidor: Calificar.');}
+  else if(ok)toast(!transOK?'Aportes transversales pendientes; conserva esta pestaña.':'Guardado no confirmado. Sus cambios locales están protegidos');
+  paint();return confirmed;
+  }catch(_){toast('Guardado no confirmado. Sus cambios locales están protegidos');return false;}finally{save.pending=false;criticalSaveContext=null;prefetch?.release('save');root.IEAcademicSaveFeedback.finish(notice,confirmed);paint();}
  }
  async function uploadAttendance(){const client=get(),key=binding();if(!client||!canEdit('asistencia')||uploadAttendance.pending)return false;uploadAttendance.pending=true;prefetch?.hold('attendance-save');try{if(!await connection.check(false,true)||key!==binding()||client!==get()||!canEdit('asistencia'))return false;guardarAsistencia();const ok=await client.save('asistencia');if(ok)toast('Asistencia confirmada por el servidor.');return ok;}finally{uploadAttendance.pending=false;prefetch?.release('attendance-save');}}
  async function download(){const client=get(),pane=currentPanel();if(pane==='resumen'||!client||download.pending)return false;download.pending=true;prefetch?.hold('recovery');try{if(canEdit())collect();const ok=await client.load({manual:true,panel:pane});if(ok){render();toast('Se restauró la última versión confirmada.');}return ok;}finally{download.pending=false;prefetch?.release('recovery');if(prefetch&&backgroundEligible())startPrefetch();}}
@@ -323,7 +357,7 @@
   if(typeof toast==='function')toast(count+' calificaciones históricas seleccionadas. Guarde Promedios para confirmar.');
   return true;
  }
- const api={prefetchStatus:()=>prefetch?{...prefetch.stats(),rosterRequests,rosterUnavailable:[...rosterUnavailable].map(([bimestre,code])=>({bimestre,code})),rosterContexts:contextRosters.size,rosterRetainedBytes:rosterBytes}:null,save,download,process,collect,screenPending,status:viewStatus,worked,setWorked,canEdit,officialOnly,persist,refresh,pendingPanels,hasPending,reconcileHistorical,activePending:()=>{const pane=currentPanel();return pane==='resumen'?false:pane==='calificar'?(!!get()?.status()?.panels.calificar?.pending||(typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty)):!!get()?.status()?.panels[pane]?.pending;},keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
+ const api={saving:()=>!!(save.pending||uploadAttendance.pending),savingContext:()=>criticalSaveContext?copy(criticalSaveContext):null,prefetchStatus:()=>prefetch?{...prefetch.stats(),rosterRequests,rosterUnavailable:[...rosterUnavailable].map(([bimestre,code])=>({bimestre,code})),rosterContexts:contextRosters.size,rosterRetainedBytes:rosterBytes}:null,save,download,process,collect,screenPending,status:viewStatus,worked,setWorked,canEdit,officialOnly,persist,refresh,pendingPanels,hasPending,reconcileHistorical,activePending:()=>{const pane=currentPanel();return pane==='resumen'?false:pane==='calificar'?(!!get()?.status()?.panels.calificar?.pending||(typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty)):!!get()?.status()?.panels[pane]?.pending;},keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
  // Existing tutor controls call this API only to verify their connection, never to write academic notes.
  root.IERegistroRecovery={refresh,automatic:()=>connection.check(),resolve:()=>{const s=get()?.status();if(s?.historicalConflicts?.length)return reconcileHistorical();connection.invalidate();return connection.check(true,true);},local:save,upload:()=>currentPanel()==='asistencia'?uploadAttendance():save(),recover:download};
  document.addEventListener('DOMContentLoaded',()=>{
@@ -340,13 +374,13 @@
   for(const id of ['registroConflictOffer','registroUndoOffer','registroDraftOffer','registroLegacyReview']){const el=document.getElementById(id);if(el)el.hidden=true;}
   const retry=document.getElementById('registroRetryOffer');if(retry){retry.hidden=true;retry.onclick=()=>connection.check(true,true);}
    document.querySelectorAll('#registroAccionesAcademicas button').forEach(b=>b.addEventListener('click',()=>paint()));
-  const block=e=>{if(canEdit())return;const write=e.target?.closest?.('.cal-nota,.fin-nota,.academic-conclusion,.asis-input,[data-val],[data-av],[data-adel],[data-delfecha],[data-an],[data-final-toggle],.fin-bulk-actions');if(write){e.preventDefault();e.stopImmediatePropagation();}};
+  const block=e=>{if(canEdit()&&!api.saving())return;const write=e.target?.closest?.('.cal-nota,.fin-nota,.academic-conclusion,.asis-input,[data-val],[data-av],[data-adel],[data-delfecha],[data-an],[data-final-toggle],.fin-bulk-actions');if(write){e.preventDefault();e.stopImmediatePropagation();}};
   for(const type of ['beforeinput','click','change'])document.addEventListener(type,block,true);
   document.addEventListener('input',()=>{paint();});document.addEventListener('change',()=>refresh());document.addEventListener('click',()=>paint());document.addEventListener('ie22375:registro-ready',()=>refresh());
   window.addEventListener('offline',()=>{prefetch?.pause();connection.pause('offline');});window.addEventListener('online',()=>refresh(true));window.addEventListener('focus',()=>refresh());window.addEventListener('storage',e=>{if(e.key==='ie22375_session_v1'){prefetch?.pause();connection.pause('session');}});
   const footer=document.getElementById('registroAcademicFooter');if(footer&&typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{const main=document.querySelector('main');if(main)main.style.paddingBottom=(footer.hidden?0:footer.getBoundingClientRect().height+12)+'px';}).observe(footer);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')prefetch?.hold('hidden');else{prefetch?.release('hidden');if(prefetch&&backgroundEligible())startPrefetch();}});
-  window.addEventListener('beforeunload',e=>{if(api.hasPending()){e.preventDefault();e.returnValue='';return '';}});
+  window.addEventListener('beforeunload',e=>{if(api.saving()||api.hasPending()){e.preventDefault();e.returnValue='';return '';}});
   refresh();
  });
 })(window);
