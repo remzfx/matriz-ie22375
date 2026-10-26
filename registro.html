@@ -1641,8 +1641,7 @@ function gradeKey(nombre) {
 }
 
 function sessionId(s) {
-  const c = ctxBase();
-  return [c.nivel, c.bim, c.grado, c.seccion, c.area, s.comp, s.capacidad, s.fecha].join('||');
+  return [s.nivel, s.bim, s.grado, s.seccion, s.area, s.comp, s.capacidad, s.fecha].join('||');
 }
 
 function hoyISO() {
@@ -2419,8 +2418,11 @@ function activarSesion() {
 
   loadCapsElegidas();
   if (tieneCapSel(comp, capacidad)) {
+    if(upsertSesionCap(comp, capacidad)===false)return;
+    sesionActiva = { fecha, unidad, comp, capacidad };
     toast('Esa capacidad ya está en la grilla');
     renderChipsCaps();
+    renderSesiones();
     renderStudents();
     return;
   }
@@ -2563,7 +2565,7 @@ function renderSesiones() {
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderSesiones',()=>renderSesiones());
   const c = ctxBase();
   const list = (store.sessions || []).concat(typeof IERegistroTransversales!=='undefined'?IERegistroTransversales.sessions():[]).filter(s =>
-    s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
+    s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
     s.seccion === c.seccion && s.area === c.area
   ).sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'') || (b.ts||0)-(a.ts||0));
 
@@ -2584,7 +2586,9 @@ function renderSesiones() {
     fechas.push(f);
   });
   const fechaAct = (document.getElementById('inpFecha')||{}).value || '';
-  box.innerHTML = fechas.map(f => {
+  const calificar=typeof IERegistroNotas2UI!=='undefined'?IERegistroNotas2UI.current()?.status()?.panels.calificar:null;
+  const estadoSesiones=calificar?(calificar.pending?'Cambios locales · pendientes de Guardar':calificar.at!=null?'Calificar · confirmado en la nube':'Sesiones locales · sin guardado confirmado'):'';
+  box.innerHTML = (estadoSesiones?'<p role="status" class="text-xs text-slate-500">'+escapeRegistro(estadoSesiones)+'</p>':'')+fechas.map(f => {
     const on = f === fechaAct ? 'on' : '';
     return `<span class="sess-chip ${on}" style="display:inline-flex;align-items:center;gap:4px">
       <button type="button" data-fecha="${escapeRegistro(f)}" style="border:0;background:transparent;font:inherit;font-weight:700;cursor:pointer;padding:0;color:inherit">Sesión ${escapeRegistro(f)}</button>
@@ -2648,7 +2652,7 @@ function borrarSesionFecha(fecha) {
     const p = k.split('||');
     if (p[0]===c.nivel && p[1]===c.bim && String(p[2])===String(c.grado) && p[3]===c.seccion && p[4]===c.area && p[7]===fecha) delete store.grades[k];
   });
-  if (store.capsSel) delete store.capsSel[keyCapsHoy()];
+  if (store.capsSel) delete store.capsSel[[c.nivel,c.bim,c.grado,c.seccion,c.area,fecha].join('||')];
   saveStore();
   loadCapsElegidas();
   renderChipsCaps();
