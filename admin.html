@@ -473,14 +473,16 @@
         <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
           <div class="font-bold text-sm">Usuarios registrados</div>
           <div class="flex flex-wrap gap-2">
-            <button type="button" class="btn btn-ok text-xs" onclick="subirDocentesNube()">Nube ↑</button>
-            <button type="button" class="btn btn-ghost text-xs" onclick="bajarDocentesNube()">Nube ↓</button>
+            <button id="docBajarNube" type="button" class="btn btn-ghost text-xs inline-flex items-center gap-1" onclick="bajarDocentesNube()" aria-describedby="docBajarAyuda"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Bajar Nube</button>
+            <button id="docSubirNube" type="button" class="btn btn-ok text-xs inline-flex items-center gap-1" onclick="subirDocentesNube()" aria-describedby="docSubirAyuda"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Subir Nube</button>
           </div>
         </div>
-        <p class="text-[11px] text-sky-800 bg-sky-50 rounded-lg px-2 py-1 mb-2">
-          <b>Nube ↑</b> sube usuarios, nivel, grados y áreas al mismo Sheets.
-          En otra PC o celular: entra a Admin y pulsa <b>Nube ↓</b> para sincronizar la configuración.
-        </p>
+        <div class="text-[11px] text-sky-800 bg-sky-50 rounded-lg px-2 py-1 mb-2">
+          <p id="docBajarAyuda"><b>Bajar Nube:</b> recupera los docentes y accesos de la nube en este equipo. Revisa las diferencias antes de reemplazar datos locales.</p>
+          <p id="docSubirAyuda"><b>Subir Nube:</b> envía la lista local de docentes y sus asignaciones. Advierte si reemplazará registros de la nube.</p>
+        </div>
+        <p class="text-xs text-slate-600 mb-2">En este equipo: <b id="docTotalLocal">0</b> · En la nube: <b id="docTotalNube">Sin consultar</b></p>
+        <p id="docSyncState" class="text-xs text-slate-600 mb-2" role="status" aria-live="polite"></p>
         <div id="docLista" class="space-y-2 text-sm"></div>
       </div>
 
@@ -1689,43 +1691,78 @@ function tokenSesionAdmin() {
     return sesion && sesion.token ? sesion.token : '';
   } catch (e) { return ''; }
 }
+function sesionSincronizacionDocentes() {
+  const raw=sessionStorage.getItem('ie22375_session_v1')||localStorage.getItem('ie22375_session_v1');
+  const sesion=raw?JSON.parse(raw):null;
+  if(!sesion||sesion.role!=='admin'||!sesion.token)throw Error('Sesión administrativa no válida.');
+  return sesion.token;
+}
+function compararDocentesNube(actual, siguiente) {
+  const mapa=list=>{
+    if(!Array.isArray(list))throw Error('Lista de docentes inválida.');
+    const out=new Map();
+    for(const d of list){const key=typeof d?.user==='string'?d.user.trim().toLowerCase():'';if(!key||out.has(key))throw Error('Identidades de docentes inválidas o repetidas.');out.set(key,d);}
+    return out;
+  };
+  const canonical=v=>JSON.stringify(v&&typeof v==='object'?Array.isArray(v)?v.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(v).sort().map(k=>[k,JSON.parse(canonical(v[k]))])):v);
+  const a=mapa(actual),b=mapa(siguiente);
+  return {ausentes:[...a.keys()].filter(k=>!b.has(k)).length,modificados:[...a].filter(([k,v])=>b.has(k)&&canonical(v)!==canonical(b.get(k))).length,nuevos:[...b.keys()].filter(k=>!a.has(k)).length};
+}
+function actualizarConteoDocentes() {
+  const list=loadDocentes(),local=document.getElementById('docTotalLocal'),cloud=document.getElementById('docTotalNube');
+  if(local)local.textContent=String(Array.isArray(list)?list.length:0);
+  const consultada=consultarDocentesNube.ultima;
+  if(cloud)cloud.textContent=consultada&&consultada.token===tokenSesionAdmin()?String(consultada.total):'Sin consultar';
+  for(const id of ['docBajarNube','docSubirNube']){const el=document.getElementById(id);if(el)el.disabled=!!(subirDocentesNube.pending||bajarDocentesNube.pending);}
+}
+function mensajeDocentesNube(texto) {
+  const el=document.getElementById('docSyncState');if(el)el.textContent=texto;
+  alert(texto);
+}
+async function consultarDocentesNube(token) {
+  const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'loaddoc',token})});
+  const data=await res.json();
+  if(res.ok===false||data.ok!==true||!Array.isArray(data.docentes))throw Error('No se pudo verificar la lista de la nube.');
+  compararDocentesNube([],data.docentes);
+  if(sesionSincronizacionDocentes()!==token)throw Error('La sesión cambió.');
+  consultarDocentesNube.ultima={token,total:data.docentes.length};actualizarConteoDocentes();
+  return data.docentes;
+}
 async function subirDocentesNube(silencio) {
-  const list = loadDocentes();
+  if(subirDocentesNube.pending||bajarDocentesNube.pending)return false;
+  subirDocentesNube.pending=true;
   try {
-    const res = await fetch(CLOUD_API_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'savedoc', token: tokenSesionAdmin(), docentes: list, ts: Date.now() })
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Error nube');
-    if (!silencio) alert('Subidos ' + list.length + ' docentes a la nube.');
-    else alert('Docente guardado en este equipo y en la nube (' + list.length + ').');
-  } catch (e) {
-    alert('Guardado aquí, pero no subió a la nube.\n' + e.message + '\nVerifique la conexión e intente sincronizar nuevamente.');
-  }
+    const token=sesionSincronizacionDocentes(),list=loadDocentes(),snapshot=JSON.stringify(list);
+    compararDocentesNube([],list);actualizarConteoDocentes();
+    if(!list.length){mensajeDocentesNube('No hay docentes locales para subir. La nube se conserva.');return false;}
+    const remote=await consultarDocentesNube(token),diff=compararDocentesNube(remote,list);
+    if(JSON.stringify(loadDocentes())!==snapshot)throw Error('La lista local cambió.');
+    if((diff.ausentes||diff.modificados)&&!confirm('Subir Nube reemplazará la lista de la nube: '+diff.ausentes+' registros ausentes en este equipo y '+diff.modificados+' modificados; '+diff.nuevos+' nuevos. Podrían perderse accesos o asignaciones. ¿Continuar?'))return false;
+    if(sesionSincronizacionDocentes()!==token||JSON.stringify(loadDocentes())!==snapshot)throw Error('El contexto cambió.');
+    const res=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'savedoc',token,docentes:list,ts:Date.now()})});
+    const data=await res.json();if(res.ok===false||data.ok!==true)throw Error('No se confirmó la subida.');
+    if(sesionSincronizacionDocentes()!==token)throw Error('La sesión cambió.');
+    consultarDocentesNube.ultima={token,total:list.length};
+    mensajeDocentesNube('Docentes subidos a la nube');return true;
+  } catch(e) {
+    mensajeDocentesNube('No se pudo subir docentes. La lista local se conserva. Verifica la sesión administrativa y la conexión; consulta la nube antes de reintentar.');return false;
+  } finally {subirDocentesNube.pending=false;actualizarConteoDocentes();}
 }
 async function bajarDocentesNube() {
+  if(subirDocentesNube.pending||bajarDocentesNube.pending)return false;
+  bajarDocentesNube.pending=true;
   try {
-    const rawSesion = sessionStorage.getItem('ie22375_session_v1') || localStorage.getItem('ie22375_session_v1');
-    const sesion = rawSesion ? JSON.parse(rawSesion) : null;
-    if (!sesion || sesion.role !== 'admin' || !sesion.token) {
-      throw new Error('La sesión administrativa no es válida. Vuelve a iniciar sesión.');
-    }
-    const res = await fetch(CLOUD_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'loaddoc', token: sesion.token })
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Error nube');
-    const list = Array.isArray(data.docentes) ? data.docentes : [];
-    if (!list.length) { alert('La nube no tiene docentes todavía. En la otra PC pulsa Nube ↑.'); return; }
-    saveDocentes(list);
-    renderDocentes();
-    alert('Configuración de ' + list.length + ' docentes sincronizada en este equipo.');
-  } catch (e) {
-    alert('No se pudo bajar de la nube.\n' + e.message + '\nVerifique la conexión e intente sincronizar nuevamente.');
-  }
+    const token=sesionSincronizacionDocentes(),local=loadDocentes(),snapshot=JSON.stringify(local);
+    compararDocentesNube([],local);actualizarConteoDocentes();
+    const list=await consultarDocentesNube(token),diff=compararDocentesNube(local,list);
+    if(!list.length){mensajeDocentesNube('La nube no tiene docentes. Los datos locales se conservan.');return false;}
+    if(JSON.stringify(loadDocentes())!==snapshot)throw Error('La lista local cambió.');
+    if((diff.ausentes||diff.modificados)&&!confirm('Bajar Nube reemplazará la lista local: '+diff.ausentes+' registros locales no están en la nube y '+diff.modificados+' son diferentes; '+diff.nuevos+' nuevos. Podrían perderse cambios locales. ¿Continuar?'))return false;
+    if(sesionSincronizacionDocentes()!==token||JSON.stringify(loadDocentes())!==snapshot)throw Error('El contexto cambió.');
+    saveDocentes(list);renderDocentes();mensajeDocentesNube('Docentes recuperados de la nube');return true;
+  } catch(e) {
+    mensajeDocentesNube('No se pudo bajar docentes. Los datos locales se conservan. Verifica la sesión administrativa y la conexión.');return false;
+  } finally {bajarDocentesNube.pending=false;actualizarConteoDocentes();}
 }
 function toggleDocFiltros() {
   const n = document.getElementById('docNivel').value;
@@ -1935,6 +1972,7 @@ function eliminarDocente(id) {
 }
 
 function renderDocentes() {
+  actualizarConteoDocentes();
   const list = loadDocentes();
   const box = document.getElementById('docLista');
   if (!box) return;
