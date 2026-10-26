@@ -92,7 +92,7 @@ function setupFixture() {
         g.connectionConfig = o;
         return {
           canEdit: () => editable,
-          check: async () => {},
+          check: async () => !!(await o.verify({valid:()=>true,review:false})).ok,
           invalidate() {}
         };
       }
@@ -104,6 +104,7 @@ function setupFixture() {
   g.fetch = async (url, opts) => {
     const b = JSON.parse(opts.body);
     requests.push(b);
+if(b.action==='academicstate')return {ok:true,text:async()=>JSON.stringify({ok:true,academicReset:1,epoch:null,phase:'idle'})};
     if (b.action === 'loadnotas2') {
       return {
         ok: true,

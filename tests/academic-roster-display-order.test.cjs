@@ -96,7 +96,7 @@ test('Auxiliar numbers before search and its report uses the same visual numbers
  for(const file of ['admin.html','registro.html','auxiliar.html','transversales.html'])assert.match(read(file),/<script src="student-identity.js"/);
  assert.match(read('transversales-client.js'),/IEStudentIdentity.numbered\(data.estudiantes\)/);
 });
-test('worker refresh v26 keeps private exclusions and shared numbering precached',()=>{const sw=read('sw.js');assert.match(sw,/CACHE_PREFIX \+ 'v26'/);assert.match(sw,/'\.\/student-identity.js'/);assert.match(sw,/MAX_STATIC_AGE_MS = 7 \*/);});
+test('worker refresh v28 keeps private exclusions and shared numbering precached',()=>{const sw=read('sw.js');assert.match(sw,/CACHE_PREFIX \+ 'v28'/);assert.match(sw,/'\.\/student-identity.js'/);assert.match(sw,/MAX_STATIC_AGE_MS = 7 \*/);});
 
 test('an exceptional draft can be hidden for read-only consultation and resumed without losing its original version',async()=>{
  const p=page();p.run("estado={primaria:{estudiantes:[]},secundaria:{estudiantes:[{nivel:'secundaria',grado:1,seccion:'A',orden:5,nombre:'Synthetic Draft',idSiagie:'draft'}]}};bdPendiente=true;baseVersion='original-draft';modoEdicionBase=true");

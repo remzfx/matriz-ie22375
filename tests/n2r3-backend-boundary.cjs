@@ -1,7 +1,7 @@
 // Exact N2-R3/N2-R6 backend hooks only.
 'use strict';
 module.exports = source => {
-  let s = source.replace(/\r\n/g, '\n');
+  let s = require('./notas2-worked-boundary.cjs')('apps-script/Notas2.js',source);
 
   // Strip historical projection and reply
   const b1Start = '    function proyectarHistorico_(payload){';

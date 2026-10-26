@@ -13,7 +13,7 @@ function setup(level='secundaria',mode='num',origin='numero'){
 }
 const academic=c=>copy({grades:c.store.grades,finales:c.store.finales,concComp:c.store.concComp,concArea:c.store.concArea,sessions:c.store.sessions,asistencia:c.store.asistencia,asisFechas:c.store.asisFechas});
 for(const level of ['primaria','secundaria'])for(const origin of ['letra','numero','ausente'])for(const mode of ['letra','num'])test(level+' '+origin+' '+mode+': render and save calculated B never manufacture a direct/deletion or an A1 conflict',()=>{
- const f=setup(level,mode,origin),c=f.c,before=academic(c),base=copy(c.sliceRegistroArea());assert.equal(c.notaDesdeSesiones(f.cp,f.id).letra,'B');assert.equal(c.notaCompAlumno(f.cp,f.id).src,'C');assert.match(f.render(),/Cal /);assert.deepEqual(academic(c),before,'pure presentation preserves academic data');
+ const f=setup(level,mode,origin),c=f.c,before=academic(c),base=copy(c.sliceRegistroArea());assert.equal(c.notaDesdeSesiones(f.cp,f.id).letra,'B');assert.equal(c.notaCompAlumno(f.cp,f.id).src,'C');assert.match(f.render(),/Cal: B/);assert.deepEqual(academic(c),before,'pure presentation preserves academic data');
  if(mode==='num'){assert.ok(f.cells().length);assert.ok(f.cells().every(cell=>cell.input.value===''));}
  c.confirm=()=>{throw Error('No edit means no confirmation');};c.recolectarPantalla();c.guardarFinales();assert.deepEqual(academic(c),before,'saving untouched empty controls is a no-op');assert.equal(c.notaCompAlumno(f.cp,f.id).src,'C');
  const local=copy(c.sliceRegistroArea()),remote=copy(base);remote.finales={[c.finalKey(f.cp,f.id)]:{nivel:'A',nota20:15,origen:'numero'}};

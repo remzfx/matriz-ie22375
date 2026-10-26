@@ -49,7 +49,23 @@
    const epoch=await ensure(url,body.token);
    return native(url,{...options,body:JSON.stringify({...body,...(epoch?{academicEpoch:epoch}:{})})});
   }
-  return {fetch,ensure,accept,epoch:()=>pageEpoch};
+  // Background reads must never call accept(), sanitize storage or reload an editing page.
+  async function readOnly(url,options){
+   const body=JSON.parse(options?.body||'{}');
+   if(options?.method!=='POST'||body.action!=='loadnotas2'||!body.token)throw Error('Solo se permite una lectura Notas 2.0.');
+   async function check(){
+    if(blocked){const e=Error('Estado académico pendiente de revisión.');e.code='ACADEMIC_RESET';throw e;}
+    if(options.signal?.aborted)throw Error('Lectura cancelada.');
+    const response=await native(url,{...options,body:JSON.stringify({action:'academicstate',token:body.token})});
+    if(response.status===401||response.status===403){const e=Error('Sesión no autorizada.');e.code='SESSION';throw e;}
+    const data=await response.json();
+    if(!response.ok||data?.ok!==true){const e=Error('No se verificó la autorización.');e.code=['SESSION','DENIED'].includes(data?.code)?data.code:'SERVER';throw e;}
+    if(data.academicReset!==1||!(data.epoch===null||typeof data.epoch==='string'&&/^[a-f0-9]{32}$/.test(data.epoch))||data.epoch!==pageEpoch||data.epoch&&data.phase!=='complete'){const e=Error('La generación académica cambió.');e.code='ACADEMIC_RESET';throw e;}
+   }
+   await check();const response=await native(url,{...options,body:JSON.stringify({...body,...(pageEpoch?{academicEpoch:pageEpoch}:{})})});
+   await check();return response;
+  }
+  return {fetch,ensure,accept,readOnly,epoch:()=>pageEpoch};
  }
  const api={install,sanitizeStorage,sanitizeDrafts,localValue,marker};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;

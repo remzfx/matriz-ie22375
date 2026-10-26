@@ -284,6 +284,7 @@ function createHarness(options = {}) {
     fetch: async (url, opts) => {
       const body = JSON.parse(opts.body);
       requests.push(body);
+if(body.action==='academicstate')return {ok:true,text:async()=>JSON.stringify({ok:true,academicReset:1,epoch:null,phase:'idle'})};
       if (serverFailNext) {
         const code = serverFailNext;
         serverFailNext = null;
@@ -918,7 +919,7 @@ for (const [field,action] of [['selGrado','onGrado'],['selSeccion','onContexto']
 
 test('historical normalization admits exact context hooks and never masks a mutated academic handler',()=>{
  const source=fs.readFileSync(path.resolve(__dirname,'../registro.html'),'utf8').replace(/\r\n/g,'\n');
- const boundary=require('./n2g22-context-boundary.cjs');
+ const boundary=s=>require('./n2g22-context-boundary.cjs')(require('./notas2-worked-boundary.cjs')('registro.html',s));
  const old=require('node:child_process').execFileSync('git',['show','e2774536d360fce75949cbd0254517a2995cb073:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
  assert.equal(boundary(source),old);
  assert.notEqual(boundary(source.replace('function confirmarSalidaContexto(accionTexto) {','function confirmarSalidaContexto(accionTexto) { throw Error("mutated");')),old);
