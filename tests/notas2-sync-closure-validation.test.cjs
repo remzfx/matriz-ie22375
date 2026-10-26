@@ -152,7 +152,7 @@ function setupFixture(initialOverrides = {}) {
           canEdit: () => editable,
           snapshot: () => ({ state: cState }),
           check: async (rev, force) => {
-            return o.verify({ valid: () => true, review: rev });
+            return !!(await o.verify({ valid: () => true, review: rev })).ok;
           },
           pause: r => { cState = r; editable = false; o.changed?.({ state: r }); },
           changed: p => { cState = p ? 'pending' : 'connected'; o.changed?.({ state: cState }); },
@@ -168,6 +168,7 @@ function setupFixture(initialOverrides = {}) {
   g.fetch = async (url, opts) => {
     const b = JSON.parse(opts.body);
     requests.push(b);
+if(b.action==='academicstate')return {ok:true,text:async()=>JSON.stringify({ok:true,academicReset:1,epoch:null,phase:'idle'})};
     const reqKey = [b.nivel, b.bimestre, b.grado, b.seccion, b.area].join('||');
     const db = databases[reqKey];
 

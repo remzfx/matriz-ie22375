@@ -12,6 +12,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
+  .fin-grid .fin-competence-inactive {opacity:.4;}
   .hidden { display: none !important; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
   .session-evaluation-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);column-gap:12px;row-gap:10px;align-items:start;}
@@ -769,6 +770,7 @@ function registroDependenciaFallida(){
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
               <div class="fin-header-aux">
                 <div class="fin-mode-info" id="finModeInfo"></div>
+                <span id="finContextStatus" role="status" class="text-xs text-slate-500" hidden>Verificando datos…</span>
                 <div id="finResumen"></div>
               </div>
             </div>
@@ -1048,11 +1050,13 @@ function registroDependenciaFallida(){
  function create(o){
   const now=o.now||Date.now,set=o.setTimeout||setTimeout,clear=o.clearTimeout||clearTimeout;
   const interval=o.interval||120000,lease=o.lease||150000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
+  const grants=new Map();let expiryTimer=null;
   const online=()=>o.online?o.online():true;
+  function watchLease(){clear(expiryTimer);expiryTimer=null;if(until>now()){const key=binding;expiryTimer=set(()=>{expiryTimer=null;if(key===binding&&now()>=until){grants.delete(key);emit('checking');}},until-now());}}
   function snapshot(){return {state,validUntil:until,pending:state==='pending',retentionFailed,binding};}
-  function emit(next){state=next;if(next!=='connected'&&next!=='pending')until=0;const stamp=binding+'|'+next;if(stamp!==published){published=stamp;o.changed?.(snapshot());}}
-  function scope(){const current=o.binding();if(binding!==current){binding=current;epoch++;until=0;expired=false;retentionFailed=false;state='checking';}return current;}
-  function canEdit(){return !disposed&&!expired&&binding===o.binding()&&o.authorized()&&(state==='connected'||state==='pending')&&now()<until;}
+  function emit(next){state=next;if(next!=='connected'&&next!=='pending'&&!(next==='checking'&&now()<until)){until=0;clear(expiryTimer);grants.delete(binding);}if(['offline','server','session'].includes(next))grants.clear();const stamp=binding+'|'+next+'|'+(now()<until);if(stamp!==published){published=stamp;o.changed?.(snapshot());}}
+  function scope(){const current=o.binding();if(binding!==current){binding=current;epoch++;until=0;expired=false;retentionFailed=false;state='checking';for(const [key,g]of grants)if(g.until<=now())grants.delete(key);const saved=grants.get(current);if(saved&&online()&&o.authorized()&&(!o.allowed||o.allowed())){until=saved.until;state=saved.state;}watchLease();}return current;}
+  function canEdit(){return !disposed&&!expired&&binding===o.binding()&&o.authorized()&&(!o.allowed||o.allowed())&&(state==='connected'||state==='pending'||state==='checking')&&now()<until;}
   function arm(ms){clear(timer);if(disposed||expired)return;timer=set(()=>{timer=null;if(o.visible&&!o.visible()){arm(interval);return;}check(false,true);},ms);}
   function pause(reason='offline'){
    if(disposed)return;scope();try{if(canEdit())o.retain?.();}catch(e){retentionFailed=true;reason='review';}
@@ -1062,23 +1066,23 @@ function registroDependenciaFallida(){
    if(disposed)return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
    if(!o.authorized()){emit(o.readonly?.()?'readonly':'session');return false;}
    if(!online()){pause('offline');return false;}
-   if(flight){const p=flight.promise;if(!force&&!review&&binding===o.binding())return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit())return true;
-   try{if(canEdit())o.retain?.();}catch(e){retentionFailed=true;emit('review');return false;}
+   if(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit())return true;
+   try{if(review&&canEdit())o.retain?.();}catch(e){retentionFailed=true;emit('review');return false;}
    const priorPending=state==='pending'||canEdit();
    const id=++epoch,key=binding;clear(timer);emit('checking');
    const same=()=>!disposed&&id===epoch&&key===o.binding();const valid=()=>same()&&o.authorized();
-   const task={};flight=task;task.promise=(async()=>{try{
-    const result=await o.verify({review,valid});if(!same())return false;
+   const task={key,owner:o.owner?.()};flight=task;task.promise=(async()=>{try{
+    const result=await o.verify({review,valid});if(['SESSION','DENIED'].includes(result?.code)&&o.owner&&task.owner===o.owner()){expired=true;epoch++;emit('session');return false;}if(!same())return false;
     if(result?.code==='SESSION'||result?.code==='DENIED'){expired=true;emit('session');return false;}
     if(!o.authorized()){emit('session');return false;}
     if(result?.code==='CLOSED'){emit('readonly');return false;}
     if(!result?.ok){emit(result?.conflict?'review':result?.code==='LOCAL_STORAGE'?'review':'server');return false;}
     if(result.conflict||(result.pending&&!review&&!priorPending)){emit('review');return false;}
-    until=now()+lease;attempt=0;emit(result.pending?'pending':'connected');return true;
+    until=now()+lease;grants.set(key,{until,state:result.pending?'pending':'connected'});watchLease();attempt=0;emit(result.pending?'pending':'connected');return true;
    }catch(e){if(valid()){if(['SESSION','DENIED'].includes(e.code)){expired=true;emit('session');}else emit(online()?'server':'offline');}return false;
    }finally{if(flight===task){flight=null;if(!disposed&&(binding!==o.binding()||(id!==epoch&&state==='checking'))){check(false,false);}else arm(state==='connected'||state==='pending'?interval:Math.min(60000,15000*2**Math.min(attempt++,2)));}}})();return task.promise;
   }
-  const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},invalidate(){scope();epoch++;until=0;emit('checking');}};active=api;return api;
+  const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);clear(expiryTimer);grants.clear();flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},select(){scope();emit(state);if(canEdit())arm(Math.min(interval,Math.max(0,until-now()-30000)));},invalidate(){scope();epoch++;until=0;emit('checking');}};active=api;return api;
  }
  root.IERegistroConnection={create,canEdit:()=>!!active&&active.canEdit(),current:()=>active};
  if(typeof module!=='undefined')module.exports=root.IERegistroConnection;
@@ -1136,11 +1140,12 @@ let sesionActiva = null; // { fecha, unidad, comp, capacidad }
 let notas = {}; // key alumno -> { nivel, nota20, conclusion }
 let store = { sessions: [], grades: {}, meta: {}, ...(typeof IEAcademicResetClient!=='undefined'&&IEAcademicResetClient.epoch()?{academicEpoch:IEAcademicResetClient.epoch()}:{}) };
 
-function toast(msg) {
+function toast(msg, duration = 1600) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.remove('hidden');
-  setTimeout(() => el.classList.add('hidden'), 1600);
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => el.classList.add('hidden'), duration);
 }
 
 function numToLetter(n) {
@@ -1522,7 +1527,7 @@ function sincronizarEdicionRegistro() {
   main.inert = false;
   main.setAttribute('aria-busy', cargandoEstudiantes ? 'true' : 'false');
   const bloquearLocal = registroSoloLectura();
-  document.querySelectorAll('[data-reg-write],[data-delfecha],[data-adel],[data-an]').forEach(el => { el.disabled = bloquearLocal; });
+  document.querySelectorAll('[data-reg-write],[data-delfecha],[data-adel],[data-an]').forEach(el => { el.disabled = bloquearLocal || !!el.closest?.('td.fin-competence-inactive'); });
   document.querySelectorAll('[data-reg-cloud]').forEach(el => { el.disabled = registroNubeNoVerificada(); });
   // Los controles recién renderizados conservan sus restricciones académicas propias.
   document.querySelectorAll('.cal-nota,.fin-nota,.academic-conclusion').forEach(el => { if (bloquearLocal) el.readOnly = true; });
@@ -1636,8 +1641,7 @@ function gradeKey(nombre) {
 }
 
 function sessionId(s) {
-  const c = ctxBase();
-  return [c.nivel, c.bim, c.grado, c.seccion, c.area, s.comp, s.capacidad, s.fecha].join('||');
+  return [s.nivel, s.bim, s.grado, s.seccion, s.area, s.comp, s.capacidad, s.fecha].join('||');
 }
 
 function hoyISO() {
@@ -2414,8 +2418,11 @@ function activarSesion() {
 
   loadCapsElegidas();
   if (tieneCapSel(comp, capacidad)) {
+    if(upsertSesionCap(comp, capacidad)===false)return;
+    sesionActiva = { fecha, unidad, comp, capacidad };
     toast('Esa capacidad ya está en la grilla');
     renderChipsCaps();
+    renderSesiones();
     renderStudents();
     return;
   }
@@ -2558,7 +2565,7 @@ function renderSesiones() {
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderSesiones',()=>renderSesiones());
   const c = ctxBase();
   const list = (store.sessions || []).concat(typeof IERegistroTransversales!=='undefined'?IERegistroTransversales.sessions():[]).filter(s =>
-    s.nivel === c.nivel && s.bim === c.bim && s.grado === c.grado &&
+    s.nivel === c.nivel && s.bim === c.bim && String(s.grado)===String(c.grado) &&
     s.seccion === c.seccion && s.area === c.area
   ).sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'') || (b.ts||0)-(a.ts||0));
 
@@ -2579,7 +2586,9 @@ function renderSesiones() {
     fechas.push(f);
   });
   const fechaAct = (document.getElementById('inpFecha')||{}).value || '';
-  box.innerHTML = fechas.map(f => {
+  const calificar=typeof IERegistroNotas2UI!=='undefined'?IERegistroNotas2UI.current()?.status()?.panels.calificar:null;
+  const estadoSesiones=calificar?(calificar.pending?'Cambios locales · pendientes de Guardar':calificar.at!=null?'Calificar · confirmado en la nube':'Sesiones locales · sin guardado confirmado'):'';
+  box.innerHTML = (estadoSesiones?'<p role="status" class="text-xs text-slate-500">'+escapeRegistro(estadoSesiones)+'</p>':'')+fechas.map(f => {
     const on = f === fechaAct ? 'on' : '';
     return `<span class="sess-chip ${on}" style="display:inline-flex;align-items:center;gap:4px">
       <button type="button" data-fecha="${escapeRegistro(f)}" style="border:0;background:transparent;font:inherit;font-weight:700;cursor:pointer;padding:0;color:inherit">Sesión ${escapeRegistro(f)}</button>
@@ -2643,7 +2652,7 @@ function borrarSesionFecha(fecha) {
     const p = k.split('||');
     if (p[0]===c.nivel && p[1]===c.bim && String(p[2])===String(c.grado) && p[3]===c.seccion && p[4]===c.area && p[7]===fecha) delete store.grades[k];
   });
-  if (store.capsSel) delete store.capsSel[keyCapsHoy()];
+  if (store.capsSel) delete store.capsSel[[c.nivel,c.bim,c.grado,c.seccion,c.area,fecha].join('||')];
   saveStore();
   loadCapsElegidas();
   renderChipsCaps();
@@ -3583,6 +3592,12 @@ function renderFinales() {
   if(!box.dataset)box.dataset={};box.dataset.registroContexto=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||');
   const res = document.getElementById('finResumen');
   const modeInfo = document.getElementById('finModeInfo');
+  // A new context has no confirmed selection yet; never render provisional academic columns.
+  if(typeof IERegistroNotas2UI!=='undefined'&&!registroHistoricoProyectando&&IERegistroNotas2UI.current()?.status()?.panels.promedios.version==null){
+    box.setAttribute?.('aria-busy','true');box.innerHTML='<p id="finContextLoading" role="status" class="text-sm text-slate-500 p-3">Verificando datos…</p>';
+    res.innerHTML='';modeInfo.innerHTML='';const stats=document.getElementById('finEstadisticas');if(stats)stats.innerHTML='';return;
+  }
+  box.setAttribute?.('aria-busy','false');
   const bloqueado = bimCerradoDocente();
   const alumnos = estudiantes();
   const estadisticas = document.getElementById('finEstadisticas');
@@ -3603,23 +3618,22 @@ function renderFinales() {
     const capsTxt = caps.length
       ? caps.map(x => (x.fecha?x.fecha.slice(5)+' · ':'') + x.capacidad).join('<br>')
       : 'Sin capacidades aún';
-    head += '<th><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" title="Configuración de Calificar; se aplica a Promedios al Procesar" '+((typeof IERegistroNotas2UI!=='undefined'?IERegistroNotas2UI.worked(cp,'calificar'):competenciaTrabajada(cp))?'checked':'')+' '+(bloqueado?'disabled':'')+'><span>'+escapeRegistro(cp)+'</span></label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
+    head += '<th'+(!competenciaTrabajada(cp)?' class="fin-competence-inactive"':'')+'><label class="worked-label"><input type="checkbox" data-trabajada="'+encodeURIComponent(cp)+'" title="Incluir esta competencia en Promedios; sus notas y conclusiones se conservan al desactivarla" '+(competenciaTrabajada(cp)?'checked':'')+' '+(bloqueado?'disabled':'')+'><span>'+escapeRegistro(cp)+'</span></label>'+(!competenciaTrabajada(cp)?'<small>No trabajada este bimestre</small>':'')+'</th>';
   });
 
   const rows = alumnos.map((al, i) => {
     let tds = '<td class="fin-nom"><div class="text-[10px] text-slate-400 font-bold">'+(i+1)+'</div><div class="font-bold text-xs leading-tight">'+escapeRegistro(al.nombre)+'</div></td>';
     comps.forEach(cp => {
-      const lock = bloqueado||!competenciaTrabajada(cp);
+      const activa=competenciaTrabajada(cp),lock=bloqueado||!activa;
       const dir = notaDirectaAlumno(cp, studentKey(al));
       const ev = notaDesdeSesiones(cp, studentKey(al));
-      const ofi = notaCompAlumno(cp, studentKey(al));
+      const ofi = activa?notaCompAlumno(cp, studentKey(al)):dir;
       let nota='', letra='';
       const original = leerNota(store.finales, finalKey(cp, studentKey(al))) || {};
       if (dir.letra || (dir.nota !== '' && dir.nota != null)) { nota = original.origen==='letra'?'':(dir.nota !== '' && dir.nota != null ? dir.nota : ''); letra = dir.letra; }
-      if (ofi.letra==='AD') cAD++; else if (ofi.letra==='A') cA++; else if (ofi.letra==='B') cB++; else if (ofi.letra==='C') cC++;
-      if (ofi.letra) cV++;
+      if (activa&&ofi.letra==='AD') cAD++; else if (activa&&ofi.letra==='A') cA++; else if (activa&&ofi.letra==='B') cB++; else if (activa&&ofi.letra==='C') cC++;
+      if (activa&&ofi.letra) cV++;
       cTot++;
-      if(!competenciaTrabajada(cp)){tds+='<td>No trabajada este bimestre</td>';return;}
       const encN = encodeURIComponent(studentKey(al));
       const encC = encodeURIComponent(cp);
       let grade='';
@@ -3627,19 +3641,19 @@ function renderFinales() {
         const L = letra || ofi.letra || '';
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(L===v?' on':'')+'" data-val="'+v+'" aria-pressed="'+(L===v)+'" '+(lock?'disabled':'')+'>'+v+'</button>').join('') +
-          (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400" title="Calculado desde Calificar; no es una nota directa">Cal '+ev.letra+'</div>' : '') +
+          (ev.letra ? '<div class="text-[10px] text-slate-400" title="Calculado desde Calificar; no es una nota directa">Cal: '+ev.letra+'</div>' : '') +
           '</div>';
       } else {
         grade = '<div class="fin-cell" data-fin="'+encN+'" data-comp="'+encC+'">' +
           '<input type="number" min="0" max="20" step="1" class="fin-nota" '+(lock?'readonly':'')+' value="'+(nota!==''?pad2(nota):'')+'" placeholder="—">' +
           '<button type="button" class="eq-letter final-level-toggle '+(letra?eqClass(letra): (ofi.letra?eqClass(ofi.letra):'eq-none'))+'" data-final-toggle="'+encC+'" data-alumno="'+encN+'" '+(lock||registroSoloLectura()||!letra?'disabled':'')+' title="Quitar la nota directa; conservar evidencias" aria-label="Quitar nota directa '+escapeRegistro(letra||'')+'">'+(letra||ofi.letra||'—')+'</button>' +
-          (dir.nota==='' && ev.letra ? '<div class="text-[10px] text-slate-400" title="Calculado desde Calificar; no es una nota directa">Cal '+(numeroExactoComp(cp,studentKey(al))?pad2(ev.nota)+' · ':'')+ev.letra+'</div>' : '') +
+          (ev.letra ? '<div class="text-[10px] text-slate-400" title="Calculado desde Calificar; no es una nota directa">Cal: '+ev.letra+(numeroExactoComp(cp,studentKey(al))?' · '+pad2(ev.nota):'')+'</div>' : '') +
           '</div>';
       }
       grade=(typeof comparativoLinea==='function'?comparativoLinea(cp,studentKey(al)):'')+grade;
       const required=IERegistroAcademico.requiresConclusion(c.nivel,ofi.letra);
       const conclusion=required?IEConclusionSuggestions.compactHtml(cp,concCompAlumno(cp,studentKey(al)),'data-id="'+encN+'" data-comp="'+encC+'"',lock):'';
-      tds+='<td><div class="final-cell-layout'+(required?' has-conclusion':'')+'"><div class="final-grade">'+grade+'</div>'+conclusion+'</div></td>';
+      tds+='<td'+(!activa?' class="fin-competence-inactive"':'')+'><div class="final-cell-layout'+(required?' has-conclusion':'')+'"><div class="final-grade">'+grade+'</div>'+conclusion+'</div></td>';
     });
     return '<tr>'+tds+'</tr>';
   }).join('');
@@ -3690,7 +3704,7 @@ function renderFinales() {
     });
   });
   box.querySelectorAll('[data-final-toggle]').forEach(el=>el.onclick=()=>{if(el.disabled||[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')!==cloudClaveReg())return;const comp=decodeURIComponent(el.dataset.finalToggle),id=decodeURIComponent(el.dataset.alumno),previo=leerNota(store.finales,finalKey(comp,id));if(previo)seleccionarFinalReversible(comp,id,previo.nivel||numToLetter(previo.nota20));});
-  box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
+  box.querySelectorAll('[data-trabajada]').forEach(el=>el.onchange=()=>{if([c.nivel,c.bim,c.grado,c.seccion,c.area].join('||')!==cloudClaveReg())return;const cp=decodeURIComponent(el.dataset.trabajada);if(!setCompetenciaTrabajada(cp,el.checked))el.checked=competenciaTrabajada(cp);});
   IEConclusionSuggestions.bindCompact(box,(el,text)=>{const changed=setConclusionAcademica(decodeURIComponent(el.dataset.comp),decodeURIComponent(el.dataset.id),text);if(changed && estadisticas && typeof estadisticasCompetenciasHTML==='function')estadisticas.innerHTML=estadisticasCompetenciasHTML(comps,alumnos);return changed;});
   if(typeof IERegistroTransversales!=='undefined')IERegistroTransversales.finals(box);
   if (typeof sincronizarFondoPromedios==='function') sincronizarFondoPromedios();
@@ -4085,6 +4099,7 @@ function confirmarSalidaContexto(accionTexto) {
       areaActual = anterior.area;
     }
   if (typeof IERegistroNotas2UI !== 'undefined') {
+    if(!IERegistroNotas2UI.canEdit()&&['calificar','promedios'].some(p=>IERegistroNotas2UI.screenPending?.(p))){toast('Hay una edición en pantalla sin confirmar. Regresa a su panel o verifica la conexión antes de cambiar de contexto.');return false;}
     let valid = true;
     if (typeof IERegistroNotas2UI.canEdit === 'function' && IERegistroNotas2UI.canEdit()) {
       if (typeof IERegistroNotas2UI.collect === 'function') {
@@ -4186,6 +4201,7 @@ if (document.readyState !== 'loading') {
 })(typeof window==='undefined'?globalThis:window);
 
 </script>
+<script src="registro-notas2-prefetch.js" onerror="registroDependenciaFallida()"></script>
 <script src="registro-notas2-ui.js" onerror="registroDependenciaFallida()"></script>
 <script>
 /* Adaptador frontend: operaciones explícitas y timers exclusivamente locales. */

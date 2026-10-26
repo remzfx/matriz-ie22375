@@ -265,6 +265,7 @@ function createHarness(options = {}) {
   g.fetch = async (url, opts) => {
     const body = JSON.parse(opts.body);
     requests.push(body);
+if(body.action==='academicstate')return {ok:true,text:async()=>JSON.stringify({ok:true,academicReset:1,epoch:null,phase:'idle'})};
 
     if (body.action === 'loadnotas2') {
       return {
