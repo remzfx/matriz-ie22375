@@ -70,7 +70,7 @@ En cada recorrido se evitaron cuatro primeras comprobaciones foreground, sin con
 
 Pruebas finales focalizadas: 71 aprobadas; batería diferencial previa de los componentes modificados: 167 aprobadas. Tres escenarios amplios de navegador, uno final de publicación y dos de fallback sin alcance aprobados; cero escrituras académicas automáticas. La única escritura intentada por escenario de CAS fue explícita y ficticia.
 
-El runner `tests/notas2-session-authorization-browser.cjs` usa `IE_PLAYWRIGHT_MODULE`. Resultados finales y CI del mismo SHA se registran en el PR. No se repite manualmente la suite completa; la ejecuta el CI obligatorio.
+El runner `tests/notas2-session-authorization-browser.cjs` usa `IE_PLAYWRIGHT_MODULE`. Resultados finales y CI del mismo SHA se registran en el PR. El CI obligatorio ejecuta la suite completa. Tras fallar las comparaciones históricas se corrigió su cadena exacta y se comprobó también localmente; no se repitieron auditorías ni escenarios sin cambios.
 
 ## Dependencias, publicación y reversión
 
@@ -78,10 +78,12 @@ El runner `tests/notas2-session-authorization-browser.cjs` usa `IE_PLAYWRIGHT_MO
 
 Después de la autorización de integración, el orden compatible es backend candidato primero, verificando el código/versionado del proyecto e implementación existentes, y frontend completo después. No crear otra implementación ni cambiar su URL. Esta entrega no ejecuta esas operaciones ni solicitudes autenticadas de producción.
 
-Los cuatro scripts/archivos de producción modificados deben publicarse coherentemente. El PR sigue usando su versión estática v29 aún no publicada; no se cambia la política del Service Worker ni se limpia almacenamiento de usuarios.
+Los cinco archivos de producción modificados (incluida la copia inline del controlador en registro.html) deben publicarse coherentemente. El PR sigue usando su versión estática v29 aún no publicada; no se cambia la política del Service Worker ni se limpia almacenamiento de usuarios.
 
 Reversión: retirar la optimización del frontend, conservando la ruta autenticada anterior; el contrato backend es aditivo y puede permanecer. No hay esquema académico nuevo, migración ni limpieza que revertir. Revertir código no restaura datos escritos posteriormente.
 
 Limitaciones: la revocación no observada no puede notificarse sin una consulta; el plazo máximo y las revalidaciones obligatorias limitan esa ventana. Guardar nunca omite la autorización remota ni CAS. Equipos lentos, reservas vencidas, padrones faltantes, registros históricos o presupuestos agotados pueden requerir una lectura/validación de red. La meta de 300 ms se mide localmente con datos ficticios y no garantiza latencias reales.
 
 Sin merge, despliegue, cambios de permisos institucionales ni escrituras académicas reales.
+
+La copia inline de IERegistroConnection en registro.html coincide exactamente con registro-connection.js, incluyendo force y el plazo compartido. Una regresión comprueba esta igualdad; los adaptadores históricos excluyen únicamente esos tres cambios exactos y siguen detectando alteraciones no aprobadas.
