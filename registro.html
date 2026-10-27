@@ -1550,8 +1550,23 @@ function pintarPadronInmediato(base, bimestre, desdeCache) {
   // Recolectar antes de cambiar nombres/IDs o reconstruir la grilla; nunca subir automáticamente.
   if (mismoPadron && guardarTodo() === false) throw Object.assign(new Error('No se pudo conservar el trabajo local. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.'),{code:'LOCAL_STORAGE',retryable:true});
   bdEstudiantes = base; padronBimestre = bimestre;
-  try { if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()){recordarPadron(base); saveStore();} }
-  catch(e) { throw Object.assign(new Error('No se pudo conservar el padrón local. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.'),{code:'LOCAL_STORAGE',retryable:true}); }
+  if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()){
+    let operacion = 'recordarPadron';
+    try { recordarPadron(base); operacion = 'saveStore'; saveStore(); }
+    catch(e) {
+      // Only allowlisted exception metadata: never log messages, storage or the exception itself.
+      let tipo = 'UnknownError', codigo = 'UNKNOWN';
+      try {
+        if(e && ['Error','TypeError','SyntaxError','RangeError','SecurityError','QuotaExceededError','NS_ERROR_DOM_QUOTA_REACHED','InvalidStateError'].includes(e.name)) tipo = e.name;
+        if(e && ['LOCAL_STORAGE','QUOTA_EXCEEDED','STORAGE_UNAVAILABLE',22,1014].includes(e.code)) codigo = e.code;
+      } catch(_) {}
+      try { console.warn('registro.persistencia', {operacion,tipo,codigo}); } catch(_) {}
+      const mensaje = operacion === 'recordarPadron'
+        ? 'No se pudo actualizar la referencia local del padrón (recordarPadron).'
+        : 'No se pudo guardar el registro local (saveStore).';
+      throw Object.assign(new Error(mensaje+' Los datos en memoria se conservan. No cierre esta pestaña; consulte el diagnóstico antes de reintentar.'),{code:'LOCAL_STORAGE',retryable:true,operacion,tipo,codigo});
+    }
+  }
   llenarAulasPadron(nivel);
   onContexto({localOnly:desdeCache, preservar:mismoPadron && contextoAnterior === JSON.stringify(ctxBase())});
   sincronizarEdicionRegistro();
