@@ -1,7 +1,7 @@
 /* One reusable, presentation-only save dialog. No transport or storage access. */
 (function(root){
  'use strict';
- let dialog,icon,message,detail,closeButton,previousFocus,sequence=0,pending=false;
+ let dialog,icon,message,detail,closeButton,previousFocus,sequence=0,pending=false,panelLabel='Registro';
  function mount(){
   if(dialog||typeof document.createElement!=='function'||!document.head||!document.body)return;
   const style=document.createElement('style');style.textContent='#academicSaveDialog{box-sizing:border-box;position:fixed;inset:0;margin:auto;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid #e2e8f0;border-radius:20px;padding:28px 24px;background:#fff;color:#0f172a;font:inherit;text-align:center;box-shadow:0 18px 60px #0f172a26}#academicSaveDialog::backdrop{background:#0f172a70}#academicSaveDialog [data-save-icon]{display:block;box-sizing:border-box;width:44px;height:44px;margin:0 auto 18px;border:4px solid #dbeafe;border-top-color:#0284c7;border-radius:50%;animation:academicSaveSpin 1s linear infinite}#academicSaveDialog[data-state="success"] [data-save-icon]{border:0;animation:none;color:#15803d;background:#f0fdf4;font-size:34px;line-height:44px}#academicSaveDialog[data-state="unconfirmed"] [data-save-icon]{border:0;animation:none;color:#a16207;background:#fffbeb;font-size:30px;line-height:44px}#academicSaveDialog h2{font-size:18px;line-height:1.5;font-weight:700;margin:0;overflow-wrap:anywhere;outline:none}#academicSaveDialog p{font-size:14px;line-height:1.5;color:#475569;margin:12px 0}#academicSaveDialog button{font:inherit;min-height:44px;margin-top:8px;padding:10px 24px;border:0;border-radius:10px;background:#075985;color:white;cursor:pointer}#academicSaveDialog button:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}@keyframes academicSaveSpin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#academicSaveDialog [data-save-icon]{animation-duration:2.5s}}';document.head.appendChild(style);
@@ -14,14 +14,14 @@
   dialog.addEventListener('close',()=>{if(previousFocus?.isConnected&&!previousFocus.disabled)previousFocus.focus();});
   dialog.append(icon,message,detail,closeButton);document.body.appendChild(dialog);
  }
- function begin(){
-  if(pending)return null;pending=true;const id=++sequence;try{mount();}catch(e){pending=false;throw e;}if(!dialog)return id;
-  previousFocus=document.activeElement;dialog.dataset.state='pending';dialog.setAttribute('aria-busy','true');icon.textContent='';message.textContent='Guardando datos... Espere, no cierre ni cambie de grado';detail.textContent='Estamos guardando las notas en la nube.';closeButton.hidden=true;
+ function begin(panel){
+  if(pending)return null;panelLabel=({calificar:'Calificar',promedios:'Promedios',asistencia:'Asistencia'})[panel]||'Registro';pending=true;const id=++sequence;try{mount();}catch(e){pending=false;throw e;}if(!dialog)return id;
+  previousFocus=document.activeElement;dialog.dataset.state='pending';dialog.setAttribute('aria-busy','true');icon.textContent='';message.textContent='Guardando datos... Espere, no cierre ni cambie de grado';detail.textContent=panelLabel+': estamos guardando los datos en la nube.';closeButton.hidden=true;
   if(!dialog.open)dialog.showModal();message.focus();return id;
  }
  function finish(id,confirmed){
   if(id!==sequence||!pending)return;pending=false;if(!dialog)return;
-  dialog.dataset.state=confirmed?'success':'unconfirmed';dialog.setAttribute('aria-busy','false');icon.textContent=confirmed?'✓':'!';message.textContent=confirmed?'¡Guardado confirmado en la nube!':'Guardado no confirmado. Sus cambios locales están protegidos';detail.textContent=confirmed?'Las notas se guardaron correctamente en la nube.':'No se reenviará automáticamente. Consulte el diagnóstico antes de reintentar.';closeButton.hidden=false;closeButton.focus();
+  dialog.dataset.state=confirmed?'success':'unconfirmed';dialog.setAttribute('aria-busy','false');icon.textContent=confirmed?'✓':'!';message.textContent=confirmed?'¡Guardado confirmado en la nube!':'Guardado no confirmado. Sus cambios locales están protegidos';detail.textContent=panelLabel+': '+(confirmed?'Los datos se guardaron correctamente en la nube.':'No se reenviará automáticamente. Consulte el diagnóstico antes de reintentar.');closeButton.hidden=false;closeButton.focus();
  }
  root.IEAcademicSaveFeedback={begin,finish,focus:()=>{if(dialog?.open)(pending?message:closeButton).focus();},busy:()=>pending};
 })(window);
@@ -180,7 +180,7 @@
  function viewStamp(s){return JSON.stringify([binding(),currentPanel(),s?.legacy,s?.processed,Object.values(s?.panels||{}).map(p=>p.version)]);}
  function render(){lastView=viewStamp(get()?.status());renderedPaused=!canEdit();if(tutor()){if(connection?.canEdit())tutorRegistroController?.refresh?.();else document.querySelectorAll('#transRows input,#transRows textarea,#transRows select,#transRows button').forEach(el=>el.disabled=true);return;}if(painting)return;painting=true;try{renderSesiones();renderStudents();if(currentPanel()==='promedios')renderFinales();if(document.getElementById('panelAvance')?.classList.contains('on'))renderAvance();if(currentPanel()==='asistencia')renderAsistencia();sincronizarEdicionRegistro();}finally{painting=false;paint();}}
  function paint(){
-  const s=get()?.status(),pane=currentPanel(),label=document.getElementById('registroSaveState');if(label&&s){label.textContent=['calificar','promedios'].map(n=>{const p=s.panels[n];return (n==='calificar'?'Calificar':'Promedios')+': '+(p.pending?'Cambios sin guardar':p.at?'Guardado '+new Date(p.at).toLocaleString('es-PE'):'Sin guardado confirmado');}).join(' · ')+(s.legacy?' · Consulta histórica: Procesar y Guardar Promedios para iniciar Notas 2.0.':'');if(s.historicalConflicts?.length)label.textContent+=' · '+s.historicalConflicts.length+' notas históricas pendientes de decisión explícita.';}
+  const s=get()?.status(),pane=currentPanel(),label=document.getElementById('registroSaveState');if(label&&s){const p=s.panels[pane];label.textContent=p?({calificar:'Calificar',promedios:'Promedios',asistencia:'Asistencia'})[pane]+': '+(p.pending?'Cambios sin guardar':p.at?'Guardado '+new Date(p.at).toLocaleString('es-PE'):'Sin guardado confirmado'):'Resumen — consulta de solo lectura.';if(pane==='promedios'&&s.legacy)label.textContent+=' · Consulta histórica: Procesar y Guardar Promedios para iniciar Notas 2.0.';if(pane==='promedios'&&s.historicalConflicts?.length)label.textContent+=' · '+s.historicalConflicts.length+' notas históricas pendientes de decisión explícita.';}
   if(label&&typeof IERegistroTransversales!=='undefined'&&IERegistroTransversales.current()?.dirty)label.textContent+=' · Aportes transversales pendientes.';
   const connState=connection?.snapshot?.()?.state||'checking';
   const paneNames={calificar:'Calificar',promedios:'Promedios',asistencia:'Asistencia',resumen:'Resumen'};
@@ -217,7 +217,7 @@
   const client=get(),pane=currentPanel();if(pane==='resumen'||!client||!canEdit(pane))return false;
   if(pane==='asistencia'){guardarAsistencia();persist();toast('Asistencia guardada localmente.');return true;}
   if(save.pending)return false;save.pending=true;criticalSaveContext=copy(ctxBase());prefetch?.hold('save');let notice,confirmed=false;const key=binding();try{
-  notice=root.IEAcademicSaveFeedback.begin();
+  notice=root.IEAcademicSaveFeedback.begin(pane);
   if(!await connection.check(false,true)||key!==binding()||pane!==currentPanel()||client!==get()||!canEdit(pane))return false;
   if(!collect())return false;if(pane==='calificar')saveCapsElegidas();root.IEAcademicSaveFeedback.focus();
   if(client.status().legacy&&pane==='promedios'&&!client.pending(pane)&&!client.status().processed){toast('No hay cambios pendientes para guardar en Promedios.');return false;}

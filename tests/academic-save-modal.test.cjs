@@ -28,5 +28,17 @@ test('timeout followed by a late acknowledgement never changes unconfirmed into 
 
 test('a failure mounting feedback cannot start a write or leave navigation permanently locked',async()=>{const f=await setup();f.g.document.createElement=()=>{throw Error('Synthetic unavailable DOM');};assert.equal(await f.api.save(),false);assert.equal(f.api.saving(),false);assert.equal(f.g.IEAcademicSaveFeedback.busy(),false);assert.equal(f.api.current().pending('promedios'),true);assert.equal(f.requests.filter(x=>x.action==='savenotas2').length,0);});
 
+for(const pane of ['calificar','promedios'])test(pane+': save feedback keeps the initiating panel label through pending, confirmation and late context change',async()=>{
+ const f=await setup(pane),label=pane==='calificar'?'Calificar':'Promedios',other=pane==='calificar'?'Promedios':'Calificar';
+ const native=f.g.fetch;let release;f.g.fetch=async(u,o)=>{if(JSON.parse(o.body).action==='savenotas2')await new Promise(r=>release=r);return native(u,o);};
+ const saving=f.api.save();assert.match(f.nodes.academicSaveDetail.textContent,new RegExp('^'+label+':'));
+ await until(()=>release);release();assert.equal(await saving,true);
+ assert.match(f.nodes.academicSaveDetail.textContent,new RegExp('^'+label+':'));assert.doesNotMatch(f.nodes.academicSaveDetail.textContent,new RegExp(other));
+ f.edit();release=null;const late=f.api.save();await until(()=>release);
+ f.pane(pane==='calificar'?'promedios':'calificar');release();assert.equal(await late,false);
+ assert.equal(f.nodes.academicSaveDialog.dataset.state,'unconfirmed');
+ assert.match(f.nodes.academicSaveDetail.textContent,new RegExp('^'+label+':'));assert.doesNotMatch(f.nodes.academicSaveDetail.textContent,new RegExp(other));
+});
+
 test('v28 to v29 installs the coupled save UI before removing only static old caches',async()=>{const path=require('node:path'),source=fs.readFileSync('tests/service-worker-static.test.cjs','utf8'),fixture=new Function('require','__dirname',source.split('\ntest(')[0]+'\nreturn fixture;')(require,__dirname),s=fixture();s.cache('matriz-ie22375-v28');s.cache('unrelated-private-cache');await s.dispatch('install');assert.equal(s.stores.has('matriz-ie22375-v28'),true);assert.ok(await s.cache('matriz-ie22375-v29').match(s.request('registro-notas2-ui.js')));await s.dispatch('activate');assert.equal(s.stores.has('matriz-ie22375-v28'),false);assert.equal(s.stores.has('unrelated-private-cache'),true);});
 test('historical allowlist preserves unrelated authorization and navigation mutations',()=>{const boundary=require('./academic-save-modal-boundary.cjs'),source=fs.readFileSync('registro-notas2-ui.js','utf8'),normal=boundary('registro-notas2-ui.js',source);assert.notEqual(source,normal);assert.equal(boundary('registro-notas2-ui.js',normal),normal);assert.notEqual(boundary('registro-notas2-ui.js',source.replace('!canEdit(pane)','false')),normal);const html=fs.readFileSync('registro.html','utf8'),original=boundary('registro.html',html);assert.notEqual(boundary('registro.html',html.replace('IERegistroNotas2UI.saving?.()','false')),original);});
