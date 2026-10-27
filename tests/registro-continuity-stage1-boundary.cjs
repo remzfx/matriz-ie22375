@@ -78,4 +78,4 @@ const assert=require('node:assert/strict'),edits={
   ]
  ]
 };
-module.exports=(file,source)=>{let s=source.replace(/\r\n/g,'\n');for(const [current,previous]of edits[file]||[])if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique stage-1 continuity hook');s=s.replace(current,previous);}return s;};
+module.exports=(file,source)=>{source=require('./notas2-session-authorization-boundary.cjs')(file,source);let s=source.replace(/\r\n/g,'\n');for(const [current,previous]of edits[file]||[])if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique stage-1 continuity hook');s=s.replace(current,previous);}return s;};

@@ -134,4 +134,5 @@ const assert=require('node:assert/strict'),edits={
     ]
   ]
 };
+edits['registro.html']=edits['registro-connection.js'];
 module.exports=(file,source)=>{let s=source.replace(/\r\n/g,'\n');for(const [current,previous]of edits[file]||[])if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique reviewed session authorization delta');s=s.replace(current,previous);}return s;};
