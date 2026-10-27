@@ -29,12 +29,12 @@ test('I/II/III/I rosters reuse the account store without multiplying persistent 
  assert.equal(f.r.run('Object.keys(store.studentAliases["secundaria||4||B"]).length'),3);
 });
 for(const [failure,name,message]of [['read','SecurityError',/access denied/],['json','Error',/interpretar el almacenamiento/],['concurrent','Error',/Otra pestaña/],['quota','QuotaExceededError',/quota exceeded/]]){
- test('Identical roster warning masks '+failure+'; students visible does not prove persistence',()=>{
+ test('Safe saveStore warning identifies '+failure+' without exposing storage; students visible does not prove persistence',()=>{
   const f=setup(failure),before=f.disk.get(f.key),memory=f.r.run('store');
   memory.grades.synthetic={nivel:'C',origen:'letra'};
   for(const bim of ['I','III']){
    f.r.el('selBim').value=bim;
-   assert.throws(()=>f.r.c.pintarPadronInmediato(f.r.roster([{idSiagie:'synthetic',nombre:'FICTICIO',grado:4,seccion:'B'}],bim),bim,true),e=>e.code==='LOCAL_STORAGE'&&/No se pudo conservar el padrón local/.test(e.message));
+   assert.throws(()=>f.r.c.pintarPadronInmediato(f.r.roster([{idSiagie:'synthetic',nombre:'FICTICIO',grado:4,seccion:'B'}],bim),bim,true),e=>e.code==='LOCAL_STORAGE'&&e.operacion==='saveStore'&&/No se pudo guardar el registro local \(saveStore\)/.test(e.message));
    assert.equal(f.original().name,name);assert.match(f.original().message,message);
    assert.equal(f.r.run('estudiantes().length'),1);assert.equal(memory.grades.synthetic.nivel,'C');
   }
