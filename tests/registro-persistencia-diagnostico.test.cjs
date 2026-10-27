@@ -38,3 +38,11 @@ test('historical consultation still skips both persistence operations',()=>{
  const s=fixture(null,null,true);s.c.pintarPadronInmediato({},'III',false);
  assert.deepEqual(s.calls,['aulas','contexto','edicion']);assert.deepEqual(s.logs,[]);
 });
+test('historical comparison normalizes only the exact reviewed diagnostic block',()=>{
+ const normalize=require('./academic-save-modal-boundary.cjs');
+ const reviewed=normalize('registro.html',source);
+ assert.match(reviewed,/No se pudo conservar el padrón local/);
+ const mutated=source.replace('try { recordarPadron(base);','try { recordarPadron({});');
+ assert.match(normalize('registro.html',mutated),/recordarPadron\(\{\}\)/);
+ assert.notEqual(normalize('registro.html',mutated),reviewed);
+});
