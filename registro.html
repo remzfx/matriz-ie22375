@@ -15,6 +15,32 @@
   .fin-grid .fin-competence-inactive {opacity:.4;}
   .hidden { display: none !important; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
+  /* Compact screen-only headers; session rendering and controls retain their existing DOM/events. */
+  @media screen {
+    #wrapSesiones {display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 12px;}
+    #wrapSesiones > .sessions-title,#wrapSesiones > .sessions-help,#listaSesiones > [role="status"] {margin:0;line-height:1.4;min-width:0;overflow-wrap:anywhere;}
+    #wrapSesiones > .sessions-title {flex:0 0 auto;}
+    #wrapSesiones > .sessions-help {flex:0 1 auto;}
+    #listaSesiones {display:contents;}
+    #listaSesiones > [role="status"] {order:0;flex:0 1 auto;}
+    #wrapSesiones > .sessions-chip-break {flex-basis:100%;height:0;order:1;}
+    #listaSesiones > .sess-chip {order:2;margin:0;}
+    #wrapSesiones > #lblSinSesiones {order:2;flex-basis:100%;margin:0;}
+    #wrapCalificar {padding:8px 12px;}
+    #wrapCalificar .calificar-heading {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;margin-bottom:4px;}
+    #wrapCalificar .calificar-heading-context {display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0;}
+    #wrapCalificar .calificar-heading-context > :first-child::after {content:'·';margin-left:8px;color:#94a3b8;}
+    #wrapCalificar #lblSesionActiva {font-size:13px;line-height:1.4;overflow-wrap:anywhere;}
+    #wrapCalificar .calificar-heading .mode-toggle {margin-left:auto;max-width:100%;}
+    #wrapCalificar .calificar-heading-help {display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;}
+    #wrapCalificar .calificar-heading-help > p {margin:0;line-height:1.4;}
+    #wrapCalificar .calificar-heading-help > p + p {padding-left:12px;border-left:1px solid #e2e8f0;}
+    #wrapCalificar > #stuList {margin-top:6px;}
+    @media(max-width:640px) {
+      #wrapSesiones {column-gap:8px;}
+      #wrapCalificar .calificar-heading-help > p + p {padding-left:0;border-left:0;}
+    }
+  }
   .session-evaluation-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);column-gap:12px;row-gap:10px;align-items:start;}
   .session-evaluation-grid>div{min-width:0;}
   .session-evaluation-grid label{display:block;margin:0 0 4px;font-size:12px;line-height:1.4;}
@@ -876,16 +902,17 @@ function registroDependenciaFallida(){
       <button type="button" class="btn btn-primary w-full text-sm" data-reg-write onclick="activarSesion()">Agregar a la grilla</button>
     </div>
     <div class="card p-3" id="wrapSesiones">
-      <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS</div>
-      <p class="text-[11px] text-slate-500 mb-1">Un chip por día. Tócalo para abrir esa fecha.</p>
+      <div class="sessions-title text-[10px] font-bold text-slate-500">SESIONES GUARDADAS</div>
+      <p class="sessions-help text-[11px] text-slate-500">Un chip por día. Tócalo para abrir esa fecha.</p>
+      <span class="sessions-chip-break" aria-hidden="true"></span>
       <div id="listaSesiones" class="flex flex-wrap gap-1"></div>
       <p class="text-[11px] text-slate-400 mt-1" id="lblSinSesiones">Aún no hay sesiones guardadas.</p>
     </div>
 
     <!-- Calificar -->
     <div class="card p-3" id="wrapCalificar">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div>
+      <div class="calificar-heading">
+        <div class="calificar-heading-context">
           <div class="text-[10px] font-bold text-slate-500">CALIFICAR</div>
           <div class="text-sm font-bold text-slate-800" id="lblSesionActiva">Define fecha, competencia y capacidad arriba</div>
         </div>
@@ -894,8 +921,10 @@ function registroDependenciaFallida(){
           <button type="button" data-modo="num" onclick="setModoCalif('num')">0–20</button>
         </div>
       </div>
-      <p class="scale-hint" id="lblEscala">Escala: AD destacado · A logrado · B proceso · C inicio</p>
-      <p class="text-[10px] text-slate-400 mt-1">Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas.</p>
+      <div class="calificar-heading-help">
+        <p class="scale-hint" id="lblEscala">Escala: AD destacado · A logrado · B proceso · C inicio</p>
+        <p class="text-[10px] text-slate-400">Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas.</p>
+      </div>
       <div id="stuList" class="mt-2"></div>
     </div>
     </div><!-- /panelCalificar -->
