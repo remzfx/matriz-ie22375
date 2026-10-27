@@ -200,7 +200,7 @@
   else{effectiveState='connected';effectiveMsg=otherPending.length>0?'Conectado — '+(paneNames[pane]||'Notas')+' al día. ('+otherPending.join(', ')+' con cambios sin guardar).':'Conectado — notas verificadas.';}
   updateSyncIndicator(effectiveState,effectiveMsg,otherPending);
   const loading=document.getElementById('finContextLoading'),verification=document.getElementById('finContextStatus');
-  if(loading)loading.textContent=effectiveState==='checking'?'Verificando datos…':effectiveMsg;
+  if(loading)loading.textContent=effectiveState==='checking'?'Verificando acceso a '+ctxBase().grado+'° '+ctxBase().seccion+' · Bim '+ctxBase().bim+'… Las calificaciones se mostrarán al confirmar la autorización.':effectiveMsg;
   if(verification)verification.hidden=pane!=='promedios'||!!loading||effectiveState!=='checking';
   const save=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.save()"]'),process=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.process()"]'),down=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.download()"]');
   const isResumen=pane==='resumen';if(save){save.disabled=isResumen||!canEdit(pane)||isConflict;save.hidden=isResumen;save.querySelector('span').textContent=pane==='asistencia'?'Guardar local':'Guardar';}
