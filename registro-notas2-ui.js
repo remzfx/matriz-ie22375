@@ -30,7 +30,7 @@
  'use strict';
  const model=root.IERegistroNotas2;
  if(!model||!root.IERegistroConnection){registroDependenciaFallida();return;}
- let criticalSaveContext=null;
+ let criticalSaveContext=null,scopeAuthorization=null;
  const clients=new Map();let memoryLoaded=false,protectedDisk=null,painting=false,timer=null,connection,activeKey='',renderedPaused=false,lastView='';
  const pausedControls=new WeakMap();
  const copy=x=>JSON.parse(JSON.stringify(x));
@@ -113,28 +113,52 @@
   const c=Object.freeze({...ctxBase()}),session={...getLoginSession()},key=binding();receiptGuards.delete(key);
   if(body.action==='loadnotas2'&&prefetch){
    prefetch.select(c);
-   if(currentPanel()!=='asistencia'&&clients.get(key)?.status().panels.calificar.version==null){const reserved=await prefetch.acquire(c);if(reserved){receiptGuards.set(key,{signature:reserved.signature});return reserved.response;}}
+   if(currentPanel()!=='asistencia'&&clients.get(key)?.status().panels.calificar.version==null){const grant=contextAuthorization(c),reserved=await prefetch.acquire(c);if(reserved){receiptGuards.set(key,{signature:reserved.signature,...(grant?{authorizedUntil:grant.until}:{})});return reserved.response;}}
   }
   return requestFor(c,session,body,options);
  }
  function startPrefetch(){
-  if(!prefetch||!backgroundEligible()||get()?.status().legacy||!root.IEAcademicResetClient?.readOnly)return;
+  if(!prefetch||!backgroundEligible()||!root.IEAcademicResetClient?.readOnly)return;
   prefetch.resume();const list=candidates();void prepareRosters();prefetch.start(ctxBase(),list);
  }
  if(root.IERegistroNotas2Prefetch)prefetch=IERegistroNotas2Prefetch.create({
-  identity:prefetchOwner,overheadBytes:()=>rosterBytes,canRun:backgroundEligible,contextIdentity:c=>contextRosters.get(c.bim)?.version||'',isKnown:c=>clients.get([IERegistroNotas2Prefetch.key(c),getLoginSession()?.token||'',getLoginSession()?.user||'',getLoginSession()?.role||''].join('|'))?.status().panels.calificar.version!=null,fingerprint:model.signature,
+  identity:prefetchOwner,overheadBytes:()=>rosterBytes+(scopeAuthorization?.bytes||0),canRun:backgroundEligible,contextIdentity:c=>contextRosters.get(c.bim)?.version||'',isKnown:c=>clients.get([IERegistroNotas2Prefetch.key(c),getLoginSession()?.token||'',getLoginSession()?.user||'',getLoginSession()?.role||''].join('|'))?.status().panels.calificar.version!=null,fingerprint:model.signature,
   allowed:c=>{candidates();return authorized()&&candidateKeys.has(IERegistroNotas2Prefetch.key(c));},
   localSignature:c=>model.signature(academicContext(c)),hasLocal:c=>Object.values(academicContext(c)).some(v=>Object.keys(v).length),
   read:(c,signal)=>requestFor(c,{...getLoginSession()},{action:'loadnotas2'},{signal},true),
   validate:(r,c)=>{model.validateRead(r,IERegistroNotas2Prefetch.key(c));const roster=(contextRosters.get(c.bim)?.rows||[]).filter(a=>Number(a.grado)===Number(c.grado)&&a.seccion===c.seccion);IERegistroAcademico.validate(copy(r.payload),c);const resolved=IEAcademicIdentity.project(r.payload,roster,c,IERegistroAcademico.catalog[c.nivel][c.area]);if(resolved.conflicts.length||resolved.unresolved.length)throw Error('Identidades pendientes de revisión.');return r;},
   denied:e=>connection?.pause(e.code==='ACADEMIC_RESET'?'server':'session')
  });
+ // A server-issued scope is kept only in this page and tied to the exact actor/profile/generation.
+ const authorizationKey=c=>[c.nivel,c.bim,Number(c.grado),['UNICA','ÚNICA'].includes(String(c.seccion).toUpperCase())?'ÚNICA':String(c.seccion).toUpperCase(),c.area].join('||');
+ function contextAuthorization(c=ctxBase()){
+  const a=scopeAuthorization;if(!a||a.actor!==prefetchOwner()||a.until<=Date.now()||navigator.onLine===false||!authorized()||a.epoch!==(root.IEAcademicResetClient?.epoch?.()||null)||!a.contexts.has(authorizationKey(c)))return null;
+  return a;
+ }
+ function acceptContextAuthorization(data,started,actor){
+  const a=data.contextAuthorization,s=getLoginSession()||{};
+  scopeAuthorization=null;
+  if(!a||a.schema!==1||a.role!=='docente'||s.role!==a.role||a.user!==String(s.user||'').trim().toLowerCase()||a.nivel!==s.nivel||a.permisosVersion!==s.permisosVersion||a.epoch!==data.epoch||!Number.isSafeInteger(a.issuedAt)||!Number.isSafeInteger(a.expiresAt)||a.expiresAt<=a.issuedAt||a.expiresAt-a.issuedAt>150000||!Array.isArray(a.contexts)||a.contexts.length>4096||a.contexts.some(k=>typeof k!=='string'||k.length>1024))return;
+  const until=started+a.expiresAt-a.issuedAt;if(until<=Date.now())return;
+  scopeAuthorization={actor,until,epoch:a.epoch,contexts:new Set(a.contexts),bytes:JSON.stringify(a).length*2};
+ }
+ function preparation(c=ctxBase()){
+  // The visible roster may be switching; a presentation query must not prune other-period receipts.
+  if(!authorized())return {state:'preparing',reason:'authorization'};
+  const key=IERegistroNotas2Prefetch.key(c),local=key===cloudClaveReg()&&get()?.status().panels;
+  if(local&&Object.values(local).some(p=>p.pending)||key===cloudClaveReg()&&(screenPending('calificar')||screenPending('promedios')))return {state:'local',snapshot:true};
+  const a=prefetch?.availability(c),lease=contextAuthorization(c),known=a?.state==='known';
+  if(a?.protectedLocal)return {state:'local',snapshot:true};
+  if((a?.reserved||known)&&lease)return {state:'prepared',snapshot:true,consultedAt:a.consultedAt,authorizedUntil:lease.until};
+  if(['failed','deferred','incompatible','historical'].includes(a?.state))return {state:'unavailable',reason:a.state};
+  return {state:'preparing',reason:!lease?'authorization':a?.state||'unknown'};
+ }
  async function verifyPermission(valid){
-  const key=binding(),actor=owner(),session=getLoginSession()||{},controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
+  const key=binding(),actor=owner(),profile=prefetchOwner(),started=Date.now(),session=getLoginSession()||{},controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
   try{
-   const response=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},cache:'no-store',signal:controller.signal,body:JSON.stringify({action:'academicstate',token:session.token})});
+   const response=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},cache:'no-store',signal:controller.signal,body:JSON.stringify({action:'academicstate',token:session.token,contextAuthorization:1})});
    const data=JSON.parse(await response.text());if(owner()!==actor)return {ok:false};
-   if(response.status===401||response.status===403||['SESSION','DENIED'].includes(data?.code))return {ok:false,code:'SESSION'};
+   if(response.status===401||response.status===403||['SESSION','DENIED'].includes(data?.code)){scopeAuthorization=null;prefetch?.pause();return {ok:false,code:'SESSION'};}
    if(!valid()||binding()!==key)return {ok:false};
    if(!response.ok||data?.ok!==true||data.academicReset!==1||!(data.epoch===null||typeof data.epoch==='string'&&/^[a-f0-9]{32}$/.test(data.epoch)))return {ok:false};
    const localEpoch=root.IEAcademicResetClient?.epoch?.()||null;
@@ -142,8 +166,9 @@
    const initialized=clients.get(key)?.status()?.panels.calificar.version!=null;
    // First load still passes through the existing reset-aware transport; a live context never crosses generations silently.
    if(data.epoch!==localEpoch&&(initialized||typeof root.IEAcademicResetClient?.ensure!=='function'))return {ok:false,code:'ACADEMIC_RESET'};
+   if(profile!==prefetchOwner())return {ok:false};acceptContextAuthorization(data,started,profile);
    return {ok:true};
-  }catch(_){return {ok:false};}finally{clearTimeout(timeout);}
+  }catch(_){scopeAuthorization=null;return {ok:false};}finally{clearTimeout(timeout);}
  }
  function screenPending(panel=currentPanel()){
   const selector=panel==='calificar'?'.cal-nota':panel==='promedios'?'#finLista .fin-nota,#finLista .academic-conclusion':'';if(!selector)return false;
@@ -161,7 +186,7 @@
  }
  function get(){
   if(!authorized()||tutor())return null;const key=binding();if(!activeKey)activeKey=key;
-  if(!clients.has(key))clients.set(key,model.create({key:cloudClaveReg(),binding,authorized,readonly,capture,apply,request,deferReadPanel:name=>name==='asistencia'&&receiptGuards.has(key),beforeApply:()=>{const expected=receiptGuards.get(key);receiptGuards.delete(key);if(expected!==undefined&&(expected.signature!==model.signature(academicContext(ctxBase()))||screenPending('calificar')||screenPending('promedios'))){const e=Error('El borrador cambió. La precarga no reemplazó datos locales.');e.code='PREFETCH_LOCAL';throw e;}},hasExisting:name=>(name==='calificar'?['grades']:name==='promedios'?['finales','concComp']:['asistencia']).some(f=>Object.keys(capture()[f]||{}).length),confirm:async info=>confirm('Bajar Nube reemplazará los cambios sin guardar de '+info.panels.join(', ')+'. Última confirmación: '+Object.values(info.at).filter(Boolean).map(x=>new Date(x).toLocaleString('es-PE')).join(', ')+'. ¿Continuar?'),changed:()=>{if(key===binding())paint();},error:e=>{receiptGuards.delete(key);if(key!==binding())return;toast(e.message);if(['SESSION','DENIED'].includes(e.code))retirarVerificacionNube((getLoginSession()||{}).token,ctxBase().bim,{code:e.code});}}));
+  if(!clients.has(key))clients.set(key,model.create({key:cloudClaveReg(),binding,authorized,readonly,capture,apply,request,deferReadPanel:name=>name==='asistencia'&&receiptGuards.has(key),beforeApply:()=>{const expected=receiptGuards.get(key);receiptGuards.delete(key);if(expected?.authorizedUntil!=null&&expected.authorizedUntil<=Date.now()){const e=Error('La autorización caducó antes de aplicar la reserva; se deben verificar nuevamente los permisos.');e.code='READ_AUTH_EXPIRED';throw e;}if(expected!==undefined&&(expected.signature!==model.signature(academicContext(ctxBase()))||screenPending('calificar')||screenPending('promedios'))){const e=Error('El borrador cambió. La precarga no reemplazó datos locales.');e.code='PREFETCH_LOCAL';throw e;}},hasExisting:name=>(name==='calificar'?['grades']:name==='promedios'?['finales','concComp']:['asistencia']).some(f=>Object.keys(capture()[f]||{}).length),confirm:async info=>confirm('Bajar Nube reemplazará los cambios sin guardar de '+info.panels.join(', ')+'. Última confirmación: '+Object.values(info.at).filter(Boolean).map(x=>new Date(x).toLocaleString('es-PE')).join(', ')+'. ¿Continuar?'),changed:()=>{if(key===binding())paint();},error:e=>{receiptGuards.delete(key);if(key!==binding())return;toast(e.message);if(['SESSION','DENIED'].includes(e.code))retirarVerificacionNube((getLoginSession()||{}).token,ctxBase().bim,{code:e.code});}}));
   return clients.get(key);
  }
  function collect(silent=false){const pane=currentPanel();if(!canEdit(pane))return false;const selector=pane==='calificar'?'.cal-nota':pane==='promedios'?'#finLista .fin-nota':'.asis-input';if(pane!=='asistencia'&&Array.from(document.querySelectorAll(selector)).some(el=>!el.readOnly&&el.value!==''&&(!Number.isFinite(Number(el.value))||Number(el.value)<0||Number(el.value)>20))){if(!silent)toast('Corrige las notas inválidas antes de guardar.');return false;}recolectarPantalla(pane);return true;}
@@ -198,9 +223,11 @@
   else if(connState==='checking'||s?.state==='checking'||pane==='asistencia'&&s?.panels.asistencia.version===null){effectiveState='checking';effectiveMsg='Verificando conexión…';}
   else if(activePending){effectiveState='pending';effectiveMsg='Conectado — cambios sin guardar.';}
   else{effectiveState='connected';effectiveMsg=otherPending.length>0?'Conectado — '+(paneNames[pane]||'Notas')+' al día. ('+otherPending.join(', ')+' con cambios sin guardar).':'Conectado — notas verificadas.';}
+  const prepared=prefetch&&!tutor()?preparation():null;
+  if(effectiveState==='connected'&&prepared?.state==='prepared')effectiveMsg='Aula preparada — copia consultada; Guardar revalidará la versión.';
   updateSyncIndicator(effectiveState,effectiveMsg,otherPending);
   const loading=document.getElementById('finContextLoading'),verification=document.getElementById('finContextStatus');
-  if(loading)loading.textContent=effectiveState==='checking'?'Verificando acceso a '+ctxBase().grado+'° '+ctxBase().seccion+' · Bim '+ctxBase().bim+'… Las calificaciones se mostrarán al confirmar la autorización.':effectiveMsg;
+  if(loading)loading.textContent=effectiveState==='checking'?(prepared?.reason!=='authorization'&&prepared?.state==='preparing'?'Aula en preparación — recuperando datos autorizados…':'Verificando acceso a '+ctxBase().grado+'° '+ctxBase().seccion+' · Bim '+ctxBase().bim+'… Las calificaciones se mostrarán al confirmar la autorización.'):effectiveMsg;
   if(verification)verification.hidden=pane!=='promedios'||!!loading||effectiveState!=='checking';
   const save=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.save()"]'),process=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.process()"]'),down=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.download()"]');
   const isResumen=pane==='resumen';if(save){save.disabled=isResumen||!canEdit(pane)||isConflict;save.hidden=isResumen;save.querySelector('span').textContent=pane==='asistencia'?'Guardar local':'Guardar';}
@@ -315,15 +342,16 @@
    box.appendChild(details);
   }
  }
- connection=IERegistroConnection.create({owner,binding:()=>binding()+(tutor()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:''),authorized:()=>{if(tutor())return !!getLoginSession()?.token;if(esVistaAdmin()){const s=getLoginSession()||{};return !!(s.token&&s.role==='admin'&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&padronBimestre===ctxBase().bim&&tokenPadron===s.token&&registroLocal.matches());}return authorized();},readonly,allowed:()=>tutor()?!esVistaAdmin()&&bimestreHabilitado(document.getElementById('transBim')?.value):!readonly(),retain:()=>{if(canEdit())collect();},online:()=>navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',changed:value=>{const box=document.getElementById('registroConnectionStatus'),text=document.getElementById('registroConnectionText');if(box){box.dataset.state=value.state;box.style.display='none';}const statusMap={connected:'Conectado — notas verificadas.',pending:'Conectado — cambios sin guardar.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',readonly:esVistaAdmin()?'Vista Administrador — solo lectura.':'Bimestre cerrado — solo lectura.',review:'Conflicto de versiones — consulta la nube antes de guardar.'};const msg=statusMap[value.state]||value.state;if(text)text.textContent=msg;lastConnectionState=value.state;/* Connectivity gates editing without changing academic errors, CAS or in-flight epochs. */const retryBtn=document.getElementById('registroRetryOffer');if(retryBtn)retryBtn.hidden=true;paint();if(value.state==='connected'||value.state==='pending')startPrefetch();},verify:async({valid,review})=>{
+ connection=IERegistroConnection.create({owner,binding:()=>binding()+(tutor()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:''),authorized:()=>{if(tutor())return !!getLoginSession()?.token;if(esVistaAdmin()){const s=getLoginSession()||{};return !!(s.token&&s.role==='admin'&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&padronBimestre===ctxBase().bim&&tokenPadron===s.token&&registroLocal.matches());}return authorized();},readonly,allowed:()=>tutor()?!esVistaAdmin()&&bimestreHabilitado(document.getElementById('transBim')?.value):!readonly(),retain:()=>{if(canEdit())collect();},online:()=>navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',changed:value=>{if(['session','server','offline'].includes(value.state)){scopeAuthorization=null;prefetch?.pause();}const box=document.getElementById('registroConnectionStatus'),text=document.getElementById('registroConnectionText');if(box){box.dataset.state=value.state;box.style.display='none';}const statusMap={connected:'Conectado — notas verificadas.',pending:'Conectado — cambios sin guardar.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',readonly:esVistaAdmin()?'Vista Administrador — solo lectura.':'Bimestre cerrado — solo lectura.',review:'Conflicto de versiones — consulta la nube antes de guardar.'};const msg=statusMap[value.state]||value.state;if(text)text.textContent=msg;lastConnectionState=value.state;/* Connectivity gates editing without changing academic errors, CAS or in-flight epochs. */const retryBtn=document.getElementById('registroRetryOffer');if(retryBtn)retryBtn.hidden=true;paint();if(value.state==='connected'||value.state==='pending')startPrefetch();},verify:async({valid,review,force})=>{
   if(tutor())return tutorRegistroController?.verifyConnection?await tutorRegistroController.verifyConnection({valid,review:false}):{ok:false};
-  const [periods,permission]=await Promise.all([sincronizarPeriodosNube(true),verifyPermission(valid)]);if(permission.code==='SESSION')return permission;if(!valid())return {ok:false};if(!permission.ok)return permission;if(!periods)return {ok:false};
+  const lease=!force&&!review?contextAuthorization():null;
+  const [periods,permission]=lease?[true,{ok:true}]:await Promise.all([sincronizarPeriodosNube(true),verifyPermission(valid)]);if(permission.code==='SESSION')return permission;if(!valid())return {ok:false};if(!permission.ok)return permission;if(!periods)return {ok:false};
   if(esVistaAdmin())return {ok:true,code:'CLOSED',pending:false};
   const c=get();if(!c)return {ok:false,code:'SESSION'};const initialized=c.status().panels.calificar.version!==null;
   const attendanceMissing=initialized&&currentPanel()==='asistencia'&&c.status().panels.asistencia.version===null;
-  if(!initialized||attendanceMissing){const ok=await c.load(attendanceMissing?{panel:'asistencia',verify:true}:{});if(!valid())return {ok:false};const s=c.status();if(ok&&!esVistaAdmin())render();return {ok,code:s.state==='session'?'SESSION':(ok&&(s.readonly||readonly()))?'CLOSED':undefined,conflict:s.state==='conflict',pending:false};}
+  if(!initialized||attendanceMissing){const ok=await c.load(attendanceMissing?{panel:'asistencia',verify:true}:{});if(!valid())return {ok:false};const s=c.status();if(ok&&!esVistaAdmin()&&lastView!==viewStamp(s))render();return {ok,code:s.state==='session'?'SESSION':(ok&&(s.readonly||readonly()))?'CLOSED':undefined,conflict:s.state==='conflict',pending:false,...(lease?{validUntil:lease.until}:{})};}
   const s=c.status(),cerrado=typeof bimestreHabilitado==='function'&&!bimestreHabilitado(ctxBase().bim);
-  return {ok:true,code:s.state==='session'?'SESSION':cerrado||s.readonly?'CLOSED':undefined,conflict:s.state==='conflict',pending:false};
+  return {ok:true,code:s.state==='session'?'SESSION':cerrado||s.readonly?'CLOSED':undefined,conflict:s.state==='conflict',pending:false,...(lease?{validUntil:lease.until}:{})};
  }});
  function viewStatus(){const s=get()?.status();if(s)for(const [name,p]of Object.entries(s.panels))p.pending=p.pending||screenPending(name);return s;}
  function pendingPanels(){const s=get()?.status();if(!s)return [];const names={calificar:'Calificar',promedios:'Promedios',asistencia:'Asistencia'};const list=[];for(const [name,p] of Object.entries(s.panels)){const isDirty=p.pending||screenPending(name)||(name==='calificar'&&typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty);if(isDirty)list.push(names[name]||name);}return list;}
@@ -357,7 +385,7 @@
   if(typeof toast==='function')toast(count+' calificaciones históricas seleccionadas. Guarde Promedios para confirmar.');
   return true;
  }
- const api={saving:()=>!!(save.pending||uploadAttendance.pending),savingContext:()=>criticalSaveContext?copy(criticalSaveContext):null,prefetchStatus:()=>prefetch?{...prefetch.stats(),rosterRequests,rosterUnavailable:[...rosterUnavailable].map(([bimestre,code])=>({bimestre,code})),rosterContexts:contextRosters.size,rosterRetainedBytes:rosterBytes}:null,save,download,process,collect,screenPending,status:viewStatus,worked,setWorked,canEdit,officialOnly,persist,refresh,pendingPanels,hasPending,reconcileHistorical,activePending:()=>{const pane=currentPanel();return pane==='resumen'?false:pane==='calificar'?(!!get()?.status()?.panels.calificar?.pending||(typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty)):!!get()?.status()?.panels[pane]?.pending;},keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
+ const api={preparation:root.IERegistroNotas2Prefetch?preparation:undefined,saving:()=>!!(save.pending||uploadAttendance.pending),savingContext:()=>criticalSaveContext?copy(criticalSaveContext):null,prefetchStatus:()=>prefetch?{...prefetch.stats(),rosterRequests,rosterUnavailable:[...rosterUnavailable].map(([bimestre,code])=>({bimestre,code})),rosterContexts:contextRosters.size,rosterRetainedBytes:rosterBytes}:null,save,download,process,collect,screenPending,status:viewStatus,worked,setWorked,canEdit,officialOnly,persist,refresh,pendingPanels,hasPending,reconcileHistorical,activePending:()=>{const pane=currentPanel();return pane==='resumen'?false:pane==='calificar'?(!!get()?.status()?.panels.calificar?.pending||(typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty)):!!get()?.status()?.panels[pane]?.pending;},keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
  // Existing tutor controls call this API only to verify their connection, never to write academic notes.
  root.IERegistroRecovery={refresh,automatic:()=>connection.check(),resolve:()=>{const s=get()?.status();if(s?.historicalConflicts?.length)return reconcileHistorical();connection.invalidate();return connection.check(true,true);},local:save,upload:()=>currentPanel()==='asistencia'?uploadAttendance():save(),recover:download};
  document.addEventListener('DOMContentLoaded',()=>{
