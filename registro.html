@@ -3526,12 +3526,13 @@ function sincronizarFondoPromedios() {
 }
 
 function indicadorCargaRegistro(detalle,compacto=false){
- return '<div data-registro-read-wait class="registro-read-wait'+(compacto?' compact':'')+'"><span class="registro-read-spinner" aria-hidden="true"></span><div class="registro-read-copy"><strong>Espere, sincronizando información…</strong><span data-read-detail>'+escapeRegistro(detalle)+'</span></div></div>';
+ return '<div data-registro-read-wait class="registro-read-wait'+(compacto?' compact':'')+'"><span class="registro-read-spinner" aria-hidden="true"></span><div class="registro-read-copy"><strong>'+escapeRegistro(tituloCargaRegistro(detalle))+'</strong><span data-read-detail>'+escapeRegistro(detalle)+'</span></div></div>';
 }
+function tituloCargaRegistro(detalle){return String(detalle).startsWith('Verificando acceso')?'Verificando acceso…':detalle==='Preparando comparativo bimestral'?'Preparando comparativo bimestral…':'Espere, sincronizando información…';}
 function pintarCargaRegistro(box,detalle,pendiente,compacto=false){
  if(!box)return;box.setAttribute?.('role','status');box.setAttribute?.('aria-live','polite');box.setAttribute?.('aria-atomic','true');box.setAttribute?.('aria-busy',String(!!pendiente));
  if(!pendiente){box.textContent=detalle||'';return;}
- const text=box.querySelector?.('[data-read-detail]');if(text)text.textContent=detalle;else box.innerHTML=indicadorCargaRegistro(detalle,compacto);
+ const text=box.querySelector?.('[data-read-detail]');if(text){text.textContent=detalle;const title=box.querySelector?.('strong');if(title)title.textContent=tituloCargaRegistro(detalle);}else box.innerHTML=indicadorCargaRegistro(detalle,compacto);
 }
 function renderEsperaRegistro(box,id){
  if(!box)return;const state=typeof IERegistroNotas2UI==='undefined'?null:IERegistroNotas2UI.readStatus?.();box.innerHTML='<div id="'+id+'"></div>';
@@ -3706,10 +3707,18 @@ async function cargarComparativoBim(){
  const status=document.getElementById('comparativoBimStatus');
  if(Array.from({length:numero-1},(_,i)=>({...c,bim:['I','II','III'][i]})).some(p=>!historicoLecturaPreparada(p,token))){if(status){status.dataset.readSequence=String(seq);status.dataset.readContext=clave;status.hidden=false;pintarCargaRegistro(status,'Preparando comparativo bimestral',true,true);}renderFinales();}
  try{
-  for(let i=1;i<numero;i++){
-   const prior={...c,bim:['','I','II','III'][i]},cached=historicoLecturaPreparada(prior,token),cachedUntil=cached?registroHistoricoCache.get([prior.nivel,prior.bim,prior.grado,prior.seccion,prior.area].join('||'))?.until:0,proof=cached||await leerRegistroHistorico(prior,token);if(!vigente())return;
-   proofs.push({c:prior,roster:historicoFirmaPadron(prior),local:historicoFirmaLocal(prior),cachedUntil});
-   datos[i]={};comps.forEach(cp=>{datos[i][cp]={};alumnos.forEach(al=>{const prior=comparativoAlumnoAnterior(al,proof.roster);datos[i][cp][studentKey(al)]=prior?comparativoNotaAnterior(proof.payload,proof.c,cp,prior,proof.roster):'';});});
+  // At most two independent periods in flight; each retains its own roster and authenticated reader.
+  for(let first=1;first<numero;first+=2){
+   if(!vigente())return;
+   const batch=await Promise.all(Array.from({length:Math.min(2,numero-first)},async(_,offset)=>{
+    const i=first+offset,prior={...c,bim:['','I','II','III'][i]},cached=historicoLecturaPreparada(prior,token),cachedUntil=cached?registroHistoricoCache.get([prior.nivel,prior.bim,prior.grado,prior.seccion,prior.area].join('||'))?.until:0,proof=cached||await leerRegistroHistorico(prior,token);
+    return {i,prior,cachedUntil,proof,roster:historicoFirmaPadron(prior),local:historicoFirmaLocal(prior)};
+   }));
+   if(!vigente())return;
+   for(const {i,prior,cachedUntil,proof,roster,local}of batch){
+    proofs.push({c:prior,roster,local,cachedUntil});
+    datos[i]={};comps.forEach(cp=>{datos[i][cp]={};alumnos.forEach(al=>{const prior=comparativoAlumnoAnterior(al,proof.roster);datos[i][cp][studentKey(al)]=prior?comparativoNotaAnterior(proof.payload,proof.c,cp,prior,proof.roster):'';});});
+   }
   }
   if(proofs.some(p=>p.roster!==historicoFirmaPadron(p.c)||p.local!==historicoFirmaLocal(p.c)||p.cachedUntil&&(p.cachedUntil<=Date.now()||!historicoAutorizadoHasta(token))))throw Error('La autorización o los datos históricos cambiaron; vuelve a consultar.');
   if(vigente()){const deadlines=[historicoAutorizadoHasta(token),...proofs.map(p=>p.cachedUntil)].filter(n=>n>0);comparativoBimDatos=datos;comparativoBimValidacion={actor,until:deadlines.length?Math.min(...deadlines):0,proofs};renderComparativoBim();}
