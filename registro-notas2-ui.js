@@ -155,20 +155,21 @@
  }
  async function verifyPermission(valid){
   const key=binding(),actor=owner(),profile=prefetchOwner(),started=Date.now(),session=getLoginSession()||{},controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
+  const trace=root.IERegistroEditTrace,ticket=trace?.begin(connection?.diagnosticState?.());let outcome='error';
   try{
    const response=await fetch(CLOUD_API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},cache:'no-store',signal:controller.signal,body:JSON.stringify({action:'academicstate',token:session.token,contextAuthorization:1})});
-   const data=JSON.parse(await response.text());if(owner()!==actor)return {ok:false};
-   if(response.status===401||response.status===403||['SESSION','DENIED'].includes(data?.code)){scopeAuthorization=null;prefetch?.pause();return {ok:false,code:'SESSION'};}
-   if(!valid()||binding()!==key)return {ok:false};
-   if(!response.ok||data?.ok!==true||data.academicReset!==1||!(data.epoch===null||typeof data.epoch==='string'&&/^[a-f0-9]{32}$/.test(data.epoch)))return {ok:false};
+   const data=JSON.parse(await response.text());if(owner()!==actor){outcome='context-change';return {ok:false};}
+   if(response.status===401||response.status===403||['SESSION','DENIED'].includes(data?.code)){outcome='permissions';scopeAuthorization=null;prefetch?.pause();return {ok:false,code:'SESSION'};}
+   if(!valid()||binding()!==key){outcome='context-change';return {ok:false};}
+   if(!response.ok||data?.ok!==true||data.academicReset!==1||!(data.epoch===null||typeof data.epoch==='string'&&/^[a-f0-9]{32}$/.test(data.epoch))){outcome='invalid-response';return {ok:false};}
    const localEpoch=root.IEAcademicResetClient?.epoch?.()||null;
-   if(data.epoch&&data.phase!=='complete')return {ok:false,code:'ACADEMIC_RESET'};
+   if(data.epoch&&data.phase!=='complete'){outcome='generation';return {ok:false,code:'ACADEMIC_RESET'};}
    const initialized=clients.get(key)?.status()?.panels.calificar.version!=null;
    // First load still passes through the existing reset-aware transport; a live context never crosses generations silently.
-   if(data.epoch!==localEpoch&&(initialized||typeof root.IEAcademicResetClient?.ensure!=='function'))return {ok:false,code:'ACADEMIC_RESET'};
-   if(profile!==prefetchOwner())return {ok:false};acceptContextAuthorization(data,started,profile);
+   if(data.epoch!==localEpoch&&(initialized||typeof root.IEAcademicResetClient?.ensure!=='function')){outcome='generation';return {ok:false,code:'ACADEMIC_RESET'};}
+   if(profile!==prefetchOwner()){outcome='context-change';return {ok:false};}acceptContextAuthorization(data,started,profile);outcome='ok';
    return {ok:true};
-  }catch(_){scopeAuthorization=null;return {ok:false};}finally{clearTimeout(timeout);}
+  }catch(e){if(trace?.enabled())try{if(e?.name==='AbortError')outcome='timeout';else if(e?.name==='SyntaxError')outcome='invalid-response';}catch(_){}scopeAuthorization=null;return {ok:false};}finally{clearTimeout(timeout);trace?.end(ticket,connection?.diagnosticState?.(),outcome);}
  }
  function screenPending(panel=currentPanel()){
   const selector=panel==='calificar'?'.cal-nota':panel==='promedios'?'#finLista .fin-nota,#finLista .academic-conclusion':'';if(!selector)return false;
@@ -206,7 +207,18 @@
  function worked(comp,panel=currentPanel(),c=ctxBase()){
   const key=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');const map=panel==='calificar'?(store.calificarEstado||store.competenciasEstado):store.competenciasEstado;return !map||map[key]?.trabajada!==false;
  }
- function canEdit(panel=currentPanel()){if(panel==='resumen')return false;if(tutor())return !!connection?.canEdit();const c=get();if(c?.status()?.state==='conflict')return false;return !!connection?.canEdit()&&!!c?.canEdit(panel);}
+ function canEdit(panel=currentPanel()){
+  let result,c,s,clientEditable=null;
+  if(panel==='resumen')result=false;
+  else if(tutor())result=!!connection?.canEdit();
+  else{c=get();s=c?.status();result=s?.state==='conflict'?false:!!connection?.canEdit()&&!!(clientEditable=c?.canEdit(panel));}
+  const trace=root.IERegistroEditTrace;
+  if(trace?.enabled()){
+   const state=connection?.diagnosticState?.(),gate=state?.gate;
+   const reason=result?'enabled':panel==='resumen'?'readonly':gate?.reason==='context-change'?'context-change':s?.state==='conflict'?'conflict':s?.readonly?'readonly':gate?.canEdit===false?gate.reason:s?.busy?'client-busy':s?.legacy&&clientEditable===false?'client-legacy':'client-state';
+   trace.record('gate',state,{layer:'ui',panel,canEdit:result,authorized:gate?.authorized,allowed:gate?.allowed,clientState:s?.state,clientReadonly:s?.readonly,clientBusy:s?.busy,reason});
+  }return result;
+ }
  function viewStamp(s){return JSON.stringify([binding(),currentPanel(),s?.legacy,s?.processed,Object.values(s?.panels||{}).map(p=>p.version)]);}
  function render(){lastView=viewStamp(get()?.status());renderedPaused=!canEdit();if(tutor()){if(connection?.canEdit())tutorRegistroController?.refresh?.();else document.querySelectorAll('#transRows input,#transRows textarea,#transRows select,#transRows button').forEach(el=>el.disabled=true);return;}if(painting)return;painting=true;try{renderSesiones();renderStudents();if(currentPanel()==='promedios')renderFinales();if(document.getElementById('panelAvance')?.classList.contains('on'))renderAvance();if(currentPanel()==='asistencia')renderAsistencia();sincronizarEdicionRegistro();}finally{painting=false;paint();}}
  // Presentation observes existing promises/states; never starts a read or grants access.
@@ -375,7 +387,7 @@
   let lease=!force&&!review?contextAuthorization():null;
   const operation={key:binding()};if(!lease){accessRead=operation;paintReadFeedback();}
   let periods,permission;try{[periods,permission]=lease?[true,{ok:true}]:await Promise.all([sincronizarPeriodosNube(true),verifyPermission(valid)]);}finally{if(accessRead===operation)accessRead=null;paintReadFeedback();}
-  if(permission.code==='SESSION')return permission;if(!valid())return {ok:false};if(!permission.ok)return permission;if(!periods)return {ok:false};
+  if(permission.code==='SESSION')return permission;if(!valid())return {ok:false};if(!permission.ok)return permission;if(!periods){root.IERegistroEditTrace?.record('verification-rejected',connection?.diagnosticState?.(),{reason:'period-verification',outcome:'error'});return {ok:false};}
   // A newly issued scope must also cap this context's grant, not only later visits.
   lease=lease||contextAuthorization();
   if(esVistaAdmin())return {ok:true,code:'CLOSED',pending:false};
