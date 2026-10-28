@@ -14,4 +14,4 @@ const assert=require('node:assert/strict'),edits=[
   ""
  ]
 ];
-module.exports=(file,source)=>{let s=source.replace(/\r\n/g,'\n');if(file==='registro-notas2-ui.js')for(const [current,previous]of edits)if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique bimestre navigation delta');s=s.replace(current,previous);}return s;};
+module.exports=(file,source)=>{source=require('./notas2-active-renewal-boundary.cjs')(file,source);let s=source.replace(/\r\n/g,'\n');if(file==='registro-notas2-ui.js')for(const [current,previous]of edits)if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique bimestre navigation delta');s=s.replace(current,previous);}return s;};

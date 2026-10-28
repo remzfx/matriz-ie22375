@@ -20,7 +20,7 @@
    if(disposed)return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
    if(!o.authorized()){emit(o.readonly?.()?'readonly':'session');return false;}
    if(!online()){pause('offline');return false;}
-   if(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit())return true;
+   while(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit())return true;
    try{if(review&&canEdit())o.retain?.();}catch(e){retentionFailed=true;emit('review');return false;}
    const priorPending=state==='pending'||canEdit();
    const id=++epoch,key=binding;clear(timer);emit('checking');
