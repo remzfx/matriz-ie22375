@@ -1,6 +1,6 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),{execFileSync}=require('node:child_process');
-const current=require('./notas2-session-authorization-boundary.cjs')('registro.html',fs.readFileSync('registro.html','utf8')),before=execFileSync('git',['show','9d81f20:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
+const current=require('./notas2-session-authorization-boundary.cjs')('registro.html',require('./roster-persistence-boundary.cjs')('registro.html',fs.readFileSync('registro.html','utf8'))),before=execFileSync('git',['show','9d81f20:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
 test('compact header changes only reviewed HTML/CSS; every inline script and academic handler is unchanged',()=>{
  const scripts=s=>[...s.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[0]);assert.deepEqual(scripts(current),scripts(before));
  const normalize=require('./academic-save-modal-boundary.cjs');assert.equal(normalize('registro.html',current),normalize('registro.html',before));
