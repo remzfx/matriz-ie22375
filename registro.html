@@ -1480,11 +1480,19 @@ function aliasesAula() {
   return store.studentAliases[key] || (store.studentAliases[key] = {});
 }
 function recordarPadron(base) {
+  const original = store.studentAliases;
+  const mapaValido = v => v && typeof v === 'object' && !Array.isArray(v);
+  if (original !== undefined && (!mapaValido(original) || Object.values(original).some(aula =>
+    !mapaValido(aula) || Object.values(aula).some(names => !Array.isArray(names) || names.some(n => typeof n !== 'string'))))) {
+    throw new TypeError('Formato de alias local inesperado; originales conservados.');
+  }
+  // Trabajar sobre mapas separados: un error no debe dejar alias parcialmente actualizados.
+  const siguiente = Object.fromEntries(Object.entries(original || {}).map(([key, aula]) => [key, {...aula}]));
   ['primaria','secundaria'].forEach(n => ((base[n] || {}).estudiantes || []).forEach(al => {
     const key = [n,al.grado,al.seccion].join('||');
-    store.studentAliases = store.studentAliases || {};
-    IEStudentIdentity.recordar(store.studentAliases[key] || (store.studentAliases[key] = {}), al);
+    IEStudentIdentity.recordar(siguiente[key] || (siguiente[key] = {}), al);
   }));
+  store.studentAliases = siguiente;
 }
 function leerNota(mapa, key) {
   if (!key) return undefined;
@@ -1544,14 +1552,25 @@ function bloquearRegistroMientrasValida(bloquear) {
   padronVerificadoServidor = !bloquear;
   sincronizarEdicionRegistro();
 }
+function errorPadronLocal(phase, e) {
+  const exceptionType = ['TypeError','SyntaxError','SecurityError','QuotaExceededError','Error'].includes(e?.name) ? e.name : 'OtherError';
+  console.warn('Registro: diagnóstico del padrón local', {phase, exceptionType});
+  return Object.assign(new Error(phase === 'recordarPadron'
+    ? 'No se pudieron preparar los alias del padrón local. Los originales se conservaron; no se intentó guardar. No cierres esta pestaña.'
+    : 'No se pudo conservar el padrón local al guardar. No cierres esta pestaña; conserva los datos y revisa el almacenamiento.'),
+    {code:phase === 'recordarPadron' ? 'ROSTER_ALIASES' : 'LOCAL_STORAGE',phase,exceptionType,retryable:true});
+}
+
 function pintarPadronInmediato(base, bimestre, desdeCache) {
   const mismoPadron = padronBimestre === bimestre && !registroSoloLectura();
   const contextoAnterior = JSON.stringify(ctxBase());
   // Recolectar antes de cambiar nombres/IDs o reconstruir la grilla; nunca subir automáticamente.
   if (mismoPadron && guardarTodo() === false) throw Object.assign(new Error('No se pudo conservar el trabajo local. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.'),{code:'LOCAL_STORAGE',retryable:true});
   bdEstudiantes = base; padronBimestre = bimestre;
-  try { if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()){recordarPadron(base); saveStore();} }
-  catch(e) { throw Object.assign(new Error('No se pudo conservar el padrón local. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.'),{code:'LOCAL_STORAGE',retryable:true}); }
+  if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()) {
+    try { recordarPadron(base); } catch(e) { throw errorPadronLocal('recordarPadron', e); }
+    try { saveStore(); } catch(e) { throw errorPadronLocal('saveStore', e); }
+  }
   llenarAulasPadron(nivel);
   onContexto({localOnly:desdeCache, preservar:mismoPadron && contextoAnterior === JSON.stringify(ctxBase())});
   sincronizarEdicionRegistro();
@@ -1578,10 +1597,12 @@ async function cargarPadronRegistro(bimestre) {
   }
   tokenPadron = tokenSolicitud; cargandoEstudiantes = true;
   bloquearRegistroMientrasValida(true);
-  if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica())recordarPadron(bdEstudiantes);
   const candidata = IEStudents.peekRoster(bimestre);
   const cache = typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&candidata?.padronInicializado!==true?null:candidata;
   try {
+  if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()) {
+    try { recordarPadron(bdEstudiantes); } catch(e) { throw errorPadronLocal('recordarPadron', e); }
+  }
   if (cache) pintarPadronInmediato(cache,bimestre,true);
   else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
     ['finLista','avanceBox','asisLista'].forEach(id => { const el=document.getElementById(id); if(el)el.innerHTML=''; }); }
@@ -1602,10 +1623,10 @@ async function cargarPadronRegistro(bimestre) {
     if (solicitud !== solicitudPadron) return false;
     cargandoEstudiantes = false; padronVerificadoServidor = false;
     const vigente = e.retryable && IEStudents.validToken() === tokenPadron && IEStudents.peekRoster(bimestre);
-    if (vigente) { if (e.code !== 'LOCAL_STORAGE') pintarPadronInmediato(vigente,bimestre,true); }
+    if (vigente) { if (!['LOCAL_STORAGE','ROSTER_ALIASES'].includes(e.code)) pintarPadronInmediato(vigente,bimestre,true); }
     else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
       ['finLista','avanceBox','asisLista'].forEach(id => { const el=document.getElementById(id); if(el)el.innerHTML=''; }); }
-    estadoPadron(e.message + (vigente ? ' Modo local activo: puedes seguir trabajando; nube pendiente.' : ' Puedes reintentar.'),true);
+    estadoPadron(e.message + (vigente ? (e.code === 'ROSTER_ALIASES' ? ' Consulta conservada; revisión de alias pendiente.' : ' Modo local activo: puedes seguir trabajando; nube pendiente.') : ' Puedes reintentar.'),true);
     return !!vigente;
   } finally {
     if (solicitud === solicitudPadron) { cargandoEstudiantes = false; sincronizarEdicionRegistro(); }

@@ -1,5 +1,38 @@
 # PR #118: persistencia local de padrones — diagnóstico focalizado
 
+## Corrección autorizada de clasificación
+
+El diagnóstico inicial de abajo se conserva como antecedente. Se reprodujo
+además un `TypeError` en `recordarPadron()` con un alias no iterable, antes
+de llamar a `saveStore()`. Esto prueba una clasificación incorrecta, no el
+estado concreto del almacenamiento del equipo reportado.
+
+Ahora `recordarPadron()` valida mapas y listas de nombres antes de iterarlos;
+prepara mapas separados y solo los adopta al finalizar. Un formato inesperado
+conserva el objeto original completo y no intenta persistirlo. No hay reparación,
+migración, limpieza ni sustitución automática de datos o IndexedDB.
+
+Los errores llevan `phase: recordarPadron | saveStore` y un `exceptionType`
+limitado a tipos conocidos (otros se registran como `OtherError`). La consola
+solo recibe esas dos propiedades: no incluye excepción original, mensaje,
+pila, nombres, identificadores, notas ni contenido del almacenamiento.
+El error de alias explica que no se intentó guardar; el de guardado identifica
+esa operación. La captura previa del padrón anterior también queda dentro del
+manejo de errores. No se repite el procesamiento de alias fallidos desde el
+fallback; se conserva la consulta cargada cuando la caché/token siguen vigentes,
+sin habilitar verificaciones ni escrituras de nube.
+
+Regresiones diferenciales I/III: alias válidos/inválidos, ausencia de cambios
+parciales y persistencia ante alias inválidos, notas/conclusiones/sesiones y
+disco anteriores intactos, cero escrituras remotas, diagnóstico sin datos
+personales. La comparación histórica reconoce únicamente los deltas literales
+de estas cuatro funciones; mutaciones de validación o autorización quedan
+visibles. No modifica los contratos de persistencia ni el helper de identidad.
+
+Validación local: 50 pruebas focalizadas inicialmente y 13 del archivo
+diferencial final (incluye la protección de la comparación histórica), todas
+aprobadas. Sintaxis y dependencias correctas. Resultado integral en CI del HEAD.
+
 ## Evidencia demostrada con datos ficticios
 
 `pintarPadronInmediato()` asigna `bdEstudiantes` y `padronBimestre` antes de
@@ -57,8 +90,8 @@ limpiar almacenamiento ni reemplazar datos para intentar resolver el aviso.
 No se ha demostrado pérdida efectiva de borradores ni que su almacenamiento
 independiente haya fallado; tampoco se garantiza su recuperación sin comprobarlo.
 
-No se cambia código de producción mientras falte identificar la excepción
-del equipo. Corregir después únicamente la causa reproducida; conservar las
+El diagnóstico inicial no cambió producción. La corrección posterior de arriba
+aborda únicamente la clasificación y validación reproducidas; conservar las
 guardas de cuenta/pestañas y no recomendar liberar espacio mediante borrado de
 datos institucionales. Este diagnóstico no modifica ni vuelve a subir padrones.
 

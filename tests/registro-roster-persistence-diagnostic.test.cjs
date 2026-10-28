@@ -29,12 +29,12 @@ test('I/II/III/I rosters reuse the account store without multiplying persistent 
  assert.equal(f.r.run('Object.keys(store.studentAliases["secundaria||4||B"]).length'),3);
 });
 for(const [failure,name,message]of [['read','SecurityError',/access denied/],['json','Error',/interpretar el almacenamiento/],['concurrent','Error',/Otra pestaña/],['quota','QuotaExceededError',/quota exceeded/]]){
- test('Identical roster warning masks '+failure+'; students visible does not prove persistence',()=>{
+ test('saveStore failure '+failure+' is classified separately; students remain in memory',()=>{
   const f=setup(failure),before=f.disk.get(f.key),memory=f.r.run('store');
   memory.grades.synthetic={nivel:'C',origen:'letra'};
   for(const bim of ['I','III']){
    f.r.el('selBim').value=bim;
-   assert.throws(()=>f.r.c.pintarPadronInmediato(f.r.roster([{idSiagie:'synthetic',nombre:'FICTICIO',grado:4,seccion:'B'}],bim),bim,true),e=>e.code==='LOCAL_STORAGE'&&/No se pudo conservar el padrón local/.test(e.message));
+   assert.throws(()=>f.r.c.pintarPadronInmediato(f.r.roster([{idSiagie:'synthetic',nombre:'FICTICIO',grado:4,seccion:'B'}],bim),bim,true),e=>e.code==='LOCAL_STORAGE'&&e.phase==='saveStore'&&e.exceptionType===name&&/al guardar/.test(e.message));
    assert.equal(f.original().name,name);assert.match(f.original().message,message);
    assert.equal(f.r.run('estudiantes().length'),1);assert.equal(memory.grades.synthetic.nivel,'C');
   }
@@ -47,4 +47,55 @@ test('VS Code and published origins have independent storage even for the same a
  stores[0].write('{"asistencia":{"synthetic":"P"}}');
  assert.equal(stores[1].read(),null);assert.equal(stores[0].key,stores[1].key);
  assert.equal(stores[0].read(),'{"asistencia":{"synthetic":"P"}}');
+});
+for(const bim of ['I','III']) {
+ test(bim+': valid aliases retain originals and academic drafts while completing the roster capture',()=>{
+  const f=setup(),memory=f.r.run('store'),beforeDisk=f.disk.get(f.key);
+  memory.studentAliases={'secundaria||4||B':{'id:synthetic':['FICTICIO ANTERIOR']}};
+  memory.grades.original={nivel:'B'};memory.finales.original={nivel:'A'};memory.concComp={original:'Conclusión ficticia'};
+  const before=JSON.stringify([memory.grades,memory.finales,memory.concComp,memory.sessions]),diagnostics=[];
+  f.r.c.console={warn:(...args)=>diagnostics.push(args)};f.r.el('selBim').value=bim;
+  const base=f.r.roster([{idSiagie:'synthetic',nombre:'FICTICIO ACTUAL',grado:4,seccion:'B'}],bim);
+  f.r.c.pintarPadronInmediato(base,bim,true);
+  assert.equal(JSON.stringify([memory.grades,memory.finales,memory.concComp,memory.sessions]),before);
+  assert.deepEqual(Array.from(memory.studentAliases['secundaria||4||B']['id:synthetic']),['FICTICIO ACTUAL','FICTICIO ANTERIOR']);
+  assert.equal(f.r.run('bdEstudiantes'),base);assert.equal(f.disk.get(f.key),beforeDisk);
+  assert.equal(diagnostics.length,0);assert.equal(f.a.requests.length+f.r.requests.length,0);
+ });
+ test(bim+': unexpected alias types are non-destructive, diagnosed before any storage operation',()=>{
+  for(const invalid of ['unexpected',null,{},[42]]){
+   const f=setup(),memory=f.r.run('store'),diagnostics=[],beforeDisk=f.disk.get(f.key);
+   memory.studentAliases={'secundaria||4||B':{'id:valid':['FICTICIO ORIGINAL'],'id:synthetic':invalid}};
+   memory.grades.original={nivel:'B'};memory.finales.original={nivel:'A'};memory.concComp={original:'Conclusión ficticia'};
+   const before=JSON.stringify(memory),aliases=memory.studentAliases,operations=f.operations.length;
+   f.r.c.console={warn:(...args)=>diagnostics.push(args)};f.r.el('selBim').value=bim;
+   const base=f.r.roster([{idSiagie:'valid',nombre:'FICTICIO CAMBIADO',grado:4,seccion:'B'},{idSiagie:'synthetic',nombre:'FICTICIO SECRETO',grado:4,seccion:'B'}],bim);
+   assert.throws(()=>f.r.c.pintarPadronInmediato(base,bim,true),e=>e.code==='ROSTER_ALIASES'&&e.phase==='recordarPadron'&&e.exceptionType==='TypeError'&&/no se intentó guardar/.test(e.message)&&!/almacenamiento/.test(e.message));
+   assert.equal(JSON.stringify(memory),before);assert.equal(memory.studentAliases,aliases);
+   assert.equal(f.r.run('bdEstudiantes'),base);assert.equal(f.r.run('estudiantes().length'),2);
+   assert.equal(f.operations.length,operations);assert.equal(f.disk.get(f.key),beforeDisk);
+   assert.equal(JSON.stringify(diagnostics),'[["Registro: diagnóstico del padrón local",{"phase":"recordarPadron","exceptionType":"TypeError"}]]');
+   assert.equal(f.a.requests.length+f.r.requests.length,0);
+  }
+ });
+ test(bim+': loader classifies prior alias capture once without recursive retry or persistence',async()=>{
+  const f=setup(),memory=f.r.run('store'),diagnostics=[],beforeDisk=f.disk.get(f.key);
+  memory.studentAliases={'secundaria||4||B':{'id:synthetic':'unexpected'}};
+  f.r.c.base=f.r.roster([{idSiagie:'synthetic',nombre:'FICTICIO',grado:4,seccion:'B'}],bim);
+  f.r.c.console={warn:(...args)=>diagnostics.push(args)};f.r.el('selBim').value=bim;
+  f.r.run('bdEstudiantes=base');
+  const before=JSON.stringify(memory),operations=f.operations.length;
+  assert.equal(await f.r.c.cargarPadronRegistro(bim),true);
+  assert.equal(diagnostics.length,1);assert.equal(diagnostics[0][1].phase,'recordarPadron');
+  assert.equal(f.operations.length,operations);assert.equal(f.disk.get(f.key),beforeDisk);
+  assert.equal(JSON.stringify(memory),before);assert.equal(f.a.requests.length+f.r.requests.length,0);
+ });
+}
+test('Historical boundary recognizes only the exact diagnostic changes and exposes safety mutations',()=>{
+ const boundary=require('./roster-persistence-boundary.cjs'),source=fs.readFileSync('registro.html','utf8');
+ const previous=require('node:child_process').execFileSync('git',['show','4f98fc28061525f23d4ba54409a58cbd2aa10c2c:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
+ assert.equal(boundary('registro.html',source),previous);
+ for(const [from,to]of [['!Array.isArray(names)','false'],["throw errorPadronLocal('recordarPadron', e)","saveStore()"],['IEStudents.validToken() === tokenPadron','true']]){
+  assert.ok(source.includes(from));assert.notEqual(boundary('registro.html',source.replace(from,to)),previous);
+ }
 });
