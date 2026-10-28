@@ -101,11 +101,17 @@
    if(r.local||o.hasLocal(c)||r.signature!==o.localSignature(c)){const error=Error('Existe trabajo local protegido. La reserva no lo reemplazó; requiere revisión.');error.code='PREFETCH_LOCAL';throw error;}
    cacheHits++;return {response:JSON.parse(r.json),signature:r.signature};
   }
+  function availability(raw){
+   sync();const c=context(raw),k=key(c),candidate=receipts.get(k),known=!!o.isKnown?.(c),e=records.get(k);
+   // Presentation checks one receipt only; expiry/identity checks remain mandatory on acquire().
+   const r=candidate&&candidate.identity===identity&&candidate.expires>now()&&candidate.proof===proof(c)&&o.allowed(c)&&!known?candidate:null;
+   return {state:r?'reserved':known?'known':candidate?'incompatible':e?.state||'unknown',reserved:!!r,protectedLocal:!!r&&(r.local||!!o.hasLocal(c)||r.signature!==o.localSignature(c)),consultedAt:r?.at??null,expiresAt:r?.expires??null};
+  }
   function stats(){
    sync();prune();const states={};for(const e of records.values())states[e.state]=(states[e.state]||0)+1;
    return {reads,avoided,cacheHits,enumerated:observed.size,admitted:records.size,deferredContexts:observed.size-records.size,completed,pending:!!task,reserved:!!receipts.size,reservations:receipts.size,retainedBytes:bytes(),totalRetainedBytes:totalBytes(),peakBytes,peakTotalBytes,queued:states.queued||0,states,paused,holds:[...holds],budgetExhausted:reads>=limits.maxReads,limits:{...limits},target:task?key(task.context):null};
   }
-  return {start,select,prefetch,acquire,pause,hold,release,availableBytes:()=>Math.max(0,limits.maxBytes-totalBytes()),resume(){sync();paused=false;},stats,dispose(){pause();records.clear();holds.clear();clear(timer);clear(expiryTimer);}};
+  return {start,select,prefetch,acquire,pause,hold,release,availability,availableBytes:()=>Math.max(0,limits.maxBytes-totalBytes()),resume(){sync();paused=false;},stats,dispose(){pause();records.clear();holds.clear();clear(timer);clear(expiryTimer);}};
  }
  const api={key,context,enumerate,create};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.IERegistroNotas2Prefetch=api;
 })(typeof window==='undefined'?globalThis:window);

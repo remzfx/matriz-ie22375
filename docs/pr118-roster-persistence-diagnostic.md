@@ -12,9 +12,9 @@ prepara mapas separados y solo los adopta al finalizar. Un formato inesperado
 conserva el objeto original completo y no intenta persistirlo. No hay reparación,
 migración, limpieza ni sustitución automática de datos o IndexedDB.
 
-Los errores llevan `phase: recordarPadron | saveStore` y un `exceptionType`
-limitado a tipos conocidos (otros se registran como `OtherError`). La consola
-solo recibe esas dos propiedades: no incluye excepción original, mensaje,
+Se reutiliza el diagnóstico remoto existente: `operacion: recordarPadron | saveStore`,
+`tipo` y `codigo`, limitados a listas permitidas (otros quedan como
+`UnknownError` / `UNKNOWN`). La consola solo recibe esas propiedades: no incluye excepción original, mensaje,
 pila, nombres, identificadores, notas ni contenido del almacenamiento.
 El error de alias explica que no se intentó guardar; el de guardado identifica
 esa operación. La captura previa del padrón anterior también queda dentro del
@@ -29,9 +29,9 @@ personales. La comparación histórica reconoce únicamente los deltas literales
 de estas cuatro funciones; mutaciones de validación o autorización quedan
 visibles. No modifica los contratos de persistencia ni el helper de identidad.
 
-Validación local: 50 pruebas focalizadas inicialmente y 13 del archivo
-diferencial final (incluye la protección de la comparación histórica), todas
-aprobadas. Sintaxis y dependencias correctas. Resultado integral en CI del HEAD.
+Validación local tras integrar el HEAD remoto `96297c8`: 57 pruebas focalizadas
+aprobadas, incluidas las regresiones previas de metadatos seguros y la
+protección de la comparación histórica. Sintaxis y dependencias correctas. Resultado integral en CI del HEAD.
 
 ## Evidencia demostrada con datos ficticios
 

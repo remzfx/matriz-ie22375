@@ -34,7 +34,7 @@ for(const [failure,name,message]of [['read','SecurityError',/access denied/],['j
   memory.grades.synthetic={nivel:'C',origen:'letra'};
   for(const bim of ['I','III']){
    f.r.el('selBim').value=bim;
-   assert.throws(()=>f.r.c.pintarPadronInmediato(f.r.roster([{idSiagie:'synthetic',nombre:'FICTICIO',grado:4,seccion:'B'}],bim),bim,true),e=>e.code==='LOCAL_STORAGE'&&e.phase==='saveStore'&&e.exceptionType===name&&/al guardar/.test(e.message));
+   assert.throws(()=>f.r.c.pintarPadronInmediato(f.r.roster([{idSiagie:'synthetic',nombre:'FICTICIO',grado:4,seccion:'B'}],bim),bim,true),e=>e.code==='LOCAL_STORAGE'&&e.operacion==='saveStore'&&e.tipo===name&&/saveStore/.test(e.message));
    assert.equal(f.original().name,name);assert.match(f.original().message,message);
    assert.equal(f.r.run('estudiantes().length'),1);assert.equal(memory.grades.synthetic.nivel,'C');
   }
@@ -70,11 +70,11 @@ for(const bim of ['I','III']) {
    const before=JSON.stringify(memory),aliases=memory.studentAliases,operations=f.operations.length;
    f.r.c.console={warn:(...args)=>diagnostics.push(args)};f.r.el('selBim').value=bim;
    const base=f.r.roster([{idSiagie:'valid',nombre:'FICTICIO CAMBIADO',grado:4,seccion:'B'},{idSiagie:'synthetic',nombre:'FICTICIO SECRETO',grado:4,seccion:'B'}],bim);
-   assert.throws(()=>f.r.c.pintarPadronInmediato(base,bim,true),e=>e.code==='ROSTER_ALIASES'&&e.phase==='recordarPadron'&&e.exceptionType==='TypeError'&&/no se intentó guardar/.test(e.message)&&!/almacenamiento/.test(e.message));
+   assert.throws(()=>f.r.c.pintarPadronInmediato(base,bim,true),e=>e.code==='LOCAL_STORAGE'&&e.operacion==='recordarPadron'&&e.tipo==='TypeError'&&/no se intentó guardar/.test(e.message)&&!/almacenamiento/.test(e.message));
    assert.equal(JSON.stringify(memory),before);assert.equal(memory.studentAliases,aliases);
    assert.equal(f.r.run('bdEstudiantes'),base);assert.equal(f.r.run('estudiantes().length'),2);
    assert.equal(f.operations.length,operations);assert.equal(f.disk.get(f.key),beforeDisk);
-   assert.equal(JSON.stringify(diagnostics),'[["Registro: diagnóstico del padrón local",{"phase":"recordarPadron","exceptionType":"TypeError"}]]');
+   assert.equal(JSON.stringify(diagnostics),'[["registro.persistencia",{"operacion":"recordarPadron","tipo":"TypeError","codigo":"UNKNOWN"}]]');
    assert.equal(f.a.requests.length+f.r.requests.length,0);
   }
  });
@@ -86,14 +86,14 @@ for(const bim of ['I','III']) {
   f.r.run('bdEstudiantes=base');
   const before=JSON.stringify(memory),operations=f.operations.length;
   assert.equal(await f.r.c.cargarPadronRegistro(bim),true);
-  assert.equal(diagnostics.length,1);assert.equal(diagnostics[0][1].phase,'recordarPadron');
+  assert.equal(diagnostics.length,1);assert.equal(diagnostics[0][1].operacion,'recordarPadron');
   assert.equal(f.operations.length,operations);assert.equal(f.disk.get(f.key),beforeDisk);
   assert.equal(JSON.stringify(memory),before);assert.equal(f.a.requests.length+f.r.requests.length,0);
  });
 }
 test('Historical boundary recognizes only the exact diagnostic changes and exposes safety mutations',()=>{
  const boundary=require('./roster-persistence-boundary.cjs'),source=fs.readFileSync('registro.html','utf8');
- const previous=require('node:child_process').execFileSync('git',['show','4f98fc28061525f23d4ba54409a58cbd2aa10c2c:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
+ const previous=require('node:child_process').execFileSync('git',['show','96297c81e1f846f284e4b1371c5c4908d5d00eaf:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
  assert.equal(boundary('registro.html',source),previous);
  for(const [from,to]of [['!Array.isArray(names)','false'],["throw errorPadronLocal('recordarPadron', e)","saveStore()"],['IEStudents.validToken() === tokenPadron','true']]){
   assert.ok(source.includes(from));assert.notEqual(boundary('registro.html',source.replace(from,to)),previous);

@@ -35,4 +35,4 @@ const edits={
   ]
  ]
 };
-module.exports=(file,source)=>{let s=file==='registro.html'?require('./notas2-context-loading-boundary.cjs')(source):source.replace(/\r\n/g,'\n');for(const [current,previous] of edits[file]||[]){if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique worked-selection hook');s=s.replace(current,previous);}}return s;};
+module.exports=(file,source)=>{source=require('./registro-read-feedback-boundary.cjs')(file,source);let s=file==='registro.html'?require('./notas2-context-loading-boundary.cjs')(source):source.replace(/\r\n/g,'\n');for(const [current,previous] of edits[file]||[]){if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique worked-selection hook');s=s.replace(current,previous);}}return s;};

@@ -18,7 +18,7 @@
   if(report?.model==='notas2'){
    const labels={ready:'Disponible',checking:'Verificando',conflict:'Conflicto CAS: usa Bajar Nube para revisar la recuperación',server:'Error académico: no se confirmó la operación',offline:'Sin conexión',session:'Sesión inválida',readonly:'Solo lectura'};
    const rows=Object.entries(report.panels||{}).map(([name,p])=>'<li>'+escapeHtml(name)+': versión confirmada '+escapeHtml(p.version==null?'sin confirmar':String(p.version))+' · '+(p.pending?'Cambios sin guardar':'Sin cambios pendientes')+'</li>').join('');
-   const details='<p><strong>Padrón:</strong> '+escapeHtml(report.roster?.message||'Sin confirmación disponible')+'</p><p>'+escapeHtml(report.saveSummary||'')+'</p>';
+   const details='<p>Diagnóstico global: incluye Calificar, Promedios y Asistencia del contexto actual.</p><p><strong>Padrón:</strong> '+escapeHtml(report.roster?.message||'Sin confirmación disponible')+'</p><p><strong>Estado del panel activo:</strong> '+escapeHtml(report.saveSummary||'Sin información disponible')+'</p>';
    return details+'<p><strong>Notas 2.0 · '+escapeHtml(labels[report.state]||report.state)+'</strong></p><p>Conexión: '+escapeHtml(report.connection||'desconocida')+(report.readonly?' · Solo lectura':'')+'</p><ul>'+rows+'</ul><p>Estado local de las últimas confirmaciones por panel. Este diagnóstico no certifica la versión actual del servidor ni consulta el registro anterior. Los errores o conflictos requieren recuperación explícita; no se descartan cambios desde este diálogo.</p>';
   }
   const p = report?.period || {};
@@ -164,7 +164,7 @@
 
   const title = document.createElement('h2');
   title.style.cssText = 'font-size:16px;font-weight:700;margin:0 0 12px 0;display:flex;align-items:center;gap:8px;';
-  title.innerHTML = '<span>Diagnóstico de sincronización</span><span style="font-size:11px;font-weight:400;background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:9999px">Solo lectura</span>';
+  title.innerHTML = '<span>Diagnóstico global de sincronización</span><span style="font-size:11px;font-weight:400;background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:9999px">Solo lectura</span>';
   dialog.appendChild(title);
 
   const content = document.createElement('div');
