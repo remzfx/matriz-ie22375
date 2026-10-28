@@ -638,6 +638,19 @@
 @media(prefers-reduced-motion:reduce){#registroConnectionStatus::before {animation:none!important;}}
 @media print{#registroConnectionStatus{display:none!important}}
 /* Fin Fase3 conexión. */
+
+  /* Read feedback: presentation only, no progress estimates or timing controller. */
+  .registro-read-wait {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:112px;max-width:100%;padding:16px 12px;border:1px solid #e0f2fe;border-radius:12px;background:#f8fcff;color:#0f172a;text-align:center;font:inherit;box-sizing:border-box;}
+  .registro-read-spinner {display:block;width:26px;height:26px;flex:0 0 auto;box-sizing:border-box;border:3px solid #dbeafe;border-top-color:#0284c7;border-radius:50%;animation:registroReadSpin .85s linear infinite;}
+  .registro-read-copy {display:flex;flex-direction:column;gap:3px;min-width:0;max-width:100%;overflow-wrap:anywhere;}
+  .registro-read-copy strong {font-size:14px;font-weight:700;line-height:1.4;}
+  .registro-read-copy [data-read-detail] {font-size:12px;color:#64748b;line-height:1.45;}
+  .registro-read-wait.compact {min-height:0;flex-direction:row;gap:8px;padding:7px 10px;margin:4px 0;}
+  .registro-read-wait.compact .registro-read-spinner {width:18px;height:18px;border-width:2px;}
+  .registro-read-wait.compact strong {font-size:12px;}
+  @keyframes registroReadSpin {to{transform:rotate(360deg)}}
+  @media(prefers-reduced-motion:reduce){.registro-read-spinner{animation:none;}}
+  @media print{.registro-read-wait{display:none!important;}}
 </style>
   <script src="login-bridge.js"></script>
 <script>
@@ -798,7 +811,7 @@ function registroDependenciaFallida(){
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
               <div class="fin-header-aux">
                 <div class="fin-mode-info" id="finModeInfo"></div>
-                <span id="finContextStatus" role="status" class="text-xs text-slate-500" hidden>Verificando datos…</span>
+                <div id="finContextStatus" hidden></div>
                 <div id="finResumen"></div>
               </div>
             </div>
@@ -819,6 +832,7 @@ function registroDependenciaFallida(){
             </div>
           </div>
         </header>
+        <div id="comparativoBimStatus" hidden></div>
         <div id="finLista" class="fin-wrap fin-scroll-body"></div>
         <div id="finEstadisticas"></div>
       </div>
@@ -850,6 +864,7 @@ function registroDependenciaFallida(){
           <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">T <span id="aT">0</span></span>
           <span class="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-800">J <span id="aJ">0</span></span>
         </div>
+        <div id="asisContextStatus" hidden></div>
         <div id="asisLista"></div>
       </div>
     </div>
@@ -925,6 +940,7 @@ function registroDependenciaFallida(){
         <p class="scale-hint" id="lblEscala">Escala: AD destacado · A logrado · B proceso · C inicio</p>
         <p class="text-[10px] text-slate-400">Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas.</p>
       </div>
+      <div id="calContextStatus" hidden></div>
       <div id="stuList" class="mt-2"></div>
     </div>
     </div><!-- /panelCalificar -->
@@ -2815,6 +2831,8 @@ function renderStudents() {
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const list = estudiantes();
   const box = document.getElementById('stuList');
+  if(typeof IERegistroNotas2UI!=='undefined'&&!registroHistoricoProyectando&&IERegistroNotas2UI.current()?.status()?.panels.calificar.version==null){renderEsperaRegistro(box,'calContextLoading');return;}
+  box.setAttribute?.('aria-busy','false');
   const fecha = (document.getElementById('inpFecha')||{}).value || '';
   const comp = (document.getElementById('selComp')||{}).value || '';
   if (!fecha) {
@@ -3507,6 +3525,19 @@ function sincronizarFondoPromedios() {
   }
 }
 
+function indicadorCargaRegistro(detalle,compacto=false){
+ return '<div data-registro-read-wait class="registro-read-wait'+(compacto?' compact':'')+'"><span class="registro-read-spinner" aria-hidden="true"></span><div class="registro-read-copy"><strong>Espere, sincronizando información…</strong><span data-read-detail>'+escapeRegistro(detalle)+'</span></div></div>';
+}
+function pintarCargaRegistro(box,detalle,pendiente,compacto=false){
+ if(!box)return;box.setAttribute?.('role','status');box.setAttribute?.('aria-live','polite');box.setAttribute?.('aria-atomic','true');box.setAttribute?.('aria-busy',String(!!pendiente));
+ if(!pendiente){box.textContent=detalle||'';return;}
+ const text=box.querySelector?.('[data-read-detail]');if(text)text.textContent=detalle;else box.innerHTML=indicadorCargaRegistro(detalle,compacto);
+}
+function renderEsperaRegistro(box,id){
+ if(!box)return;const state=typeof IERegistroNotas2UI==='undefined'?null:IERegistroNotas2UI.readStatus?.();box.innerHTML='<div id="'+id+'"></div>';
+ pintarCargaRegistro(document.getElementById(id)||box,state?.detail||'Recuperando información del servidor',!!state?.pending);
+ box.setAttribute?.('aria-busy',String(!!state?.pending));
+}
 let registroHistoricoActual=null, registroHistoricoSecuencia=0, registroHistoricoProyectando=false;
 function registroConsultaHistorica(){
  const cfg=loadPeriodosAdmin(),b=document.getElementById('selBim').value;
@@ -3595,7 +3626,7 @@ function conRegistroHistorico(fn){
 function renderRegistroHistorico(nombre,fn){
  const ids={renderStudents:'stuList',renderFinales:'finLista',renderAvance:'avanceBox',renderAsistencia:'asisLista',renderSesiones:'listaSesiones'};
  if(!registroHistoricoActual||registroHistoricoActual.key!==cloudClaveReg()||registroHistoricoActual.token!==IEStudents.validToken()){
-   const box=document.getElementById(ids[nombre]);if(box)box.innerHTML='';return false;
+   const box=document.getElementById(ids[nombre]);if(box&&!(box.dataset?.historicalReadSequence===String(registroHistoricoSecuencia)&&box.dataset.historicalReadContext===cloudClaveReg()))box.innerHTML='';return false;
  }
  return conRegistroHistorico(fn);
 }
@@ -3603,12 +3634,14 @@ async function cargarRegistroHistorico(){
  const c=ctxBase(),key=cloudClaveReg(),token=IEStudents.validToken(),seq=++registroHistoricoSecuencia;
  registroHistoricoActual=null;['stuList','finLista','avanceBox','asisLista','listaSesiones'].forEach(id=>{const box=document.getElementById(id);if(box)box.innerHTML='';});
  const actual=()=>registroConsultaHistorica()&&seq===registroHistoricoSecuencia&&key===cloudClaveReg()&&token===IEStudents.validToken();
+ const grids=['stuList','finLista','asisLista'].map(id=>document.getElementById(id)).filter(Boolean);
+ if(!historicoLecturaPreparada(c,token))for(const box of grids){if(!box.dataset)box.dataset={};box.dataset.historicalReadSequence=String(seq);box.dataset.historicalReadContext=key;pintarCargaRegistro(box,'Recuperando información del servidor',true);}
  try{
    const proof=await leerRegistroHistorico(c,token);if(!actual())return false;
    registroHistoricoActual=proof;sesionActiva=null;notas={};capsElegidas=[];
    conRegistroHistorico(()=>{updateHdr();fillComps();const fechas=proof.payload.sessions.map(s=>s.fecha).filter(Boolean).sort();if(fechas.length)abrirSesionFecha(fechas[fechas.length-1]);renderSesiones();renderStudents();renderFinales();renderAvance();renderAsistencia();});
    estadoPadron('Bimestre '+(loadPeriodosAdmin()?.bimestres[c.bim]==='cerrado'?'cerrado':'bloqueado')+' · Solo lectura'+(proof.missing?' · Sin registro remoto.':''),false);return true;
- }catch(e){if(actual()){registroHistoricoActual=null;estadoPadron('Consulta histórica no disponible: '+e.message,true);}return false;}
+ }catch(e){if(actual()){registroHistoricoActual=null;estadoPadron('Consulta histórica no disponible: '+e.message,true);for(const box of grids)pintarCargaRegistro(box,'No se pudo recuperar la información. Consulte el diagnóstico.',false);}return false;}finally{if(seq===registroHistoricoSecuencia&&key===cloudClaveReg())for(const box of grids){if(box.dataset?.historicalReadSequence===String(seq)){delete box.dataset.historicalReadSequence;delete box.dataset.historicalReadContext;box.setAttribute?.('aria-busy','false');if(box.querySelector?.('[data-registro-read-wait]'))pintarCargaRegistro(box,'',false);}}}
 }
 let comparativoBimActivo=false, comparativoBimDatos={}, comparativoBimContexto='', comparativoBimSecuencia=0, comparativoBimToken='', comparativoBimValidacion=null;
 function comparativoVigente(){
@@ -3656,6 +3689,7 @@ function comparativoLinea(comp,id){
 }
 function alternarComparativoBim(){
  comparativoBimActivo=!comparativoBimActivo;comparativoBimDatos={};comparativoBimValidacion=null;comparativoBimSecuencia++;
+ const status=document.getElementById('comparativoBimStatus');if(status){status.hidden=true;pintarCargaRegistro(status,'',false);}
  comparativoBimContexto=comparativoBimActivo?cloudClaveReg():'';comparativoBimToken=comparativoBimActivo?IEStudents.validToken():'';
  if(comparativoBimActivo)void cargarComparativoBim();else renderFinales();
 }
@@ -3669,7 +3703,8 @@ async function cargarComparativoBim(){
  if(numero<2||!token)return;
  const alumnos=estudiantes().slice(),comps=competencias().slice(),datos={},proofs=[],actor=historicoIdentidadLectura(token),rosterVisible=JSON.stringify(alumnos);
  const vigente=()=>actual()&&actor===historicoIdentidadLectura(token)&&rosterVisible===JSON.stringify(estudiantes());
- if(Array.from({length:numero-1},(_,i)=>({...c,bim:['I','II','III'][i]})).some(p=>!historicoLecturaPreparada(p,token)))renderFinales();
+ const status=document.getElementById('comparativoBimStatus');
+ if(Array.from({length:numero-1},(_,i)=>({...c,bim:['I','II','III'][i]})).some(p=>!historicoLecturaPreparada(p,token))){if(status){status.dataset.readSequence=String(seq);status.dataset.readContext=clave;status.hidden=false;pintarCargaRegistro(status,'Preparando comparativo bimestral',true,true);}renderFinales();}
  try{
   for(let i=1;i<numero;i++){
    const prior={...c,bim:['','I','II','III'][i]},cached=historicoLecturaPreparada(prior,token),cachedUntil=cached?registroHistoricoCache.get([prior.nivel,prior.bim,prior.grado,prior.seccion,prior.area].join('||'))?.until:0,proof=cached||await leerRegistroHistorico(prior,token);if(!vigente())return;
@@ -3678,12 +3713,12 @@ async function cargarComparativoBim(){
   }
   if(proofs.some(p=>p.roster!==historicoFirmaPadron(p.c)||p.local!==historicoFirmaLocal(p.c)||p.cachedUntil&&(p.cachedUntil<=Date.now()||!historicoAutorizadoHasta(token))))throw Error('La autorización o los datos históricos cambiaron; vuelve a consultar.');
   if(vigente()){const deadlines=[historicoAutorizadoHasta(token),...proofs.map(p=>p.cachedUntil)].filter(n=>n>0);comparativoBimDatos=datos;comparativoBimValidacion={actor,until:deadlines.length?Math.min(...deadlines):0,proofs};renderComparativoBim();}
- }catch(e){if(actual()){comparativoBimDatos={};toast('Comparativo histórico no disponible: '+e.message+' No se modificaron notas.');renderComparativoBim();}}
+ }catch(e){if(actual()){comparativoBimDatos={};toast('Comparativo histórico no disponible: '+e.message+' No se modificaron notas.');renderComparativoBim();}}finally{if(status?.dataset.readSequence===String(seq)){status.hidden=true;pintarCargaRegistro(status,'',false);}}
 }
 
 function renderFinales() {
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderFinales',()=>renderFinales());
-  if(typeof comparativoBimContexto!=='undefined'&&comparativoBimContexto&&(comparativoBimContexto!==cloudClaveReg()||comparativoBimToken!==IEStudents.validToken()||!comparativoVigente())){comparativoBimActivo=false;comparativoBimDatos={};comparativoBimContexto='';comparativoBimSecuencia++;}
+  if(typeof comparativoBimContexto!=='undefined'&&comparativoBimContexto&&(comparativoBimContexto!==cloudClaveReg()||comparativoBimToken!==IEStudents.validToken()||!comparativoVigente())){comparativoBimActivo=false;comparativoBimDatos={};comparativoBimContexto='';comparativoBimSecuencia++;const status=document.getElementById('comparativoBimStatus');if(status){status.hidden=true;pintarCargaRegistro(status,'',false);}}
   const comparativoBtn=document.getElementById('btnComparativoBim');
   if(comparativoBtn&&typeof comparativoBimActivo!=='undefined'){comparativoBtn.textContent=comparativoBimActivo?'Ocultar comparativo':'Comparativo bimestral';comparativoBtn.setAttribute('aria-pressed',String(comparativoBimActivo));comparativoBtn.classList.toggle('on',comparativoBimActivo);}
   const correccionesMasivas=typeof primeraCorreccionMasiva==='function'?primeraCorreccionMasiva(null,null,'prepararRender'):null;
@@ -3701,7 +3736,7 @@ function renderFinales() {
   const modeInfo = document.getElementById('finModeInfo');
   // A new context has no confirmed selection yet; never render provisional academic columns.
   if(typeof IERegistroNotas2UI!=='undefined'&&!registroHistoricoProyectando&&IERegistroNotas2UI.current()?.status()?.panels.promedios.version==null){
-    box.setAttribute?.('aria-busy','true');box.innerHTML='<p id="finContextLoading" role="status" class="text-sm text-slate-500 p-3">Verificando datos…</p>';
+    renderEsperaRegistro(box,'finContextLoading');
     res.innerHTML='';modeInfo.innerHTML='';const stats=document.getElementById('finEstadisticas');if(stats)stats.innerHTML='';return;
   }
   box.setAttribute?.('aria-busy','false');
@@ -3968,6 +4003,8 @@ function borrarFechaAsis(fecha) {
 
 function renderAsistencia() {
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderAsistencia',()=>renderAsistencia());
+  if(typeof IERegistroNotas2UI!=='undefined'&&!registroHistoricoProyectando&&IERegistroNotas2UI.current()?.status()?.panels.asistencia.version==null){renderEsperaRegistro(document.getElementById('asisLista'),'asisContextLoading');return;}
+  document.getElementById('asisLista')?.setAttribute?.('aria-busy','false');
   loadStore();
   const c = ctxBase();
   document.getElementById('lblAsisCtx').textContent =

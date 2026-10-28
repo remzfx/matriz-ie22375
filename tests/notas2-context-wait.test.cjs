@@ -9,8 +9,8 @@ for(const denied of [false,true])test('context wait names its destination and '+
   if(denied)return {ok:false,status:403,text:async()=>JSON.stringify({ok:false,code:'DENIED'})};
  }return original(u,o);};
  const checking=f.check();
- assert.match(f.nodes.finContextLoading.textContent,/Verificando acceso a 1° A · Bim III/);
- assert.match(f.nodes.finContextLoading.textContent,/confirmar la autorización/);
+ assert.match(f.nodes.finContextLoading.textContent,/Verificando acceso a 1.º A · Bimestre III/);
+ assert.equal(f.api.readStatus().pending,true);
  assert.equal(f.api.canEdit('promedios'),false);assert.equal(JSON.stringify(f.data),before);
  assert.equal(f.requests.filter(b=>b.action==='loadnotas2').length,0);
  release();assert.equal(await checking,!denied);

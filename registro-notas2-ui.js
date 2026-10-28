@@ -30,7 +30,7 @@
  'use strict';
  const model=root.IERegistroNotas2;
  if(!model||!root.IERegistroConnection){registroDependenciaFallida();return;}
- let criticalSaveContext=null,scopeAuthorization=null;
+ let criticalSaveContext=null,scopeAuthorization=null,accessRead=null;
  const clients=new Map();let memoryLoaded=false,protectedDisk=null,painting=false,timer=null,connection,activeKey='',renderedPaused=false,lastView='';
  const pausedControls=new WeakMap();
  const copy=x=>JSON.parse(JSON.stringify(x));
@@ -209,6 +209,27 @@
  function canEdit(panel=currentPanel()){if(panel==='resumen')return false;if(tutor())return !!connection?.canEdit();const c=get();if(c?.status()?.state==='conflict')return false;return !!connection?.canEdit()&&!!c?.canEdit(panel);}
  function viewStamp(s){return JSON.stringify([binding(),currentPanel(),s?.legacy,s?.processed,Object.values(s?.panels||{}).map(p=>p.version)]);}
  function render(){lastView=viewStamp(get()?.status());renderedPaused=!canEdit();if(tutor()){if(connection?.canEdit())tutorRegistroController?.refresh?.();else document.querySelectorAll('#transRows input,#transRows textarea,#transRows select,#transRows button').forEach(el=>el.disabled=true);return;}if(painting)return;painting=true;try{renderSesiones();renderStudents();if(currentPanel()==='promedios')renderFinales();if(document.getElementById('panelAvance')?.classList.contains('on'))renderAvance();if(currentPanel()==='asistencia')renderAsistencia();sincronizarEdicionRegistro();}finally{painting=false;paint();}}
+ // Presentation observes existing promises/states; never starts a read or grants access.
+ function readStatus(){
+  const pane=currentPanel(),s=get()?.status(),conn=connection?.snapshot?.(),c=ctxBase(),aula=c.grado+'.º '+c.seccion;
+  const error=['session','server','offline','review'].find(v=>conn?.state===v||s?.state===v||(v==='review'&&s?.state==='conflict'));
+  const missing=['calificar','promedios','asistencia'].includes(pane)&&s?.panels[pane]?.version==null;
+  const access=accessRead?.key===binding()&&!connection?.canEdit(),load=s?.state==='checking'&&!!s.busy,roster=typeof cargandoEstudiantes!=='undefined'&&cargandoEstudiantes;
+  const prepared=load&&missing&&prefetch?preparation().state==='prepared':false;
+  const pending=pane!=='resumen'&&!tutor()&&!error&&!save.pending&&!uploadAttendance.pending&&(access||load&&!prepared||roster&&missing);
+  const detail=error?({session:'Sesión inválida — vuelve a iniciar sesión.',server:'Servidor no disponible — edición pausada.',offline:'Conexión perdida. Estamos intentando reconectar…',review:'Conflicto de versiones — consulta la nube antes de guardar.'})[error]:access?'Verificando acceso a '+aula+' · Bimestre '+c.bim:download.pending&&load?'Recuperando información del servidor':load?'Cargando '+(pane==='asistencia'?'asistencia':'calificaciones')+' de '+aula:roster?'Recuperando información del servidor':'Información pendiente de verificación. Consulte la nubecita.';
+  return {pending:!!pending,detail,missing,pane,error};
+ }
+ function paintReadFeedback(){
+  const state=readStatus(),slots={calificar:['calContextLoading','calContextStatus'],promedios:['finContextLoading','finContextStatus'],asistencia:['asisContextLoading','asisContextStatus']};
+  const draw=(box,detail,pending,compact=false)=>{if(typeof pintarCargaRegistro==='function')pintarCargaRegistro(box,detail,pending,compact);else if(box)box.textContent=detail;};
+  for(const [pane,[gridId,noticeId]]of Object.entries(slots)){
+   const active=pane===state.pane,grid=document.getElementById(gridId),notice=document.getElementById(noticeId);
+   if(grid){draw(grid,active?state.detail:'',active&&state.pending);grid.parentElement?.setAttribute?.('aria-busy',String(active&&state.pending));}
+   if(notice){notice.hidden=!active||!state.pending||state.missing;if(!notice.hidden)draw(notice,state.detail,true,true);else draw(notice,'',false,true);}
+  }
+  const comparison=document.getElementById('comparativoBimStatus');if(comparison&&!comparison.hidden&&(state.error||comparison.dataset.readContext!==cloudClaveReg())){comparison.hidden=true;draw(comparison,'',false,true);}
+ }
  function paint(){
   const s=get()?.status(),pane=currentPanel(),label=document.getElementById('registroSaveState');if(label&&s){const p=s.panels[pane];label.textContent=p?({calificar:'Calificar',promedios:'Promedios',asistencia:'Asistencia'})[pane]+': '+(p.pending?'Cambios sin guardar':p.at?'Guardado '+new Date(p.at).toLocaleString('es-PE'):'Sin guardado confirmado'):'Resumen — consulta de solo lectura.';if(pane==='promedios'&&s.legacy)label.textContent+=' · Consulta histórica: Procesar y Guardar Promedios para iniciar Notas 2.0.';if(pane==='promedios'&&s.historicalConflicts?.length)label.textContent+=' · '+s.historicalConflicts.length+' notas históricas pendientes de decisión explícita.';}
   if(label&&typeof IERegistroTransversales!=='undefined'&&IERegistroTransversales.current()?.dirty)label.textContent+=' · Aportes transversales pendientes.';
@@ -231,9 +252,7 @@
   const prepared=prefetch&&!tutor()?preparation():null;
   if(effectiveState==='connected'&&prepared?.state==='prepared')effectiveMsg='Aula preparada — copia consultada; Guardar revalidará la versión.';
   updateSyncIndicator(effectiveState,effectiveMsg,otherPending);
-  const loading=document.getElementById('finContextLoading'),verification=document.getElementById('finContextStatus');
-  if(loading)loading.textContent=effectiveState==='checking'?(prepared?.reason!=='authorization'&&prepared?.state==='preparing'?'Aula en preparación — recuperando datos autorizados…':'Verificando acceso a '+ctxBase().grado+'° '+ctxBase().seccion+' · Bim '+ctxBase().bim+'… Las calificaciones se mostrarán al confirmar la autorización.'):effectiveMsg;
-  if(verification)verification.hidden=pane!=='promedios'||!!loading||effectiveState!=='checking';
+  paintReadFeedback();
   const save=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.save()"]'),process=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.process()"]'),down=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.download()"]');
   const isResumen=pane==='resumen';if(save){save.disabled=isResumen||!canEdit(pane)||isConflict;save.hidden=isResumen;save.querySelector('span').textContent=pane==='asistencia'?'Guardar local':'Guardar';}
   if(process){process.hidden=tutor()||(pane!=='calificar'&&pane!=='asistencia');process.querySelector('span').textContent=pane==='asistencia'?'Subir Nube':'Procesar a Promedios';process.disabled=!connection?.canEdit()||!s||s.busy||s.readonly||readonly()||isConflict||pane==='asistencia'&&!canEdit('asistencia');}
@@ -350,7 +369,9 @@
  connection=IERegistroConnection.create({owner,binding:()=>binding()+(tutor()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:''),authorized:()=>{if(tutor())return !!getLoginSession()?.token;if(esVistaAdmin()){const s=getLoginSession()||{};return !!(s.token&&s.role==='admin'&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&padronBimestre===ctxBase().bim&&tokenPadron===s.token&&registroLocal.matches());}return authorized();},readonly,allowed:()=>tutor()?!esVistaAdmin()&&bimestreHabilitado(document.getElementById('transBim')?.value):!readonly(),retain:()=>{if(canEdit())collect();},online:()=>navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',changed:value=>{if(['session','server','offline'].includes(value.state)){scopeAuthorization=null;prefetch?.pause();}const box=document.getElementById('registroConnectionStatus'),text=document.getElementById('registroConnectionText');if(box){box.dataset.state=value.state;box.style.display='none';}const statusMap={connected:'Conectado — notas verificadas.',pending:'Conectado — cambios sin guardar.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',readonly:esVistaAdmin()?'Vista Administrador — solo lectura.':'Bimestre cerrado — solo lectura.',review:'Conflicto de versiones — consulta la nube antes de guardar.'};const msg=statusMap[value.state]||value.state;if(text)text.textContent=msg;lastConnectionState=value.state;/* Connectivity gates editing without changing academic errors, CAS or in-flight epochs. */const retryBtn=document.getElementById('registroRetryOffer');if(retryBtn)retryBtn.hidden=true;paint();if(value.state==='connected'||value.state==='pending')startPrefetch();},verify:async({valid,review,force})=>{
   if(tutor())return tutorRegistroController?.verifyConnection?await tutorRegistroController.verifyConnection({valid,review:false}):{ok:false};
   const lease=!force&&!review?contextAuthorization():null;
-  const [periods,permission]=lease?[true,{ok:true}]:await Promise.all([sincronizarPeriodosNube(true),verifyPermission(valid)]);if(permission.code==='SESSION')return permission;if(!valid())return {ok:false};if(!permission.ok)return permission;if(!periods)return {ok:false};
+  const operation={key:binding()};if(!lease){accessRead=operation;paintReadFeedback();}
+  let periods,permission;try{[periods,permission]=lease?[true,{ok:true}]:await Promise.all([sincronizarPeriodosNube(true),verifyPermission(valid)]);}finally{if(accessRead===operation)accessRead=null;paintReadFeedback();}
+  if(permission.code==='SESSION')return permission;if(!valid())return {ok:false};if(!permission.ok)return permission;if(!periods)return {ok:false};
   if(esVistaAdmin())return {ok:true,code:'CLOSED',pending:false};
   const c=get();if(!c)return {ok:false,code:'SESSION'};const initialized=c.status().panels.calificar.version!==null;
   const attendanceMissing=initialized&&currentPanel()==='asistencia'&&c.status().panels.asistencia.version===null;
@@ -390,7 +411,7 @@
   if(typeof toast==='function')toast(count+' calificaciones históricas seleccionadas. Guarde Promedios para confirmar.');
   return true;
  }
- const api={confirmedVersions,preparation:root.IERegistroNotas2Prefetch?preparation:undefined,saving:()=>!!(save.pending||uploadAttendance.pending),savingContext:()=>criticalSaveContext?copy(criticalSaveContext):null,prefetchStatus:()=>prefetch?{...prefetch.stats(),rosterRequests,rosterUnavailable:[...rosterUnavailable].map(([bimestre,code])=>({bimestre,code})),rosterContexts:contextRosters.size,rosterRetainedBytes:rosterBytes}:null,save,download,process,collect,screenPending,status:viewStatus,worked,setWorked,canEdit,officialOnly,persist,refresh,pendingPanels,hasPending,reconcileHistorical,activePending:()=>{const pane=currentPanel();return pane==='resumen'?false:pane==='calificar'?(!!get()?.status()?.panels.calificar?.pending||(typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty)):!!get()?.status()?.panels[pane]?.pending;},keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
+ const api={readStatus,confirmedVersions,preparation:root.IERegistroNotas2Prefetch?preparation:undefined,saving:()=>!!(save.pending||uploadAttendance.pending),savingContext:()=>criticalSaveContext?copy(criticalSaveContext):null,prefetchStatus:()=>prefetch?{...prefetch.stats(),rosterRequests,rosterUnavailable:[...rosterUnavailable].map(([bimestre,code])=>({bimestre,code})),rosterContexts:contextRosters.size,rosterRetainedBytes:rosterBytes}:null,save,download,process,collect,screenPending,status:viewStatus,worked,setWorked,canEdit,officialOnly,persist,refresh,pendingPanels,hasPending,reconcileHistorical,activePending:()=>{const pane=currentPanel();return pane==='resumen'?false:pane==='calificar'?(!!get()?.status()?.panels.calificar?.pending||(typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty)):!!get()?.status()?.panels[pane]?.pending;},keepMemory(){if(memoryLoaded)return true;memoryLoaded=true;return false;},current:get,panel:currentPanel};root.IERegistroNotas2UI=api;
  // Existing tutor controls call this API only to verify their connection, never to write academic notes.
  root.IERegistroRecovery={refresh,automatic:()=>connection.check(),resolve:()=>{const s=get()?.status();if(s?.historicalConflicts?.length)return reconcileHistorical();connection.invalidate();return connection.check(true,true);},local:save,upload:()=>currentPanel()==='asistencia'?uploadAttendance():save(),recover:download};
  document.addEventListener('DOMContentLoaded',()=>{
