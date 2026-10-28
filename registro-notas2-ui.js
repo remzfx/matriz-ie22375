@@ -451,7 +451,7 @@
   document.addEventListener('input',()=>{paint();});document.addEventListener('change',()=>refresh());document.addEventListener('click',()=>paint());document.addEventListener('ie22375:registro-ready',()=>refresh());
   window.addEventListener('offline',()=>{prefetch?.pause();connection.pause('offline');});window.addEventListener('online',()=>refresh(true));window.addEventListener('focus',()=>refresh());window.addEventListener('storage',e=>{if(e.key==='ie22375_session_v1'){prefetch?.pause();connection.pause('session');}});
   const footer=document.getElementById('registroAcademicFooter');if(footer&&typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{const main=document.querySelector('main');if(main)main.style.paddingBottom=(footer.hidden?0:footer.getBoundingClientRect().height+12)+'px';}).observe(footer);
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')prefetch?.hold('hidden');else{prefetch?.release('hidden');if(prefetch&&backgroundEligible())startPrefetch();}});
+  document.addEventListener('visibilitychange',()=>{root.IERegistroEditTrace?.record(document.visibilityState==='hidden'?'page-hidden':'page-visible',connection?.diagnosticState?.());if(document.visibilityState==='hidden')prefetch?.hold('hidden');else{prefetch?.release('hidden');if(prefetch&&backgroundEligible())startPrefetch();refresh();}});
   window.addEventListener('beforeunload',e=>{if(api.saving()||api.hasPending()){e.preventDefault();e.returnValue='';return '';}});
   refresh();
  });

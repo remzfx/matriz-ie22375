@@ -40,7 +40,7 @@ Cada evento contiene exclusivamente:
 - `context`: identificador opaco c1, c2... de un binding observado; sin hash,
   token, usuario, aula o nombres. No es comparable entre capturas.
 - `event`: gate, edit-blocked, connection, context, lease-expired,
-  academicstate-start/end o verification-rejected.
+  academicstate-start/end, verification-rejected o page-hidden/page-visible.
 - `layer`: connection/ui y `panel` limitado a los paneles conocidos.
 - `state`, `validUntilMs` relativo al mismo inicio y `expired`.
 - `authorized`, `allowed`: booleanos observados, o null si el cortocircuito

@@ -11,7 +11,7 @@
   if(event==='lease-expired')context.expired=true;else if(s.until>Date.now())context.expired=false;
   const layer=choice(detail.layer,['connection','ui']),panel=choice(detail.panel,['calificar','promedios','asistencia','resumen']);
   let reason=choice(detail.reason,reasons);if(reason==='no-grant'&&context.expired)reason='expiration';
-  const row={event:choice(event,['gate','connection','context','lease-expired','academicstate-start','academicstate-end','verification-rejected']),context:context.id,layer,panel,
+  const row={event:choice(event,['gate','connection','context','lease-expired','academicstate-start','academicstate-end','verification-rejected','page-hidden','page-visible']),context:context.id,layer,panel,
    state:choice(s.state,states),validUntilMs:Number.isFinite(s.until)&&s.until>0?s.until-origin:null,expired:context.expired||!!(s.until>0&&s.until<=Date.now()),
    authorized:flag(detail.authorized),allowed:flag(detail.allowed),clientState:choice(detail.clientState,states),clientReadonly:flag(detail.clientReadonly),clientBusy:flag(detail.clientBusy),
    canEdit:flag(detail.canEdit),reason,verification:Number.isSafeInteger(detail.verification)&&detail.verification>0?detail.verification:null,
@@ -59,7 +59,7 @@
    if(disposed)return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
    if(!o.authorized()){emit(o.readonly?.()?'readonly':'session');return false;}
    if(!online()){pause('offline');return false;}
-   while(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit())return true;
+   while(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit()){arm(Math.min(interval,Math.max(0,until-now()-30000)));return true;}
    try{if(review&&canEdit())o.retain?.();}catch(e){retentionFailed=true;emit('review');return false;}
    const priorPending=state==='pending'||canEdit();
    const id=++epoch,key=binding;clear(timer);emit('checking');
