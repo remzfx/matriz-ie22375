@@ -39,6 +39,7 @@
  const owner=()=>{const s=getLoginSession()||{};return [s.token||'',s.user||'',s.role||''].join('|');};
  const receiptGuards=new Map(),contextRosters=new Map(),rosterAttempts=new Set(),rosterUnavailable=new Map();let prefetch=null,rosterActor='',rosterFlight=null,rosterRequests=0,rosterBytes=0,candidateStamp='',candidateList=[],candidateKeys=new Set();
  const tutor=()=>document.getElementById('registroTutorPanel')?.hidden===false;
+ function missingRoster(c=ctxBase()){return tutor()?null:root.IERegistroRosterAvailability?.get(c.bim)||null;}
  function authorized(){const s=getLoginSession()||{};return !!(s.token&&['admin','docente'].includes(s.role)&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&padronBimestre===ctxBase().bim&&tokenPadron===s.token&&areaActual&&areas().includes(areaActual)&&registroLocal.matches());}
  function readonly(){return esVistaAdmin()||!bimestreHabilitado(ctxBase().bim)||registroConsultaHistorica();}
  function capture(){const p=sliceRegistroArea(),prefix=prefijoReg();p.calificarEstado=Object.fromEntries(Object.entries(store.calificarEstado||{}).filter(([k])=>k.startsWith(prefix)));if(p.asisFechas)p.asisFechas=Object.fromEntries(Object.entries(p.asisFechas).filter(([,v])=>Array.isArray(v)&&v.length>0));if(p.capsSel)p.capsSel=Object.fromEntries(Object.entries(p.capsSel).filter(([,v])=>Array.isArray(v)&&v.length>0));return p;}
@@ -69,7 +70,7 @@
  function syncRosters(){const actor=prefetchOwner();if(actor!==rosterActor){rosterActor=actor;contextRosters.clear();rosterAttempts.clear();rosterUnavailable.clear();rosterFlight=null;rosterRequests=0;rosterBytes=0;candidateStamp='';}return actor;}
  function rememberRoster(bim,base){
   const session=getLoginSession()||{},rows=base?.[session.nivel]?.estudiantes;
-  if(!Array.isArray(rows))return;
+  if(base?.padronInicializado!==true||missingRoster({bim})||!Array.isArray(rows))return;
   const version=String(base.version||model.signature(rows.map(r=>[r.idSiagie,r.codigoEstudiante,r.grado,r.seccion])));
   if(contextRosters.get(bim)?.version===version)return;
   const next={version,rows:copy(rows)},size=JSON.stringify(next).length*2,proposed=new Map(contextRosters);proposed.set(bim,next);const nextBytes=JSON.stringify([...proposed.values()]).length*2;
@@ -80,15 +81,16 @@
   syncRosters();if(!root.IERegistroNotas2Prefetch||!root.IERegistroAcademico||!authorized()||tutor())return [];
   const c=ctxBase(),periods=loadPeriodosAdmin()?.bimestres||{};
   if(padronBimestre===c.bim&&typeof padronVerificadoServidor!=='undefined'&&padronVerificadoServidor)rememberRoster(c.bim,bdEstudiantes);
-  const rosters=Object.fromEntries([...contextRosters].filter(([bim])=>periods[bim]==='abierto').map(([bim,r])=>[bim,r.rows]));
-  const stamp=JSON.stringify([rosterActor,periods,[...contextRosters].map(([bim,r])=>[bim,r.version])]);
+  const rosters=Object.fromEntries([...contextRosters].filter(([bim])=>periods[bim]==='abierto'&&!missingRoster({bim})).map(([bim,r])=>[bim,r.rows]));
+  const stamp=JSON.stringify([rosterActor,periods,[...contextRosters].map(([bim,r])=>[bim,r.version]),Object.keys(rosters)]);
   if(stamp!==candidateStamp){candidateStamp=stamp;candidateList=IERegistroNotas2Prefetch.enumerate(getLoginSession(),rosters,IERegistroAcademico.catalog);candidateKeys=new Set(candidateList.map(IERegistroNotas2Prefetch.key));}
   return candidateList;
  }
  function backgroundEligible(){return !!connection?.canEdit()&&connection.snapshot().state!=='checking'&&get()?.status().state==='ready'&&!get()?.status().busy&&!save.pending&&!download.pending&&!uploadAttendance.pending&&!tutor()&&navigator.onLine!==false&&document.visibilityState!=='hidden';}
  async function prepareRosters(){
   const actor=syncRosters();if(rosterFlight||typeof IEStudents.readRoster!=='function')return;
-  const missing=['I','II','III','IV'].filter(b=>bimestreHabilitado(b)&&!contextRosters.has(b)&&!rosterAttempts.has(b));if(!missing.length)return;
+  for(const bim of ['I','II','III','IV'])if(rosterUnavailable.get(bim)==='ROSTER_MISSING'&&!missingRoster({bim}))rosterAttempts.delete(bim);
+  const missing=['I','II','III','IV'].filter(b=>bimestreHabilitado(b)&&!missingRoster({bim:b})&&!contextRosters.has(b)&&!rosterAttempts.has(b));if(!missing.length)return;
   prefetch.hold('roster');const task={};rosterFlight=task;
   task.promise=(async()=>{try{for(const bim of missing){
    if(actor!==prefetchOwner()||!backgroundEligible())break;
@@ -97,7 +99,7 @@
     if(actor!==prefetchOwner())return;
     if(base.offline||base.bimestre!==bim||base.padronInicializado!==true)continue;
     rememberRoster(bim,base);if(!contextRosters.has(bim))rosterUnavailable.set(bim,'MEMORY');
-   }catch(e){rosterUnavailable.set(bim,e.code||'SERVER');if(actor!==prefetchOwner())return;if(['SESSION','DENIED'].includes(e.code)){prefetch.pause();connection?.pause('session');break;}}
+   }catch(e){if(e.code==='ROSTER_MISSING'&&actor===prefetchOwner())root.IERegistroRosterAvailability?.mark(bim);rosterUnavailable.set(bim,e.code||'SERVER');if(actor!==prefetchOwner())return;if(['SESSION','DENIED'].includes(e.code)){prefetch.pause();connection?.pause('session');break;}}
   }}finally{if(rosterFlight===task){rosterFlight=null;prefetch.release('roster');if(actor===prefetchOwner()&&backgroundEligible())prefetch.start(ctxBase(),candidates());}}})();
   return task.promise;
  }
@@ -186,8 +188,8 @@
   });
  }
  function get(){
-  if(!authorized()||tutor())return null;const key=binding();if(!activeKey)activeKey=key;
-  if(!clients.has(key))clients.set(key,model.create({key:cloudClaveReg(),binding,authorized,readonly,capture,apply,request,deferReadPanel:name=>name==='asistencia'&&receiptGuards.has(key),beforeApply:()=>{const expected=receiptGuards.get(key);receiptGuards.delete(key);if(expected?.authorizedUntil!=null&&expected.authorizedUntil<=Date.now()){const e=Error('La autorización caducó antes de aplicar la reserva; se deben verificar nuevamente los permisos.');e.code='READ_AUTH_EXPIRED';throw e;}if(expected!==undefined&&(expected.signature!==model.signature(academicContext(ctxBase()))||screenPending('calificar')||screenPending('promedios'))){const e=Error('El borrador cambió. La precarga no reemplazó datos locales.');e.code='PREFETCH_LOCAL';throw e;}},hasExisting:name=>(name==='calificar'?['grades']:name==='promedios'?['finales','concComp']:['asistencia']).some(f=>Object.keys(capture()[f]||{}).length),confirm:async info=>confirm('Bajar Nube reemplazará los cambios sin guardar de '+info.panels.join(', ')+'. Última confirmación: '+Object.values(info.at).filter(Boolean).map(x=>new Date(x).toLocaleString('es-PE')).join(', ')+'. ¿Continuar?'),changed:()=>{if(key===binding())paint();},error:e=>{receiptGuards.delete(key);if(key!==binding())return;toast(e.message);if(['SESSION','DENIED'].includes(e.code))retirarVerificacionNube((getLoginSession()||{}).token,ctxBase().bim,{code:e.code});}}));
+  if(!authorized()||missingRoster()||tutor())return null;const key=binding();if(!activeKey)activeKey=key;
+  if(!clients.has(key))clients.set(key,model.create({key:cloudClaveReg(),binding,authorized,readonly,capture,apply,request,deferReadPanel:name=>name==='asistencia'&&receiptGuards.has(key),beforeApply:()=>{if(missingRoster())throw Object.assign(new Error('Padrón del bimestre no verificado'),{code:'ROSTER'});const expected=receiptGuards.get(key);receiptGuards.delete(key);if(expected?.authorizedUntil!=null&&expected.authorizedUntil<=Date.now()){const e=Error('La autorización caducó antes de aplicar la reserva; se deben verificar nuevamente los permisos.');e.code='READ_AUTH_EXPIRED';throw e;}if(expected!==undefined&&(expected.signature!==model.signature(academicContext(ctxBase()))||screenPending('calificar')||screenPending('promedios'))){const e=Error('El borrador cambió. La precarga no reemplazó datos locales.');e.code='PREFETCH_LOCAL';throw e;}},hasExisting:name=>(name==='calificar'?['grades']:name==='promedios'?['finales','concComp']:['asistencia']).some(f=>Object.keys(capture()[f]||{}).length),confirm:async info=>confirm('Bajar Nube reemplazará los cambios sin guardar de '+info.panels.join(', ')+'. Última confirmación: '+Object.values(info.at).filter(Boolean).map(x=>new Date(x).toLocaleString('es-PE')).join(', ')+'. ¿Continuar?'),changed:()=>{if(key===binding())paint();},error:e=>{receiptGuards.delete(key);if(key!==binding())return;if(e.code==='ROSTER'){root.IERegistroRosterAvailability?.mark(ctxBase().bim,'ROSTER');paint();}toast(e.message);if(['SESSION','DENIED'].includes(e.code))retirarVerificacionNube((getLoginSession()||{}).token,ctxBase().bim,{code:e.code});}}));
   return clients.get(key);
  }
  // Read-only confirmed metadata; no payload, no new client and no permission grant.
@@ -225,13 +227,15 @@
  function visibleRosterRead(){return !!(typeof lecturaPadronRegistro!=='undefined'&&lecturaPadronRegistro&&typeof cargandoEstudiantes!=='undefined'&&cargandoEstudiantes&&lecturaPadronRegistro.bimestre===ctxBase().bim&&lecturaPadronRegistro.token===getLoginSession()?.token);}
  function readStatus(){
   const pane=currentPanel(),s=get()?.status(),conn=connection?.snapshot?.(),c=ctxBase(),aula=c.grado+'.º '+c.seccion;
-  const error=['session','server','offline','review'].find(v=>conn?.state===v||s?.state===v||(v==='review'&&s?.state==='conflict'));
+  const rosterMissing=missingRoster();
+  const fatal=['session','offline'].find(v=>conn?.state===v||s?.state===v);
+  const error=fatal||(rosterMissing?'roster':['session','server','offline','review'].find(v=>conn?.state===v||s?.state===v||(v==='review'&&s?.state==='conflict')));
   const missing=['calificar','promedios','asistencia'].includes(pane)&&s?.panels[pane]?.version==null;
   const access=accessRead?.key===binding()&&!connection?.canEdit(),load=s?.state==='checking'&&!!s.busy,roster=visibleRosterRead();
   const prepared=load&&missing&&prefetch?preparation().state==='prepared':false;
   const backgroundRoster=!!(roster&&!missing&&!access&&!load&&s?.state==='ready'&&!s.busy&&canEdit(pane));
   const pending=pane!=='resumen'&&!tutor()&&!error&&!save.pending&&!uploadAttendance.pending&&(access||load&&!prepared||roster);
-  const detail=error?({session:'Sesión inválida — vuelve a iniciar sesión.',server:'Servidor no disponible — edición pausada.',offline:'Conexión perdida. Estamos intentando reconectar…',review:'Conflicto de versiones — consulta la nube antes de guardar.'})[error]:access?'Verificando acceso a '+aula+' · Bimestre '+c.bim:download.pending&&load?'Recuperando información del servidor':load?'Cargando '+(pane==='asistencia'?'asistencia':'calificaciones')+' de '+aula:roster?'Cargando padrón de '+aula+' · Bimestre '+c.bim:'Información pendiente de verificación. Consulte la nubecita.';
+  const detail=error?({roster:rosterMissing?.code==='MISSING'?'Bimestre sin padrón inicializado':'Padrón del bimestre no verificado',session:'Sesión inválida — vuelve a iniciar sesión.',server:'Servidor no disponible — edición pausada.',offline:'Conexión perdida. Estamos intentando reconectar…',review:'Conflicto de versiones — consulta la nube antes de guardar.'})[error]:access?'Verificando acceso a '+aula+' · Bimestre '+c.bim:download.pending&&load?'Recuperando información del servidor':load?'Cargando '+(pane==='asistencia'?'asistencia':'calificaciones')+' de '+aula:roster?'Cargando padrón de '+aula+' · Bimestre '+c.bim:'Información pendiente de verificación. Consulte la nubecita.';
   return {pending:!!pending,blocking:!!pending&&!backgroundRoster,backgroundRoster,detail,missing,pane,error};
  }
  function paintReadFeedback(){
@@ -254,12 +258,13 @@
   const otherPending=[];
   if(s){for(const [name,p] of Object.entries(s.panels)){if(name===pane)continue;const isDirty=p.pending||screenPending(name)||(name==='calificar'&&typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty);if(isDirty)otherPending.push(paneNames[name]||name);}}
   const isConflict=s?.state==='conflict'||connState==='review';
-  const rosterRetry=document.getElementById('retryRoster'),rosterError=rosterRetry?.hidden===false;
-  const errorState=['session','server','offline'].find(state=>connState===state||s?.state===state)||(rosterError?'server':null);
+  const rosterMissing=missingRoster(),rosterRetry=document.getElementById('retryRoster'),rosterError=rosterRetry?.hidden===false;
+  const errorState=['session','offline'].find(state=>connState===state||s?.state===state)||(rosterMissing?null:['session','server','offline'].find(state=>connState===state||s?.state===state)||(rosterError?'server':null));
   const isReadonly=connState==='readonly'||(s?.panels.promedios.version!=null&&s.readonly)||readonly();
   let effectiveState='connected',effectiveMsg='Conectado — notas verificadas.';
   if(isConflict){effectiveState='review';effectiveMsg='Conflicto de versiones — consulta la nube antes de guardar.';}
   else if(errorState){effectiveState=errorState;const statusMap={offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.'};effectiveMsg=statusMap[errorState];}
+  else if(rosterMissing){effectiveState='readonly';effectiveMsg=rosterMissing.code==='MISSING'?'Bimestre sin padrón inicializado':'Padrón del bimestre no verificado';}
   else if(isReadonly){effectiveState='readonly';effectiveMsg=esVistaAdmin()?'Vista Administrador — solo lectura.':'Bimestre cerrado — solo lectura.';}
   else if(connState==='checking'||s?.state==='checking'||!connection?.canEdit()||pane==='asistencia'&&s?.panels.asistencia.version===null){effectiveState='checking';effectiveMsg=visibleRosterRead()?'Cargando padrón — acceso pendiente de verificación.':accessRead||s?.busy||s?.state==='checking'?'Verificando acceso — edición sujeta a autorización vigente.':'Sin concesión vigente — edición pausada. Abra el diagnóstico.';}
   else if(activePending){effectiveState='pending';effectiveMsg='Conectado — cambios sin guardar.';}
@@ -347,7 +352,7 @@
   if(!ind)return;
   ind.dataset.state=state;
   ind.title=message||state;
-  const label=ind.querySelector('.sync-label');if(label)label.textContent=({connected:'Conectado',pending:'Cambios pendientes',checking:String(message).startsWith('Cargando padrón')?'Cargando padrón':String(message).startsWith('Sin concesión')?'Edición pausada':'Verificando acceso',offline:'Sin conexión',server:'Error de conexión',session:'Sesión no válida',review:'Requiere revisión',conflict:'Requiere revisión',readonly:'Solo lectura'})[state]||'Estado de conexión';if(label&&backgroundRoster)label.textContent+=' · verificando padrón';ind.dataset.rosterRead=backgroundRoster?'background':'none';positionSyncIndicator();
+  const label=ind.querySelector('.sync-label');if(label)label.textContent=({connected:'Conectado',pending:'Cambios pendientes',checking:String(message).startsWith('Cargando padrón')?'Cargando padrón':String(message).startsWith('Sin concesión')?'Edición pausada':'Verificando acceso',offline:'Sin conexión',server:'Error de conexión',session:'Sesión no válida',review:'Requiere revisión',conflict:'Requiere revisión',readonly:String(message).startsWith('Bimestre sin padrón')?'Sin padrón':String(message).startsWith('Padrón del bimestre')?'Padrón no verificado':'Solo lectura'})[state]||'Estado de conexión';if(label&&backgroundRoster)label.textContent+=' · verificando padrón';ind.dataset.rosterRead=backgroundRoster?'background':'none';positionSyncIndicator();
   ind.setAttribute('aria-label','Estado de sincronización: '+ind.title+'. Abrir diagnóstico.');
   const dot=ind.querySelector('.sync-dot');
   if(!dot)return;
@@ -388,7 +393,7 @@
    box.appendChild(details);
   }
  }
- connection=IERegistroConnection.create({owner,defer:()=>!tutor()&&typeof cargandoEstudiantes!=='undefined'&&cargandoEstudiantes&&!authorized()&&!!getLoginSession()?.token&&IEStudents.validToken()===getLoginSession().token,binding:()=>binding()+(tutor()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:''),authorized:()=>{if(tutor())return !!getLoginSession()?.token;if(esVistaAdmin()){const s=getLoginSession()||{};return !!(s.token&&s.role==='admin'&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&padronBimestre===ctxBase().bim&&tokenPadron===s.token&&registroLocal.matches());}return authorized();},readonly,allowed:()=>tutor()?!esVistaAdmin()&&bimestreHabilitado(document.getElementById('transBim')?.value):!readonly(),retain:()=>{if(canEdit())collect();},online:()=>navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',changed:value=>{if(['session','server','offline'].includes(value.state)){scopeAuthorization=null;prefetch?.pause();}const box=document.getElementById('registroConnectionStatus'),text=document.getElementById('registroConnectionText');if(box){box.dataset.state=value.state;box.style.display='none';}const statusMap={connected:'Conectado — notas verificadas.',pending:'Conectado — cambios sin guardar.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',readonly:esVistaAdmin()?'Vista Administrador — solo lectura.':'Bimestre cerrado — solo lectura.',review:'Conflicto de versiones — consulta la nube antes de guardar.'};const msg=statusMap[value.state]||value.state;if(text)text.textContent=msg;lastConnectionState=value.state;/* Connectivity gates editing without changing academic errors, CAS or in-flight epochs. */const retryBtn=document.getElementById('registroRetryOffer');if(retryBtn)retryBtn.hidden=true;paint();if(value.state==='connected'||value.state==='pending')startPrefetch();},verify:async({valid,review,force})=>{
+ connection=IERegistroConnection.create({owner,defer:()=>!!missingRoster()||!tutor()&&typeof cargandoEstudiantes!=='undefined'&&cargandoEstudiantes&&!authorized()&&!!getLoginSession()?.token&&IEStudents.validToken()===getLoginSession().token,binding:()=>binding()+(tutor()?'|tutor|'+document.getElementById('transAula').value+'|'+document.getElementById('transBim').value:''),authorized:()=>{if(tutor())return !!getLoginSession()?.token;if(missingRoster())return false;if(esVistaAdmin()){const s=getLoginSession()||{};return !!(s.token&&s.role==='admin'&&typeof IEStudents!=='undefined'&&IEStudents.validToken()===s.token&&padronBimestre===ctxBase().bim&&tokenPadron===s.token&&registroLocal.matches());}return authorized();},readonly,allowed:()=>tutor()?!esVistaAdmin()&&bimestreHabilitado(document.getElementById('transBim')?.value):!readonly(),retain:()=>{if(canEdit())collect();},online:()=>navigator.onLine!==false,visible:()=>document.visibilityState!=='hidden',changed:value=>{if(['session','server','offline'].includes(value.state)){scopeAuthorization=null;prefetch?.pause();}const box=document.getElementById('registroConnectionStatus'),text=document.getElementById('registroConnectionText');if(box){box.dataset.state=value.state;box.style.display='none';}const statusMap={connected:'Conectado — notas verificadas.',pending:'Conectado — cambios sin guardar.',checking:'Verificando conexión…',offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',readonly:esVistaAdmin()?'Vista Administrador — solo lectura.':'Bimestre cerrado — solo lectura.',review:'Conflicto de versiones — consulta la nube antes de guardar.'};const msg=statusMap[value.state]||value.state;if(text)text.textContent=msg;lastConnectionState=value.state;/* Connectivity gates editing without changing academic errors, CAS or in-flight epochs. */const retryBtn=document.getElementById('registroRetryOffer');if(retryBtn)retryBtn.hidden=true;paint();if(value.state==='connected'||value.state==='pending')startPrefetch();},verify:async({valid,review,force})=>{
   if(tutor())return tutorRegistroController?.verifyConnection?await tutorRegistroController.verifyConnection({valid,review:false}):{ok:false};
   let lease=!force&&!review?contextAuthorization():null;
   const operation={key:binding()};if(!lease){accessRead=operation;paint();}
