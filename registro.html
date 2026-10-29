@@ -1104,7 +1104,7 @@ function registroDependenciaFallida(){
   if(event==='lease-expired')context.expired=true;else if(s.until>Date.now())context.expired=false;
   const layer=choice(detail.layer,['connection','ui']),panel=choice(detail.panel,['calificar','promedios','asistencia','resumen']);
   let reason=choice(detail.reason,reasons);if(reason==='no-grant'&&context.expired)reason='expiration';
-  const row={event:choice(event,['gate','connection','context','lease-expired','academicstate-start','academicstate-end','verification-rejected','page-hidden','page-visible']),context:context.id,layer,panel,
+  const row={event:choice(event,['gate','connection','context','lease-expired','academicstate-start','academicstate-end','roster-start','roster-end','verification-rejected','page-hidden','page-visible']),context:context.id,layer,panel,
    state:choice(s.state,states),validUntilMs:Number.isFinite(s.until)&&s.until>0?s.until-origin:null,expired:context.expired||!!(s.until>0&&s.until<=Date.now()),
    authorized:flag(detail.authorized),allowed:flag(detail.allowed),clientState:choice(detail.clientState,states),clientReadonly:flag(detail.clientReadonly),clientBusy:flag(detail.clientBusy),
    canEdit:flag(detail.canEdit),reason,verification:Number.isSafeInteger(detail.verification)&&detail.verification>0?detail.verification:null,
@@ -1689,7 +1689,9 @@ async function cargarPadronRegistro(bimestre) {
   bloquearRegistroMientrasValida(true);
   const candidata = IEStudents.peekRoster(bimestre);
   const cache = typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&candidata?.padronInicializado!==true?null:candidata;
+  const lectura=lecturaPadronRegistro;let resultadoLectura='error';
   try {
+  if(typeof IERegistroEditTrace!=='undefined')IERegistroEditTrace.record('roster-start',{context:lectura,state:'checking',until:0});
   if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()) {
     try { recordarPadron(bdEstudiantes); } catch(e) { throw errorPadronLocal('recordarPadron', e); }
   }
@@ -1708,8 +1710,10 @@ async function cargarPadronRegistro(bimestre) {
     vigilarCachePadron(bimestre,solicitud);
     estadoPadron(base.offline ? (base.verificationError === 'API_INCOMPATIBLE' ? 'Modo local activo. El backend no reconoce la lectura POST; puedes seguir trabajando y reintentar la sincronización.' : 'Modo local activo: puedes trabajar y guardar aquí. Sincronización de nube pendiente.') :
       (!base.padronInicializado ? 'Servidor verificado. Padrón pendiente: base actual autorizada.' : 'Padrón verificado con el servidor.'),!!base.offline);
+    resultadoLectura=base.offline?(base.verificationError==='TIMEOUT'?'timeout':'error'):'ok';
     return true;
   } catch(e) {
+    resultadoLectura=e?.code==='TIMEOUT'?'timeout':['SESSION','DENIED'].includes(e?.code)?'permissions':'error';
     if (solicitud !== solicitudPadron) return false;
     cargandoEstudiantes = false; padronVerificadoServidor = false;
     const vigente = e.retryable && IEStudents.validToken() === tokenPadron && IEStudents.peekRoster(bimestre);
@@ -1719,6 +1723,7 @@ async function cargarPadronRegistro(bimestre) {
     estadoPadron(e.message + (vigente ? (e.operacion === 'recordarPadron' ? ' Consulta conservada; revisión de alias pendiente.' : ' Modo local activo: puedes seguir trabajando; nube pendiente.') : ' Puedes reintentar.'),true);
     return !!vigente;
   } finally {
+    if(typeof IERegistroEditTrace!=='undefined')IERegistroEditTrace.record('roster-end',{context:lectura,state:null,until:0},{outcome:solicitud!==solicitudPadron||IEStudents.validToken()!==tokenSolicitud?'context-change':resultadoLectura});
     if (solicitud === solicitudPadron) { cargandoEstudiantes = false; lecturaPadronRegistro = null; sincronizarEdicionRegistro(); }
   }
 }
@@ -3587,8 +3592,8 @@ function pintarCargaRegistro(box,detalle,pendiente,compacto=false){
 }
 function renderEsperaRegistro(box,id){
  if(!box)return;const state=typeof IERegistroNotas2UI==='undefined'?null:IERegistroNotas2UI.readStatus?.();box.innerHTML='<div id="'+id+'"></div>';
- pintarCargaRegistro(document.getElementById(id)||box,state?.detail||'Recuperando información del servidor',!!state?.pending);
- box.setAttribute?.('aria-busy',String(!!state?.pending));
+ pintarCargaRegistro(document.getElementById(id)||box,state?.detail||'Recuperando información del servidor',!!state?.blocking);
+ box.setAttribute?.('aria-busy',String(!!state?.blocking));
 }
 let registroHistoricoActual=null, registroHistoricoSecuencia=0, registroHistoricoProyectando=false;
 function registroConsultaHistorica(){

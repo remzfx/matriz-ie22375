@@ -229,17 +229,18 @@
   const missing=['calificar','promedios','asistencia'].includes(pane)&&s?.panels[pane]?.version==null;
   const access=accessRead?.key===binding()&&!connection?.canEdit(),load=s?.state==='checking'&&!!s.busy,roster=visibleRosterRead();
   const prepared=load&&missing&&prefetch?preparation().state==='prepared':false;
+  const backgroundRoster=!!(roster&&!missing&&!access&&!load&&s?.state==='ready'&&!s.busy&&canEdit(pane));
   const pending=pane!=='resumen'&&!tutor()&&!error&&!save.pending&&!uploadAttendance.pending&&(access||load&&!prepared||roster);
   const detail=error?({session:'Sesión inválida — vuelve a iniciar sesión.',server:'Servidor no disponible — edición pausada.',offline:'Conexión perdida. Estamos intentando reconectar…',review:'Conflicto de versiones — consulta la nube antes de guardar.'})[error]:access?'Verificando acceso a '+aula+' · Bimestre '+c.bim:download.pending&&load?'Recuperando información del servidor':load?'Cargando '+(pane==='asistencia'?'asistencia':'calificaciones')+' de '+aula:roster?'Cargando padrón de '+aula+' · Bimestre '+c.bim:'Información pendiente de verificación. Consulte la nubecita.';
-  return {pending:!!pending,detail,missing,pane,error};
+  return {pending:!!pending,blocking:!!pending&&!backgroundRoster,backgroundRoster,detail,missing,pane,error};
  }
  function paintReadFeedback(){
   const state=readStatus(),slots={calificar:['calContextLoading','calContextStatus'],promedios:['finContextLoading','finContextStatus'],asistencia:['asisContextLoading','asisContextStatus']};
   const draw=(box,detail,pending,compact=false)=>{if(typeof pintarCargaRegistro==='function')pintarCargaRegistro(box,detail,pending,compact);else if(box)box.textContent=detail;};
   for(const [pane,[gridId,noticeId]]of Object.entries(slots)){
    const active=pane===state.pane,grid=document.getElementById(gridId),notice=document.getElementById(noticeId);
-   if(grid){draw(grid,active?state.detail:'',active&&state.pending);grid.parentElement?.setAttribute?.('aria-busy',String(active&&state.pending));}
-   if(notice){notice.hidden=!active||!state.pending||(state.missing&&!!grid);if(!notice.hidden)draw(notice,state.detail,true,true);else draw(notice,'',false,true);}
+   if(grid){draw(grid,active?state.detail:'',active&&state.blocking);grid.parentElement?.setAttribute?.('aria-busy',String(active&&state.blocking));}
+   if(notice){notice.hidden=!active||!state.blocking||(state.missing&&!!grid);if(!notice.hidden)draw(notice,state.detail,true,true);else draw(notice,'',false,true);}
   }
   const comparison=document.getElementById('comparativoBimStatus');if(comparison&&!comparison.hidden&&(state.error||comparison.dataset.readContext!==cloudClaveReg())){comparison.hidden=true;draw(comparison,'',false,true);}
  }
@@ -265,7 +266,8 @@
   else{effectiveState='connected';effectiveMsg=otherPending.length>0?'Conectado — '+(paneNames[pane]||'Notas')+' al día. ('+otherPending.join(', ')+' con cambios sin guardar).':'Conectado — notas verificadas.';}
   const prepared=prefetch&&!tutor()?preparation():null;
   if(effectiveState==='connected'&&prepared?.state==='prepared')effectiveMsg='Aula preparada — copia consultada; Guardar revalidará la versión.';
-  updateSyncIndicator(effectiveState,effectiveMsg,otherPending);
+  const feedback=readStatus();if(feedback.backgroundRoster)effectiveMsg+=' Verificación secundaria del padrón en curso.';
+  updateSyncIndicator(effectiveState,effectiveMsg,otherPending,feedback.backgroundRoster);
   paintReadFeedback();
   const save=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.save()"]'),process=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.process()"]'),down=document.querySelector('#registroRecoveryControls [onclick="IERegistroNotas2UI.download()"]');
   const isResumen=pane==='resumen';if(save){save.disabled=isResumen||!canEdit(pane)||isConflict;save.hidden=isResumen;save.querySelector('span').textContent=pane==='asistencia'?'Guardar local':'Guardar';}
@@ -340,12 +342,12 @@
   return ind;
  }
  function positionSyncIndicator(){const ind=document.getElementById('hdrSyncIndicator'),host=document.getElementById('registroAcademicFooter')?.querySelector?.('.shell');if(!ind)return;if(host){if(ind.parentElement!==host)host.appendChild(ind);Object.assign(host.style,{display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:'8px',alignItems:'center'});Object.assign(ind.style,{position:'static',bottom:'auto',marginLeft:'0'});}else{ind.style.bottom='12px';}}
- function updateSyncIndicator(state,message,otherPending=[]){
+ function updateSyncIndicator(state,message,otherPending=[],backgroundRoster=false){
   const ind=ensureSyncIndicator();
   if(!ind)return;
   ind.dataset.state=state;
   ind.title=message||state;
-  const label=ind.querySelector('.sync-label');if(label)label.textContent=({connected:'Conectado',pending:'Cambios pendientes',checking:String(message).startsWith('Cargando padrón')?'Cargando padrón':String(message).startsWith('Sin concesión')?'Edición pausada':'Verificando acceso',offline:'Sin conexión',server:'Error de conexión',session:'Sesión no válida',review:'Requiere revisión',conflict:'Requiere revisión',readonly:'Solo lectura'})[state]||'Estado de conexión';positionSyncIndicator();
+  const label=ind.querySelector('.sync-label');if(label)label.textContent=({connected:'Conectado',pending:'Cambios pendientes',checking:String(message).startsWith('Cargando padrón')?'Cargando padrón':String(message).startsWith('Sin concesión')?'Edición pausada':'Verificando acceso',offline:'Sin conexión',server:'Error de conexión',session:'Sesión no válida',review:'Requiere revisión',conflict:'Requiere revisión',readonly:'Solo lectura'})[state]||'Estado de conexión';if(label&&backgroundRoster)label.textContent+=' · verificando padrón';ind.dataset.rosterRead=backgroundRoster?'background':'none';positionSyncIndicator();
   ind.setAttribute('aria-label','Estado de sincronización: '+ind.title+'. Abrir diagnóstico.');
   const dot=ind.querySelector('.sync-dot');
   if(!dot)return;
