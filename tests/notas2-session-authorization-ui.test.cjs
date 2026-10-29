@@ -26,6 +26,7 @@ test('protected local work is never described as a prepared reserve',()=>{
 test('old backend without an explicit scope keeps the authenticated fallback',()=>{const f=fixture();f.c.acceptContextAuthorization({epoch:null},1000,'user|token|profile|epoch');assert.equal(f.c.contextAuthorization(),null);});
 for(const until of [1000,1001])test('reserve publication rechecks authorization deadline '+until,()=>{
  const text=fs.readFileSync('registro-notas2-ui.js','utf8'),start=text.indexOf('beforeApply:()=>{'),end=text.indexOf('},hasExisting:',start),guard=text.slice(start+'beforeApply:()=>{'.length,end);
- const receiptGuards=new Map([['key',{signature:'empty',authorizedUntil:until}]]),memory={nota:'A'};const c=vm.createContext({key:'key',receiptGuards,Date:{now:()=>1000},model:{signature:()=> 'empty'},academicContext:()=>({}),ctxBase:()=>({}),screenPending:()=>false,memory});
+ const receiptGuards=new Map([['key',{signature:'empty',authorizedUntil:until}]]),memory={nota:'A'};const c=vm.createContext({key:'key',root:{},tutor:()=>false,receiptGuards,Date:{now:()=>1000},model:{signature:()=> 'empty'},academicContext:()=>({}),ctxBase:()=>({}),screenPending:()=>false,memory});
+ const helper=text.indexOf(' function missingRoster(');assert.ok(helper>=0);vm.runInContext(text.slice(helper,text.indexOf('\n',helper)),c);
  if(until===1000)assert.throws(()=>vm.runInContext(guard,c),{code:'READ_AUTH_EXPIRED'});else assert.doesNotThrow(()=>vm.runInContext(guard,c));assert.deepEqual(memory,{nota:'A'});
 });
