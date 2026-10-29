@@ -1680,7 +1680,7 @@ function crearEstadoPadronRegistro(){
  const entries=new Map();let actor='';
  const identity=()=>JSON.stringify([IEStudents.validToken(),getLoginSession()?.user,getLoginSession()?.role,getLoginSession()?.permisosVersion,loadPeriodosAdmin()]);
  const sync=()=>{const next=identity();if(next!==actor){entries.clear();actor=next;}};
- return {get(bim){sync();const e=entries.get(bim),base=IEStudents.peekRoster(bim);if(e&&(e.until<=Date.now()||base?.padronInicializado===true&&(!e.initialized||String(base.version)!==e.version))){entries.delete(bim);return null;}return e||null;},mark(bim,code='MISSING'){sync();if(!IEStudents.validToken())return;entries.set(bim,{code,until:Date.now()+60000,version:String(IEStudents.peekRoster(bim)?.version||''),initialized:IEStudents.peekRoster(bim)?.padronInicializado===true});},retry(bim){sync();entries.delete(bim);}};
+ return {get(bim){sync();const e=entries.get(bim),base=IEStudents.peekRoster(bim);if(e&&(base?.padronInicializado===true&&(!e.initialized||String(base.version)!==e.version))){entries.delete(bim);return null;}return e||null;},mark(bim,code='MISSING'){sync();if(!IEStudents.validToken()||entries.get(bim)?.state==='SIN_PADRON'&&code==='ROSTER')return;entries.set(bim,{code,state:code==='MISSING'?'SIN_PADRON':'PADRON_NO_VERIFICADO',version:String(IEStudents.peekRoster(bim)?.version||''),initialized:IEStudents.peekRoster(bim)?.padronInicializado===true});},retry(bim){sync();const e=entries.get(bim);if(e)e.recheck=true;},confirm(bim){sync();entries.delete(bim);}};
 }
 window.IERegistroRosterAvailability=crearEstadoPadronRegistro();
 async function cargarPadronRegistro(bimestre) {
@@ -1688,7 +1688,8 @@ async function cargarPadronRegistro(bimestre) {
     padronVerificadoServidor = false; estadoPadron('No se pudo guardar localmente. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.',true); return false;
   }
   const knownMissing=window.IERegistroRosterAvailability?.get(bimestre);
-  if(knownMissing){++solicitudPadron;cargandoEstudiantes=false;lecturaPadronRegistro=null;padronVerificadoServidor=false;estadoPadron(knownMissing.code==='MISSING'?'Bimestre sin padrón inicializado':'Padrón del bimestre no verificado',true);return false;}
+  if(knownMissing&&!knownMissing.recheck){++solicitudPadron;cargandoEstudiantes=false;lecturaPadronRegistro=null;padronVerificadoServidor=false;estadoPadron(knownMissing.code==='MISSING'?'No hay padrón registrado para este bimestre':'Padrón del bimestre no verificado',true);return false;}
+  if(knownMissing)knownMissing.recheck=false;
   const solicitud = ++solicitudPadron;
   const tokenSolicitud = IEStudents.validToken();
   if (tokenSolicitud !== tokenPadron) {
@@ -1697,7 +1698,7 @@ async function cargarPadronRegistro(bimestre) {
   tokenPadron = tokenSolicitud; lecturaPadronRegistro = Object.freeze({solicitud,bimestre,token:tokenSolicitud}); cargandoEstudiantes = true;
   bloquearRegistroMientrasValida(true);
   const candidata = IEStudents.peekRoster(bimestre);
-  const cache = candidata?.padronInicializado===true?candidata:null;
+  const cache = !knownMissing&&candidata?.padronInicializado===true?candidata:null;
   const lectura=lecturaPadronRegistro;let resultadoLectura='error';
   try {
   if(typeof IERegistroEditTrace!=='undefined')IERegistroEditTrace.record('roster-start',{context:lectura,state:'checking',until:0});
@@ -1712,7 +1713,9 @@ async function cargarPadronRegistro(bimestre) {
     const base = await IEStudents.loadRoster(bimestre);
     if (solicitud !== solicitudPadron) return false;
     if (IEStudents.validToken() !== tokenSolicitud) throw Object.assign(new Error('La sesión cambió.'),{code:'SESSION'});
-    if(base.padronInicializado!==true){if(base.offline)throw Object.assign(new Error('No se pudo verificar el padrón del bimestre. Reintenta con conexión.'),{code:base.verificationError||'NETWORK'});window.IERegistroRosterAvailability?.mark(bimestre);throw Object.assign(new Error('Bimestre sin padrón inicializado'),{code:'ROSTER_MISSING'});}
+    if(knownMissing&&base.offline)throw Object.assign(new Error('No se pudo verificar el padrón del bimestre. Reintenta con conexión.'),{code:base.verificationError||'NETWORK'});
+    if(base.padronInicializado!==true){if(base.offline)throw Object.assign(new Error('No se pudo verificar el padrón del bimestre. Reintenta con conexión.'),{code:base.verificationError||'NETWORK'});if(base.padronInicializado!==false)throw Object.assign(new Error('El servidor no confirmó el padrón del bimestre.'),{code:'INVALID_RESPONSE'});window.IERegistroRosterAvailability?.mark(bimestre);cargandoEstudiantes=false;padronVerificadoServidor=false;padronBimestre='';resultadoLectura='ok';estadoPadron('No hay padrón registrado para este bimestre',true);return false;}
+    if(!base.offline)window.IERegistroRosterAvailability?.confirm(bimestre);
     cargandoEstudiantes = false;
     bloquearRegistroMientrasValida(!!base.offline);
     pintarPadronInmediato(base,bimestre,!!base.offline);
@@ -3693,14 +3696,14 @@ function conRegistroHistorico(fn){
 }
 function renderRegistroHistorico(nombre,fn){
  const ids={renderStudents:'stuList',renderFinales:'finLista',renderAvance:'avanceBox',renderAsistencia:'asisLista',renderSesiones:'listaSesiones'};
- if(window.IERegistroRosterAvailability?.get(ctxBase().bim)){const box=document.getElementById(ids[nombre]);if(box)box.textContent='Bimestre sin padrón inicializado';return false;}
+ if(window.IERegistroRosterAvailability?.get(ctxBase().bim)){const box=document.getElementById(ids[nombre]);if(box)box.textContent='No hay padrón registrado para este bimestre';return false;}
  if(!registroHistoricoActual||registroHistoricoActual.key!==cloudClaveReg()||registroHistoricoActual.token!==IEStudents.validToken()){
    const box=document.getElementById(ids[nombre]);if(box&&!(box.dataset?.historicalReadSequence===String(registroHistoricoSecuencia)&&box.dataset.historicalReadContext===cloudClaveReg()))box.innerHTML='';return false;
  }
  return conRegistroHistorico(fn);
 }
 async function cargarRegistroHistorico(){
- if(window.IERegistroRosterAvailability?.get(ctxBase().bim)){estadoPadron('Bimestre sin padrón inicializado',true);return false;}
+ if(window.IERegistroRosterAvailability?.get(ctxBase().bim)){estadoPadron('No hay padrón registrado para este bimestre',true);return false;}
  const c=ctxBase(),key=cloudClaveReg(),token=IEStudents.validToken(),seq=++registroHistoricoSecuencia;
  registroHistoricoActual=null;['stuList','finLista','avanceBox','asisLista','listaSesiones'].forEach(id=>{const box=document.getElementById(id);if(box)box.innerHTML='';});
  const actual=()=>registroConsultaHistorica()&&seq===registroHistoricoSecuencia&&key===cloudClaveReg()&&token===IEStudents.validToken();
