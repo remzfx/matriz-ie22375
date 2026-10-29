@@ -1248,7 +1248,7 @@ function eqClass(L) {
 }
 
 let bdEstudiantes = IEStudents.empty();
-let cargandoEstudiantes = false;
+let cargandoEstudiantes = false, lecturaPadronRegistro = null;
 function loadBD() { return bdEstudiantes; }
 function loadStore() {
   if(typeof IERegistroNotas2UI!=='undefined'&&registroLocal.matches()&&IERegistroNotas2UI.keepMemory())return;
@@ -1685,7 +1685,7 @@ async function cargarPadronRegistro(bimestre) {
   if (tokenSolicitud !== tokenPadron) {
     padronBimestre = ''; bdEstudiantes = IEStudents.empty(); sesionActiva = null; notas = {};
   }
-  tokenPadron = tokenSolicitud; cargandoEstudiantes = true;
+  tokenPadron = tokenSolicitud; lecturaPadronRegistro = Object.freeze({solicitud,bimestre,token:tokenSolicitud}); cargandoEstudiantes = true;
   bloquearRegistroMientrasValida(true);
   const candidata = IEStudents.peekRoster(bimestre);
   const cache = typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&candidata?.padronInicializado!==true?null:candidata;
@@ -1719,7 +1719,7 @@ async function cargarPadronRegistro(bimestre) {
     estadoPadron(e.message + (vigente ? (e.operacion === 'recordarPadron' ? ' Consulta conservada; revisión de alias pendiente.' : ' Modo local activo: puedes seguir trabajando; nube pendiente.') : ' Puedes reintentar.'),true);
     return !!vigente;
   } finally {
-    if (solicitud === solicitudPadron) { cargandoEstudiantes = false; sincronizarEdicionRegistro(); }
+    if (solicitud === solicitudPadron) { cargandoEstudiantes = false; lecturaPadronRegistro = null; sincronizarEdicionRegistro(); }
   }
 }
 async function cambiarBimestreRegistro() {

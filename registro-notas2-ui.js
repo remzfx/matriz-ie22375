@@ -222,11 +222,12 @@
  function viewStamp(s){return JSON.stringify([binding(),currentPanel(),s?.legacy,s?.processed,Object.values(s?.panels||{}).map(p=>p.version)]);}
  function render(){lastView=viewStamp(get()?.status());renderedPaused=!canEdit();if(tutor()){if(connection?.canEdit())tutorRegistroController?.refresh?.();else document.querySelectorAll('#transRows input,#transRows textarea,#transRows select,#transRows button').forEach(el=>el.disabled=true);return;}if(painting)return;painting=true;try{renderSesiones();renderStudents();if(currentPanel()==='promedios')renderFinales();if(document.getElementById('panelAvance')?.classList.contains('on'))renderAvance();if(currentPanel()==='asistencia')renderAsistencia();sincronizarEdicionRegistro();}finally{painting=false;paint();}}
  // Presentation observes existing promises/states; never starts a read or grants access.
+ function visibleRosterRead(){return !!(typeof lecturaPadronRegistro!=='undefined'&&lecturaPadronRegistro&&typeof cargandoEstudiantes!=='undefined'&&cargandoEstudiantes&&lecturaPadronRegistro.bimestre===ctxBase().bim&&lecturaPadronRegistro.token===getLoginSession()?.token);}
  function readStatus(){
   const pane=currentPanel(),s=get()?.status(),conn=connection?.snapshot?.(),c=ctxBase(),aula=c.grado+'.º '+c.seccion;
   const error=['session','server','offline','review'].find(v=>conn?.state===v||s?.state===v||(v==='review'&&s?.state==='conflict'));
   const missing=['calificar','promedios','asistencia'].includes(pane)&&s?.panels[pane]?.version==null;
-  const access=accessRead?.key===binding()&&!connection?.canEdit(),load=s?.state==='checking'&&!!s.busy,roster=typeof cargandoEstudiantes!=='undefined'&&cargandoEstudiantes;
+  const access=accessRead?.key===binding()&&!connection?.canEdit(),load=s?.state==='checking'&&!!s.busy,roster=visibleRosterRead();
   const prepared=load&&missing&&prefetch?preparation().state==='prepared':false;
   const pending=pane!=='resumen'&&!tutor()&&!error&&!save.pending&&!uploadAttendance.pending&&(access||load&&!prepared||roster);
   const detail=error?({session:'Sesión inválida — vuelve a iniciar sesión.',server:'Servidor no disponible — edición pausada.',offline:'Conexión perdida. Estamos intentando reconectar…',review:'Conflicto de versiones — consulta la nube antes de guardar.'})[error]:access?'Verificando acceso a '+aula+' · Bimestre '+c.bim:download.pending&&load?'Recuperando información del servidor':load?'Cargando '+(pane==='asistencia'?'asistencia':'calificaciones')+' de '+aula:roster?'Cargando padrón de '+aula+' · Bimestre '+c.bim:'Información pendiente de verificación. Consulte la nubecita.';
@@ -259,7 +260,7 @@
   if(isConflict){effectiveState='review';effectiveMsg='Conflicto de versiones — consulta la nube antes de guardar.';}
   else if(errorState){effectiveState=errorState;const statusMap={offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.'};effectiveMsg=statusMap[errorState];}
   else if(isReadonly){effectiveState='readonly';effectiveMsg=esVistaAdmin()?'Vista Administrador — solo lectura.':'Bimestre cerrado — solo lectura.';}
-  else if(connState==='checking'||s?.state==='checking'||!connection?.canEdit()||pane==='asistencia'&&s?.panels.asistencia.version===null){effectiveState='checking';effectiveMsg=typeof cargandoEstudiantes!=='undefined'&&cargandoEstudiantes?'Cargando padrón — acceso pendiente de verificación.':accessRead||s?.busy||s?.state==='checking'?'Verificando acceso — edición sujeta a autorización vigente.':'Sin concesión vigente — edición pausada. Abra el diagnóstico.';}
+  else if(connState==='checking'||s?.state==='checking'||!connection?.canEdit()||pane==='asistencia'&&s?.panels.asistencia.version===null){effectiveState='checking';effectiveMsg=visibleRosterRead()?'Cargando padrón — acceso pendiente de verificación.':accessRead||s?.busy||s?.state==='checking'?'Verificando acceso — edición sujeta a autorización vigente.':'Sin concesión vigente — edición pausada. Abra el diagnóstico.';}
   else if(activePending){effectiveState='pending';effectiveMsg='Conectado — cambios sin guardar.';}
   else{effectiveState='connected';effectiveMsg=otherPending.length>0?'Conectado — '+(paneNames[pane]||'Notas')+' al día. ('+otherPending.join(', ')+' con cambios sin guardar).':'Conectado — notas verificadas.';}
   const prepared=prefetch&&!tutor()?preparation():null;
