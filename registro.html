@@ -1149,7 +1149,7 @@ function registroDependenciaFallida(){
    epoch++;emit(reason);arm(Math.min(60000,15000*2**Math.min(attempt++,2)));
   }
   async function check(review=false,force=false){
-   if(disposed)return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
+   if(disposed)return false;if(o.defer?.())return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
    if(!o.authorized()){emit(o.readonly?.()?'readonly':'session');return false;}
    if(!online()){pause('offline');return false;}
    while(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit()){arm(Math.min(interval,Math.max(0,until-now()-30000)));return true;}
@@ -1160,7 +1160,7 @@ function registroDependenciaFallida(){
    const task={key,owner:o.owner?.()};flight=task;task.promise=(async()=>{try{
     const result=await o.verify({review,valid,force});if(['SESSION','DENIED'].includes(result?.code)&&o.owner&&task.owner===o.owner()){expired=true;epoch++;emit('session');return false;}if(!same())return false;
     if(result?.code==='SESSION'||result?.code==='DENIED'){expired=true;emit('session');return false;}
-    if(!o.authorized()){emit('session');return false;}
+    if(!o.authorized()){if(o.defer?.())return false;emit('session');return false;}
     if(result?.code==='CLOSED'){emit('readonly');return false;}
     if(!result?.ok){emit(result?.conflict?'review':result?.code==='LOCAL_STORAGE'?'review':'server');return false;}
     if(result.conflict||(result.pending&&!review&&!priorPending)){emit('review');return false;}
@@ -3579,7 +3579,7 @@ function sincronizarFondoPromedios() {
 function indicadorCargaRegistro(detalle,compacto=false){
  return '<div data-registro-read-wait class="registro-read-wait'+(compacto?' compact':'')+'"><span class="registro-read-spinner" aria-hidden="true"></span><div class="registro-read-copy"><strong>'+escapeRegistro(tituloCargaRegistro(detalle))+'</strong><span data-read-detail>'+escapeRegistro(detalle)+'</span></div></div>';
 }
-function tituloCargaRegistro(detalle){return String(detalle).startsWith('Verificando acceso')?'Verificando acceso…':detalle==='Preparando comparativo bimestral'?'Preparando comparativo bimestral…':'Espere, sincronizando información…';}
+function tituloCargaRegistro(detalle){return String(detalle).startsWith('Verificando acceso')?'Verificando acceso…':String(detalle).startsWith('Cargando padrón')?'Cargando padrón…':detalle==='Preparando comparativo bimestral'?'Preparando comparativo bimestral…':'Espere, sincronizando información…';}
 function pintarCargaRegistro(box,detalle,pendiente,compacto=false){
  if(!box)return;box.setAttribute?.('role','status');box.setAttribute?.('aria-live','polite');box.setAttribute?.('aria-atomic','true');box.setAttribute?.('aria-busy',String(!!pendiente));
  if(!pendiente){box.textContent=detalle||'';return;}

@@ -56,7 +56,7 @@
    epoch++;emit(reason);arm(Math.min(60000,15000*2**Math.min(attempt++,2)));
   }
   async function check(review=false,force=false){
-   if(disposed)return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
+   if(disposed)return false;if(o.defer?.())return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
    if(!o.authorized()){emit(o.readonly?.()?'readonly':'session');return false;}
    if(!online()){pause('offline');return false;}
    while(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit()){arm(Math.min(interval,Math.max(0,until-now()-30000)));return true;}
@@ -67,7 +67,7 @@
    const task={key,owner:o.owner?.()};flight=task;task.promise=(async()=>{try{
     const result=await o.verify({review,valid,force});if(['SESSION','DENIED'].includes(result?.code)&&o.owner&&task.owner===o.owner()){expired=true;epoch++;emit('session');return false;}if(!same())return false;
     if(result?.code==='SESSION'||result?.code==='DENIED'){expired=true;emit('session');return false;}
-    if(!o.authorized()){emit('session');return false;}
+    if(!o.authorized()){if(o.defer?.())return false;emit('session');return false;}
     if(result?.code==='CLOSED'){emit('readonly');return false;}
     if(!result?.ok){emit(result?.conflict?'review':result?.code==='LOCAL_STORAGE'?'review':'server');return false;}
     if(result.conflict||(result.pending&&!review&&!priorPending)){emit('review');return false;}
