@@ -40,4 +40,4 @@ const assert=require('node:assert/strict'),edits={
     ]
   ]
 };
-module.exports=(file,source)=>{let s=source.replace(/\r\n/g,'\n');for(const [current,previous]of edits[file]||[])if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique roster heartbeat delta');s=s.replace(current,previous);}return s;};
+module.exports=(file,source)=>{let s=require('./notas2-control-restoration-boundary.cjs')(file,source).replace(/\r\n/g,'\n');for(const [current,previous]of edits[file]||[])if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique roster heartbeat delta');s=s.replace(current,previous);}return s;};

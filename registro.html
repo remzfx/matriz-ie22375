@@ -1621,10 +1621,10 @@ function sincronizarEdicionRegistro() {
   main.inert = false;
   main.setAttribute('aria-busy', cargandoEstudiantes ? 'true' : 'false');
   const bloquearLocal = registroSoloLectura();
-  document.querySelectorAll('[data-reg-write],[data-delfecha],[data-adel],[data-an]').forEach(el => { el.disabled = bloquearLocal || !!el.closest?.('td.fin-competence-inactive'); });
+  document.querySelectorAll('[data-reg-write],[data-delfecha],[data-adel],[data-an]').forEach(el => { if(bloquearLocal&&typeof IERegistroNotas2UI!=='undefined')IERegistroNotas2UI.capturePausedControl?.(el);el.disabled = bloquearLocal || !!el.closest?.('td.fin-competence-inactive'); });
   document.querySelectorAll('[data-reg-cloud]').forEach(el => { el.disabled = registroNubeNoVerificada(); });
   // Los controles recién renderizados conservan sus restricciones académicas propias.
-  document.querySelectorAll('.cal-nota,.fin-nota,.academic-conclusion').forEach(el => { if (bloquearLocal) el.readOnly = true; });
+  document.querySelectorAll('.cal-nota,.fin-nota,.academic-conclusion').forEach(el => { if (bloquearLocal) { if(typeof IERegistroNotas2UI!=='undefined')IERegistroNotas2UI.capturePausedControl?.(el);el.readOnly = true; } });
   if(typeof document.dispatchEvent==='function'&&typeof Event!=='undefined')document.dispatchEvent(new Event('ie22375:registro-ready'));
 }
 function estadoPadron(message, retry) {
