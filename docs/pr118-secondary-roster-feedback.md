@@ -24,7 +24,8 @@ Se conservan los timeouts y reintentos existentes del transporte. No se añade u
 ## Verificación diferencial
 
 - 6 pruebas nuevas: Calificar, Promedios y Asistencia con lectura secundaria real; espera sin concesión; resultado y privacidad del trace; cambios locales pendientes junto a la lectura secundaria.
-- 39 pruebas existentes afectadas: feedback, ciclo de vida del padrón, restauración de controles y diagnóstico. Todas aprobadas tras corregir la coherencia entre la copia inline y externa del diagnóstico.
+- 41 pruebas existentes afectadas: feedback, ciclo de vida del padrón, restauración de controles y diagnóstico. Todas aprobadas tras corregir la coherencia entre la copia inline y externa del diagnóstico.
+- El primer CI detectó dos fixtures de contexto desconocido que simulaban readStatus sin el nuevo campo blocking. Se actualizó exclusivamente ese contrato de la fixture; se mantienen todas las aserciones de spinner obligatorio, ausencia de valores previos, aislamiento y permisos. Las dos pruebas fallidas pasan.
 - Se actualiza una expectativa anterior que exigía el spinner superior durante una lectura secundaria editable. Ahora comprueba que la lectura sigue pendiente y observable en la nube, sin exigir el bloqueo visual retirado por esta orden.
 - Navegador Edge con cargador, DOM, N2 y controlador reales, transporte ficticio: una lectura con demora mínima de 3000 ms permaneció pendiente durante 3279 ms sin spinner superior; se comprobaron respuestas fuera de orden y paso de espera obligatoria a secundaria al recuperar una concesión válida. Cero escrituras, solicitudes externas y errores de página.
 - Sintaxis: 276 archivos JS/GS, 36 scripts inline, 90 dependencias locales; diff sin errores.
