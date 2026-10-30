@@ -7,7 +7,7 @@ function ui(){
  c.bimestreHabilitado=b=>cfg.bimestres[b]==='abierto';c.estadoPadron=(m,retry)=>states.push({m,retry});c.retirarVerificacionNube=()=>{token=''};c.saveStore=()=>saves++;c.fillComps=c.updateHdr=()=>{};c.capsElegidas=[];c.sesionActiva=null;c.notas={};c.IERegistroTransversales=undefined;c.document.querySelectorAll=()=>[];
  vm.runInContext(src.slice(src.indexOf('function indicadorCargaRegistro('),src.indexOf('function renderFinales()',src.indexOf('let registroHistoricoActual='))),c);
  vm.runInContext("var padronBimestre='III',tokenPadron='synthetic';",c);
- for(const n of ['registroSoloLectura','bimCerradoDocente','conRegistroHistorico','guardarTodo','bajarRegistroNube','imprimirResumen','prepararImpresion','imprimirAsistenciaRegistro'])vm.runInContext((n==='bajarRegistroNube'?'async ':'')+extract(src,n),c);
+ for(const n of ['actualizarAvisoPadronContexto','registroSoloLectura','bimCerradoDocente','conRegistroHistorico','guardarTodo','bajarRegistroNube','imprimirResumen','prepararImpresion','imprimirAsistenciaRegistro'])vm.runInContext((n==='bajarRegistroNube'?'async ':'')+extract(src,n),c);
  const setBim=b=>{bim=b;f.el('selBim').value=b;vm.runInContext('padronBimestre='+JSON.stringify(b),c);};setBim('III');
  return {...f,c,cfg,requests,states,setBim,setToken:t=>{token=t},saves:()=>saves,run:s=>vm.runInContext(s,c),install:p=>{c.proof=p;vm.runInContext('registroHistoricoActual=proof;',c);}};
 }

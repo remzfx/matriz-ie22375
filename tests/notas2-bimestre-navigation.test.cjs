@@ -50,7 +50,7 @@ function fixture({closed=false,latency=4000,uiSource}={}){
  };
  vm.runInContext(fs.readFileSync('students.js','utf8'),g);
  g.bdEstudiantes=g.IEStudents.empty();
- for(const name of ['bloquearRegistroMientrasValida','estadoPadron','errorPadronLocal','pintarPadronInmediato','cargarPadronRegistro','cambiarBimestreRegistro'])vm.runInContext(extract(name),g);
+ for(const name of ['bloquearRegistroMientrasValida','actualizarAvisoPadronContexto','estadoPadron','errorPadronLocal','pintarPadronInmediato','cargarPadronRegistro','cambiarBimestreRegistro'])vm.runInContext(extract(name),g);
  // Alias persistence is outside this navigation change; use a non-writing test capture.
  g.saveStore=()=>{};g.registroSoloLectura=()=>!g.IERegistroNotas2UI.canEdit();g.vigilarCachePadron=()=>{};
  async function visit(bim,grado=1,seccion='A'){

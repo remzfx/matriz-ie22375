@@ -1627,10 +1627,18 @@ function sincronizarEdicionRegistro() {
   document.querySelectorAll('.cal-nota,.fin-nota,.academic-conclusion').forEach(el => { if (bloquearLocal) { if(typeof IERegistroNotas2UI!=='undefined')IERegistroNotas2UI.capturePausedControl?.(el);el.readOnly = true; } });
   if(typeof document.dispatchEvent==='function'&&typeof Event!=='undefined')document.dispatchEvent(new Event('ie22375:registro-ready'));
 }
-function estadoPadron(message, retry) {
-  const st = document.getElementById('studentsStatus'); if (st) st.textContent = message;
+function estadoPadron(message, retry, error = '', contexto = JSON.stringify(ctxBase())) {
+  const st = document.getElementById('studentsStatus'); if (st) { st.textContent = message; if(st.dataset) { st.dataset.rosterContext = contexto; st.dataset.rosterError = error; } }
   const button = document.getElementById('retryRoster'); if (button) { button.hidden = !retry; button.disabled = cargandoEstudiantes; }
+  actualizarAvisoPadronContexto();
   sincronizarEdicionRegistro();
+}
+function actualizarAvisoPadronContexto() {
+  const st = document.getElementById('studentsStatus'), key = JSON.stringify(ctxBase());
+  if(!st?.dataset?.rosterContext || st.dataset.rosterContext === key) return;
+  st.dataset.rosterContext = key; delete st.dataset.rosterError;
+  st.textContent = st.dataset.persistenceError ? 'Advertencia de persistencia local ('+st.dataset.persistenceError+') pendiente de verificación. Los datos en memoria se conservan; consulte el diagnóstico.' : '';
+  const retry = document.getElementById('retryRoster'); if(retry) retry.hidden = !st.dataset.persistenceError;
 }
 function bloquearRegistroMientrasValida(bloquear) {
   padronVerificadoServidor = !bloquear;
@@ -1644,12 +1652,12 @@ function errorPadronLocal(operacion, e) {
     if(e && ['LOCAL_STORAGE','QUOTA_EXCEEDED','STORAGE_UNAVAILABLE',22,1014].includes(e.code)) codigo = e.code;
   } catch(_) {}
   try { console.warn('registro.persistencia', {operacion,tipo,codigo}); } catch(_) {}
-  const status = document.getElementById('studentsStatus'); if(status?.dataset) status.dataset.persistenceError = operacion;
+  const status = document.getElementById('studentsStatus'); if(status?.dataset) { status.dataset.persistenceError = operacion; status.dataset.persistenceContext = JSON.stringify(ctxBase()); }
   const mensaje = operacion === 'recordarPadron'
     ? 'No se pudo actualizar la referencia local del padrón (recordarPadron). Los originales se conservaron; no se intentó guardar.'
     : 'No se pudo guardar el registro local (saveStore).';
   return Object.assign(new Error(mensaje+' Los datos en memoria se conservan. No cierre esta pestaña; consulte el diagnóstico antes de reintentar.'),
-    {code:'LOCAL_STORAGE',retryable:true,operacion,tipo,codigo});
+    {code:'LOCAL_STORAGE',retryable:true,operacion,tipo,codigo,contexto:JSON.stringify(ctxBase())});
 }
 
 function pintarPadronInmediato(base, bimestre, desdeCache) {
@@ -1661,7 +1669,7 @@ function pintarPadronInmediato(base, bimestre, desdeCache) {
   if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()) {
     try { recordarPadron(base); } catch(e) { throw errorPadronLocal('recordarPadron', e); }
     try { saveStore(); } catch(e) { throw errorPadronLocal('saveStore', e); }
-    const status = document.getElementById('studentsStatus'); if(status?.dataset) delete status.dataset.persistenceError;
+    const status = document.getElementById('studentsStatus'); if(status?.dataset && (status.dataset.persistenceError === 'saveStore' || status.dataset.persistenceContext === JSON.stringify(ctxBase()))) { delete status.dataset.persistenceError; delete status.dataset.persistenceContext; }
   }
   llenarAulasPadron(nivel);
   onContexto({localOnly:desdeCache, preservar:mismoPadron && contextoAnterior === JSON.stringify(ctxBase())});
@@ -1692,7 +1700,7 @@ async function cargarPadronRegistro(bimestre) {
   const knownMissing=window.IERegistroRosterAvailability?.get(bimestre);
   if(knownMissing&&!knownMissing.recheck){++solicitudPadron;cargandoEstudiantes=false;lecturaPadronRegistro=null;padronVerificadoServidor=false;estadoPadron(knownMissing.code==='MISSING'?'No hay padrón registrado para este bimestre':'Padrón del bimestre no verificado',true);return false;}
   if(knownMissing)knownMissing.recheck=false;
-  const solicitud = ++solicitudPadron;
+  const solicitud = ++solicitudPadron, contextoSolicitud = JSON.stringify(ctxBase());
   const tokenSolicitud = IEStudents.validToken();
   if (tokenSolicitud !== tokenPadron) {
     padronBimestre = ''; bdEstudiantes = IEStudents.empty(); sesionActiva = null; notas = {};
@@ -1735,7 +1743,7 @@ async function cargarPadronRegistro(bimestre) {
     if (vigente) { if (e.code !== 'LOCAL_STORAGE') pintarPadronInmediato(vigente,bimestre,true); }
     else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
       ['finLista','avanceBox','asisLista'].forEach(id => { const el=document.getElementById(id); if(el)el.innerHTML=''; }); }
-    estadoPadron(e.message + (vigente ? (e.operacion === 'recordarPadron' ? ' Consulta conservada; revisión de alias pendiente.' : ' Modo local activo: puedes seguir trabajando; nube pendiente.') : ' Puedes reintentar.'),true);
+    estadoPadron(e.message + (vigente ? (e.operacion === 'recordarPadron' ? ' Consulta conservada; revisión de alias pendiente.' : ' Modo local activo: puedes seguir trabajando; nube pendiente.') : ' Puedes reintentar.'),true,e.code === 'LOCAL_STORAGE' ? 'local' : 'remote',e.contexto || contextoSolicitud);
     return !!vigente;
   } finally {
     if(typeof IERegistroEditTrace!=='undefined')IERegistroEditTrace.record('roster-end',{context:lectura,state:null,until:0},{outcome:solicitud!==solicitudPadron||IEStudents.validToken()!==tokenSolicitud?'context-change':resultadoLectura});
@@ -2303,6 +2311,7 @@ function onContexto(options) {
   }
 
   const c = ctxBase();
+  actualizarAvisoPadronContexto();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
   actualizarDocenteResponsable();
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()){

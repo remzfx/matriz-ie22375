@@ -258,7 +258,7 @@
   const otherPending=[];
   if(s){for(const [name,p] of Object.entries(s.panels)){if(name===pane)continue;const isDirty=p.pending||screenPending(name)||(name==='calificar'&&typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty);if(isDirty)otherPending.push(paneNames[name]||name);}}
   const isConflict=s?.state==='conflict'||connState==='review';
-  const rosterMissing=missingRoster(),rosterRetry=document.getElementById('retryRoster'),rosterError=rosterRetry?.hidden===false;
+  const rosterMissing=missingRoster(),rosterStatus=document.getElementById('studentsStatus'),rosterError=rosterStatus?.dataset?.rosterContext===JSON.stringify(ctxBase())&&rosterStatus.dataset.rosterError==='remote';
   const errorState=['session','offline'].find(state=>connState===state||s?.state===state)||(rosterMissing?null:['session','server','offline'].find(state=>connState===state||s?.state===state)||(document.getElementById('studentsStatus')?.dataset?.persistenceError?'local':rosterError?'server':null));
   const isReadonly=connState==='readonly'||(s?.panels.promedios.version!=null&&s.readonly)||readonly();
   let effectiveState='connected',effectiveMsg='Conectado — notas verificadas.';

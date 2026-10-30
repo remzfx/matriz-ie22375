@@ -358,7 +358,7 @@ if(body.action==='academicstate')return {ok:true,text:async()=>JSON.stringify({o
     assert.ok(a >= 0, name);
     return regHtml.slice(a, regHtml.indexOf('\n}', a) + 2);
   }
-  for (const fn of ['confirmarSalidaContexto', 'onGrado', 'onContexto', 'setArea', 'volverHome', 'guardarTodo']) {
+  for (const fn of ['actualizarAvisoPadronContexto', 'confirmarSalidaContexto', 'onGrado', 'onContexto', 'setArea', 'volverHome', 'guardarTodo']) {
     vm.runInContext(extractFn(fn), g);
   }
 
