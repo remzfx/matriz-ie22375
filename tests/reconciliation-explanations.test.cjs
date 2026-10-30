@@ -58,7 +58,7 @@ test('Deletion and unverified student identity are never hidden or inferred from
 });
 
 test('Old unowned local storage is independent of cloud historical keys; it is not auto-adopted or deleted',()=>{
- const {create}=require('../registro-local-store.js'),legacyKey='ie22375_registro_notas_v2',raw=JSON.stringify({finales:{fictitious:{nivel:'C'}}}),memory=new Map([[legacyKey,raw]]);let writes=0;
+ const {create}=require('./registro-inline-modules.cjs').load('registro-local-store.js'),legacyKey='ie22375_registro_notas_v2',raw=JSON.stringify({finales:{fictitious:{nivel:'C'}}}),memory=new Map([[legacyKey,raw]]);let writes=0;
  const local=create({getItem:k=>memory.get(k)||null,setItem:(k,v)=>{writes++;memory.set(k,v);}},()=>({role:'docente',user:'fake-teacher'}));assert.equal(local.hasLegacy(),true);assert.equal(local.read(),null);assert.throws(()=>local.legacy(),/Solo Admin/);assert.equal(memory.get(legacyKey),raw);assert.equal(writes,0);
 });
 

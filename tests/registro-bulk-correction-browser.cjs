@@ -1,6 +1,6 @@
 // Real DOM/render/save/load paths in a fresh browser context; synthetic session/roster, all network blocked.
 const fs=require('node:fs'),assert=require('node:assert/strict');
-const read=p=>fs.readFileSync(p,'utf8').replace(/\r\n/g,'\n');
+const read=p=>require('./registro-inline-modules.cjs').readFile(p,'utf8').replace(/\r\n/g,'\n');
 function build(level='secundaria',source=read('registro.html')){
  const css=source.match(/<style>([\s\S]*?)<\/style>/)[1],body=source.match(/<body[^>]*>([\s\S]*?)<\/body>/)[1].replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'');
  const start=source.indexOf('const registroLocal = IERegistroLocalStore.create('),main=source.slice(start,source.indexOf("window.addEventListener('resize', fixHdrHeight);",start));

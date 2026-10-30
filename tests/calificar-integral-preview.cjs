@@ -1,5 +1,5 @@
 // Reproducible offline review artifacts, using existing fictitious roster and actual print wrapper.
-const fs=require('node:fs'),path=require('node:path'),{report,build}=require('./registro-bimestral-print-fixture.cjs'),printer=require('../registro-calificar-print.js');
+const fs=require('node:fs'),path=require('node:path'),{report,build}=require('./registro-bimestral-print-fixture.cjs'),printer=require('./registro-inline-modules.cjs').load('registro-calificar-print.js');
 function preview(mode){
  const options={level:mode==='num'?'primaria':'secundaria',area:mode==='num'?'Personal Social':'Matemática',count:mode==='num'?40:30,mode,kind:'bimestre'},f=report(options),original=f.html;
  Object.values(f.c.store.grades).forEach((g,i)=>{const n=[8,12,15,18][i%4];g.nota20=n;g.nivel=f.c.numToLetter(n);g.origen=i%5?'numero':'letra';});f.c.prepararImpresion();

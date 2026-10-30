@@ -1,6 +1,6 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{execFileSync}=require('node:child_process');
-const root=path.resolve(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
+const root=path.resolve(__dirname,'..'),read=f=>require('./registro-inline-modules.cjs').readFile(path.join(root,f),'utf8').replace(/\r\n/g,'\n');
 const base='9b740af5408b1d5fb87f85ede5078d17ec45b1c8',old=f=>execFileSync('git',['show',base+':'+f],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n');
 const boundary=require('./notas2-frontend-boundary.cjs'),stripBackend=require('./n2r3-backend-boundary.cjs');
 for(const file of ['admin.html','primaria.html','secundaria.html','aula_innovacion.js','apps-script/Codigo.js','apps-script/Notas2.js','registro-local-store.js','registro-drafts.js','registro-recovery-ui.js','registro-calificar-print.js','registro-evaluation.js','registro-academic-model.js'])test('selective integration preserves '+file+' exactly',()=>{
@@ -8,7 +8,7 @@ for(const file of ['admin.html','primaria.html','secundaria.html','aula_innovaci
  assert.equal(raw,old(file));
 });
 for(const [kind,file]of [['html','registro.html'],['matrix','matrix-registry-import.js'],['sw','sw.js']])test('historical boundary excludes exact '+kind+' hooks without hiding unrelated source mutations',()=>{
- const raw=kind==='html'?read(file).replace(read('registro-connection.js').trim(),old('registro-connection.js').trim()):read(file);assert.equal(boundary(kind,raw),old(file));assert.equal(boundary(kind,old(file)),old(file));assert.notEqual(boundary(kind,raw+'\n/* unrelated synthetic mutation */'),old(file));
+ const raw=kind==='html'?read(file).replace(require('./registro-inline-modules.cjs').read('registro-connection.js').trim(),old('registro-connection.js').trim()):read(file);assert.equal(boundary(kind,raw),old(file));assert.equal(boundary(kind,old(file)),old(file));assert.notEqual(boundary(kind,raw+'\n/* unrelated synthetic mutation */'),old(file));
 });
 test('legacy styles/helpers and print implementation survive; only one active N2 synchronizer is initialized',()=>{
  const s=read('registro.html');for(const name of ['av-card','av-comp','av-meta','av-badge','av-ev','av-stu'])assert.match(s,new RegExp('\\.'+name+'\\b'));
@@ -16,7 +16,7 @@ test('legacy styles/helpers and print implementation survive; only one active N2
  assert.equal((s.match(/function create\(o\)/g)||[]).length,(old('registro.html').match(/function create\(o\)/g)||[]).length);
  assert.ok(s.includes('data-notas2="1"'));assert.ok(s.indexOf('src="registro-notas2-ui.js"')<s.indexOf('/* Adaptador frontend: operaciones explícitas'));
  assert.match(s,/dataset\?\.notas2==='1'\)\{if\(typeof IERegistroNotas2UI==='undefined'\)registroDependenciaFallida\(\);return;/);
- const original=read('registro-calificar-print.js').trim();assert.ok(s.includes(original));assert.equal((s.match(/src="registro-notas2-ui.js"/g)||[]).length,1);
+ const original=require('./registro-inline-modules.cjs').read('registro-calificar-print.js').trim();assert.ok(s.includes(original));assert.equal((s.match(/src="registro-notas2-ui.js"/g)||[]).length,1);
 });
 test('missing mandatory calculation dependency pauses startup before academic state can be initialized',()=>{
  const s=read('registro.html'),a=s.indexOf('/* Dependencias obligatorias de la integración'),b=s.indexOf('const registroLocal =',a),guard=s.slice(a,b);let blocked=0;

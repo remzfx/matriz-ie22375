@@ -8,7 +8,7 @@ function fixture(prior,options={}){const r=prior?prior.r:sessions.cloud(),f=sess
  function node(tag){return {tag,children:[],style:{},append(child){this.children.push(child);},setAttribute(k,v){this[k]=v;},focus(){},close(){},remove(){},showModal(){}};}
  c.document.createElement=node;c.document.body={append(dialog){dialogs.push(dialog);queueMicrotask(()=>{const buttons=dialog.children.filter(x=>x.tag==='button');buttons[answer?1:0].onclick();});}};
  if(options.prepare)options.prepare(c,{events,timers,intervals,db,r,f});
- vm.runInContext(require('./reconcile-fixture.cjs').extract('guardarRegistroIntegrado'),c);vm.runInContext(read('registro-drafts.js'),c);vm.runInContext(options.source||read('registro-recovery-ui.js'),c);if(options.boot!==false)events.DOMContentLoaded();
+ vm.runInContext(require('./reconcile-fixture.cjs').extract('guardarRegistroIntegrado'),c);vm.runInContext(require('./registro-inline-modules.cjs').read('registro-drafts.js'),c);vm.runInContext(options.source||require('./registro-inline-modules.cjs').read('registro-recovery-ui.js'),c);if(options.boot!==false)events.DOMContentLoaded();
  return {...f,r,db,events,timers,intervals,dialogs,api:c.IERegistroRecovery,role:v=>role=v,closed:()=>closed=true,denied:()=>denied=true,cancel:()=>answer=false};
 }
 test('actual UI recovery after mass removal retains unrelated contexts and shared attendance with zero savereg',async()=>{

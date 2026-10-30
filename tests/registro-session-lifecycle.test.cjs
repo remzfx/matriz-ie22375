@@ -1,4 +1,4 @@
-const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),local=require('../registro-local-store.js');
+const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),local=require('./registro-inline-modules.cjs').load('registro-local-store.js');
 const {gate,sessionCode,pages}=require('./registro-session-lifecycle-fixture.cjs');
 function storage(){const map=new Map();return {getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};}
 function browser(shared=storage()){const navigations=[],c=vm.createContext({sessionStorage:storage(),localStorage:shared,location:{replace:url=>navigations.push(url)},window:{location:{},__IE_NEED_ROLES:['admin','primaria','secundaria']},document:{getElementById:()=>({classList:{add(){},remove(){}},value:'unused'})},iniciarPuenteLogin(){},alert(){}});vm.runInContext(sessionCode,c);return {c,navigations};}
