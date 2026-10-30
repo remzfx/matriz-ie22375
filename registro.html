@@ -1644,6 +1644,7 @@ function errorPadronLocal(operacion, e) {
     if(e && ['LOCAL_STORAGE','QUOTA_EXCEEDED','STORAGE_UNAVAILABLE',22,1014].includes(e.code)) codigo = e.code;
   } catch(_) {}
   try { console.warn('registro.persistencia', {operacion,tipo,codigo}); } catch(_) {}
+  const status = document.getElementById('studentsStatus'); if(status?.dataset) status.dataset.persistenceError = operacion;
   const mensaje = operacion === 'recordarPadron'
     ? 'No se pudo actualizar la referencia local del padrón (recordarPadron). Los originales se conservaron; no se intentó guardar.'
     : 'No se pudo guardar el registro local (saveStore).';
@@ -1660,6 +1661,7 @@ function pintarPadronInmediato(base, bimestre, desdeCache) {
   if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()) {
     try { recordarPadron(base); } catch(e) { throw errorPadronLocal('recordarPadron', e); }
     try { saveStore(); } catch(e) { throw errorPadronLocal('saveStore', e); }
+    const status = document.getElementById('studentsStatus'); if(status?.dataset) delete status.dataset.persistenceError;
   }
   llenarAulasPadron(nivel);
   onContexto({localOnly:desdeCache, preservar:mismoPadron && contextoAnterior === JSON.stringify(ctxBase())});

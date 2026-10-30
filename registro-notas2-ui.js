@@ -202,7 +202,7 @@
   if(protectedDisk===null){const raw=registroLocal.read();try{protectedDisk=raw?JSON.parse(raw):{};}catch(_){throw Error('No se puede interpretar el almacenamiento anterior; no se sobrescribió.');}}
   const next=copy(protectedDisk);
   for(const f of model.fields.asistencia){const value=store[f];if(value!==undefined&&(Object.keys(value).length||Object.prototype.hasOwnProperty.call(protectedDisk,f)))next[f]=copy(value);}
-  if(JSON.stringify(next)!==JSON.stringify(protectedDisk)){registroLocal.write(JSON.stringify(next));protectedDisk=next;}
+  if(JSON.stringify(next)!==JSON.stringify(protectedDisk)){const epoch=root.IEAcademicResetClient?.epoch?.();if(epoch)next.academicEpoch=epoch;registroLocal.write(JSON.stringify(next));protectedDisk=next;}
 
  }
  function officialOnly(){if(registroHistoricoProyectando)return metaRegistro()?.notas2?.adopted===true;const state=get()?.status();return !!state&&state.panels.promedios.version!==null&&(!state.legacy||state.processed);}
@@ -259,11 +259,11 @@
   if(s){for(const [name,p] of Object.entries(s.panels)){if(name===pane)continue;const isDirty=p.pending||screenPending(name)||(name==='calificar'&&typeof IERegistroTransversales!=='undefined'&&!!IERegistroTransversales.current()?.dirty);if(isDirty)otherPending.push(paneNames[name]||name);}}
   const isConflict=s?.state==='conflict'||connState==='review';
   const rosterMissing=missingRoster(),rosterRetry=document.getElementById('retryRoster'),rosterError=rosterRetry?.hidden===false;
-  const errorState=['session','offline'].find(state=>connState===state||s?.state===state)||(rosterMissing?null:['session','server','offline'].find(state=>connState===state||s?.state===state)||(rosterError?'server':null));
+  const errorState=['session','offline'].find(state=>connState===state||s?.state===state)||(rosterMissing?null:['session','server','offline'].find(state=>connState===state||s?.state===state)||(document.getElementById('studentsStatus')?.dataset?.persistenceError?'local':rosterError?'server':null));
   const isReadonly=connState==='readonly'||(s?.panels.promedios.version!=null&&s.readonly)||readonly();
   let effectiveState='connected',effectiveMsg='Conectado — notas verificadas.';
   if(isConflict){effectiveState='review';effectiveMsg='Conflicto de versiones — consulta la nube antes de guardar.';}
-  else if(errorState){effectiveState=errorState;const statusMap={offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.'};effectiveMsg=statusMap[errorState];}
+  else if(errorState){effectiveState=errorState;const statusMap={offline:'Conexión perdida. Estamos intentando reconectar…',server:'Servidor no disponible — edición pausada.',session:'Sesión inválida — vuelve a iniciar sesión.',local:'No se pudo conservar el registro local. Los datos en memoria se conservan; consulte el diagnóstico.'};effectiveMsg=statusMap[errorState];}
   else if(rosterMissing){effectiveState=rosterMissing.state==='SIN_PADRON'?'sin_padron':'readonly';effectiveMsg=rosterMissing.code==='MISSING'?'No hay padrón registrado para este bimestre':'Padrón del bimestre no verificado';}
   else if(isReadonly){effectiveState='readonly';effectiveMsg=esVistaAdmin()?'Vista Administrador — solo lectura.':'Bimestre cerrado — solo lectura.';}
   else if(connState==='checking'||s?.state==='checking'||!connection?.canEdit()||pane==='asistencia'&&s?.panels.asistencia.version===null){effectiveState='checking';effectiveMsg=visibleRosterRead()?'Cargando padrón — acceso pendiente de verificación.':accessRead||s?.busy||s?.state==='checking'?'Verificando acceso — edición sujeta a autorización vigente.':'Sin concesión vigente — edición pausada. Abra el diagnóstico.';}
@@ -352,7 +352,7 @@
   if(!ind)return;
   ind.dataset.state=state;
   ind.title=message||state;
-  const label=ind.querySelector('.sync-label');if(label)label.textContent=({connected:'Conectado',pending:'Cambios pendientes',checking:String(message).startsWith('Cargando padrón')?'Cargando padrón':String(message).startsWith('Sin concesión')?'Edición pausada':'Verificando acceso',offline:'Sin conexión',server:'Error de conexión',session:'Sesión no válida',review:'Requiere revisión',conflict:'Requiere revisión',readonly:String(message).startsWith('Bimestre sin padrón')?'Sin padrón':String(message).startsWith('Padrón del bimestre')?'Padrón no verificado':'Solo lectura'})[state]||'Estado de conexión';if(state==='sin_padron'&&label)label.textContent='Sin padrón';if(label&&backgroundRoster)label.textContent+=' · verificando padrón';ind.dataset.rosterRead=backgroundRoster?'background':'none';positionSyncIndicator();
+  const label=ind.querySelector('.sync-label');if(label)label.textContent=({connected:'Conectado',pending:'Cambios pendientes',checking:String(message).startsWith('Cargando padrón')?'Cargando padrón':String(message).startsWith('Sin concesión')?'Edición pausada':'Verificando acceso',offline:'Sin conexión',server:'Error de conexión',local:'Error local',session:'Sesión no válida',review:'Requiere revisión',conflict:'Requiere revisión',readonly:String(message).startsWith('Bimestre sin padrón')?'Sin padrón':String(message).startsWith('Padrón del bimestre')?'Padrón no verificado':'Solo lectura'})[state]||'Estado de conexión';if(state==='sin_padron'&&label)label.textContent='Sin padrón';if(label&&backgroundRoster)label.textContent+=' · verificando padrón';ind.dataset.rosterRead=backgroundRoster?'background':'none';positionSyncIndicator();
   ind.setAttribute('aria-label','Estado de sincronización: '+ind.title+'. Abrir diagnóstico.');
   const dot=ind.querySelector('.sync-dot');
   if(!dot)return;
@@ -362,7 +362,7 @@
    ind.style.color='#fde68a';dot.style.backgroundColor='#f59e0b';dot.style.animation='none';
   }else if(state==='checking'){
    ind.style.color='#fde68a';dot.style.backgroundColor='#f59e0b';dot.style.animation='pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite';
-  }else if(['offline','server','session','review','conflict'].includes(state)){
+  }else if(['offline','server','session','review','conflict','local'].includes(state)){
    ind.style.color='#fca5a5';dot.style.backgroundColor='#ef4444';dot.style.animation='none';
   }else if(state==='readonly'||state==='sin_padron'){
    ind.style.color='#cbd5e1';dot.style.backgroundColor='#94a3b8';dot.style.animation='none';
