@@ -27,7 +27,7 @@ function fixture(){
  function fillCaps(){};function loadCapsElegidas(){};function renderChipsCaps(){};function markClean(){};function updateHdr(){};
  function renderSesiones(){renders++};function renderFinales(){};function renderAvance(){};function renderAsistencia(){};
  function consultarEstadoSiagie(){};function recolectarPantalla(){};function guardarMeta(){};function saveCapsElegidas(){};`);
- for(const name of ['registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','bloquearRegistroMientrasValida','pintarPadronInmediato','vigilarCachePadron','cargarPadronRegistro','cambiarBimestreRegistro','reintentarPadronRegistro','actualizarUnidades','onContexto','guardarTodo'])run(extract(name));
+ for(const name of ['registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','actualizarAvisoPadronContexto','estadoPadron','bloquearRegistroMientrasValida','errorPadronLocal','pintarPadronInmediato','vigilarCachePadron','cargarPadronRegistro','cambiarBimestreRegistro','reintentarPadronRegistro','actualizarUnidades','onContexto','guardarTodo'])run(extract(name));
  return {c,run,main,writes,cloud,element,tick,calls,alerts,response,storage,timers,now:()=>now};
 }
 test('Fast server verifies the exact roster/session and enables writing without inert',async()=>{

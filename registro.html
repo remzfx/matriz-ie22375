@@ -15,6 +15,32 @@
   .fin-grid .fin-competence-inactive {opacity:.4;}
   .hidden { display: none !important; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; margin:0; }
+  /* Compact screen-only headers; session rendering and controls retain their existing DOM/events. */
+  @media screen {
+    #wrapSesiones {display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:8px 12px;}
+    #wrapSesiones > .sessions-title,#wrapSesiones > .sessions-help,#listaSesiones > [role="status"] {margin:0;line-height:1.4;min-width:0;overflow-wrap:anywhere;}
+    #wrapSesiones > .sessions-title {flex:0 0 auto;}
+    #wrapSesiones > .sessions-help {flex:0 1 auto;}
+    #listaSesiones {display:contents;}
+    #listaSesiones > [role="status"] {order:0;flex:0 1 auto;}
+    #wrapSesiones > .sessions-chip-break {flex-basis:100%;height:0;order:1;}
+    #listaSesiones > .sess-chip {order:2;margin:0;}
+    #wrapSesiones > #lblSinSesiones {order:2;flex-basis:100%;margin:0;}
+    #wrapCalificar {padding:8px 12px;}
+    #wrapCalificar .calificar-heading {display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;margin-bottom:4px;}
+    #wrapCalificar .calificar-heading-context {display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;min-width:0;}
+    #wrapCalificar .calificar-heading-context > :first-child::after {content:'·';margin-left:8px;color:#94a3b8;}
+    #wrapCalificar #lblSesionActiva {font-size:13px;line-height:1.4;overflow-wrap:anywhere;}
+    #wrapCalificar .calificar-heading .mode-toggle {margin-left:auto;max-width:100%;}
+    #wrapCalificar .calificar-heading-help {display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;}
+    #wrapCalificar .calificar-heading-help > p {margin:0;line-height:1.4;}
+    #wrapCalificar .calificar-heading-help > p + p {padding-left:12px;border-left:1px solid #e2e8f0;}
+    #wrapCalificar > #stuList {margin-top:6px;}
+    @media(max-width:640px) {
+      #wrapSesiones {column-gap:8px;}
+      #wrapCalificar .calificar-heading-help > p + p {padding-left:0;border-left:0;}
+    }
+  }
   .session-evaluation-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);column-gap:12px;row-gap:10px;align-items:start;}
   .session-evaluation-grid>div{min-width:0;}
   .session-evaluation-grid label{display:block;margin:0 0 4px;font-size:12px;line-height:1.4;}
@@ -360,6 +386,8 @@
   :is(#stuList,#finLista) .chip[data-val].nivel-b.on {background:#fef3c7;color:#92400e;border-color:#fcd34d;}
   :is(#stuList,#finLista) .chip[data-val].nivel-a.on {background:#dcfce7;color:#166534;border-color:#86efac;}
   :is(#stuList,#finLista) .chip[data-val].nivel-ad.on {background:#e0f2fe;color:#075985;border-color:#7dd3fc;}
+  #stuList .chip[data-val].nivel-b.on {background:#ffedd5;color:#9a3412;border-color:#fdba74;}
+  #stuList .chip[data-val].nivel-ad.on {background:#bbf7d0;color:#14532d;border-color:#4ade80;}
   #finLista .final-level-toggle {border:0;cursor:pointer;font:inherit;}
   #finLista .final-level-toggle:disabled {cursor:default;}
   #finLista .final-level-toggle:focus-visible {outline:2px solid #0369a1;outline-offset:2px;}
@@ -610,6 +638,19 @@
 @media(prefers-reduced-motion:reduce){#registroConnectionStatus::before {animation:none!important;}}
 @media print{#registroConnectionStatus{display:none!important}}
 /* Fin Fase3 conexión. */
+
+  /* Read feedback: presentation only, no progress estimates or timing controller. */
+  .registro-read-wait {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:112px;max-width:100%;padding:16px 12px;border:1px solid #e0f2fe;border-radius:12px;background:#f8fcff;color:#0f172a;text-align:center;font:inherit;box-sizing:border-box;}
+  .registro-read-spinner {display:block;width:26px;height:26px;flex:0 0 auto;box-sizing:border-box;border:3px solid #dbeafe;border-top-color:#0284c7;border-radius:50%;animation:registroReadSpin .85s linear infinite;}
+  .registro-read-copy {display:flex;flex-direction:column;gap:3px;min-width:0;max-width:100%;overflow-wrap:anywhere;}
+  .registro-read-copy strong {font-size:14px;font-weight:700;line-height:1.4;}
+  .registro-read-copy [data-read-detail] {font-size:12px;color:#64748b;line-height:1.45;}
+  .registro-read-wait.compact {min-height:0;flex-direction:row;gap:8px;padding:7px 10px;margin:4px 0;}
+  .registro-read-wait.compact .registro-read-spinner {width:18px;height:18px;border-width:2px;}
+  .registro-read-wait.compact strong {font-size:12px;}
+  @keyframes registroReadSpin {to{transform:rotate(360deg)}}
+  @media(prefers-reduced-motion:reduce){.registro-read-spinner{animation:none;}}
+  @media print{.registro-read-wait{display:none!important;}}
 </style>
   <script src="login-bridge.js"></script>
 <script>
@@ -770,7 +811,7 @@ function registroDependenciaFallida(){
               <div class="text-sm font-bold" id="lblFinCtx">—</div>
               <div class="fin-header-aux">
                 <div class="fin-mode-info" id="finModeInfo"></div>
-                <span id="finContextStatus" role="status" class="text-xs text-slate-500" hidden>Verificando datos…</span>
+                <div id="finContextStatus" hidden></div>
                 <div id="finResumen"></div>
               </div>
             </div>
@@ -791,6 +832,7 @@ function registroDependenciaFallida(){
             </div>
           </div>
         </header>
+        <div id="comparativoBimStatus" hidden></div>
         <div id="finLista" class="fin-wrap fin-scroll-body"></div>
         <div id="finEstadisticas"></div>
       </div>
@@ -822,6 +864,7 @@ function registroDependenciaFallida(){
           <span class="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">T <span id="aT">0</span></span>
           <span class="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-800">J <span id="aJ">0</span></span>
         </div>
+        <div id="asisContextStatus" hidden></div>
         <div id="asisLista"></div>
       </div>
     </div>
@@ -874,16 +917,17 @@ function registroDependenciaFallida(){
       <button type="button" class="btn btn-primary w-full text-sm" data-reg-write onclick="activarSesion()">Agregar a la grilla</button>
     </div>
     <div class="card p-3" id="wrapSesiones">
-      <div class="text-[10px] font-bold text-slate-500 mb-1">SESIONES GUARDADAS</div>
-      <p class="text-[11px] text-slate-500 mb-1">Un chip por día. Tócalo para abrir esa fecha.</p>
+      <div class="sessions-title text-[10px] font-bold text-slate-500">SESIONES GUARDADAS</div>
+      <p class="sessions-help text-[11px] text-slate-500">Un chip por día. Tócalo para abrir esa fecha.</p>
+      <span class="sessions-chip-break" aria-hidden="true"></span>
       <div id="listaSesiones" class="flex flex-wrap gap-1"></div>
       <p class="text-[11px] text-slate-400 mt-1" id="lblSinSesiones">Aún no hay sesiones guardadas.</p>
     </div>
 
     <!-- Calificar -->
     <div class="card p-3" id="wrapCalificar">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div>
+      <div class="calificar-heading">
+        <div class="calificar-heading-context">
           <div class="text-[10px] font-bold text-slate-500">CALIFICAR</div>
           <div class="text-sm font-bold text-slate-800" id="lblSesionActiva">Define fecha, competencia y capacidad arriba</div>
         </div>
@@ -892,8 +936,11 @@ function registroDependenciaFallida(){
           <button type="button" data-modo="num" onclick="setModoCalif('num')">0–20</button>
         </div>
       </div>
-      <p class="scale-hint" id="lblEscala">Escala: AD destacado · A logrado · B proceso · C inicio</p>
-      <p class="text-[10px] text-slate-400 mt-1">Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas.</p>
+      <div class="calificar-heading-help">
+        <p class="scale-hint" id="lblEscala">Escala: AD destacado · A logrado · B proceso · C inicio</p>
+        <p class="text-[10px] text-slate-400">Cambiar entre Letras y 0–20 solo cambia la forma de calificar; no modifica las notas ya guardadas.</p>
+      </div>
+      <div id="calContextStatus" hidden></div>
       <div id="stuList" class="mt-2"></div>
     </div>
     </div><!-- /panelCalificar -->
@@ -1044,45 +1091,84 @@ function registroDependenciaFallida(){
 })(typeof window==='undefined'?globalThis:window);
 </script>
 <script>
+/* Diagnóstico temporal optativo: solo memoria, sin identidad ni transporte. */
+(function(root){
+ 'use strict';
+ const capacity=300,states=['checking','connected','pending','offline','server','session','readonly','review','ready','conflict','closed'];
+ const reasons=['enabled','permissions','readonly','conflict','client-state','client-legacy','client-busy','context-change','expiration','no-grant','disposed','review','server','offline','session','period-verification','unknown'];
+ let active=false,origin=0,sequence=0,contextSequence=0,dropped=0,rows=[],contexts=new WeakMap(),run={},observed={};
+ const flag=v=>typeof v==='boolean'?v:null,choice=(v,list)=>list.includes(v)?v:null;
+ function record(event,s={},detail={}){if(!active)return null;try{
+  if(!s.context||typeof s.context!=='object')return null;
+  let context=contexts.get(s.context);if(!context){context={id:'c'+(++contextSequence),last:{},expired:false};contexts.set(s.context,context);}
+  if(event==='lease-expired')context.expired=true;else if(s.until>Date.now())context.expired=false;
+  const layer=choice(detail.layer,['connection','ui']),panel=choice(detail.panel,['calificar','promedios','asistencia','resumen']);
+  let reason=choice(detail.reason,reasons);if(reason==='no-grant'&&context.expired)reason='expiration';
+  const row={event:choice(event,['gate','connection','context','lease-expired','academicstate-start','academicstate-end','roster-start','roster-end','verification-rejected','page-hidden','page-visible']),context:context.id,layer,panel,
+   state:choice(s.state,states),validUntilMs:Number.isFinite(s.until)&&s.until>0?s.until-origin:null,expired:context.expired||!!(s.until>0&&s.until<=Date.now()),
+   authorized:flag(detail.authorized),allowed:flag(detail.allowed),clientState:choice(detail.clientState,states),clientReadonly:flag(detail.clientReadonly),clientBusy:flag(detail.clientBusy),
+   canEdit:flag(detail.canEdit),reason,verification:Number.isSafeInteger(detail.verification)&&detail.verification>0?detail.verification:null,
+   outcome:choice(detail.outcome,['ok','permissions','context-change','invalid-response','generation','timeout','error'])};
+  if(!row.event)return null;
+  if(event==='gate'){
+   const key=layer+'|'+panel,prior=observed[key],signature=JSON.stringify(row);if(context.last[key]===signature)return null;
+   context.last[key]=signature;observed[key]={canEdit:row.canEdit,context:context.id};
+   if(prior?.canEdit===true&&row.canEdit===false){row.event='edit-blocked';if(prior.context!==context.id)row.reason='context-change';}
+  }
+  row.atMs=Date.now()-origin;if(rows.length===capacity){rows.shift();dropped++;}rows.push(row);return row;
+ }catch(_){return null;}}
+ const capture=()=>JSON.parse(JSON.stringify({schema:1,active,capacity,dropped,events:rows}));
+ root.IERegistroEditTrace=Object.freeze({enabled:()=>active,start(){origin=Date.now();sequence=contextSequence=dropped=0;rows=[];contexts=new WeakMap();run={};observed={};active=true;return {active,capacity};},stop(){active=false;},clear(){active=false;rows=[];contexts=new WeakMap();run={};observed={};dropped=0;},capture,export:()=>JSON.stringify(capture(),null,2),record,
+  begin(s){if(!active)return null;const ticket={id:++sequence,run,context:s?.context};record('academicstate-start',s,{verification:ticket.id});return ticket;},
+  end(ticket,s,outcome){if(ticket&&ticket.run===run&&active){const changed=ticket.context!==s?.context;record('academicstate-end',changed?{context:ticket.context,state:null,until:0}:s,{verification:ticket.id,outcome:changed?'context-change':outcome});}}});
+})(typeof window==='undefined'?globalThis:window);
 /* Conexión obligatoria de Registro. Solo coordina lecturas; nunca escribe datos académicos. */
 (function(root){
  'use strict';let active=null;
  function create(o){
   const now=o.now||Date.now,set=o.setTimeout||setTimeout,clear=o.clearTimeout||clearTimeout;
   const interval=o.interval||120000,lease=o.lease||150000;let state='checking',binding='',until=0,flight=null,timer=null,epoch=0,attempt=0,disposed=false,expired=false,published='',retentionFailed=false;
-  const grants=new Map();let expiryTimer=null;
+  const grants=new Map();let expiryTimer=null,diagnosticContext={},diagnosticGate=null;
+  const trace=root.IERegistroEditTrace;
+  function diagnosticState(){return {context:diagnosticContext,state,until,gate:diagnosticGate};}
   const online=()=>o.online?o.online():true;
-  function watchLease(){clear(expiryTimer);expiryTimer=null;if(until>now()){const key=binding;expiryTimer=set(()=>{expiryTimer=null;if(key===binding&&now()>=until){grants.delete(key);emit('checking');}},until-now());}}
+  function watchLease(){clear(expiryTimer);expiryTimer=null;if(until>now()){const key=binding;expiryTimer=set(()=>{expiryTimer=null;if(key===binding&&now()>=until){trace.record('lease-expired',diagnosticState(),{reason:'expiration'});grants.delete(key);emit('checking');}},until-now());}}
   function snapshot(){return {state,validUntil:until,pending:state==='pending',retentionFailed,binding};}
-  function emit(next){state=next;if(next!=='connected'&&next!=='pending'&&!(next==='checking'&&now()<until)){until=0;clear(expiryTimer);grants.delete(binding);}if(['offline','server','session'].includes(next))grants.clear();const stamp=binding+'|'+next+'|'+(now()<until);if(stamp!==published){published=stamp;o.changed?.(snapshot());}}
-  function scope(){const current=o.binding();if(binding!==current){binding=current;epoch++;until=0;expired=false;retentionFailed=false;state='checking';for(const [key,g]of grants)if(g.until<=now())grants.delete(key);const saved=grants.get(current);if(saved&&online()&&o.authorized()&&(!o.allowed||o.allowed())){until=saved.until;state=saved.state;}watchLease();}return current;}
-  function canEdit(){return !disposed&&!expired&&binding===o.binding()&&o.authorized()&&(!o.allowed||o.allowed())&&(state==='connected'||state==='pending'||state==='checking')&&now()<until;}
+  function emit(next){state=next;if(next!=='connected'&&next!=='pending'&&!(next==='checking'&&now()<until)){until=0;clear(expiryTimer);grants.delete(binding);}if(['offline','server','session'].includes(next))grants.clear();const stamp=binding+'|'+next+'|'+(now()<until);if(stamp!==published){published=stamp;trace.record('connection',diagnosticState());o.changed?.(snapshot());}}
+  function scope(){const current=o.binding();if(binding!==current){binding=current;diagnosticContext={};diagnosticGate=null;epoch++;until=0;expired=false;retentionFailed=false;state='checking';for(const [key,g]of grants)if(g.until<=now())grants.delete(key);const saved=grants.get(current);if(saved&&online()&&o.authorized()&&(!o.allowed||o.allowed())){until=saved.until;state=saved.state;}watchLease();trace.record('context',diagnosticState(),{reason:'context-change'});}return current;}
+  function canEdit(){let same=null,authorized=null,allowed=null;
+   const result=!disposed&&!expired&&(same=binding===o.binding())&&(authorized=o.authorized())&&(allowed=!o.allowed||o.allowed())&&(state==='connected'||state==='pending'||state==='checking')&&now()<until;
+   if(trace.enabled()){
+    const reason=result?'enabled':disposed?'disposed':expired?'permissions':same===false?'context-change':!authorized?'permissions':!allowed?'readonly':!['connected','pending','checking'].includes(state)?state:until>0?'expiration':'no-grant';
+    diagnosticGate={authorized:typeof authorized==='boolean'?authorized:null,allowed:typeof allowed==='boolean'?allowed:null,canEdit:!!result,reason};trace.record('gate',diagnosticState(),{layer:'connection',...diagnosticGate});
+   }return result;
+  }
   function arm(ms){clear(timer);if(disposed||expired)return;timer=set(()=>{timer=null;if(o.visible&&!o.visible()){arm(interval);return;}check(false,true);},ms);}
   function pause(reason='offline'){
    if(disposed)return;scope();try{if(canEdit())o.retain?.();}catch(e){retentionFailed=true;reason='review';}
    epoch++;emit(reason);arm(Math.min(60000,15000*2**Math.min(attempt++,2)));
   }
   async function check(review=false,force=false){
-   if(disposed)return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
+   if(disposed)return false;if(o.defer?.())return false;scope();if(retentionFailed){emit('review');return false;}if(expired){emit('session');return false;}
    if(!o.authorized()){emit(o.readonly?.()?'readonly':'session');return false;}
    if(!online()){pause('offline');return false;}
-   if(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit())return true;
+   while(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit()){arm(Math.min(interval,Math.max(0,until-now()-30000)));return true;}
    try{if(review&&canEdit())o.retain?.();}catch(e){retentionFailed=true;emit('review');return false;}
    const priorPending=state==='pending'||canEdit();
    const id=++epoch,key=binding;clear(timer);emit('checking');
    const same=()=>!disposed&&id===epoch&&key===o.binding();const valid=()=>same()&&o.authorized();
    const task={key,owner:o.owner?.()};flight=task;task.promise=(async()=>{try{
-    const result=await o.verify({review,valid});if(['SESSION','DENIED'].includes(result?.code)&&o.owner&&task.owner===o.owner()){expired=true;epoch++;emit('session');return false;}if(!same())return false;
+    const result=await o.verify({review,valid,force});if(['SESSION','DENIED'].includes(result?.code)&&o.owner&&task.owner===o.owner()){expired=true;epoch++;emit('session');return false;}if(!same())return false;
     if(result?.code==='SESSION'||result?.code==='DENIED'){expired=true;emit('session');return false;}
-    if(!o.authorized()){emit('session');return false;}
+    if(!o.authorized()){if(o.defer?.())return false;emit('session');return false;}
     if(result?.code==='CLOSED'){emit('readonly');return false;}
     if(!result?.ok){emit(result?.conflict?'review':result?.code==='LOCAL_STORAGE'?'review':'server');return false;}
     if(result.conflict||(result.pending&&!review&&!priorPending)){emit('review');return false;}
-    until=now()+lease;grants.set(key,{until,state:result.pending?'pending':'connected'});watchLease();attempt=0;emit(result.pending?'pending':'connected');return true;
+    until=Math.min(now()+lease,Number.isFinite(result.validUntil)?result.validUntil:Infinity);if(until<=now()){emit('checking');return false;}grants.set(key,{until,state:result.pending?'pending':'connected'});watchLease();attempt=0;emit(result.pending?'pending':'connected');return true;
    }catch(e){if(valid()){if(['SESSION','DENIED'].includes(e.code)){expired=true;emit('session');}else emit(online()?'server':'offline');}return false;
-   }finally{if(flight===task){flight=null;if(!disposed&&(binding!==o.binding()||(id!==epoch&&state==='checking'))){check(false,false);}else arm(state==='connected'||state==='pending'?interval:Math.min(60000,15000*2**Math.min(attempt++,2)));}}})();return task.promise;
+   }finally{if(flight===task){flight=null;if(!disposed&&(binding!==o.binding()||(id!==epoch&&state==='checking'))){check(false,false);}else arm(state==='connected'||state==='pending'?Math.min(interval,Math.max(1000,until-now()-30000)):Math.min(60000,15000*2**Math.min(attempt++,2)));}}})();return task.promise;
   }
-  const api={check,pause,canEdit,snapshot,dispose(){disposed=true;epoch++;clear(timer);clear(expiryTimer);grants.clear();flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},select(){scope();emit(state);if(canEdit())arm(Math.min(interval,Math.max(0,until-now()-30000)));},invalidate(){scope();epoch++;until=0;emit('checking');}};active=api;return api;
+  const api={check,pause,canEdit,snapshot,diagnosticState,dispose(){disposed=true;epoch++;clear(timer);clear(expiryTimer);grants.clear();flight=null;},changed(pending=true){if(canEdit())emit(pending?'pending':'connected');},select(){scope();emit(state);if(canEdit())arm(Math.min(interval,Math.max(0,until-now()-30000)));},invalidate(){scope();epoch++;until=0;emit('checking');}};active=api;return api;
  }
  root.IERegistroConnection={create,canEdit:()=>!!active&&active.canEdit(),current:()=>active};
  if(typeof module!=='undefined')module.exports=root.IERegistroConnection;
@@ -1162,7 +1248,7 @@ function eqClass(L) {
 }
 
 let bdEstudiantes = IEStudents.empty();
-let cargandoEstudiantes = false;
+let cargandoEstudiantes = false, lecturaPadronRegistro = null;
 function loadBD() { return bdEstudiantes; }
 function loadStore() {
   if(typeof IERegistroNotas2UI!=='undefined'&&registroLocal.matches()&&IERegistroNotas2UI.keepMemory())return;
@@ -1478,11 +1564,19 @@ function aliasesAula() {
   return store.studentAliases[key] || (store.studentAliases[key] = {});
 }
 function recordarPadron(base) {
+  const original = store.studentAliases;
+  const mapaValido = v => v && typeof v === 'object' && !Array.isArray(v);
+  if (original !== undefined && (!mapaValido(original) || Object.values(original).some(aula =>
+    !mapaValido(aula) || Object.values(aula).some(names => !Array.isArray(names) || names.some(n => typeof n !== 'string'))))) {
+    throw new TypeError('Formato de alias local inesperado; originales conservados.');
+  }
+  // Trabajar sobre mapas separados: un error no debe dejar alias parcialmente actualizados.
+  const siguiente = Object.fromEntries(Object.entries(original || {}).map(([key, aula]) => [key, {...aula}]));
   ['primaria','secundaria'].forEach(n => ((base[n] || {}).estudiantes || []).forEach(al => {
     const key = [n,al.grado,al.seccion].join('||');
-    store.studentAliases = store.studentAliases || {};
-    IEStudentIdentity.recordar(store.studentAliases[key] || (store.studentAliases[key] = {}), al);
+    IEStudentIdentity.recordar(siguiente[key] || (siguiente[key] = {}), al);
   }));
+  store.studentAliases = siguiente;
 }
 function leerNota(mapa, key) {
   if (!key) return undefined;
@@ -1527,29 +1621,56 @@ function sincronizarEdicionRegistro() {
   main.inert = false;
   main.setAttribute('aria-busy', cargandoEstudiantes ? 'true' : 'false');
   const bloquearLocal = registroSoloLectura();
-  document.querySelectorAll('[data-reg-write],[data-delfecha],[data-adel],[data-an]').forEach(el => { el.disabled = bloquearLocal || !!el.closest?.('td.fin-competence-inactive'); });
+  document.querySelectorAll('[data-reg-write],[data-delfecha],[data-adel],[data-an]').forEach(el => { if(bloquearLocal&&typeof IERegistroNotas2UI!=='undefined')IERegistroNotas2UI.capturePausedControl?.(el);el.disabled = bloquearLocal || !!el.closest?.('td.fin-competence-inactive'); });
   document.querySelectorAll('[data-reg-cloud]').forEach(el => { el.disabled = registroNubeNoVerificada(); });
   // Los controles recién renderizados conservan sus restricciones académicas propias.
-  document.querySelectorAll('.cal-nota,.fin-nota,.academic-conclusion').forEach(el => { if (bloquearLocal) el.readOnly = true; });
+  document.querySelectorAll('.cal-nota,.fin-nota,.academic-conclusion').forEach(el => { if (bloquearLocal) { if(typeof IERegistroNotas2UI!=='undefined')IERegistroNotas2UI.capturePausedControl?.(el);el.readOnly = true; } });
   if(typeof document.dispatchEvent==='function'&&typeof Event!=='undefined')document.dispatchEvent(new Event('ie22375:registro-ready'));
 }
-function estadoPadron(message, retry) {
-  const st = document.getElementById('studentsStatus'); if (st) st.textContent = message;
+function estadoPadron(message, retry, error = '', contexto = JSON.stringify(ctxBase())) {
+  const st = document.getElementById('studentsStatus'); if (st) { st.textContent = message; if(st.dataset) { st.dataset.rosterContext = contexto; st.dataset.rosterError = error; } }
   const button = document.getElementById('retryRoster'); if (button) { button.hidden = !retry; button.disabled = cargandoEstudiantes; }
+  actualizarAvisoPadronContexto();
   sincronizarEdicionRegistro();
+}
+function actualizarAvisoPadronContexto() {
+  const st = document.getElementById('studentsStatus'), key = JSON.stringify(ctxBase());
+  if(!st?.dataset?.rosterContext || st.dataset.rosterContext === key) return;
+  st.dataset.rosterContext = key; delete st.dataset.rosterError;
+  st.textContent = st.dataset.persistenceError ? 'Advertencia de persistencia local ('+st.dataset.persistenceError+') pendiente de verificación. Los datos en memoria se conservan; consulte el diagnóstico.' : '';
+  const retry = document.getElementById('retryRoster'); if(retry) retry.hidden = !st.dataset.persistenceError;
 }
 function bloquearRegistroMientrasValida(bloquear) {
   padronVerificadoServidor = !bloquear;
   sincronizarEdicionRegistro();
 }
+function errorPadronLocal(operacion, e) {
+  // Only allowlisted exception metadata: never log messages, storage or the exception itself.
+  let tipo = 'UnknownError', codigo = 'UNKNOWN';
+  try {
+    if(e && ['Error','TypeError','SyntaxError','RangeError','SecurityError','QuotaExceededError','NS_ERROR_DOM_QUOTA_REACHED','InvalidStateError'].includes(e.name)) tipo = e.name;
+    if(e && ['LOCAL_STORAGE','QUOTA_EXCEEDED','STORAGE_UNAVAILABLE',22,1014].includes(e.code)) codigo = e.code;
+  } catch(_) {}
+  try { console.warn('registro.persistencia', {operacion,tipo,codigo}); } catch(_) {}
+  const status = document.getElementById('studentsStatus'); if(status?.dataset) { status.dataset.persistenceError = operacion; status.dataset.persistenceContext = JSON.stringify(ctxBase()); }
+  const mensaje = operacion === 'recordarPadron'
+    ? 'No se pudo actualizar la referencia local del padrón (recordarPadron). Los originales se conservaron; no se intentó guardar.'
+    : 'No se pudo guardar el registro local (saveStore).';
+  return Object.assign(new Error(mensaje+' Los datos en memoria se conservan. No cierre esta pestaña; consulte el diagnóstico antes de reintentar.'),
+    {code:'LOCAL_STORAGE',retryable:true,operacion,tipo,codigo,contexto:JSON.stringify(ctxBase())});
+}
+
 function pintarPadronInmediato(base, bimestre, desdeCache) {
   const mismoPadron = padronBimestre === bimestre && !registroSoloLectura();
   const contextoAnterior = JSON.stringify(ctxBase());
   // Recolectar antes de cambiar nombres/IDs o reconstruir la grilla; nunca subir automáticamente.
   if (mismoPadron && guardarTodo() === false) throw Object.assign(new Error('No se pudo conservar el trabajo local. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.'),{code:'LOCAL_STORAGE',retryable:true});
   bdEstudiantes = base; padronBimestre = bimestre;
-  try { if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()){recordarPadron(base); saveStore();} }
-  catch(e) { throw Object.assign(new Error('No se pudo conservar el padrón local. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.'),{code:'LOCAL_STORAGE',retryable:true}); }
+  if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()) {
+    try { recordarPadron(base); } catch(e) { throw errorPadronLocal('recordarPadron', e); }
+    try { saveStore(); } catch(e) { throw errorPadronLocal('saveStore', e); }
+    const status = document.getElementById('studentsStatus'); if(status?.dataset && (status.dataset.persistenceError === 'saveStore' || status.dataset.persistenceContext === JSON.stringify(ctxBase()))) { delete status.dataset.persistenceError; delete status.dataset.persistenceContext; }
+  }
   llenarAulasPadron(nivel);
   onContexto({localOnly:desdeCache, preservar:mismoPadron && contextoAnterior === JSON.stringify(ctxBase())});
   sincronizarEdicionRegistro();
@@ -1565,21 +1686,35 @@ function vigilarCachePadron(bimestre, solicitud) {
     } else vencimientoCachePadron = setTimeout(comprobar,15000);
   },15000);
 }
+function crearEstadoPadronRegistro(){
+ const entries=new Map();let actor='';
+ const identity=()=>JSON.stringify([IEStudents.validToken(),getLoginSession()?.user,getLoginSession()?.role,getLoginSession()?.permisosVersion,loadPeriodosAdmin()]);
+ const sync=()=>{const next=identity();if(next!==actor){entries.clear();actor=next;}};
+ return {get(bim){sync();const e=entries.get(bim),base=IEStudents.peekRoster(bim);if(e&&(base?.padronInicializado===true&&(!e.initialized||String(base.version)!==e.version))){entries.delete(bim);return null;}return e||null;},mark(bim,code='MISSING'){sync();if(!IEStudents.validToken()||entries.get(bim)?.state==='SIN_PADRON'&&code==='ROSTER')return;entries.set(bim,{code,state:code==='MISSING'?'SIN_PADRON':'PADRON_NO_VERIFICADO',version:String(IEStudents.peekRoster(bim)?.version||''),initialized:IEStudents.peekRoster(bim)?.padronInicializado===true});},retry(bim){sync();const e=entries.get(bim);if(e)e.recheck=true;},confirm(bim){sync();entries.delete(bim);}};
+}
+window.IERegistroRosterAvailability=crearEstadoPadronRegistro();
 async function cargarPadronRegistro(bimestre) {
   if (padronBimestre === bimestre && !registroSoloLectura() && guardarTodo() === false) {
     padronVerificadoServidor = false; estadoPadron('No se pudo guardar localmente. No cierres esta pestaña; libera almacenamiento y pulsa Reintentar.',true); return false;
   }
-  const solicitud = ++solicitudPadron;
+  const knownMissing=window.IERegistroRosterAvailability?.get(bimestre);
+  if(knownMissing&&!knownMissing.recheck){++solicitudPadron;cargandoEstudiantes=false;lecturaPadronRegistro=null;padronVerificadoServidor=false;estadoPadron(knownMissing.code==='MISSING'?'No hay padrón registrado para este bimestre':'Padrón del bimestre no verificado',true);return false;}
+  if(knownMissing)knownMissing.recheck=false;
+  const solicitud = ++solicitudPadron, contextoSolicitud = JSON.stringify(ctxBase());
   const tokenSolicitud = IEStudents.validToken();
   if (tokenSolicitud !== tokenPadron) {
     padronBimestre = ''; bdEstudiantes = IEStudents.empty(); sesionActiva = null; notas = {};
   }
-  tokenPadron = tokenSolicitud; cargandoEstudiantes = true;
+  tokenPadron = tokenSolicitud; lecturaPadronRegistro = Object.freeze({solicitud,bimestre,token:tokenSolicitud}); cargandoEstudiantes = true;
   bloquearRegistroMientrasValida(true);
-  if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica())recordarPadron(bdEstudiantes);
   const candidata = IEStudents.peekRoster(bimestre);
-  const cache = typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&candidata?.padronInicializado!==true?null:candidata;
+  const cache = !knownMissing&&candidata?.padronInicializado===true?candidata:null;
+  const lectura=lecturaPadronRegistro;let resultadoLectura='error';
   try {
+  if(typeof IERegistroEditTrace!=='undefined')IERegistroEditTrace.record('roster-start',{context:lectura,state:'checking',until:0});
+  if(typeof registroConsultaHistorica!=='function'||!registroConsultaHistorica()) {
+    try { recordarPadron(bdEstudiantes); } catch(e) { throw errorPadronLocal('recordarPadron', e); }
+  }
   if (cache) pintarPadronInmediato(cache,bimestre,true);
   else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
     ['finLista','avanceBox','asisLista'].forEach(id => { const el=document.getElementById(id); if(el)el.innerHTML=''; }); }
@@ -1588,25 +1723,31 @@ async function cargarPadronRegistro(bimestre) {
     const base = await IEStudents.loadRoster(bimestre);
     if (solicitud !== solicitudPadron) return false;
     if (IEStudents.validToken() !== tokenSolicitud) throw Object.assign(new Error('La sesión cambió.'),{code:'SESSION'});
-    if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&base.padronInicializado!==true)throw Object.assign(new Error('El bimestre no tiene padrón histórico confirmado. No se utiliza BASE_ACTUAL para esta consulta.'),{code:'ROSTER_MISSING'});
+    if(knownMissing&&base.offline)throw Object.assign(new Error('No se pudo verificar el padrón del bimestre. Reintenta con conexión.'),{code:base.verificationError||'NETWORK'});
+    if(base.padronInicializado!==true){if(base.offline)throw Object.assign(new Error('No se pudo verificar el padrón del bimestre. Reintenta con conexión.'),{code:base.verificationError||'NETWORK'});if(base.padronInicializado!==false)throw Object.assign(new Error('El servidor no confirmó el padrón del bimestre.'),{code:'INVALID_RESPONSE'});window.IERegistroRosterAvailability?.mark(bimestre);cargandoEstudiantes=false;padronVerificadoServidor=false;padronBimestre='';resultadoLectura='ok';estadoPadron('No hay padrón registrado para este bimestre',true);return false;}
+    if(!base.offline)window.IERegistroRosterAvailability?.confirm(bimestre);
     cargandoEstudiantes = false;
     bloquearRegistroMientrasValida(!!base.offline);
     pintarPadronInmediato(base,bimestre,!!base.offline);
     vigilarCachePadron(bimestre,solicitud);
     estadoPadron(base.offline ? (base.verificationError === 'API_INCOMPATIBLE' ? 'Modo local activo. El backend no reconoce la lectura POST; puedes seguir trabajando y reintentar la sincronización.' : 'Modo local activo: puedes trabajar y guardar aquí. Sincronización de nube pendiente.') :
       (!base.padronInicializado ? 'Servidor verificado. Padrón pendiente: base actual autorizada.' : 'Padrón verificado con el servidor.'),!!base.offline);
+    resultadoLectura=base.offline?(base.verificationError==='TIMEOUT'?'timeout':'error'):'ok';
     return true;
   } catch(e) {
+    resultadoLectura=e?.code==='TIMEOUT'?'timeout':['SESSION','DENIED'].includes(e?.code)?'permissions':'error';
     if (solicitud !== solicitudPadron) return false;
     cargandoEstudiantes = false; padronVerificadoServidor = false;
-    const vigente = e.retryable && IEStudents.validToken() === tokenPadron && IEStudents.peekRoster(bimestre);
+    const candidataVigente = e.retryable && IEStudents.validToken() === tokenPadron && IEStudents.peekRoster(bimestre);
+    const vigente = candidataVigente?.padronInicializado===true?candidataVigente:null;
     if (vigente) { if (e.code !== 'LOCAL_STORAGE') pintarPadronInmediato(vigente,bimestre,true); }
     else { bdEstudiantes = IEStudents.empty(); padronBimestre = ''; renderStudents();
       ['finLista','avanceBox','asisLista'].forEach(id => { const el=document.getElementById(id); if(el)el.innerHTML=''; }); }
-    estadoPadron(e.message + (vigente ? ' Modo local activo: puedes seguir trabajando; nube pendiente.' : ' Puedes reintentar.'),true);
+    estadoPadron(e.message + (vigente ? (e.operacion === 'recordarPadron' ? ' Consulta conservada; revisión de alias pendiente.' : ' Modo local activo: puedes seguir trabajando; nube pendiente.') : ' Puedes reintentar.'),true,e.code === 'LOCAL_STORAGE' ? 'local' : 'remote',e.contexto || contextoSolicitud);
     return !!vigente;
   } finally {
-    if (solicitud === solicitudPadron) { cargandoEstudiantes = false; sincronizarEdicionRegistro(); }
+    if(typeof IERegistroEditTrace!=='undefined')IERegistroEditTrace.record('roster-end',{context:lectura,state:null,until:0},{outcome:solicitud!==solicitudPadron||IEStudents.validToken()!==tokenSolicitud?'context-change':resultadoLectura});
+    if (solicitud === solicitudPadron) { cargandoEstudiantes = false; lecturaPadronRegistro = null; sincronizarEdicionRegistro(); }
   }
 }
 async function cambiarBimestreRegistro() {
@@ -1631,6 +1772,7 @@ async function reintentarPadronRegistro() {
   if (!periodos) { await sincronizarPeriodosNube(); periodos = loadPeriodosAdmin(); pintarBimestresRegistro(periodos); }
   const bimestre = document.getElementById('selBim').value;
   if (!bimestre) { estadoPadron('No se pudo obtener la configuración de bimestres. Reintenta con conexión.',true); return; }
+  window.IERegistroRosterAvailability?.retry(bimestre);
   await cambiarBimestreRegistro();
 }
 
@@ -2134,6 +2276,9 @@ function actualizarUnidades() {
  sel.value=IERegistroAcademico.unitsForBim(bim).includes(Number(prev))&&prev!==''?prev:'';
 }
 function onContexto(options) {
+  if(typeof IERegistroNotas2UI!=='undefined'&&IERegistroNotas2UI.saving?.()){
+    const previous=IERegistroNotas2UI.savingContext?.()||window.__prevCtx;if(previous){for(const [id,value]of [['selGrado',previous.grado],['selSeccion',previous.seccion],['selBim',previous.bim]]){const el=document.getElementById(id);if(el)el.value=String(value);}areaActual=previous.area;actualizarBotonesContextoRegistro();}return false;
+  }
   actualizarBotonesContextoRegistro();
   actualizarUnidades();
   if (typeof cerrarTransversalesRegistro === 'function' && !cerrarTransversalesRegistro()) return;
@@ -2166,6 +2311,7 @@ function onContexto(options) {
   }
 
   const c = ctxBase();
+  actualizarAvisoPadronContexto();
   const mk = [c.nivel, c.bim, c.grado, c.seccion, c.area].join('||');
   actualizarDocenteResponsable();
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()){
@@ -2766,6 +2912,8 @@ function renderStudents() {
   if(typeof IERegistroAcademico!=='undefined')baselineAcademica();
   const list = estudiantes();
   const box = document.getElementById('stuList');
+  if(typeof IERegistroNotas2UI!=='undefined'&&!registroHistoricoProyectando&&IERegistroNotas2UI.current()?.status()?.panels.calificar.version==null){renderEsperaRegistro(box,'calContextLoading');return;}
+  box.setAttribute?.('aria-busy','false');
   const fecha = (document.getElementById('inpFecha')||{}).value || '';
   const comp = (document.getElementById('selComp')||{}).value || '';
   if (!fecha) {
@@ -2811,7 +2959,7 @@ function renderStudents() {
       const encP = encodeURIComponent(col.comp);
       if (modoCalif === 'letra') {
         tds += '<td><div class="fin-cell" data-nom="'+encN+'" data-cap="'+encC+'" data-comp="'+encP+'">' +
-          ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(letra===v?' on':'')+'" data-val="'+v+'" '+(bloqueado||noTrabajada?'disabled':'')+'>'+v+'</button>').join('') +
+          ['C','B','A','AD'].map(v => '<button type="button" class="chip nivel-'+v.toLowerCase()+(letra===v?' on':'')+'" data-val="'+v+'" aria-pressed="'+(letra===v)+'" '+(bloqueado||noTrabajada?'disabled':'')+'>'+v+'</button>').join('') +
           '</div></td>';
       } else {
         tds += '<td><div class="fin-cell">' +
@@ -2860,6 +3008,12 @@ function renderStudents() {
       saveStore();
     });
   });
+  // Persisting a local copy must not prevent the committed in-memory evidence from being painted.
+  const actualizarEvidencia = () => {
+    try { saveStore(); }
+    catch (_) { toast('Cambio conservado en memoria; no se pudo actualizar el almacenamiento local. No cierre esta pestaña.'); }
+    finally { renderStudents(); }
+  };
   box.querySelectorAll('.fin-cell button[data-val]').forEach(btn => {
     btn.addEventListener('click', function() {
       if (contextoCalificar !== cloudClaveReg()) return;
@@ -2884,16 +3038,14 @@ function renderStudents() {
       // Repetir la selección quita únicamente la evidencia de esta celda.
       if (letraPrevia === val) {
         store.grades[k] = Object.assign({},store.grades[k]||{},{borrado:true,ts:Date.now()});
-        saveStore();
-        renderStudents();
+        actualizarEvidencia();
         return;
       }
       const n = letterToNum(val);
       upsertSesionCap(cp, cap);
       store.grades[k] = Object.assign({},store.grades[k]||{},{nota20:n,nivel:val,origen:'letra',ts:Date.now()});
       delete store.grades[k].borrado;
-      saveStore();
-      renderStudents();
+      actualizarEvidencia();
     });
   });
   sincronizarEdicionRegistro();
@@ -3151,6 +3303,7 @@ function aplicarModoAdminRegistro() {
   showPanel('av');
 }
 function showPanel(which) {
+  if(typeof IERegistroNotas2UI!=='undefined'&&IERegistroNotas2UI.saving?.())return false;
   if (esVistaAdmin() && which !== 'av') which = 'av';
   const cal = document.getElementById('panelCalificar');
   const av = document.getElementById('panelAvance');
@@ -3453,6 +3606,20 @@ function sincronizarFondoPromedios() {
   }
 }
 
+function indicadorCargaRegistro(detalle,compacto=false){
+ return '<div data-registro-read-wait class="registro-read-wait'+(compacto?' compact':'')+'"><span class="registro-read-spinner" aria-hidden="true"></span><div class="registro-read-copy"><strong>'+escapeRegistro(tituloCargaRegistro(detalle))+'</strong><span data-read-detail>'+escapeRegistro(detalle)+'</span></div></div>';
+}
+function tituloCargaRegistro(detalle){return String(detalle).startsWith('Verificando acceso')?'Verificando acceso…':String(detalle).startsWith('Cargando padrón')?'Cargando padrón…':detalle==='Preparando comparativo bimestral'?'Preparando comparativo bimestral…':'Espere, sincronizando información…';}
+function pintarCargaRegistro(box,detalle,pendiente,compacto=false){
+ if(!box)return;box.setAttribute?.('role','status');box.setAttribute?.('aria-live','polite');box.setAttribute?.('aria-atomic','true');box.setAttribute?.('aria-busy',String(!!pendiente));
+ if(!pendiente){box.textContent=detalle||'';return;}
+ const text=box.querySelector?.('[data-read-detail]');if(text){text.textContent=detalle;const title=box.querySelector?.('strong');if(title)title.textContent=tituloCargaRegistro(detalle);}else box.innerHTML=indicadorCargaRegistro(detalle,compacto);
+}
+function renderEsperaRegistro(box,id){
+ if(!box)return;const state=typeof IERegistroNotas2UI==='undefined'?null:IERegistroNotas2UI.readStatus?.();box.innerHTML='<div id="'+id+'"></div>';
+ pintarCargaRegistro(document.getElementById(id)||box,state?.fullscreen?'':state?.detail||'Recuperando información del servidor',!!state?.blocking&&!state?.fullscreen);
+ box.setAttribute?.('aria-busy',String(!!state?.blocking));
+}
 let registroHistoricoActual=null, registroHistoricoSecuencia=0, registroHistoricoProyectando=false;
 function registroConsultaHistorica(){
  const cfg=loadPeriodosAdmin(),b=document.getElementById('selBim').value;
@@ -3472,7 +3639,49 @@ function historicoPayloadAcotado(payload,c){
  out.sessions=(payload.sessions||[]).filter(row=>historicoContextoIgual(row,c)).map(row=>JSON.parse(JSON.stringify(row)));
  const aliases=payload.meta?.studentAliases||{};out.meta[clave]={studentAliases:JSON.parse(JSON.stringify(aliases)),...(payload.meta?.notas2?{notas2:JSON.parse(JSON.stringify(payload.meta.notas2))}:{})};out.studentAliases={[[c.nivel,c.grado,c.seccion].join('||')]:JSON.parse(JSON.stringify(aliases))};return out;
 }
+// Only authenticated historical proofs are cached; editable N2 state/reservations are not consumed.
+const registroHistoricoCache=new Map(),registroHistoricoVuelos=new Map();let registroHistoricoActor='';
+function historicoIdentidadLectura(token){
+ const s=getLoginSession()||{};return JSON.stringify([token,s.user,s.role,s.nivel,s.permisosVersion,s.grados,s.areas,s.aulas,s.asignaciones,CLOUD_API_URL,typeof IEAcademicResetClient==='undefined'?null:IEAcademicResetClient.epoch(),loadPeriodosAdmin()]);
+}
+function historicoAutorizadoHasta(token){
+ const s=getLoginSession()||{},conn=typeof IERegistroConnection==='undefined'?null:IERegistroConnection.current()?.snapshot();
+ if(!token||IEStudents.validToken()!==token||s.token!==token||typeof navigator!=='undefined'&&navigator.onLine===false||!conn||!['connected','pending','checking'].includes(conn.state)||conn.binding!==[cloudClaveReg(),token,s.user||'',s.role||''].join('|'))return 0;
+ return Number.isFinite(conn.validUntil)&&conn.validUntil>Date.now()?conn.validUntil:0;
+}
+function historicoFirmaPadron(c){
+ const base=IEStudents.peekRoster(c.bim);if(!base||base.offline||base.bimestre!==c.bim||base.padronInicializado!==true||!Array.isArray(base[c.nivel]?.estudiantes))return '';
+ return JSON.stringify([base.version,base[c.nivel].estudiantes.filter(a=>String(a.grado)===String(c.grado)&&a.seccion===c.seccion)]);
+}
+function historicoFirmaLocal(c){
+ const key=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||'),out={};
+ for(const field of ['grades','finales','concComp','competenciasEstado','calificarEstado','capsSel'])out[field]=Object.fromEntries(Object.entries(store[field]||{}).filter(([k])=>k.startsWith(key+'||')));
+ out.sessions=(store.sessions||[]).filter(s=>historicoContextoIgual(s,c));out.version=store.meta?.[key]?.notas2;out.confirmed=typeof IERegistroNotas2UI==='undefined'?null:IERegistroNotas2UI.confirmedVersions?.(c)||null;return JSON.stringify(out);
+}
+function historicoLecturaPreparada(c,token){
+ const actor=historicoIdentidadLectura(token);if(actor!==registroHistoricoActor){registroHistoricoActor=actor;registroHistoricoCache.clear();registroHistoricoVuelos.clear();}
+ const key=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||'),entry=registroHistoricoCache.get(key);
+ if(!entry)return null;
+ if(entry.until<=Date.now()||!historicoAutorizadoHasta(token)||entry.roster!==historicoFirmaPadron(c)||entry.local!==historicoFirmaLocal(c)){registroHistoricoCache.delete(key);return null;}
+ return JSON.parse(JSON.stringify(entry.proof));
+}
 async function leerRegistroHistorico(c,token){
+ c=Object.freeze({...c});const cached=historicoLecturaPreparada(c,token);if(cached)return cached;
+ const actor=historicoIdentidadLectura(token),key=[c.nivel,c.bim,c.grado,c.seccion,c.area].join('||'),flightKey=actor+'|'+key,existing=registroHistoricoVuelos.get(flightKey);
+ if(existing)return JSON.parse(JSON.stringify(await existing));
+ const until=historicoAutorizadoHasta(token),local=historicoFirmaLocal(c);
+ const task=leerRegistroHistoricoRemoto(c,token).then(proof=>{
+  if(historicoIdentidadLectura(token)!==actor)throw Error('La autorización cambió durante la lectura histórica.');
+  const roster=historicoFirmaPadron(c),deadline=Math.min(until,historicoAutorizadoHasta(token));
+  if(!proof.missing&&roster&&deadline>Date.now()&&local===historicoFirmaLocal(c)){
+   const entry={proof:JSON.parse(JSON.stringify(proof)),until:deadline,roster,local};entry.bytes=JSON.stringify(entry).length*2;
+   if(entry.bytes<=512*1024){registroHistoricoCache.set(key,entry);while(registroHistoricoCache.size>12||[...registroHistoricoCache.values()].reduce((n,e)=>n+e.bytes,0)>2*1024*1024)registroHistoricoCache.delete(registroHistoricoCache.keys().next().value);}
+  }
+  return proof;
+ }).finally(()=>{if(registroHistoricoVuelos.get(flightKey)===task)registroHistoricoVuelos.delete(flightKey);});
+ registroHistoricoVuelos.set(flightKey,task);return JSON.parse(JSON.stringify(await task));
+}
+async function leerRegistroHistoricoRemoto(c,token){
  const actual=()=>IEStudents.validToken()===token&&(getLoginSession()||{}).token===token;
  if(!token||!actual())throw Error('Sesión histórica no autorizada.');
  const base=await IEStudents.loadRoster(c.bim);
@@ -3498,23 +3707,30 @@ function conRegistroHistorico(fn){
 }
 function renderRegistroHistorico(nombre,fn){
  const ids={renderStudents:'stuList',renderFinales:'finLista',renderAvance:'avanceBox',renderAsistencia:'asisLista',renderSesiones:'listaSesiones'};
+ if(window.IERegistroRosterAvailability?.get(ctxBase().bim)){const box=document.getElementById(ids[nombre]);if(box)box.textContent='No hay padrón registrado para este bimestre';return false;}
  if(!registroHistoricoActual||registroHistoricoActual.key!==cloudClaveReg()||registroHistoricoActual.token!==IEStudents.validToken()){
-   const box=document.getElementById(ids[nombre]);if(box)box.innerHTML='';return false;
+   const box=document.getElementById(ids[nombre]);if(box&&!(box.dataset?.historicalReadSequence===String(registroHistoricoSecuencia)&&box.dataset.historicalReadContext===cloudClaveReg()))box.innerHTML='';return false;
  }
  return conRegistroHistorico(fn);
 }
 async function cargarRegistroHistorico(){
+ if(window.IERegistroRosterAvailability?.get(ctxBase().bim)){estadoPadron('No hay padrón registrado para este bimestre',true);return false;}
  const c=ctxBase(),key=cloudClaveReg(),token=IEStudents.validToken(),seq=++registroHistoricoSecuencia;
  registroHistoricoActual=null;['stuList','finLista','avanceBox','asisLista','listaSesiones'].forEach(id=>{const box=document.getElementById(id);if(box)box.innerHTML='';});
  const actual=()=>registroConsultaHistorica()&&seq===registroHistoricoSecuencia&&key===cloudClaveReg()&&token===IEStudents.validToken();
+ const grids=['stuList','finLista','asisLista'].map(id=>document.getElementById(id)).filter(Boolean);
+ if(!historicoLecturaPreparada(c,token))for(const box of grids){if(!box.dataset)box.dataset={};box.dataset.historicalReadSequence=String(seq);box.dataset.historicalReadContext=key;pintarCargaRegistro(box,'Recuperando información del servidor',true);}
  try{
    const proof=await leerRegistroHistorico(c,token);if(!actual())return false;
    registroHistoricoActual=proof;sesionActiva=null;notas={};capsElegidas=[];
    conRegistroHistorico(()=>{updateHdr();fillComps();const fechas=proof.payload.sessions.map(s=>s.fecha).filter(Boolean).sort();if(fechas.length)abrirSesionFecha(fechas[fechas.length-1]);renderSesiones();renderStudents();renderFinales();renderAvance();renderAsistencia();});
    estadoPadron('Bimestre '+(loadPeriodosAdmin()?.bimestres[c.bim]==='cerrado'?'cerrado':'bloqueado')+' · Solo lectura'+(proof.missing?' · Sin registro remoto.':''),false);return true;
- }catch(e){if(actual()){registroHistoricoActual=null;estadoPadron('Consulta histórica no disponible: '+e.message,true);}return false;}
+ }catch(e){if(actual()){registroHistoricoActual=null;estadoPadron('Consulta histórica no disponible: '+e.message,true);for(const box of grids)pintarCargaRegistro(box,'No se pudo recuperar la información. Consulte el diagnóstico.',false);}return false;}finally{if(seq===registroHistoricoSecuencia&&key===cloudClaveReg())for(const box of grids){if(box.dataset?.historicalReadSequence===String(seq)){delete box.dataset.historicalReadSequence;delete box.dataset.historicalReadContext;box.setAttribute?.('aria-busy','false');if(box.querySelector?.('[data-registro-read-wait]'))pintarCargaRegistro(box,'',false);}}}
 }
-let comparativoBimActivo=false, comparativoBimDatos={}, comparativoBimContexto='', comparativoBimSecuencia=0, comparativoBimToken='';
+let comparativoBimActivo=false, comparativoBimDatos={}, comparativoBimContexto='', comparativoBimSecuencia=0, comparativoBimToken='', comparativoBimValidacion=null;
+function comparativoVigente(){
+ const v=comparativoBimValidacion;return !v||v.actor===historicoIdentidadLectura(comparativoBimToken)&&(!v.until||v.until>Date.now()&&!!historicoAutorizadoHasta(comparativoBimToken))&&v.proofs.every(p=>p.roster===historicoFirmaPadron(p.c)&&p.local===historicoFirmaLocal(p.c));
+}
 function comparativoIndice(b){return ({I:1,II:2,III:3,IV:4,1:1,2:2,3:3,4:4})[String(b).toUpperCase()]||0;}
 function comparativoNotaAnterior(payload,c,comp,al,roster){
  const pref=[c.nivel,c.bim,c.grado,c.seccion,c.area,comp].join('||');
@@ -3556,27 +3772,45 @@ function comparativoLinea(comp,id){
  return '<div class="comp-hist-line" title="Notas anteriores: solo lectura">'+linea+'</div>';
 }
 function alternarComparativoBim(){
- comparativoBimActivo=!comparativoBimActivo;comparativoBimDatos={};comparativoBimSecuencia++;
+ comparativoBimActivo=!comparativoBimActivo;comparativoBimDatos={};comparativoBimValidacion=null;comparativoBimSecuencia++;
+ const status=document.getElementById('comparativoBimStatus');if(status){status.hidden=true;pintarCargaRegistro(status,'',false);}
  comparativoBimContexto=comparativoBimActivo?cloudClaveReg():'';comparativoBimToken=comparativoBimActivo?IEStudents.validToken():'';
- renderFinales();if(comparativoBimActivo)void cargarComparativoBim();
+ if(comparativoBimActivo)void cargarComparativoBim();else renderFinales();
+}
+function renderComparativoBim(){
+ if(typeof IERegistroNotas2UI!=='undefined'&&IERegistroNotas2UI.screenPending?.('promedios'))return false;
+ renderFinales();return true;
 }
 async function cargarComparativoBim(){
  const c=ctxBase(),clave=cloudClaveReg(),numero=comparativoIndice(c.bim),token=IEStudents.validToken(),seq=++comparativoBimSecuencia;
  const actual=()=>comparativoBimActivo&&seq===comparativoBimSecuencia&&cloudClaveReg()===clave&&IEStudents.validToken()===token;
  if(numero<2||!token)return;
- const alumnos=estudiantes().slice(),comps=competencias().slice(),datos={};
+ const alumnos=estudiantes().slice(),comps=competencias().slice(),datos={},proofs=[],actor=historicoIdentidadLectura(token),rosterVisible=JSON.stringify(alumnos);
+ const vigente=()=>actual()&&actor===historicoIdentidadLectura(token)&&rosterVisible===JSON.stringify(estudiantes());
+ const status=document.getElementById('comparativoBimStatus');
+ if(Array.from({length:numero-1},(_,i)=>({...c,bim:['I','II','III'][i]})).some(p=>!historicoLecturaPreparada(p,token))){if(status){status.dataset.readSequence=String(seq);status.dataset.readContext=clave;status.hidden=false;pintarCargaRegistro(status,'Preparando comparativo bimestral',true,true);}renderFinales();}
  try{
-  for(let i=1;i<numero;i++){
-   const proof=await leerRegistroHistorico({...c,bim:['','I','II','III'][i]},token);if(!actual())return;
-   datos[i]={};comps.forEach(cp=>{datos[i][cp]={};alumnos.forEach(al=>{const prior=comparativoAlumnoAnterior(al,proof.roster);datos[i][cp][studentKey(al)]=prior?comparativoNotaAnterior(proof.payload,proof.c,cp,prior,proof.roster):'';});});
+  // At most two independent periods in flight; each retains its own roster and authenticated reader.
+  for(let first=1;first<numero;first+=2){
+   if(!vigente())return;
+   const batch=await Promise.all(Array.from({length:Math.min(2,numero-first)},async(_,offset)=>{
+    const i=first+offset,prior={...c,bim:['','I','II','III'][i]},cached=historicoLecturaPreparada(prior,token),cachedUntil=cached?registroHistoricoCache.get([prior.nivel,prior.bim,prior.grado,prior.seccion,prior.area].join('||'))?.until:0,proof=cached||await leerRegistroHistorico(prior,token);
+    return {i,prior,cachedUntil,proof,roster:historicoFirmaPadron(prior),local:historicoFirmaLocal(prior)};
+   }));
+   if(!vigente())return;
+   for(const {i,prior,cachedUntil,proof,roster,local}of batch){
+    proofs.push({c:prior,roster,local,cachedUntil});
+    datos[i]={};comps.forEach(cp=>{datos[i][cp]={};alumnos.forEach(al=>{const prior=comparativoAlumnoAnterior(al,proof.roster);datos[i][cp][studentKey(al)]=prior?comparativoNotaAnterior(proof.payload,proof.c,cp,prior,proof.roster):'';});});
+   }
   }
-  if(actual()){comparativoBimDatos=datos;renderFinales();}
- }catch(e){if(actual()){comparativoBimDatos={};toast('Comparativo histórico no disponible: '+e.message+' No se modificaron notas.');renderFinales();}}
+  if(proofs.some(p=>p.roster!==historicoFirmaPadron(p.c)||p.local!==historicoFirmaLocal(p.c)||p.cachedUntil&&(p.cachedUntil<=Date.now()||!historicoAutorizadoHasta(token))))throw Error('La autorización o los datos históricos cambiaron; vuelve a consultar.');
+  if(vigente()){const deadlines=[historicoAutorizadoHasta(token),...proofs.map(p=>p.cachedUntil)].filter(n=>n>0);comparativoBimDatos=datos;comparativoBimValidacion={actor,until:deadlines.length?Math.min(...deadlines):0,proofs};renderComparativoBim();}
+ }catch(e){if(actual()){comparativoBimDatos={};toast('Comparativo histórico no disponible: '+e.message+' No se modificaron notas.');renderComparativoBim();}}finally{if(status?.dataset.readSequence===String(seq)){status.hidden=true;pintarCargaRegistro(status,'',false);}}
 }
 
 function renderFinales() {
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderFinales',()=>renderFinales());
-  if(typeof comparativoBimContexto!=='undefined'&&comparativoBimContexto&&(comparativoBimContexto!==cloudClaveReg()||comparativoBimToken!==IEStudents.validToken())){comparativoBimActivo=false;comparativoBimDatos={};comparativoBimContexto='';comparativoBimSecuencia++;}
+  if(typeof comparativoBimContexto!=='undefined'&&comparativoBimContexto&&(comparativoBimContexto!==cloudClaveReg()||comparativoBimToken!==IEStudents.validToken()||!comparativoVigente())){comparativoBimActivo=false;comparativoBimDatos={};comparativoBimContexto='';comparativoBimSecuencia++;const status=document.getElementById('comparativoBimStatus');if(status){status.hidden=true;pintarCargaRegistro(status,'',false);}}
   const comparativoBtn=document.getElementById('btnComparativoBim');
   if(comparativoBtn&&typeof comparativoBimActivo!=='undefined'){comparativoBtn.textContent=comparativoBimActivo?'Ocultar comparativo':'Comparativo bimestral';comparativoBtn.setAttribute('aria-pressed',String(comparativoBimActivo));comparativoBtn.classList.toggle('on',comparativoBimActivo);}
   const correccionesMasivas=typeof primeraCorreccionMasiva==='function'?primeraCorreccionMasiva(null,null,'prepararRender'):null;
@@ -3594,7 +3828,7 @@ function renderFinales() {
   const modeInfo = document.getElementById('finModeInfo');
   // A new context has no confirmed selection yet; never render provisional academic columns.
   if(typeof IERegistroNotas2UI!=='undefined'&&!registroHistoricoProyectando&&IERegistroNotas2UI.current()?.status()?.panels.promedios.version==null){
-    box.setAttribute?.('aria-busy','true');box.innerHTML='<p id="finContextLoading" role="status" class="text-sm text-slate-500 p-3">Verificando datos…</p>';
+    renderEsperaRegistro(box,'finContextLoading');
     res.innerHTML='';modeInfo.innerHTML='';const stats=document.getElementById('finEstadisticas');if(stats)stats.innerHTML='';return;
   }
   box.setAttribute?.('aria-busy','false');
@@ -3861,6 +4095,8 @@ function borrarFechaAsis(fecha) {
 
 function renderAsistencia() {
   if(typeof registroConsultaHistorica==='function'&&registroConsultaHistorica()&&!registroHistoricoProyectando)return renderRegistroHistorico('renderAsistencia',()=>renderAsistencia());
+  if(typeof IERegistroNotas2UI!=='undefined'&&!registroHistoricoProyectando&&IERegistroNotas2UI.current()?.status()?.panels.asistencia.version==null){renderEsperaRegistro(document.getElementById('asisLista'),'asisContextLoading');return;}
+  document.getElementById('asisLista')?.setAttribute?.('aria-busy','false');
   loadStore();
   const c = ctxBase();
   document.getElementById('lblAsisCtx').textContent =
@@ -4099,6 +4335,7 @@ function confirmarSalidaContexto(accionTexto) {
       areaActual = anterior.area;
     }
   if (typeof IERegistroNotas2UI !== 'undefined') {
+    if(IERegistroNotas2UI.saving?.()){toast('Espere a que termine el guardado antes de cambiar de contexto.');return false;}
     if(!IERegistroNotas2UI.canEdit()&&['calificar','promedios'].some(p=>IERegistroNotas2UI.screenPending?.(p))){toast('Hay una edición en pantalla sin confirmar. Regresa a su panel o verifica la conexión antes de cambiar de contexto.');return false;}
     let valid = true;
     if (typeof IERegistroNotas2UI.canEdit === 'function' && IERegistroNotas2UI.canEdit()) {

@@ -84,7 +84,7 @@ test('Registro startup uses cached period configuration without waiting for the 
     function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};function fillCaps(){};
     function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};function onContexto(){};let periodFetches=0;
     function sincronizarPeriodosNube(){periodFetches++;return new Promise(()=>{});} `);
-  for(const name of ['escapeRegistro','loadBD','llenarAulasPadron','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  for(const name of ['escapeRegistro','loadBD','llenarAulasPadron','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','actualizarAvisoPadronContexto','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
   const p=s.c.entrarNivel('primaria');
   await new Promise(r=>setTimeout(r,0));
   assert.equal(s.run('padronBimestre'),'III');
@@ -101,7 +101,7 @@ test('Registro enters its current flow only after protected students are loaded'
     function fillComps(){};function syncModoBtns(){};function updateHdr(){};function renderSesiones(){};function renderStudents(){};
     function fillCaps(){};function markClean(){};function aplicarModoAdminRegistro(){};function fixHdrHeight(){};
     function sincronizarPeriodosNube(){return Promise.resolve()};function onContexto(){};`);
-  for(const name of ['escapeRegistro','loadBD','llenarAulasPadron','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
+  for(const name of ['escapeRegistro','loadBD','llenarAulasPadron','registroSoloLectura','registroNubeNoVerificada','sincronizarEdicionRegistro','actualizarAvisoPadronContexto','estadoPadron','vigilarCachePadron','bloquearRegistroMientrasValida','pintarPadronInmediato','cargarPadronRegistro','entrarNivel'])s.run(extract('registro.html',name));
   await s.c.entrarNivel('primaria');await new Promise(r=>setTimeout(r,0));checkRequest(s,'III');
   assert.match(s.elements.get('selGrado').innerHTML,/value="1"/);
   assert.equal(s.c.loadBD().primaria.estudiantes[0].nombre,'Synthetic Primary');
@@ -248,7 +248,7 @@ for (const file of ['primaria.html','secundaria.html']) test(file+': reuses Regi
   const s=fixture('docente');
   s.run(`let bdEstudiantes=IEStudents.empty(),padronBimestre='',solicitudPadron=0,tokenPadron='',cargandoEstudiantes=false,sesionActiva=null,notas={},padronVerificadoServidor=false;
     function registroSoloLectura(){return true};function guardarTodo(){return true};function bloquearRegistroMientrasValida(){};function recordarPadron(){};function renderStudents(){};
-    function pintarPadronInmediato(base,b){bdEstudiantes=base;padronBimestre=b};function estadoPadron(){};function vigilarCachePadron(){};function sincronizarEdicionRegistro(){}`);
+    function ctxBase(){return {nivel:'secundaria',bim:'III',grado:1,seccion:'A',area:'Matemática'}};function pintarPadronInmediato(base,b){bdEstudiantes=base;padronBimestre=b};function estadoPadron(){};function vigilarCachePadron(){};function sincronizarEdicionRegistro(){}`);
   s.run(extract('registro.html','cargarPadronRegistro'));
   assert.equal(await s.c.cargarPadronRegistro('III'),true);checkRequest(s,'III');
   // Reload the shared client as a new page: only persisted session cache remains.

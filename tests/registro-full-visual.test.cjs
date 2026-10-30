@@ -27,7 +27,7 @@ test('Fixture contains real data/form/footer and all four actual renderers, rema
 });
 
 test('Standalone fixture generator accepts its output path without confusing it with backend source',()=>{
- const os=require('node:os'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'pr81-ficticio-')),file=path.join(dir,'fixture.html');try{execFileSync(process.execPath,[path.join(__dirname,'registro-full-visual-fixture.cjs'),file,'secundaria','Comunicación','closed']);const html=fs.readFileSync(file,'utf8');assert.match(html,/3 competencias · cerrado/);assert.match(html,/data-val="C" disabled/);assert.match(html,/ESTUDIANTE FICTICIO/);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+ const os=require('node:os'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'pr81-ficticio-')),file=path.join(dir,'fixture.html');try{execFileSync(process.execPath,[path.join(__dirname,'registro-full-visual-fixture.cjs'),file,'secundaria','Comunicación','closed']);const html=fs.readFileSync(file,'utf8');assert.match(html,/3 competencias · cerrado/);assert.match(html,/data-val="C" aria-pressed="(?:true|false)" disabled/);assert.match(html,/ESTUDIANTE FICTICIO/);}finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
 function contrast(a,b){const lum=h=>{const rgb=h.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2]};const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);}

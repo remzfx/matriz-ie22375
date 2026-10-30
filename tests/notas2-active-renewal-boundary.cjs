@@ -1,0 +1,4 @@
+'use strict';
+// Exact demonstrated renewal/context deduplication change; never normalizes guards.
+const assert=require('node:assert/strict'),current="   while(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit())return true;",previous="   if(flight){const p=flight.promise;if(!review&&flight.key===binding)return p;await p;if(disposed)return false;scope();}if(!force&&!review&&canEdit())return true;";
+module.exports=(file,source)=>{source=require('./notas2-edit-trace-boundary.cjs')(file,source);let s=source.replace(/\r\n/g,'\n');if(['registro-connection.js','registro.html'].includes(file)&&s.includes(current)){assert.equal(s.split(current).length,2,'Unique renewal deduplication delta');s=s.replace(current,previous);}return s;};

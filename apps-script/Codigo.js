@@ -616,8 +616,9 @@ function asegurarConfig_() {
   return sh;
 }
 
-function obtenerPeriodosConfig_() {
-  const sh = asegurarConfig_();
+function obtenerPeriodosConfig_(soloLectura) {
+  const sh = soloLectura ? SpreadsheetApp.getActiveSpreadsheet().getSheetByName('ConfigSistema') : asegurarConfig_();
+  if (!sh) return null;
   const last = sh.getLastRow();
   if (last < 2) return null;
   const data = sh.getRange(2, 1, last - 1, 3).getValues();
@@ -2029,7 +2030,29 @@ function archivarHistorialAcademico_(payload,clave,version) {
 }
 
 // Academic reset fence: read directly, never from a potentially stale cache.
-function academicResetRead_(body){if(!sesionLectura_(body.token,['admin','docente']))return {ok:false,code:'SESSION',error:'Sesión inválida.'};return {ok:true,academicReset:1,...academicResetState_()};}
+function academicResetRead_(body){
+ const access=sesionLectura_(body.token,['admin','docente']);if(!access)return {ok:false,code:'SESSION',error:'Sesión inválida.'};
+ const state=academicResetState_(),out={ok:true,academicReset:1,...state};
+ if(body.contextAuthorization===1&&access.sesion.role==='docente'&&(!state.epoch||state.phase==='complete'))out.contextAuthorization=academicContextAuthorization_(access,state);
+ return out;
+}
+// Optional, read-only lease. Does not replace authorization on any read/save endpoint.
+function academicContextAuthorization_(access,state){
+ const doc=access.docente,session=access.sesion,nivel=String(doc.nivel||'').toLowerCase(),catalog=registroAcademico_().catalog[nivel]||{},periods=obtenerPeriodosConfig_(true)?.bimestres||{};
+ const mapping=nivel==='primaria'?asignacionesPrimaria_(doc):doc.asignaciones,explicit=mapping&&Object.keys(mapping).length,contexts=new Set();
+ for(const area of Object.keys(catalog)){
+  if(area==='Competencias Transversales')continue;
+  const aulas=explicit?mapping[area]:Array.isArray(doc.areas)&&doc.areas.includes(area)?doc.aulas:[];
+  for(const aula of Array.isArray(aulas)?aulas:[]){
+   const parts=String(aula).split('|');if(parts.length!==2)continue;
+   const numero=gradoEscritura_(parts[0]),seccion=seccionEscritura_(parts[1]),ctx={nivel,numero,grado:String(numero),seccion,area};
+   if(!puedeLeerContexto_(access,ctx))continue;
+   for(const bim of ['I','II','III','IV'])if(periods[bim]==='abierto')contexts.add([nivel,bim,numero,seccion,area].join('||'));
+   if(contexts.size>4096)return null;
+  }
+ }
+ const issuedAt=Date.now();return {schema:1,user:normalizarUsuario_(session.user),role:session.role,nivel,permisosVersion:Number(session.permisosVersion),issuedAt,expiresAt:Math.min(issuedAt+150000,Number(session.exp)),epoch:state.epoch,contexts:[...contexts].sort()};
+}
 function academicResetState_(){
  const sh=SpreadsheetApp.getActiveSpreadsheet().getSheetByName('AcademicResetControl');if(!sh)return {epoch:null,phase:null};
  const row=sh.getRange(2,1,1,4).getValues()[0];

@@ -1,0 +1,34 @@
+'use strict';
+// Differential timing only: real coordinator/core/controller/DOM, synthetic transport, fresh profiles.
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const make=new Function('require',fs.readFileSync(path.join(__dirname,'notas2-prefetch-integral-browser.cjs'),'utf8').split('async function run(){')[0]+'\nreturn {html,navigate};')(require);
+const script=s=>'<script>'+s.replace(/<\/script/gi,'<\\/script')+'</script>';
+const instrument=`window.waitMarks=[];window.waitTiming=false;window.waitReject=false;window.waitDelay=3500;
+const mark=(phase,extra={})=>{if(waitTiming)waitMarks.push({phase,at:performance.now(),key:cloudClaveReg(),...extra});};
+const transport=window.fetch;window.fetch=async(u,o)=>{const b=JSON.parse(o?.body||'{}');if(waitTiming&&b.action==='academicstate'){mark('auth-start');await new Promise(r=>setTimeout(r,waitDelay));mark('auth-end');if(waitReject)return new Response(JSON.stringify({ok:false,code:'DENIED'}),{status:403});}return transport(u,o);};
+const pc=IERegistroNotas2Prefetch.create;IERegistroNotas2Prefetch.create=o=>{const c=pc(o),acquire=c.acquire;c.acquire=async context=>{mark('reserve-start',{reservations:c.stats().reservations});const r=await acquire(context);mark('reserve-end',{hit:!!r});return r;};return c;};
+const mc=IERegistroNotas2.create;IERegistroNotas2.create=o=>{const apply=o.apply;o.apply=p=>{mark('apply-start');apply(p);mark('apply-end');};return mc(o);};
+const render=renderFinales;renderFinales=function(){mark('render-start');const r=render.apply(this,arguments);mark('render-end',{table:!!document.querySelector('#finLista table')});return r;};`;
+function fixture(){let h=make.html('secundaria').replace("Array.from({length:nivel==='primaria'?6:5},(_,i)=>i+1)",'[3,4,5]').replace("[{grado,seccion:'A'},{grado,seccion:'B'}]","[{grado,seccion:grado===4?'B':'A'}]").replace(",'Comunicación':classrooms.filter(c=>nivel==='primaria'||c.seccion==='A').map(c=>c.grado+'|'+c.seccion)",'').replace("I:'abierto',II:'cerrado'","I:'cerrado',II:'cerrado'").replace("document.getElementById('selGrado').value='1'","document.getElementById('selGrado').value='3'").replace("[nivel,'III',1,","[nivel,'III',3,");const ui=script(fs.readFileSync('registro-notas2-ui.js','utf8'));return h.replace(ui,script(instrument)+ui);}
+async function run(){const {chromium}=require(process.env.IE_PLAYWRIGHT_MODULE||'playwright'),browser=await chromium.launch({channel:process.env.CI?undefined:'msedge',headless:true});const results=[];try{
+for(const width of [1366,390]){
+ const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage(),errors=[];let external=0;
+ page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());await page.route('**/*',r=>r.request().url()==='https://fixture.invalid/'?r.fulfill({contentType:'text/html',body:fixture()}):(external++,r.abort()));await page.goto('https://fixture.invalid/');
+ await page.waitForFunction(()=>IERegistroNotas2UI.canEdit('promedios')&&typeof integralRelease==='function');await page.evaluate(()=>integralRelease());await page.waitForFunction(()=>IERegistroNotas2UI.prefetchStatus().completed===2&&!IERegistroNotas2UI.prefetchStatus().pending);
+ const baseline=await page.evaluate(()=>({requests:integralRequests.length,reads:integralRequests.filter(b=>b.action==='loadnotas2').length,hits:IERegistroNotas2UI.prefetchStatus().cacheHits}));
+ await page.evaluate(()=>{waitTiming=true;waitMarks=[];waitMarks.push({phase:'navigate',at:performance.now()});});
+ const B={nivel:'secundaria',bim:'III',grado:4,seccion:'B',area:'Matemática'},A={...B,grado:3,seccion:'A'};
+ const navigating=make.navigate(page,B);await page.waitForFunction(()=>waitMarks.some(m=>m.phase==='auth-start'));
+ const waiting=await page.evaluate(()=>({message:document.getElementById('finContextLoading')?.textContent,table:!!document.querySelector('#finLista table'),canEdit:IERegistroNotas2UI.canEdit('promedios'),hits:IERegistroNotas2UI.prefetchStatus().cacheHits,reservations:IERegistroNotas2UI.prefetchStatus().reservations}));
+ assert.equal(waiting.table,false);assert.equal(waiting.canEdit,false);assert.equal(waiting.hits,baseline.hits);assert.equal(waiting.reservations,2);
+ if(!process.env.IE_WAIT_BASELINE){assert.match(waiting.message,/Verificando acceso a 4/);assert.match(waiting.message,/B.*III/);assert.match(waiting.message,/autorización/);}
+ await navigating;const marks=await page.evaluate(()=>waitMarks),find=phase=>marks.find(m=>m.phase===phase).at;
+ const rendered=marks.find(m=>m.phase==='render-end'&&m.table),measure={width,authorizationMs:find('auth-end')-find('auth-start'),reserveMs:find('reserve-end')-find('reserve-start'),applyMs:find('apply-end')-find('apply-start'),firstRenderMs:rendered.at-marks.find(m=>m.phase==='render-start'&&m.at<=rendered.at&&m.at>=find('apply-end')).at,timeToTableMs:rendered.at-find('navigate'),reserveReadyBeforeAuthorization:true,waitingMessage:waiting.message};
+ const after=await page.evaluate(()=>({reads:integralRequests.filter(b=>b.action==='loadnotas2').length,hits:IERegistroNotas2UI.prefetchStatus().cacheHits,auth:integralRequests.filter(b=>b.action==='academicstate').length}));assert.equal(after.reads,baseline.reads);assert.equal(after.hits,baseline.hits+1);
+ await page.evaluate(()=>{waitMarks=[];waitMarks.push({phase:'return',at:performance.now()});});await make.navigate(page,A);const back=await page.evaluate(()=>({marks:waitMarks,auth:integralRequests.filter(b=>b.action==='academicstate').length,reads:integralRequests.filter(b=>b.action==='loadnotas2').length}));
+ assert.equal(back.auth,after.auth);assert.equal(back.reads,after.reads);const returnRender=back.marks.find(m=>m.phase==='render-end'&&m.table);measure.returnKnownMs=returnRender.at-back.marks[0].at;
+ await page.evaluate(()=>{waitReject=true;waitMarks=[];});const C={...A,grado:5};const rejected=make.navigate(page,C).catch(()=>{});await page.waitForFunction(()=>IERegistroConnection.current().snapshot().state==='session',null,{timeout:12000});
+ assert.equal(await page.locator('#finLista table').count(),0);assert.equal(await page.evaluate(()=>IERegistroNotas2UI.current()?.status().panels.promedios.version),null);assert.equal(await page.evaluate(()=>IERegistroNotas2UI.canEdit()),false);
+ assert.equal(await page.evaluate(()=>integralRequests.filter(b=>b.action==='savenotas2').length),0);assert.equal(external,0);assert.deepEqual(errors,[]);results.push({...measure,additionalAcademicReads:0,reserveHits:1,deniedWithoutGrades:true,automaticWrites:0});await context.close();await rejected;
+}console.log(JSON.stringify({passed:results.length,failed:0,synthetic:true,results},null,2));}finally{await browser.close();}}
+module.exports={fixture,run};if(require.main===module)run().catch(e=>{console.error(e);process.exitCode=1;});

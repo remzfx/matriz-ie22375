@@ -4,7 +4,7 @@
 const fs=require('node:fs'),path=require('node:path'),Module=require('node:module');
 const root=path.join(__dirname,'..');
 const firstLines={
- "registro-connection.js": "/* Conexión obligatoria de Registro. Solo coordina lecturas; nunca escribe datos académicos. */",
+ "registro-connection.js": "/* Diagnóstico temporal optativo: solo memoria, sin identidad ni transporte. */",
  "registro-drafts.js": "/* Borradores locales y recuperación voluntaria; no contiene transporte de escritura. */",
  "registro-local-store.js": "/* Persistencia por cuenta. Los datos anteriores sin propietario nunca se adoptan automáticamente. */",
  "registro-recovery-ui.js": "/* Adaptador frontend: operaciones explícitas y timers exclusivamente locales. */",
