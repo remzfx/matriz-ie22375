@@ -25,6 +25,25 @@
  }
  root.IEAcademicSaveFeedback={begin,finish,focus:()=>{if(dialog?.open)(pending?message:closeButton).focus();},busy:()=>pending};
 })(window);
+/* Mandatory-read overlay: same visual language as the save dialog, independent state, presentation only. */
+(function(root){
+ 'use strict';
+ let box,title,info,key='';
+ function mount(){
+  if(box||typeof document.createElement!=='function'||!document.head||!document.body)return;
+  const style=document.createElement('style');style.textContent='#academicLoadOverlay{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;background:#0f172a70}#academicLoadOverlay[hidden]{display:none}#academicLoadOverlay [data-load-card]{box-sizing:border-box;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid #e2e8f0;border-radius:20px;padding:28px 24px;background:#fff;color:#0f172a;text-align:center;box-shadow:0 18px 60px #0f172a26}#academicLoadOverlay [data-load-icon]{display:block;box-sizing:border-box;width:44px;height:44px;margin:0 auto 18px;border:4px solid #dbeafe;border-top-color:#0284c7;border-radius:50%;animation:academicSaveSpin 1s linear infinite}#academicLoadOverlay h2{font-size:18px;line-height:1.5;font-weight:700;margin:0;overflow-wrap:anywhere}#academicLoadOverlay p{font-size:14px;line-height:1.5;color:#475569;margin:12px 0 0}@keyframes academicSaveSpin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#academicLoadOverlay [data-load-icon]{animation-duration:2.5s}}@media print{#academicLoadOverlay{display:none!important}}';document.head.appendChild(style);
+  const node=document.createElement('div');node.id='academicLoadOverlay';node.hidden=true;node.setAttribute('role','status');node.setAttribute('aria-live','polite');node.setAttribute('aria-atomic','true');
+  const card=document.createElement('div');card.dataset.loadCard='';const icon=document.createElement('span');icon.dataset.loadIcon='';icon.setAttribute('aria-hidden','true');
+  title=document.createElement('h2');title.id='academicLoadMessage';info=document.createElement('p');info.id='academicLoadDetail';
+  card.append(icon,title,info);node.appendChild(card);document.body.appendChild(node);box=node;
+ }
+ function show(message,detail){
+  try{mount();}catch(_){return false;}if(!box)return false;const next=message+'\n'+detail;
+  if(key!==next){title.textContent=message;info.textContent=detail;key=next;}box.hidden=false;box.setAttribute('aria-busy','true');return true;
+ }
+ function hide(){if(box&&!box.hidden){box.hidden=true;box.setAttribute('aria-busy','false');}key='';}
+ root.IEAcademicLoadFeedback={show,hide,available:()=>{try{mount();}catch(_){}return !!box;},visible:()=>!!box&&!box.hidden};
+})(window);
 /* Integración Notas 2.0: una sesión volátil por ámbito; nunca crea borradores persistentes. */
 (function(root){
  'use strict';
@@ -236,16 +255,18 @@
   const backgroundRoster=!!(roster&&!missing&&!access&&!load&&s?.state==='ready'&&!s.busy&&canEdit(pane));
   const pending=!sinPadron&&pane!=='resumen'&&!tutor()&&!error&&!save.pending&&!uploadAttendance.pending&&(access||load&&!prepared||roster);
   const detail=sinPadron&&!fatal?'No hay padrón registrado para este bimestre':error?({roster:rosterMissing?.code==='MISSING'?'No hay padrón registrado para este bimestre':'Padrón del bimestre no verificado',session:'Sesión inválida — vuelve a iniciar sesión.',server:'Servidor no disponible — edición pausada.',offline:'Conexión perdida. Estamos intentando reconectar…',review:'Conflicto de versiones — consulta la nube antes de guardar.'})[error]:access?'Verificando acceso a '+aula+' · Bimestre '+c.bim:download.pending&&load?'Recuperando información del servidor':load?'Cargando '+(pane==='asistencia'?'asistencia':'calificaciones')+' de '+aula:roster?'Cargando padrón de '+aula+' · Bimestre '+c.bim:'Información pendiente de verificación. Consulte la nubecita.';
-  return {state:sinPadron?'SIN_PADRON':null,pending:!!pending,blocking:!!pending&&!backgroundRoster,backgroundRoster,detail,missing,pane,error};
+  const operation=access||load?(pane==='asistencia'?'asistencia':'calificaciones'):roster?'padron':null,fullscreen=!!pending&&!backgroundRoster&&!!operation&&!!root.IEAcademicLoadFeedback?.available?.();
+  return {state:sinPadron?'SIN_PADRON':null,pending:!!pending,blocking:!!pending&&!backgroundRoster,backgroundRoster,detail,missing,pane,error,operation,fullscreen,context:aula+' · Bimestre '+c.bim};
  }
  function paintReadFeedback(){
   const state=readStatus(),slots={calificar:['calContextLoading','calContextStatus'],promedios:['finContextLoading','finContextStatus'],asistencia:['asisContextLoading','asisContextStatus']};
   const draw=(box,detail,pending,compact=false)=>{if(typeof pintarCargaRegistro==='function')pintarCargaRegistro(box,detail,pending,compact);else if(box)box.textContent=detail;};
   for(const [pane,[gridId,noticeId]]of Object.entries(slots)){
    const active=pane===state.pane,grid=document.getElementById(gridId),notice=document.getElementById(noticeId);
-   if(grid){draw(grid,active?state.detail:'',active&&state.blocking);grid.parentElement?.setAttribute?.('aria-busy',String(active&&state.blocking));}
-   if(notice){notice.hidden=!active||!state.blocking||(state.missing&&!!grid);if(!notice.hidden)draw(notice,state.detail,true,true);else draw(notice,'',false,true);}
+   if(grid){draw(grid,active&&!state.fullscreen?state.detail:'',active&&state.blocking&&!state.fullscreen);grid.parentElement?.setAttribute?.('aria-busy',String(active&&state.blocking));}
+   if(notice){notice.hidden=!active||!state.blocking||state.fullscreen||(state.missing&&!!grid);if(!notice.hidden)draw(notice,state.detail,true,true);else draw(notice,'',false,true);}
   }
+  if(state.fullscreen)root.IEAcademicLoadFeedback.show(({padron:'Cargando padrón...',calificaciones:'Cargando calificaciones...',asistencia:'Cargando asistencia...'})[state.operation],state.context);else root.IEAcademicLoadFeedback?.hide();
   const comparison=document.getElementById('comparativoBimStatus');if(comparison&&!comparison.hidden&&(state.state==='SIN_PADRON'||state.error||comparison.dataset.readContext!==cloudClaveReg())){comparison.hidden=true;draw(comparison,'',false,true);}
  }
  function capturePausedControl(el){if(!pausedControls.has(el))pausedControls.set(el,{key:binding(),disabled:el.disabled,readOnly:el.readOnly});}

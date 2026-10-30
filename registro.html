@@ -3617,7 +3617,7 @@ function pintarCargaRegistro(box,detalle,pendiente,compacto=false){
 }
 function renderEsperaRegistro(box,id){
  if(!box)return;const state=typeof IERegistroNotas2UI==='undefined'?null:IERegistroNotas2UI.readStatus?.();box.innerHTML='<div id="'+id+'"></div>';
- pintarCargaRegistro(document.getElementById(id)||box,state?.detail||'Recuperando información del servidor',!!state?.blocking);
+ pintarCargaRegistro(document.getElementById(id)||box,state?.fullscreen?'':state?.detail||'Recuperando información del servidor',!!state?.blocking&&!state?.fullscreen);
  box.setAttribute?.('aria-busy',String(!!state?.blocking));
 }
 let registroHistoricoActual=null, registroHistoricoSecuencia=0, registroHistoricoProyectando=false;

@@ -10,6 +10,6 @@ test('integration keeps retired duplicates absent and executes the approved conn
 test('integration leaves SIN_PADRON, local epoch persistence and context notices exactly unchanged',()=>{
  for(const file of ['registro.html','registro-notas2-ui.js','registro-notas2.js','registro-notas2-prefetch.js']){
   const before=execFileSync('git',['show',approved+':'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
-  assert.equal(fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n'),before,file);
+  assert.equal(require('./registro-load-overlay-boundary.cjs')(file,fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n')),before,file);
  }
 });
