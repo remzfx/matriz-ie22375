@@ -600,6 +600,12 @@
     #panelFinales .fin-bulk-actions .chip {min-width:34px;padding-left:2px;padding-right:2px;}
     #panelFinales .fin-remove-bulk,#panelFinales .mode-toggle button {padding-left:5px;padding-right:5px;}
   }
+  /* PR121: en celulares/compactas los controles de Promedios fluyen de izquierda a derecha. */
+  @media screen and (max-width:768px) {
+    #panelFinales .fin-header-main {justify-content:flex-start;}
+    #panelFinales .fin-header-main > .fin-comparativo-toggle,#panelFinales .fin-header-main > .fin-header-controls {margin-left:0;}
+    #panelFinales .fin-header-controls,#panelFinales .fin-bulk-actions {justify-content:flex-start;}
+  }
   /* Solo impresión Promedios: textos completos, sin afectar otros reportes. */
   @media print {
     #printArea .promedios-print .print-conclusions {margin:5mm 0;}
