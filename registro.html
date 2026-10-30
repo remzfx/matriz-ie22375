@@ -294,7 +294,7 @@
   #finLista .fin-grid .fin-nom {width:202px;min-width:202px;max-width:202px;}
   #finLista .fin-grid td.fin-nom {position:sticky;padding:5px 6px 5px 25px;vertical-align:middle;}
   #finLista .fin-grid td.fin-nom > div:first-child {position:absolute;left:6px;top:50%;transform:translateY(-50%);width:16px;text-align:left;}
-  #panelFinales .fin-header-main > .fin-comparativo-toggle {flex:0 0 auto;align-self:flex-start;white-space:nowrap;margin:2px 4px 0;}
+  #panelFinales .fin-header-main > .fin-comparativo-toggle {flex:0 0 auto;align-self:center;white-space:nowrap;margin:0 4px;}
   #finLista .fin-grid td.fin-nom > .font-bold {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;white-space:normal;font-size:11px;line-height:1.25;max-height:2.5em;}
   #finLista .fin-grid th.fin-nom {text-align:left;}
   #finLista .fin-grid th:not(.fin-nom),#finLista .fin-grid td:not(.fin-nom) {width:212px;min-width:212px;padding:6px 10px;}
@@ -587,6 +587,17 @@
     #printArea .promedios-print .summary-stats {break-inside:auto;margin:3mm 0;padding:2mm;}
   }
   /* Fin Issue86 adaptable. */
+  /* PR121: barras de botones adaptables; envuelven a otra fila en vez de desplazarse. Sin cambios de lógica. */
+  @media screen {
+    #registroAccionesAcademicas {flex-wrap:wrap;overflow:visible;}
+    #registroAccionesAcademicas > button {flex:1 1 100px;}
+    #registroRecoveryControls .registro-recovery-actions {flex-wrap:wrap;overflow:visible;}
+    #panelFinales .fin-header-main {flex-wrap:wrap;align-items:center;}
+    #panelFinales .fin-header-context {flex-basis:100%;}
+    #panelFinales .fin-header-main > .fin-comparativo-toggle {margin-left:auto;}
+    #panelFinales .fin-header-controls {margin-left:0;}
+    #panelFinales .fin-bulk-actions {flex-wrap:wrap;overflow:visible;}
+  }
   /* Solo impresión Promedios: textos completos, sin afectar otros reportes. */
   @media print {
     #printArea .promedios-print .print-conclusions {margin:5mm 0;}

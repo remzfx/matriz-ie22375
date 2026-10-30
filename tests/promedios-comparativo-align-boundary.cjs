@@ -1,12 +1,12 @@
 'use strict';
-// Exact CSS-only delta aligning «Comparativo bimestral» with the bulk row, for historical comparisons only.
+// PR121: exact CSS-only delta for adaptive Registro button bars (nav, Promedios header, footer), for historical comparisons only.
 const assert=require('node:assert/strict'),edits={
  "registro.html": [
   [
-   "#panelFinales .fin-header-main > .fin-comparativo-toggle {flex:0 0 auto;align-self:flex-start;white-space:nowrap;margin:2px 4px 0;}",
-   "#panelFinales .fin-header-main > .fin-comparativo-toggle {flex:0 0 auto;align-self:center;white-space:nowrap;margin:0 4px;}"
+   "  /* Fin Issue86 adaptable. */\n  /* PR121: barras de botones adaptables; envuelven a otra fila en vez de desplazarse. Sin cambios de lógica. */\n  @media screen {\n    #registroAccionesAcademicas {flex-wrap:wrap;overflow:visible;}\n    #registroAccionesAcademicas > button {flex:1 1 100px;}\n    #registroRecoveryControls .registro-recovery-actions {flex-wrap:wrap;overflow:visible;}\n    #panelFinales .fin-header-main {flex-wrap:wrap;align-items:center;}\n    #panelFinales .fin-header-context {flex-basis:100%;}\n    #panelFinales .fin-header-main > .fin-comparativo-toggle {margin-left:auto;}\n    #panelFinales .fin-header-controls {margin-left:0;}\n    #panelFinales .fin-bulk-actions {flex-wrap:wrap;overflow:visible;}\n  }\n",
+   "  /* Fin Issue86 adaptable. */\n"
   ]
  ]
 };
-module.exports=(file,source)=>{let s=source.replace(/\r\n/g,'\n');for(const [current,previous]of edits[file]||[])if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique comparativo align delta');s=s.replace(current,previous);}return s;};
+module.exports=(file,source)=>{let s=source.replace(/\r\n/g,'\n');for(const [current,previous]of edits[file]||[])if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique PR121 button bars delta');s=s.replace(current,previous);}return s;};
 module.exports.edits=edits;
