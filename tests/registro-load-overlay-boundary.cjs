@@ -30,5 +30,5 @@ const assert=require('node:assert/strict'),edits={
   ]
  ]
 };
-module.exports=(file,source)=>{let s=require('./promedios-comparativo-align-boundary.cjs')(file,source.replace(/\r\n/g,'\n'));for(const [current,previous]of edits[file]||[])if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique read overlay delta');s=s.replace(current,previous);}return s;};
+module.exports=(file,source)=>{let s=require('./registro-access-renewal-boundary.cjs')(file,require('./promedios-comparativo-align-boundary.cjs')(file,source.replace(/\r\n/g,'\n')));for(const [current,previous]of edits[file]||[])if(s.includes(current)){assert.equal(s.split(current).length,2,'Unique read overlay delta');s=s.replace(current,previous);}return s;};
 module.exports.edits=edits;
