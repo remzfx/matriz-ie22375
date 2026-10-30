@@ -23,7 +23,7 @@ test('Merely checking an allowed numeric replacement does not consume it; reject
 function realPersistence(f){
  const c=f.c,memory=new Map(),session=c.getLoginSession;c.getLoginSession=()=>({...session(),role:'docente'});
  c.localStorage={getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,v)};
- vm.runInContext(read('registro-local-store.js'),c);
+ vm.runInContext(require('./registro-inline-modules.cjs').read('registro-local-store.js'),c);
  vm.runInContext('const registroLocal=IERegistroLocalStore.create(localStorage,getLoginSession);const NOTAS_KEY=registroLocal.key;',c);
  for(const n of ['loadStore','saveStore'])vm.runInContext(extract(src,n),c);
  c.store.finales={};c.saveStore();return f;

@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
-global.IERegistroReconcile=require('../registro-reconcile.js');const api=require('../registro-drafts.js'),copy=global.IERegistroReconcile.copy;
+global.IERegistroReconcile=require('../registro-reconcile.js');const api=require('./registro-inline-modules.cjs').load('registro-drafts.js'),copy=global.IERegistroReconcile.copy;
 const key='secundaria||III||1||A||Matemática||Competencia ficticia||id:synthetic';
 function setup(){let context='synthetic-context',allowed=true,local={finales:{[key]:{nivel:'A',nota20:15,origen:'numero'}},concComp:{[key]:{texto:'Conclusión ficticia'}},grades:{},sessions:[]},remote={exists:true,version:5,payload:{finales:{[key]:{nivel:'B',nota20:12,origen:'numero'}},grades:{},sessions:[]}},backups=[],applied=0,reads=0,confirmations=0,state=[],failBackup=false,answer=true;
  const d={context:()=>context,guard:()=>allowed,capture:()=>({context,payload:copy(local)}),read:async()=>{reads++;return copy(remote);},backup:async(s,kind)=>{if(failBackup)throw Error('storage failed');backups.push({snapshot:copy(s),kind});},apply:async(r)=>{local=copy(r.payload);applied++;},confirm:async()=>{confirmations++;return answer;},state:m=>state.push(m),baseline:()=>global.IERegistroReconcile.signature(remote.payload)};

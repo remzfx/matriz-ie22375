@@ -22,7 +22,7 @@ function fixture(){
 
  g.window=g;g.fetch=async(_,options)=>{const b=JSON.parse(options.body);requests.push(b);if(!available)throw Error('Fictitious transport failure');if(b.action==='academicstate')return {ok:true,text:async()=>JSON.stringify({ok:true,academicReset:1,epoch:null,phase:'idle'})};if(b.action==='savenotas2'){if(failSave)throw Error('Fictitious academic save failure');if(b.version!==versions[b.panel])return {ok:true,text:async()=>JSON.stringify({ok:false,code:'CONFLICT'})};Object.assign(remote,copy(b.payload));versions[b.panel]++;at[b.panel]=123;}return {ok:true,text:async()=>JSON.stringify({ok:true,notas2:1,key,exists:true,legacy:false,readonly:closed,versions,at,payload:remote,...(b.panel?{panel:b.panel}:{})})};};
 
- vm.createContext(g);for(const f of ['registro-connection.js','registro-notas2-ui.js','registro-sync-diagnostic-ui.js'])vm.runInContext(fs.readFileSync(f,'utf8'),g);
+ vm.createContext(g);for(const f of ['registro-connection.js','registro-notas2-ui.js','registro-sync-diagnostic-ui.js'])vm.runInContext(require('./registro-inline-modules.cjs').readFile(f,'utf8'),g);
 
  const connection=g.IERegistroConnection.current(),api=g.IERegistroNotas2UI;
 

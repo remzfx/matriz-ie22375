@@ -22,7 +22,7 @@ test('every combination of contextual controls stays in the same structural row 
  assert.doesNotMatch(c,/flex-wrap:wrap|flex-direction:column|overflow-x:hidden/);assert.match(c,/button\[hidden\][^{]*\{display:none!important/);
 });
 test('only the actions track scrolls; opaque footer keeps status/alerts outside and preserves height reservation',()=>{
- const c=css(html),f=footer(html);assert.match(c,/#registroAcademicFooter \{background:#fff;/);assert.equal((c.match(/overflow-x:auto/g)||[]).length,1);assert.doesNotMatch(c,/#registroAcademicFooter[^}]*overflow|#registroRecoveryControls \{[^}]*overflow/);assert.ok(f.indexOf('id="registroSaveState"')>f.indexOf('</div>',f.indexOf('class="registro-recovery-actions"')));assert.ok(f.indexOf('id="registroEmergencyWarning"')>f.indexOf('id="registroSaveState"'));assert.ok(read('registro-recovery-ui.js').includes('footer.getBoundingClientRect().height+12'));
+ const c=css(html),f=footer(html);assert.match(c,/#registroAcademicFooter \{background:#fff;/);assert.equal((c.match(/overflow-x:auto/g)||[]).length,1);assert.doesNotMatch(c,/#registroAcademicFooter[^}]*overflow|#registroRecoveryControls \{[^}]*overflow/);assert.ok(f.indexOf('id="registroSaveState"')>f.indexOf('</div>',f.indexOf('class="registro-recovery-actions"')));assert.ok(f.indexOf('id="registroEmergencyWarning"')>f.indexOf('id="registroSaveState"'));assert.ok(require('./registro-inline-modules.cjs').read('registro-recovery-ui.js').includes('footer.getBoundingClientRect().height+12'));
 });
 test('icons and scrolling do not change any button gate/handler or any academic inline script',()=>{
  const old=execFileSync('git',['show','cd2e3b8c194aa684221f148c2a35ad26a96a6474:registro.html'],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');

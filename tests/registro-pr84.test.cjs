@@ -1,8 +1,8 @@
 // Reused PR83 fixtures; all records, transport and storage are fictitious.
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8'),copy=require('../registro-reconcile.js').copy;
+const read=p=>require('./registro-inline-modules.cjs').readFile(path.join(__dirname,'..',p),'utf8'),copy=require('../registro-reconcile.js').copy;
 const {fixture,flush}=new Function('require','__dirname',read('tests/registro-recovery-ui.test.cjs').split('\ntest(')[0]+'\nreturn {fixture,flush};')(require,__dirname);
-const local=require('../registro-local-store.js');
+const local=require('./registro-inline-modules.cjs').load('registro-local-store.js');
 function memory(){const values=new Map();return {values,getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v)};}
 function setup(){let now=1800000000000,storage;const f=fixture(null,{boot:false,prepare(c){
  c.Date=class extends Date{static now(){return now;}};storage=memory();

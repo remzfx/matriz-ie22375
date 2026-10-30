@@ -7,9 +7,9 @@ module.exports=source=>{
  source=require('./registro-bulk-correction-snapshot.cjs')(source);
  let s=source.replace(/\r\n/g,'\n');
  const start=s.indexOf('  /* Issue86: presentación adaptable;'),end=s.indexOf('  /* Fin Issue86 adaptable. */',start);if(start>=0){const block=s.slice(start,end+'  /* Fin Issue86 adaptable. */\n'.length);assert.equal(crypto.createHash('sha256').update(block).digest('hex'),'e6cd28636bfd385fd7b0a259a4a6adee4963a133d5766e4362e764f7edb2bbb5','Exact presentation-only extension');s=s.replace(block,'');}if(!s.includes('/* Vista integral de Calificar:'))return s;
- const file=fs.readFileSync(path.join(__dirname,'..','registro-calificar-print.js'),'utf8').trim().replace(/\r\n/g,'\n'),script='<script>\n'+file+'\n</script>\n';
+ const file=require('./registro-inline-modules.cjs').read('registro-calificar-print.js').trim().replace(/\r\n/g,'\n'),script='<script>\n'+file+'\n</script>\n';
  assert.equal(s.split(script).length,2,'Exact tested print builder embedded once');s=s.replace(script,'');
- const css=require('../registro-calificar-print.js').css+'\n';assert.equal(s.split(css).length,2);s=s.replace(css,'');
+ const css=require('./registro-inline-modules.cjs').load('registro-calificar-print.js').css+'\n';assert.equal(s.split(css).length,2);s=s.replace(css,'');
  for(const [name,hash]of Object.entries({prepararImpresion:'7a3b83eee7dfa96068f3631a67dec0d03e866ee63bf4b0a161b21662421d855a',abrirSelectorImpresionCalificar:'874d47b5e329aa8ce0f089125f062acc6077d1fa08a85a8e735258bf0b60a791'})){
   const current=fn(s,name);assert.equal(crypto.createHash('sha256').update(current).digest('hex'),hash,'Only approved print wrapper/selector: '+name);s=s.replace(current,fn(base,name));
  }

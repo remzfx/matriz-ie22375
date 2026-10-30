@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {setup,measure,baseline,flush}=require('./registro-recovery-performance.cjs');
-const source=fs.readFileSync(path.join(__dirname,'..','registro-recovery-ui.js'),'utf8');
+const source=require('./registro-inline-modules.cjs').read('registro-recovery-ui.js');
 for(const count of [30,40])test('measured performance budgets: '+count+' synthetic students, five competencies, idle/offline/expiry',async()=>{
  const before=await measure(baseline(),count),after=await measure(source,count);
  for(const phase of ['idle','offlineIdle'])assert.deepEqual(after[phase],{requests:0,writes:0,indexedDB:0,serializations:0,hashes:0,renders:0,statusWrites:0},phase);
