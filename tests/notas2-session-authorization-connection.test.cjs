@@ -1,5 +1,5 @@
 'use strict';
-const {test}=require('node:test'),assert=require('node:assert/strict'),{create}=require('../registro-connection.js');
+const {test}=require('node:test'),assert=require('node:assert/strict'),{create}=require('./registro-inline-modules.cjs').load('registro-connection.js');
 test('shared scope deadline is not renewed by navigation, and forced checks stay explicit',async()=>{
  let time=0,key='owner|token|A',allowed=true,remote=0;const forces=[],c=create({now:()=>time,binding:()=>key,owner:()=> 'owner|token',authorized:()=>true,allowed:()=>allowed,setTimeout:()=>1,clearTimeout(){},verify:async({force})=>{forces.push(force);if(force){remote++;return {ok:true};}return {ok:true,validUntil:150000};}});
  await c.check();assert.equal(c.snapshot().validUntil,150000);time=100000;key='owner|token|B';c.select();await c.check();assert.equal(c.snapshot().validUntil,150000);assert.equal(remote,0);

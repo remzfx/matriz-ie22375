@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
 const fixture=new Function('require',fs.readFileSync('tests/notas2-ui.test.cjs','utf8').split('\ntest(')[0]+'\nreturn fixture;')(require);
-const local=require('../registro-local-store.js');
+const local=require('./registro-inline-modules.cjs').load('registro-local-store.js');
 function setup(){const f=fixture(),epoch='a'.repeat(32),map=new Map(),session=()=>({user:'synthetic',role:'docente'});const storage={getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,JSON.stringify({...JSON.parse(v),academicEpoch:epoch}))};f.g.registroLocal=local.create(storage,session);f.g.IEAcademicResetClient={epoch:()=>epoch};f.data.asistencia={synthetic:{marca:'P'}};return {f,epoch,map,storage};}
 test('N2 attendance persistence agrees with the active generation interceptor without losing original data',()=>{const {f,epoch}=setup();f.api.persist();assert.equal(JSON.parse(f.g.registroLocal.read()).academicEpoch,epoch);f.api.persist();});
 test('another tab still blocks persistence and preserves the local draft',()=>{const {f,map}=setup();f.api.persist();map.set(f.g.registroLocal.key,JSON.stringify({academicEpoch:'a'.repeat(32),asistencia:{other:'J'}}));f.data.asistencia.mine={marca:'P'};assert.throws(()=>f.api.persist(),/Otra pestaña/);assert.equal(f.data.asistencia.mine.marca,'P');assert.equal(JSON.parse(map.get(f.g.registroLocal.key)).asistencia.other,'J');});

@@ -346,7 +346,7 @@ if(body.action==='academicstate')return {ok:true,text:async()=>JSON.stringify({o
   const contextVm = vm.createContext(g);
 
   // Load connection, UI, and diagnostic scripts
-  const connectionSrc = fs.readFileSync(path.join(__dirname, '..', 'registro-connection.js'), 'utf8');
+  const connectionSrc = require('./registro-inline-modules.cjs').read('registro-connection.js');
   vm.runInContext(connectionSrc, contextVm);
 
   const uiSrc = fs.readFileSync(path.join(__dirname, '..', 'registro-notas2-ui.js'), 'utf8');

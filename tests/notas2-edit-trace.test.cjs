@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const text=fs.readFileSync('tests/notas2-active-renewal.test.cjs','utf8').split('\nfor(const latency')[0];
 const {fixture,clock}=new Function('require',text+'\nreturn {fixture,clock};')(require);
 const base='a226ab74a36f69c305472a455f6ad3dd7067b275';
-function isolated(source=fs.readFileSync('registro-connection.js','utf8')){
+function isolated(source=require('./registro-inline-modules.cjs').read('registro-connection.js')){
  const c=clock(),g={Date:c.Date,module:{exports:{}},fetch(){throw Error('Unexpected network');},setTimeout(){throw Error('Unexpected diagnostic timer');},indexedDB:{open(){throw Error('Unexpected database');}},localStorage:{getItem(){throw Error('Unexpected storage');}}};
  vm.createContext(g);vm.runInContext(source,g);return {c,g,trace:g.IERegistroEditTrace,create:g.module.exports.create};
 }
@@ -95,8 +95,8 @@ test('timeout, malformed response and denial produce safe outcomes with identica
 test('historical allowlist restores only the exact diagnostic delta; raw inline controller is identical',()=>{
  const normalize=require('./notas2-edit-trace-boundary.cjs');
  for(const file of ['registro-connection.js','registro.html','registro-notas2-ui.js']){
-  const source=fs.readFileSync(file,'utf8'),previous=execFileSync('git',['show',base+':'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');assert.equal(normalize(file,source),previous);
+  const source=require('./registro-inline-modules.cjs').readFile(file,'utf8'),previous=execFileSync('git',['show',base+':'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');assert.equal(normalize(file,source),previous);
   const marker=file==='registro-notas2-ui.js'?"if(!valid()||binding()!==key)":"(authorized=o.authorized())";assert.ok(source.includes(marker));assert.notEqual(normalize(file,source.replace(marker,'false')),previous);
  }
- const html=fs.readFileSync('registro.html','utf8').replace(/\r\n/g,'\n'),module=fs.readFileSync('registro-connection.js','utf8').replace(/\r\n/g,'\n').trim();assert.equal(html.split('<script>\n'+module+'\n</script>').length,2);
+ const html=fs.readFileSync('registro.html','utf8').replace(/\r\n/g,'\n'),module=require('./registro-inline-modules.cjs').read('registro-connection.js').replace(/\r\n/g,'\n').trim();assert.equal(html.split('<script>\n'+module+'\n</script>').length,2);
 });

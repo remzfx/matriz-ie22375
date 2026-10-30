@@ -2,7 +2,6 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'..','auxiliar.html'),'utf8');
-const preview=fs.readFileSync(path.join(__dirname,'..','preview-asistencia-pr75.html'),'utf8');
 function getFunction(name){
  const i=source.indexOf('function '+name+'(');
  assert.ok(i>=0,'Missing '+name);
@@ -77,15 +76,6 @@ test('Header button opens monthly panel, scrolls it into view and can close it',
  assert.equal(get('asisStatsBoton')['aria-expanded'],'false');
  assert.equal(loads,1);
 });
-test('Offline-only preview mirrors header and footer without touching production API',()=>{
- assert.match(preview,/<header[^>]*>[\s\S]*id="verStats"[^>]*>Estadísticas<\/button>/);
- assert.match(preview,/<footer id="previewDayFooter"/);
- assert.match(preview,/class="day-footer"/);
- assert.match(preview,/id="kpis"/);
- assert.match(preview,/id="statsPanel" hidden/);
- assert.match(preview,/sin conexión|sin conexión/i);
- assert.doesNotMatch(preview,/script\.google\.com|\/macros\/s\/|CLOUD_API_URL|fetch\s*\(/);
-});
 test('Attendance selection keeps six fields in one desktop grid and wraps on mobile',()=>{
  const form=source.slice(source.indexOf('<div id="asisSeccionPanel"'),source.indexOf('<p id="asisEstado"'));
  const ids=['inpFecha','asisAnio','selBimestre','selNivel','selGrado','selSeccion'];
@@ -102,7 +92,4 @@ test('Single QR button stays above roster; upload remains a separate deliberate 
  assert.doesNotMatch(form,/Probar lector QR|onclick="toggleScan\(true\)"/);
  assert.match(source.slice(source.indexOf('<footer id="asisResumenDiario"')),/onclick="subirTodoNube\(\)"/);
  assert.ok(source.indexOf('onclick="toggleScan()"')<source.indexOf('onclick="subirTodoNube()"'));
- assert.match(preview,/>Escanear QR<\/button>/);
- assert.doesNotMatch(preview,/Probar lector QR/);
- assert.doesNotMatch(preview,/getUserMedia|Html5Qrcode/,'Offline preview must remain visual-only');
 });

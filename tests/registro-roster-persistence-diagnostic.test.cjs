@@ -4,7 +4,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 function fixtureFrom(file){const src=fs.readFileSync(file,'utf8').split("\ntest(")[0];return new Function('require','__dirname',src+'\nreturn fixture;')(require,__dirname);}
 const rosterFixture=fixtureFrom('tests/registro-roster-identity.test.cjs');
 const adapterFixture=fixtureFrom('tests/notas2-ui.test.cjs');
-const localStore=require('../registro-local-store.js');
+const localStore=require('./registro-inline-modules.cjs').load('registro-local-store.js');
 function setup(failure){
  const r=rosterFixture(),a=adapterFixture(),disk=new Map(),operations=[];
  const storage={getItem(k){operations.push('read');if(failure==='read')throw Object.assign(Error('Synthetic access denied'),{name:'SecurityError'});return disk.get(k)??null;},setItem(k,v){operations.push('write');if(failure==='quota')throw Object.assign(Error('Synthetic quota exceeded'),{name:'QuotaExceededError'});disk.set(k,v);}};

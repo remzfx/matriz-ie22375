@@ -17,7 +17,7 @@ function fixture({latency=4000,ttl=150000}={}){
   .replace('const g={console,','const g={clock,console,')
   .replace('setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.length;},clearTimeout(){}','setTimeout:clock.set,clearTimeout:clock.clear');
  const instrument=`\n{const original=IERegistroConnection.create;IERegistroConnection.create=o=>original({...o,changed:s=>{clock.trace.push({at:Date.now(),event:'state',...s,canEdit:IERegistroConnection.current()?.canEdit()});o.changed?.(s);}});}`;
- const req=name=>name==='node:fs'?{...fs,readFileSync:(file,...args)=>{const text=fs.readFileSync(file,...args);return file==='registro-connection.js'?text+instrument:text;}}:require(name);
+ const req=name=>name==='./registro-inline-modules.cjs'?{...require(name),read:(file,...args)=>{const text=require(name).read(file,...args);return file==='registro-connection.js'?text+instrument:text;},readFile:(file,...args)=>{const text=require(name).readFile(file,...args);return file==='registro-connection.js'?text+instrument:text;}}:name==='node:fs'?{...fs,readFileSync:(file,...args)=>{const text=fs.readFileSync(file,...args);return file==='registro-connection.js'?text+instrument:text;}}:require(name);
  const f=new Function('require','Date','clock',src+'\nreturn fixture;')(req,c.Date,c)(),g=f.g;
  const session={token:'fictitious',user:'synthetic',role:'docente',nivel:'secundaria',permisosVersion:1};g.getLoginSession=()=>session;
  let mode='ok',wait=latency,periodReads=0;
@@ -64,7 +64,7 @@ test('revocation blocks the same session and retains pending values',async()=>{
 });
 test('watchLease blocks at the actual deadline while a controller verification is still pending',async()=>{
  // Boundary test of the controller itself: the UI HTTP timeout remains unchanged.
- const c=clock(),create=require('../registro-connection.js').create,work={grade:'A',conclusion:'FICTICIO'},before=JSON.stringify(work);let reads=0;
+ const c=clock(),create=require('./registro-inline-modules.cjs').load('registro-connection.js').create,work={grade:'A',conclusion:'FICTICIO'},before=JSON.stringify(work);let reads=0;
  const connection=create({now:c.now,setTimeout:c.set,clearTimeout:c.clear,binding:()=> 'synthetic-A',authorized:()=>true,verify:async()=>{reads++;if(reads>1)await c.delay(45000);return {ok:true,validUntil:c.now()+150000};}});
  await connection.check();await c.advance(120000);assert.equal(connection.snapshot().state,'checking');assert.equal(connection.canEdit(),true);
  await c.advance(30000);assert.equal(connection.snapshot().validUntil,0);assert.equal(connection.canEdit(),false);assert.ok(c.trace.some(e=>e.event==='watchLease'&&e.at===150000));
@@ -73,7 +73,7 @@ test('watchLease blocks at the actual deadline while a controller verification i
 test('a context change during renewal joins the new flight instead of superseding its valid response',async()=>{
  const prior=require('node:child_process').execFileSync('git',['show','06227151383b357f0018e5eb0f4249411c729b01:registro-connection.js'],{encoding:'utf8'}),moduleBefore={exports:{}};
  require('node:vm').runInNewContext(prior,{module:moduleBefore});const measured=[];
- for(const [label,create]of [['before',moduleBefore.exports.create],['after',require('../registro-connection.js').create]]){
+ for(const [label,create]of [['before',moduleBefore.exports.create],['after',require('./registro-inline-modules.cjs').load('registro-connection.js').create]]){
   const c=clock(),work={A:{grade:'B'},B:{grade:'A'}},before=JSON.stringify(work);let key='A',reads=0,tail=Promise.resolve();
   const events=[],connection=create({now:c.now,setTimeout:c.set,clearTimeout:c.clear,binding:()=>key,owner:()=> 'synthetic-session',authorized:()=>true,changed:s=>events.push({...s,at:c.now()}),verify:({valid})=>{
    reads++;const task=tail.then(async()=>{await c.delay(4000);return {ok:valid(),validUntil:c.now()+150000};});tail=task;return task;
@@ -90,7 +90,7 @@ test('a context change during renewal joins the new flight instead of supersedin
 test('historical boundary permits only the demonstrated flight-loop change and preserves security differences',()=>{
  const normalize=require('./notas2-active-renewal-boundary.cjs'),git=require('node:child_process').execFileSync;
  for(const file of ['registro-connection.js','registro.html']){
-  const source=fs.readFileSync(file,'utf8'),prior=git('git',['show','06227151383b357f0018e5eb0f4249411c729b01:'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
+  const source=require('./registro-inline-modules.cjs').readFile(file,'utf8'),prior=git('git',['show','06227151383b357f0018e5eb0f4249411c729b01:'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');
   assert.equal(normalize(file,source),prior);
   assert.notEqual(normalize(file,source.replace('await p;if(disposed)return false;scope();','await p;if(disposed)return true;scope();')),prior);
   assert.notEqual(normalize(file,source.replace('if(!o.authorized())','if(false)')),prior);

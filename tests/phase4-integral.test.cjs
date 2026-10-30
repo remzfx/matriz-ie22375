@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 const world=new Function('require','__dirname',read('tests/academic-identity-roundtrip.test.cjs').split('\ntest(')[0]+'\nreturn world;')(require,__dirname);
-const {create}=require('../registro-connection.js');
+const {create}=require('./registro-inline-modules.cjs').load('registro-connection.js');
 
 test('Phase4 A → B → A: required connection plus real backend preserves concurrent draft until explicit A1 review',async()=>{
  const w=world(),a=w.device();w.fill(a,15);assert.equal(await a.c.subirRegistroNube(),true);

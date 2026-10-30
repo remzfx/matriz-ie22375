@@ -6,7 +6,7 @@ module.exports=(s,options={})=>{s=require('./notas2-frontend-boundary.cjs')('htm
  s=s.replace('<button type="button" id="registroConnectionDiagnostic">Diagnosticar sincronización</button>','');
  s=s.replace('<script src="registro-sync-diagnostic.js" defer></script><script src="registro-sync-diagnostic-ui.js" defer></script>','');
  if(!options.keepConnection){
-  const curConn=require('./registro-continuity-stage1-boundary.cjs')('registro-connection.js',fs.readFileSync(path.join(__dirname,'..','registro-connection.js'),'utf8')).trim().replace(/\r\n/g,'\n');
+  const curConn=require('./registro-continuity-stage1-boundary.cjs')('registro-connection.js',require('./registro-inline-modules.cjs').read('registro-connection.js')).trim().replace(/\r\n/g,'\n');
   const oldConn=execFileSync('git',['show',base+':registro-connection.js'],{encoding:'utf8',maxBuffer:4000000}).trim().replace(/\r\n/g,'\n');
   s=s.replace('<script>\n'+curConn+'\n</script>','<script>\n'+oldConn+'\n</script>');
  }

@@ -8,7 +8,7 @@ function setup({legacy=false,baseline=false}={}){
  // Substitute only the reviewed modules for the before/after comparison.
  const prefix=source;
  const old={};if(baseline)for(const file of ['registro-connection.js','registro-notas2-ui.js'])old[file]=execFileSync('git',['show',base+':'+file],{encoding:'utf8',maxBuffer:4000000});
- const req=name=>name==='node:fs'?{...fs,readFileSync:(file,...args)=>{const text=old[file]??fs.readFileSync(file,...args);return file==='tests/notas2-connection-integration.test.cjs'?text.replace("bim:'III',grado:1,seccion:'A'","bim:'III',grado:3,seccion:'A'"):text;}}:require(name);
+ const req=name=>name==='./registro-inline-modules.cjs'?{...require(name),read:(file,...args)=>old[file]??require(name).read(file,...args),readFile:(file,...args)=>old[file]??require(name).readFile(file,...args)}:name==='node:fs'?{...fs,readFileSync:(file,...args)=>{const text=old[file]??fs.readFileSync(file,...args);return file==='tests/notas2-connection-integration.test.cjs'?text.replace("bim:'III',grado:1,seccion:'A'","bim:'III',grado:3,seccion:'A'"):text;}}:require(name);
  const f=new Function('require',prefix+'\nreturn fixture;')(req)(),events=new Map(),add=f.g.document.addEventListener;
  f.g.document.addEventListener=(event,fn,...args)=>{if(!events.has(event))events.set(event,[]);events.get(event).push(fn);return add(event,fn,...args);};
  if(legacy){const fetch=f.g.fetch;f.g.fetch=async(u,o)=>{const r=await fetch(u,o);if(JSON.parse(o.body).action!=='academicstate')return r;const data=JSON.parse(await r.text());delete data.contextAuthorization;return {...r,text:async()=>JSON.stringify(data)};};}
@@ -45,7 +45,7 @@ for(const legacy of [false,true])for(const beforeExpiry of [false,true])test((le
 test('a compatible backend without shared scope grants and renews an already loaded client',async()=>{
  const f=setup({legacy:true});await f.boot();const original=f.connection.snapshot().validUntil,work=JSON.stringify(f.data);assert.ok(original>f.c.now());const task=f.connection.check(false,true);await f.c.advance(4000);assert.equal(await task,true);assert.ok(f.connection.snapshot().validUntil>original);assert.equal(f.api.current().status().state,'ready');assert.equal(f.requests.filter(b=>b.action==='loadnotas2').length,1);assert.equal(JSON.stringify(f.data),work);
 });
-function controllerFixture(verify){const c=clock(),g={Date:c.Date,module:{exports:{}}};vm.createContext(g);vm.runInContext(fs.readFileSync('registro-connection.js','utf8'),g);let calls=0;const conn=g.module.exports.create({now:c.now,setTimeout:c.set,clearTimeout:c.clear,binding:()=> 'same-anonymous-context',authorized:()=>true,allowed:()=>true,verify:args=>verify({c,args,call:++calls})});return {c,conn,calls:()=>calls};}
+function controllerFixture(verify){const c=clock(),g={Date:c.Date,module:{exports:{}}};vm.createContext(g);vm.runInContext(require('./registro-inline-modules.cjs').read('registro-connection.js'),g);let calls=0;const conn=g.module.exports.create({now:c.now,setTimeout:c.set,clearTimeout:c.clear,binding:()=> 'same-anonymous-context',authorized:()=>true,allowed:()=>true,verify:args=>verify({c,args,call:++calls})});return {c,conn,calls:()=>calls};}
 test('a settled verification with an expired deadline schedules its retry instead of granting invalid time',async()=>{
  const f=controllerFixture(async({c,call})=>({ok:true,validUntil:call===1?-1:c.now()+150000}));assert.equal(await f.conn.check(),false);assert.equal(f.conn.snapshot().state,'checking');assert.equal(f.conn.snapshot().validUntil,0);assert.equal(f.conn.canEdit(),false);await f.c.advance(15000);assert.equal(f.calls(),2);assert.equal(f.conn.canEdit(),true);
 });
@@ -55,8 +55,8 @@ test('a discarded same-context epoch verification starts a fresh verification an
 test('historical allowlist accepts only the literal recovery fix and keeps the inline controller identical',()=>{
  const normalize=require('./notas2-no-grant-recovery-boundary.cjs');
  for(const file of ['registro-connection.js','registro.html','registro-notas2-ui.js']){
-  const text=fs.readFileSync(file,'utf8'),prior=execFileSync('git',['show',base+':'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');assert.equal(normalize(file,text),prior);
+  const text=require('./registro-inline-modules.cjs').readFile(file,'utf8'),prior=execFileSync('git',['show',base+':'+file],{encoding:'utf8',maxBuffer:4000000}).replace(/\r\n/g,'\n');assert.equal(normalize(file,text),prior);
   const marker=file==='registro-notas2-ui.js'?"document.visibilityState==='hidden'":"if(!force&&!review&&canEdit())";assert.ok(text.includes(marker));assert.notEqual(normalize(file,text.replace(marker,'false')),prior);
  }
- const html=fs.readFileSync('registro.html','utf8').replace(/\r\n/g,'\n'),module=fs.readFileSync('registro-connection.js','utf8').replace(/\r\n/g,'\n').trim();assert.equal(html.split('<script>\n'+module+'\n</script>').length,2);
+ const html=fs.readFileSync('registro.html','utf8').replace(/\r\n/g,'\n'),module=require('./registro-inline-modules.cjs').read('registro-connection.js').replace(/\r\n/g,'\n').trim();assert.equal(html.split('<script>\n'+module+'\n</script>').length,2);
 });
