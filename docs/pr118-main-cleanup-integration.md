@@ -21,3 +21,9 @@ Navegador aislado con transporte ficticio: SIN_PADRON (0 lecturas N2 del periodo
 Sintaxis, dependencias y ambos `git diff --check` correctos. No se ejecuta manualmente la suite completa: la aprobación final corresponde al CI del SHA integrado.
 
 Esta integración solo actualiza la rama del PR DRAFT. No fusiona #118 a main, no despliega y no accede a datos institucionales.
+
+## Ajustes focalizados tras el primer CI
+
+La primera ejecución integrada terminó con 3333/3340 aprobadas y 7 fallos de fixtures: el lector inline omitía la sustitución histórica de UI en dos casos; un caso todavía infería error de servidor por la visibilidad de Reintentar; cuatro casos no suministraban el nodo DOM usado por el diagnóstico de persistencia. Se adaptaron únicamente esas dependencias, manteniendo sus expectativas de seguridad y agregando la comprobación de que Reintentar visible por sí solo no indica una caída.
+
+Se ejecutaron solo los tres archivos afectados: 25/25 aprobadas. Total diferencial local: 227 casos únicos (2 nuevos, 225 existentes). Ningún cambio adicional de producción; la nueva ejecución CI debe confirmar el SHA final.

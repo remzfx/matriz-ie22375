@@ -4,7 +4,8 @@ const html=fs.readFileSync(require('node:path').join(__dirname,'../registro.html
 const start=html.indexOf('function pintarPadronInmediato('),source=html.slice(start,html.indexOf('\n}',start)+2);
 function fixture(failure,error,historic=false){
  const calls=[],logs=[],memory={grades:{synthetic:{nivel:'A'}},conclusiones:{synthetic:'Texto ficticio'},asistencia:{synthetic:'P'}};
- const c=vm.createContext({padronBimestre:'II',nivel:'secundaria',bdEstudiantes:null,store:memory,
+ const status={dataset:{}};
+ const c=vm.createContext({document:{getElementById:id=>id==='studentsStatus'?status:null},padronBimestre:'II',nivel:'secundaria',bdEstudiantes:null,store:memory,
   ctxBase:()=>({bim:'III'}),registroSoloLectura:()=>false,registroConsultaHistorica:()=>historic,
   guardarTodo:()=>{throw Error('Unexpected save');},console:{warn:(...args)=>logs.push(args)},
   recordarPadron:()=>{calls.push('recordarPadron');if(failure==='recordarPadron')throw error;},

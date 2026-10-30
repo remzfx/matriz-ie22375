@@ -8,7 +8,7 @@ function fixture({closed=false,latency=4000,uiSource}={}){
  let now=1000000,sequence=0;const jobs=new Map(),metrics=[];
  class Clock extends Date{static now(){return now;}}
  const baseSource=fs.readFileSync('tests/notas2-connection-integration.test.cjs','utf8').split('\ntest(')[0];
- const scopedRequire=name=>name==='node:fs'?{...fs,readFileSync:(file,...args)=>file==='registro-notas2-ui.js'&&uiSource?uiSource:fs.readFileSync(file,...args)}:require(name);
+ const scopedRequire=name=>name==='./registro-inline-modules.cjs'?{...require(name),readFile:(file,...args)=>file==='registro-notas2-ui.js'&&uiSource?uiSource:require(name).readFile(file,...args)}:name==='node:fs'?{...fs,readFileSync:(file,...args)=>file==='registro-notas2-ui.js'&&uiSource?uiSource:fs.readFileSync(file,...args)}:require(name);
  const f=new Function('require','Date',baseSource+'\nreturn fixture;')(scopedRequire,Clock)(),g=f.g;
  const ctx=g.ctxBase(),session={user:'synthetic',role:'docente',nivel:'secundaria',permisosVersion:1,token:Buffer.from(JSON.stringify({exp:now+3600000})).toString('base64url')+'.synthetic'};
  const storage=new Map(),cache={getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)};
