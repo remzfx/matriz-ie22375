@@ -592,11 +592,12 @@
     #registroAccionesAcademicas {flex-wrap:wrap;overflow:visible;}
     #registroAccionesAcademicas > button {flex:1 1 100px;}
     #registroRecoveryControls .registro-recovery-actions {flex-wrap:wrap;overflow:visible;}
-    #panelFinales .fin-header-main {flex-wrap:wrap;align-items:center;}
-    #panelFinales .fin-header-context {flex-basis:100%;}
-    #panelFinales .fin-header-main > .fin-comparativo-toggle {margin-left:auto;}
-    #panelFinales .fin-header-controls {margin-left:0;}
-    #panelFinales .fin-bulk-actions {flex-wrap:wrap;overflow:visible;}
+    #panelFinales .fin-header-main {flex-wrap:wrap;align-items:center;justify-content:space-between;column-gap:6px;}
+    #panelFinales .fin-header-main > .fin-comparativo-toggle {margin-left:auto;padding-left:5px;padding-right:5px;}
+    #panelFinales .fin-header-controls {margin-left:auto;column-gap:6px;}
+    #panelFinales .fin-bulk-actions {flex-wrap:wrap;overflow:visible;column-gap:3px;}
+    #panelFinales .fin-bulk-actions .chip {min-width:34px;padding-left:2px;padding-right:2px;}
+    #panelFinales .fin-remove-bulk,#panelFinales .mode-toggle button {padding-left:5px;padding-right:5px;}
   }
   /* Solo impresión Promedios: textos completos, sin afectar otros reportes. */
   @media print {
