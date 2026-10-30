@@ -587,6 +587,29 @@
     #printArea .promedios-print .summary-stats {break-inside:auto;margin:3mm 0;padding:2mm;}
   }
   /* Fin Issue86 adaptable. */
+  /* PR121: barras de botones adaptables; envuelven a otra fila en vez de desplazarse. Sin cambios de lógica. */
+  @media screen {
+    #registroAccionesAcademicas {flex-wrap:wrap;overflow:visible;}
+    #registroAccionesAcademicas > button {flex:1 1 100px;}
+    #registroRecoveryControls .registro-recovery-actions {flex-wrap:wrap;overflow:visible;}
+    #panelFinales .fin-header-main {flex-wrap:wrap;align-items:center;justify-content:space-between;column-gap:6px;}
+    #panelFinales .fin-header-main > .fin-comparativo-toggle {margin-left:auto;padding-left:5px;padding-right:5px;}
+    #panelFinales .fin-header-main > .fin-header-context {flex:1 1 250px;min-width:0;}
+    #panelFinales .fin-header-main > .fin-header-controls {flex:0 0 auto;max-width:100%;margin-left:auto;column-gap:6px;}
+    #panelFinales .fin-bulk-actions {flex-wrap:wrap;overflow:visible;column-gap:3px;}
+    #panelFinales .fin-bulk-actions .chip {min-width:34px;padding-left:2px;padding-right:2px;}
+    #panelFinales .fin-remove-bulk,#panelFinales .mode-toggle button {padding-left:5px;padding-right:5px;}
+  }
+  /* PR121: en celulares/compactas los controles de Promedios fluyen de izquierda a derecha. */
+  @media screen and (max-width:768px) {
+    #panelFinales .fin-header-main {justify-content:flex-start;}
+    #panelFinales .fin-header-main > .fin-comparativo-toggle,#panelFinales .fin-header-main > .fin-header-controls {margin-left:0;}
+    #panelFinales .fin-header-controls,#panelFinales .fin-bulk-actions {justify-content:flex-start;}
+    #panelFinales .fin-header-main > .fin-comparativo-toggle {white-space:normal;width:74px;height:44px;line-height:1.1;text-align:center;align-self:flex-start;}
+    #panelFinales .fin-header-main > .fin-header-context {flex-basis:100%;}
+    #panelFinales .fin-header-main > .fin-header-controls {flex:1 1 0;width:auto;min-width:0;}
+    #panelFinales .fin-header-controls .mode-toggle {flex:0 1 150px;}
+  }
   /* Solo impresión Promedios: textos completos, sin afectar otros reportes. */
   @media print {
     #printArea .promedios-print .print-conclusions {margin:5mm 0;}
