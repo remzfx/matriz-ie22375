@@ -250,7 +250,9 @@
   const fatal=['session','offline'].find(v=>conn?.state===v||s?.state===v);
   const error=fatal||(sinPadron?null:rosterMissing?'roster':['session','server','offline','review'].find(v=>conn?.state===v||s?.state===v||(v==='review'&&s?.state==='conflict')));
   const missing=['calificar','promedios','asistencia'].includes(pane)&&s?.panels[pane]?.version==null;
-  const access=accessRead?.key===binding()&&!connection?.canEdit(),load=s?.state==='checking'&&!!s.busy,roster=visibleRosterRead();
+  const accessCheck=accessRead?.key===binding()&&!connection?.canEdit(),load=s?.state==='checking'&&!!s.busy,roster=visibleRosterRead();
+  // Renewing authorization over an already loaded context is reported only by the cloud; editing stays gated by the connection.
+  const access=accessCheck&&(missing||load||roster);
   const prepared=load&&missing&&prefetch?preparation().state==='prepared':false;
   const backgroundRoster=!!(roster&&!missing&&!access&&!load&&s?.state==='ready'&&!s.busy&&canEdit(pane));
   const pending=!sinPadron&&pane!=='resumen'&&!tutor()&&!error&&!save.pending&&!uploadAttendance.pending&&(access||load&&!prepared||roster);
