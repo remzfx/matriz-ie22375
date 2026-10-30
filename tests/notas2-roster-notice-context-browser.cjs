@@ -22,5 +22,3 @@ async function run(){const {chromium}=require(process.env.IE_PLAYWRIGHT_MODULE||
  assert.equal(await page.locator('#hdrSyncIndicator .sync-label').innerText(),'Conectado');
  assert.equal(await page.evaluate(()=>JSON.stringify(store.asistencia)===testDraft),true);assert.equal(external,0);assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>integralRequests.filter(r=>r.action.startsWith('save')).length),0);console.log(JSON.stringify({width,passed:true,external,writes:0}));await page.close();}}finally{await browser.close();}}
 if(require.main===module)run().catch(e=>{console.error(e.stack);process.exitCode=1;});
-
-
