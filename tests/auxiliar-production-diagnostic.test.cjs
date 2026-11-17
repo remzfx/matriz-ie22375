@@ -90,10 +90,14 @@ test('An HTTP 404 is a transport failure before login JSON parsing, not a denied
   assert.equal((await s.context.loginBackendUnaVez('auxiliar','diagnostic-aux','wrong')).ok,false);
 });
 
-test('Every production Web App endpoint uses the verified deployment ID',()=>{
+test('Every academic production Web App endpoint uses the verified deployment ID',()=>{
   const urls=[];
-  for(const file of fs.readdirSync(path.join(__dirname,'..')).filter(f=>/\.(?:html|js)$/.test(f)))
-    urls.push(...Array.from(read(file).matchAll(/https:\/\/script\.google\.com\/macros\/s\/[^\s"'<>]+/g),m=>m[0]));
+  for(const file of fs.readdirSync(path.join(__dirname,'..')).filter(f=>/\.(?:html|js)$/.test(f))){
+    // The independently tested electoral app is an external link, not the academic API.
+    // Only its exact reviewed section is excluded; unexpected URLs still fail this guard.
+    const source=file==='admin.html'?require('./admin-elections-boundary.cjs')(read(file).replace(/\r\n/g,'\n')):read(file);
+    urls.push(...Array.from(source.matchAll(/https:\/\/script\.google\.com\/macros\/s\/[^\s"'<>]+/g),m=>m[0]));
+  }
   assert.equal(urls.length,10);
   assert.deepEqual([...new Set(urls)],['https://script.google.com/macros/s/AKfycbxI0pfjZfeecboqvwx4YOjcvyGTGVa1smmyyE9kNQCmNgNL3tDXwFlPUL0i1DJ2DwBNIg/exec']);
 });
