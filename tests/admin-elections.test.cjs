@@ -67,4 +67,9 @@ test('Existing administrator source including authorization and academic actions
   const baseline = execFileSync('git', ['show', '5214dfc117803b55d1d87839a90de6188505e33d:admin.html'],
     { cwd: root, encoding: 'utf8' }).replace(/\r\n/g, '\n');
   assert.equal(html.replace(block, '').replace(/\r\n/g, '\n'), baseline);
+  const strip = require('./admin-elections-boundary.cjs');
+  const current = html.replace(/\r\n/g, '\n');
+  assert.equal(strip(current), baseline);
+  assert.notEqual(strip(current.replace('SISTEMA DE VOTACIÓN', 'Unexpected mutation')), baseline);
+  assert.notEqual(strip(current + '\n/* unrelated mutation */'), baseline);
 });
