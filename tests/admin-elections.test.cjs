@@ -1,0 +1,70 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const { execFileSync } = require('node:child_process');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'admin.html'), 'utf8');
+const block = html.match(/      <!-- ELECCIONES ESCOLARES:[\s\S]*?<\/section>\r?\n/)[0];
+const script = block.match(/<script>([\s\S]*?)<\/script>/)[1];
+// Synthetic deployment ID; never contacted by these tests.
+const url = 'https://script.google.com/macros/s/TEST_ELECTIONS_ONLY/exec';
+function run(value) {
+  const nodes = {};
+  for (const id of ['electionsVoting', 'electionsResults', 'electionsStatus']) {
+    nodes[id] = { attrs: { 'aria-disabled': 'true', tabindex: '-1' },
+      classList: { remove() {}, add() {} },
+      removeAttribute(key) { delete this.attrs[key]; } };
+  }
+  vm.runInNewContext(script.replace("const ELECTIONS_WEB_APP_URL = '';",
+    `const ELECTIONS_WEB_APP_URL = ${JSON.stringify(value)};`),
+    { URL, document: { getElementById: id => nodes[id] } });
+  return nodes;
+}
+test('Unconfigured electoral links remain disabled without href, including before JavaScript', () => {
+  const nodes = run('');
+  for (const id of ['electionsVoting', 'electionsResults']) {
+    assert.equal(nodes[id].href, undefined);
+    assert.equal(nodes[id].attrs['aria-disabled'], 'true');
+    const anchor = block.match(new RegExp(`<a id="${id}"[^>]*>`))[0];
+    assert.doesNotMatch(anchor, /\bhref=/);
+    assert.match(anchor, /aria-disabled="true"/);
+  }
+  assert.match(block, /Configuración pendiente/);
+});
+test('One configured exec URL produces separate secure voting and results links', () => {
+  const nodes = run(url);
+  assert.equal(nodes.electionsVoting.href, url);
+  assert.equal(nodes.electionsResults.href, url + '?vista=resultados');
+  for (const id of ['electionsVoting', 'electionsResults']) {
+    assert.deepEqual(nodes[id].attrs, {});
+    assert.match(block.match(new RegExp(`<a id="${id}"[^>]*>`))[0],
+      /target="_blank" rel="noopener noreferrer"/);
+  }
+  assert.match(nodes.electionsStatus.textContent, /publicación de resultados depende de la aplicación electoral/);
+});
+test('Invalid, unsafe or non-exec configuration cannot enable either link', () => {
+  for (const invalid of ['javascript:alert(1)', '/exec', 'https://example.com/exec',
+    url.replace('https:', 'http:'), url.replace('/exec', '/dev'),
+    url.replace('script.google.com', 'script.google.com.evil.test'),
+    url.replace('script.google.com', 'user:secret@script.google.com'),
+    url + '?token=synthetic', url + '#fragment']) {
+    const nodes = run(invalid);
+    assert.equal(nodes.electionsVoting.href, undefined);
+    assert.equal(nodes.electionsResults.href, undefined);
+  }
+});
+test('Electoral section uses responsive cards and only URL/DOM access, without persistence or transport', () => {
+  assert.match(block, /grid sm:grid-cols-2 gap-3/);
+  assert.equal((block.match(/min-h-\[44px\]/g) || []).length, 2);
+  assert.doesNotMatch(script, /fetch|XMLHttpRequest|Storage|indexedDB|window\.open|session|token/i);
+  assert.equal((html.match(/const ELECTIONS_WEB_APP_URL\s*=/g) || []).length, 1);
+  assert.ok(html.indexOf(block) > html.indexOf('id="tab-menu"'));
+  assert.ok(html.indexOf(block) < html.indexOf('id="tab-bd"'));
+});
+test('Existing administrator source including authorization and academic actions is byte-equivalent', () => {
+  const baseline = execFileSync('git', ['show', '5214dfc117803b55d1d87839a90de6188505e33d:admin.html'],
+    { cwd: root, encoding: 'utf8' }).replace(/\r\n/g, '\n');
+  assert.equal(html.replace(block, '').replace(/\r\n/g, '\n'), baseline);
+});
