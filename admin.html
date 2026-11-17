@@ -186,7 +186,7 @@
       <section class="card p-4 mt-3" aria-labelledby="electionsTitle">
         <h2 id="electionsTitle" class="font-black text-slate-800">ELECCIONES ESCOLARES 2026</h2>
         <p id="electionsStatus" role="status" class="text-sm text-slate-500 mt-1 mb-3">Preparando accesos electorales…</p>
-        <div class="grid sm:grid-cols-2 gap-3">
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <a id="electionsVoting" aria-disabled="true" tabindex="-1" target="_blank" rel="noopener noreferrer" class="block min-w-0 min-h-[44px] rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-500 focus-visible:ring-2 focus-visible:ring-sky-500">
             <span aria-hidden="true" class="block text-2xl mb-1">🗳️</span>
             <span class="block font-bold">SISTEMA DE VOTACIÓN</span>
@@ -197,13 +197,18 @@
             <span class="block font-bold">RESULTADOS ELECTORALES</span>
             <span class="block text-sm mt-1">Consultar los resultados y gráficos de las elecciones</span>
           </a>
+          <a id="electionsPanel" aria-disabled="true" tabindex="-1" target="_blank" rel="noopener noreferrer" class="block min-w-0 min-h-[44px] rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-500 focus-visible:ring-2 focus-visible:ring-sky-500">
+            <span aria-hidden="true" class="block text-2xl mb-1">⚙️</span>
+            <span class="block font-bold">CONFIGURACIÓN ELECTORAL</span>
+            <span class="block text-sm mt-1">Administrar listas, candidatos y estado de las elecciones</span>
+          </a>
         </div>
         <script>
 (function(){
   // Configurar solo la URL pública de implementación de Apps Script, terminada en /exec.
   const ELECTIONS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzkKW4XhcP2wEQtVsspBYfPLdXXb0mp-s71-BSgCIybUJTWoCajSKpn0XaYJ71rXMfiYg/exec';
   const status = document.getElementById('electionsStatus');
-  let voting, results;
+  let voting, results, panel;
   try {
     voting = new URL(ELECTIONS_WEB_APP_URL);
     if(voting.protocol !== 'https:' || voting.hostname !== 'script.google.com' || voting.port ||
@@ -211,11 +216,13 @@
        !/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(voting.pathname)) throw new Error('Invalid URL');
     results = new URL(voting.href);
     results.searchParams.set('vista', 'resultados');
+    panel = new URL(voting.href);
+    panel.searchParams.set('vista', 'panel');
   } catch (_) {
     status.textContent = 'Configuración pendiente: se requiere una URL válida de la aplicación electoral terminada en /exec.';
     return;
   }
-  [['electionsVoting', voting], ['electionsResults', results]].forEach(([id, url])=>{
+  [['electionsVoting', voting], ['electionsResults', results], ['electionsPanel', panel]].forEach(([id, url])=>{
     const link = document.getElementById(id);
     link.href = url.href;
     link.removeAttribute('aria-disabled');

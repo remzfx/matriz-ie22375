@@ -12,7 +12,7 @@ const script = block.match(/<script>([\s\S]*?)<\/script>/)[1];
 const url = 'https://script.google.com/macros/s/TEST_ELECTIONS_ONLY/exec';
 function run(...configuration) {
   const nodes = {};
-  for (const id of ['electionsVoting', 'electionsResults', 'electionsStatus']) {
+  for (const id of ['electionsVoting', 'electionsResults', 'electionsPanel', 'electionsStatus']) {
     nodes[id] = { attrs: { 'aria-disabled': 'true', tabindex: '-1' },
       classList: { remove() {}, add() {} },
       removeAttribute(key) { delete this.attrs[key]; } };
@@ -25,7 +25,7 @@ function run(...configuration) {
 }
 test('Unconfigured electoral links remain disabled without href, including before JavaScript', () => {
   const nodes = run('');
-  for (const id of ['electionsVoting', 'electionsResults']) {
+  for (const id of ['electionsVoting', 'electionsResults', 'electionsPanel']) {
     assert.equal(nodes[id].href, undefined);
     assert.equal(nodes[id].attrs['aria-disabled'], 'true');
     const anchor = block.match(new RegExp(`<a id="${id}"[^>]*>`))[0];
@@ -40,24 +40,27 @@ test('Official configuration produces the exact requested destinations without p
   const nodes = run();
   assert.equal(nodes.electionsVoting.href, official);
   assert.equal(nodes.electionsResults.href, official + '?vista=resultados');
+  assert.equal(nodes.electionsPanel.href, official + '?vista=panel');
+  assert.deepEqual(nodes.electionsPanel.attrs, {});
   assert.deepEqual(nodes.electionsVoting.attrs, {});
   assert.deepEqual(nodes.electionsResults.attrs, {});
   assert.doesNotMatch(nodes.electionsStatus.textContent, /Configuración pendiente/);
   assert.match(nodes.electionsStatus.textContent, /publicación de resultados depende de la aplicación electoral/);
   assert.doesNotMatch(block.split('<script>')[0], /Configuración pendiente/);
 });
-test('One configured exec URL produces separate secure voting and results links', () => {
+test('One configured exec URL produces three separate secure electoral links', () => {
   const nodes = run(url);
   assert.equal(nodes.electionsVoting.href, url);
   assert.equal(nodes.electionsResults.href, url + '?vista=resultados');
-  for (const id of ['electionsVoting', 'electionsResults']) {
+  assert.equal(nodes.electionsPanel.href, url + '?vista=panel');
+  for (const id of ['electionsVoting', 'electionsResults', 'electionsPanel']) {
     assert.deepEqual(nodes[id].attrs, {});
     assert.match(block.match(new RegExp(`<a id="${id}"[^>]*>`))[0],
       /target="_blank" rel="noopener noreferrer"/);
   }
   assert.match(nodes.electionsStatus.textContent, /publicación de resultados depende de la aplicación electoral/);
 });
-test('Invalid, unsafe or non-exec configuration cannot enable either link', () => {
+test('Invalid, unsafe or non-exec configuration cannot enable any of the three links', () => {
   for (const invalid of ['javascript:alert(1)', '/exec', 'https://example.com/exec',
     url.replace('https:', 'http:'), url.replace('/exec', '/dev'),
     url.replace('script.google.com', 'script.google.com.evil.test'),
@@ -66,12 +69,17 @@ test('Invalid, unsafe or non-exec configuration cannot enable either link', () =
     const nodes = run(invalid);
     assert.equal(nodes.electionsVoting.href, undefined);
     assert.equal(nodes.electionsResults.href, undefined);
+    assert.equal(nodes.electionsPanel.href, undefined);
+    assert.equal(nodes.electionsPanel.attrs['aria-disabled'], 'true');
     assert.match(nodes.electionsStatus.textContent, /Configuración pendiente/);
   }
 });
 test('Electoral section uses responsive cards and only URL/DOM access, without persistence or transport', () => {
-  assert.match(block, /grid sm:grid-cols-2 gap-3/);
-  assert.equal((block.match(/min-h-\[44px\]/g) || []).length, 2);
+  assert.match(block, /grid sm:grid-cols-2 lg:grid-cols-3 gap-3/);
+  assert.match(block, /CONFIGURACIÓN ELECTORAL/);
+  assert.match(block, /Administrar listas, candidatos y estado de las elecciones/);
+  assert.match(block, /⚙️/);
+  assert.equal((block.match(/min-h-\[44px\]/g) || []).length, 3);
   assert.doesNotMatch(script, /fetch|XMLHttpRequest|Storage|indexedDB|window\.open|session|token/i);
   assert.equal((html.match(/const ELECTIONS_WEB_APP_URL\s*=/g) || []).length, 1);
   assert.ok(html.indexOf(block) > html.indexOf('id="tab-menu"'));
