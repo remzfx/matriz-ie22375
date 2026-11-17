@@ -185,7 +185,7 @@
       <!-- ELECCIONES ESCOLARES: accesos externos sin datos de la sesión académica. -->
       <section class="card p-4 mt-3" aria-labelledby="electionsTitle">
         <h2 id="electionsTitle" class="font-black text-slate-800">ELECCIONES ESCOLARES 2026</h2>
-        <p id="electionsStatus" role="status" class="text-sm text-slate-500 mt-1 mb-3">Configuración pendiente: falta la URL de la aplicación electoral.</p>
+        <p id="electionsStatus" role="status" class="text-sm text-slate-500 mt-1 mb-3">Preparando accesos electorales…</p>
         <div class="grid sm:grid-cols-2 gap-3">
           <a id="electionsVoting" aria-disabled="true" tabindex="-1" target="_blank" rel="noopener noreferrer" class="block min-w-0 min-h-[44px] rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-500 focus-visible:ring-2 focus-visible:ring-sky-500">
             <span aria-hidden="true" class="block text-2xl mb-1">🗳️</span>
@@ -201,7 +201,7 @@
         <script>
 (function(){
   // Configurar solo la URL pública de implementación de Apps Script, terminada en /exec.
-  const ELECTIONS_WEB_APP_URL = '';
+  const ELECTIONS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzkKW4XhcP2wEQtVsspBYfPLdXXb0mp-s71-BSgCIybUJTWoCajSKpn0XaYJ71rXMfiYg/exec';
   const status = document.getElementById('electionsStatus');
   let voting, results;
   try {
@@ -212,6 +212,7 @@
     results = new URL(voting.href);
     results.searchParams.set('vista', 'resultados');
   } catch (_) {
+    status.textContent = 'Configuración pendiente: se requiere una URL válida de la aplicación electoral terminada en /exec.';
     return;
   }
   [['electionsVoting', voting], ['electionsResults', results]].forEach(([id, url])=>{
