@@ -36,6 +36,7 @@ test('Semana gestión permite pintar cada hora con su propio estado, sin quitar 
    diasMes:dates,ymd:d=>d.toISOString().slice(0,10),DOW:['LUN','MAR','MIE','JUE','VIE'],
    HPRI:()=>[[1,'08:00'],[2,'08:45'],['R','RECREO']],
    HSEC:()=>[[1,'13:00'],[2,'13:45']],
+   horasPed:nivel=>nivel==='pri'?[1,2]:[1,2],
    colOk:()=>false,slotActivo:()=>false,
    clsDe:t=>({gestion:'c-ges',soporte:'c-sop',vacaciones:'c-vac'}[t]||'c-gray')
  });
@@ -97,4 +98,83 @@ test('Armar mes no borra cambios individuales en los días de gestión',()=>{
  v.armarMes(true);
  assert.equal(plan[monday].pri[2].texto,'Soporte');
  assert.equal(plan[monday].sec[1].tipo,'gestion');
+});
+
+test('Encabezado de fecha abre menú por nivel sin marcar feriado automáticamente',()=>{
+ const out={modTit:{},modSub:{},modTipo:{value:'grupo'},modGrupo:{innerHTML:'',value:'',options:[],appendChild(o){this.options.push(o);}},modal:{classList:{remove(){}}}};
+ const v=make(['abrirColumna'],{
+   editKey:null,
+   document:{getElementById:id=>out[id],createElement:()=>({value:'',textContent:''})},
+   horasPed:n=>n==='pri'?[4,5,6]:[1,2,3],
+   candidatos:(wd,h)=>h===1?[{seccion:'3A',texto:'3A COM'}]:[{seccion:'3B',texto:'3B COM'}],
+   onModTipo:()=>{}
+ });
+ v.abrirColumna('2026-12-25','sec');
+ assert.equal(v.editKey.fecha,'2026-12-25');
+ assert.equal(v.editKey.nivel,'sec');
+ assert.equal(v.editKey.columna,true);
+ assert.equal(out.modTipo.value,'');
+ assert.match(out.modSub.textContent,/excepto el recreo/);
+ assert.deepEqual(out.modGrupo.options.map(o=>o.value),['3A','3B']);
+});
+
+test('Aplicar desde fecha modifica únicamente las horas de esa fecha y nivel, no recreo ni días vecinos',()=>{
+ const fecha='2026-12-25';
+ const p={
+   [fecha]:{pri:{4:{tipo:'gestion',texto:'Semana gestión'},5:{tipo:'gestion',texto:'Semana gestión'}},sec:{1:{tipo:'gestion',texto:'Semana gestión'},2:{tipo:'gestion',texto:'Semana gestión'},R:{tipo:'gestion',texto:'RECREO'}}},
+   '2026-12-24':{sec:{1:{tipo:'grupo',texto:'1A'}}}
+ };
+ const originalPrim=JSON.stringify(p[fecha].pri),other=JSON.stringify(p['2026-12-24']);
+ const inputs={modTipo:{value:'soporte'},modGrupo:{value:'3A'}};
+ let rendered=0,closed=0;
+ const v=make(['celda','setCelda','aplicarColumna'],{
+   plan:p,editKey:{fecha,nivel:'sec',columna:true},
+   document:{getElementById:id=>inputs[id]},
+   horasPed:n=>n==='sec'?[1,2]:[4,5],
+   getHS:()=>({}),render:()=>rendered++,cerrarModal:()=>closed++
+ });
+ v.aplicarColumna();
+ for(const h of [1,2]){
+   assert.equal(p[fecha].sec[h].tipo,'soporte');
+   assert.equal(p[fecha].sec[h].manual,true);
+ }
+ assert.equal(p[fecha].sec.R.texto,'RECREO');
+ assert.equal(JSON.stringify(p[fecha].pri),originalPrim);
+ assert.equal(JSON.stringify(p['2026-12-24']),other);
+ assert.equal(rendered,1);
+ assert.equal(closed,1);
+});
+
+test('Asignar grupo por fecha incorpora grupo y docente de cada hora sin afectar el otro nivel',()=>{
+ const fecha='2026-12-25';
+ const p={[fecha]:{pri:{4:{tipo:'soporte',texto:'Soporte'}},sec:{}}};
+ const inputs={modTipo:{value:'grupo'},modGrupo:{value:'3A'}};
+ const v=make(['celda','setCelda','aplicarColumna'],{
+   plan:p,editKey:{fecha,nivel:'sec',columna:true},
+   document:{getElementById:id=>inputs[id]},
+   horasPed:n=>n==='sec'?[1,2]:[4,5],
+   getHS:()=>({4:{1:{'3A':{area:'COM',doc:'Docente A'}},2:{'3A':{area:'MAT',doc:'Docente B'}}}}),
+   render:()=>{},cerrarModal:()=>{}
+ });
+ v.aplicarColumna();
+ assert.equal(p[fecha].sec[1].doc,'Docente A');
+ assert.equal(p[fecha].sec[2].doc,'Docente B');
+ assert.equal(p[fecha].sec[1].seccion,'3A');
+ assert.equal(p[fecha].sec[2].manual,true);
+ assert.equal(p[fecha].pri[4].tipo,'soporte');
+});
+
+test('Feriado por encabezado es exclusivo de la columna seleccionada y puede visualizarse por nivel',()=>{
+ const fecha='2026-12-25',plan={[fecha]:{pri:{4:{tipo:'grupo',texto:'3°'}},sec:{}}};
+ const inputs={modTipo:{value:'feriado'},modGrupo:{value:''}};
+ const v=make(['celda','setCelda','aplicarColumna'],{
+   plan,editKey:{fecha,nivel:'sec',columna:true},
+   document:{getElementById:id=>inputs[id]},
+   horasPed:n=>n==='sec'?[1,2]:[4,5],
+   getHS:()=>({}),render:()=>{},cerrarModal:()=>{}
+ });
+ v.aplicarColumna();
+ assert.equal(plan[fecha].sec[1].tipo,'feriado');
+ assert.equal(plan[fecha].sec[2].tipo,'feriado');
+ assert.equal(plan[fecha].pri[4].texto,'3°');
 });
