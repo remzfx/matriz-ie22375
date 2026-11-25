@@ -16,6 +16,8 @@
   table.cal { width:100%; border-collapse:collapse; font-size:11px; }
   table.cal th, table.cal td { border:1px solid #cbd5e1; padding:4px; text-align:center; vertical-align:middle; }
   table.cal th { background:#0f172a; color:#fff; font-size:10px; }
+  .aip-day-head { display:block; width:100%; border:0; padding:2px 1px; min-height:40px; background:transparent; color:inherit; font:inherit; font-weight:inherit; text-align:center; cursor:pointer; }
+  .aip-day-head:hover, .aip-day-head:focus-visible { outline:2px solid #93c5fd; outline-offset:-2px; border-radius:4px; }
   .c-aip { background:#bbf7d0; cursor:pointer; font-weight:700; }
   .c-sop { background:#fed7aa; cursor:pointer; font-weight:700; }
   .c-col { background:#6ee7b7; cursor:pointer; font-weight:800; }
@@ -212,6 +214,7 @@
     <div class="font-black" id="modTit">Cambiar</div>
     <div class="text-xs text-slate-500" id="modSub"></div>
     <select id="modTipo" onchange="onModTipo()">
+      <option value="" disabled>Selecciona una actividad</option>
       <option value="grupo">Grupo / salón</option>
       <option value="abierto">Hora AIP libre</option>
       <option value="bloqueado">Bloquear este día</option>
@@ -221,6 +224,7 @@
       <option value="gestion">Semana gestión</option>
       <option value="vacaciones">Vacaciones</option>
       <option value="vacio">Vacío</option>
+      <option value="feriado">Feriado</option>
     </select>
     <div id="wrapGrupo"><select id="modGrupo"></select></div>
     <div class="flex gap-2 pt-2">
@@ -347,8 +351,8 @@ function colOk(nivel,hora,wd){ return diasDe((colegiado&&colegiado[nivel])||{},h
 function slotActivo(fecha,nivel,hora,wd){
   if(hora==='R') return false;
   const c=celda(fecha,nivel,hora);
-  if(c && c.tipo==='bloqueado') return false;
-  if(c && (c.tipo==='colegio'||c.tipo==='colegiado'||c.tipo==='gestion'||c.tipo==='vacaciones')) return false;
+  if(c && (c.tipo==='bloqueado'||c.tipo==='gestion'||c.tipo==='vacaciones'||c.tipo==='feriado'||c.tipo==='vacio')) return false;
+  if(c && (c.tipo==='colegio'||c.tipo==='colegiado')) return false;
   if(colOk(nivel,hora,wd) && !(c && c.tipo==='abierto')) return false;
   if(c && c.tipo==='abierto') return true;
   if(c && c.tipo && c.tipo!=='bloqueado') return true;
@@ -498,6 +502,7 @@ function candidatosAIP(wd,hora,fecha){
   return list.filter(c=>mismoGrupo(wd,hora,par,c.seccion));
 }
 function esFeriado(f){ return !!(feriados&&feriados[f]); }
+function esNoLectivoEditable(f){ return !!(feriados&&(feriados[f]==='Semana gestión'||feriados[f]==='Vacaciones')); }
 function normFecha(v){
   if(!v) return ''; v=String(v).trim();
   let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
@@ -520,8 +525,8 @@ function loadCfg(){
     pintarFormHorario();
   }catch(e){ plantilla=plantillaDefault(); colegiado=colegiadoDefault(); feriados={}; pintarFormHorario(); }
 }
-function guardarCfg(){
-  leerFormHorario();
+function guardarCfg(leerHorario=true){
+  if(leerHorario) leerFormHorario();
   localStorage.setItem(CFG_KEY, JSON.stringify({
     bloque:bloqueCfg(),
     modo:(document.getElementById('selModo')||{}).value||'asignar',
@@ -614,7 +619,7 @@ function imprimirPDF(){
   if(el){ const [Y,M]=ym.split('-'); const meses=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; el.textContent=(meses[+M]||'')+' '+Y; }
   setTimeout(()=>window.print(),200);
 }
-function celda(fecha,nivel,hora){ if(!plan[fecha]) plan[fecha]={}; if(!plan[fecha][nivel]) plan[fecha][nivel]={}; return plan[fecha][nivel][hora]; }
+function celda(fecha,nivel,hora){ return plan[fecha]?.[nivel]?.[hora]; }
 function setCelda(fecha,nivel,hora,obj){ if(!plan[fecha]) plan[fecha]={}; if(!plan[fecha][nivel]) plan[fecha][nivel]={}; if(!obj) delete plan[fecha][nivel][hora]; else plan[fecha][nivel][hora]=obj; }
 function toggleLista(obj,nivel,hora,wd){
   if(!obj[nivel]) obj[nivel]={}; const key=String(hora);
@@ -655,31 +660,29 @@ function renderPlantilla(){
   document.getElementById('boxPlantSec').innerHTML=tabla('sec',HSEC());
 }
 function limpiarMes(){
-  const ym=document.getElementById('inpMes').value;
-  if(!confirm('¿Limpiar el plan de '+ym+'?\nSe quitan salones, Soporte y Mantenimiento.\nFeriados, gestión, vacaciones y Colegiado AIP se quedan.')) return;
-  const days=diasMes(ym);
-  days.forEach(d=>{
-    const f=ymd(d);
-    ['pri','sec'].forEach(n=>{
-      const o=plan[f]&&plan[f][n]; if(!o) return;
-      Object.keys(o).forEach(h=>{
-        const t=o[h]&&o[h].tipo;
-        if(t==='colegio'||t==='colegiado'||t==='gestion'||t==='vacaciones') return;
-        delete o[h];
-      });
-    });
-  });
-  guardar(true); render();
+  const mes=document.getElementById('inpMes').value;
+  if(!/^[0-9]{4,}-(0[1-9]|1[0-2])$/.test(mes)) return;
+  if(!confirm('¿Limpiar el calendario de '+mes+'?\nSe eliminarán todas las asignaciones y marcas del mes y se restaurará la plantilla semanal vigente.')) return;
+  const prefijo=mes+'-';
+  for(const fecha of Object.keys(plan)) if(fecha.startsWith(prefijo)) delete plan[fecha];
+  for(const fecha of Object.keys(feriados)) if(fecha.startsWith(prefijo)) delete feriados[fecha];
+  guardarCfg(false);
+  localStorage.setItem(KEY,JSON.stringify(plan));
+  renderFeriados();
+  render();
 }
 function armarMes(silencio){
   const ym=document.getElementById('inpMes').value; const days=diasMes(ym);
   days.forEach(d=>{
     const f=ymd(d);
+    // Conservar cada ajuste manual de la semana de gestión o vacaciones.
+    if(esNoLectivoEditable(f)) return;
     ['pri','sec'].forEach(n=>{
       const o=plan[f]&&plan[f][n]; if(!o) return;
       Object.keys(o).forEach(h=>{
         const t=o[h]&&o[h].tipo;
-        if(t==='bloqueado'||t==='abierto'||t==='colegio'||t==='colegiado'||t==='gestion'||t==='vacaciones') return;
+        if(o[h]&&o[h].manual) return;
+        if(t==='bloqueado'||t==='abierto'||t==='colegio'||t==='colegiado'||t==='gestion'||t==='vacaciones'||t==='feriado') return;
         delete o[h];
       });
     });
@@ -691,7 +694,7 @@ function armarMes(silencio){
   const rotPri=['3°','4°','5°','6°']; let ip=0;
   days.forEach(d=>{
     const f=ymd(d); if(esFeriado(f)) return; const wd=d.getDay()-1;
-    const act=horasPed('pri').filter(h=>slotActivo(f,'pri',h,wd)&&!colOk('pri',h,wd)).sort((a,b)=>a-b);
+    const act=horasPed('pri').filter(h=>slotActivo(f,'pri',h,wd)&&!colOk('pri',h,wd)&&!(celda(f,'pri',h)||{}).manual).sort((a,b)=>a-b);
     if(!act.length) return;
     const g=rotPri[ip++%rotPri.length]; const modo=bloqueCfg(); let usar=act.slice();
     if(modo==='1') usar=act.slice(0,1);
@@ -713,7 +716,7 @@ function paresLibresSec(d){
   const act=horasPed('sec').filter(h=>{
     if(!slotActivo(f,'sec',h,wd)||colOk('sec',h,wd)) return false;
     const c=celda(f,'sec',h);
-    if(c && c.tipo && c.tipo!=='abierto') return false;
+    if(c && (c.manual || (c.tipo && c.tipo!=='abierto'))) return false;
     return true;
   }).sort((a,b)=>a-b);
   const pares=[]; const taken={};
@@ -808,23 +811,45 @@ function armarSecundariaMes(days, silencio){
   if(faltan.length||areasFaltan.length) msg+=' Quedan prioridad en '+nxt+'.';
   alert(msg);
 }
-function clsDe(tipo){ return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', colegiado:'c-col', man:'c-man', gestion:'c-ges', vacaciones:'c-vac', vacio:'c-aip', abierto:'c-aip', bloqueado:'c-gray' })[tipo]||'c-gray'; }
+function clsDe(tipo){ return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', colegiado:'c-col', man:'c-man', gestion:'c-ges', vacaciones:'c-vac', feriado:'c-fer', vacio:'c-gray', abierto:'c-aip', bloqueado:'c-gray' })[tipo]||'c-gray'; }
 function render(){
   const ym=document.getElementById('inpMes').value; const [Y,M]=ym.split('-');
   const meses=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   const days=diasMes(ym);
   document.getElementById('titPri').textContent='Primaria · '+meses[+M]+' '+Y+' · 3° 4° 5° 6°';
   document.getElementById('titSec').textContent='Secundaria · '+meses[+M]+' '+Y;
-  function head(){
+  function head(nivel){
     let h='<th>N°</th><th>Hora</th>';
-    days.forEach(d=>{ const f=ymd(d); h+='<th style="cursor:pointer" onclick="toggleFeriadoDia(\''+f+'\')">'+String(d.getDate()).padStart(2,'0')+'<br>'+DOW[d.getDay()-1]+(esFeriado(f)?'<br>FER':'')+'</th>'; });
+    days.forEach(d=>{
+      const f=ymd(d);
+      const feriadoNivel=horasPed(nivel).every(hora=>(celda(f,nivel,hora)||{}).tipo==='feriado');
+      h+='<th><button type="button" class="aip-day-head" title="Editar todas las horas de esta fecha en '+(nivel==='pri'?'Primaria':'Secundaria')+'" onclick="abrirColumna(\''+f+'\',\''+nivel+'\')">'+String(d.getDate()).padStart(2,'0')+'<br>'+DOW[d.getDay()-1]+(esFeriado(f)||feriadoNivel?'<br>FER':'')+'</button></th>';
+    });
     return h;
   }
   function cell(d,nivel,hora){
     const f=ymd(d); const wd=d.getDay()-1;
-    if(esFeriado(f)) return '<td class="c-fer" onclick="toggleFeriadoDia(\''+f+'\')">'+(feriados[f]||'Feriado')+'</td>';
+    const recreoOculto=plan[f]?.recreoOculto?.[nivel];
+    if(hora==='R' && typeof recreoOculto==='boolean'){
+      return '<td class="'+(recreoOculto?'':'c-rec')+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\'R\')">'+(recreoOculto?'':'RECREO')+'</td>';
+    }
+    if(esFeriado(f)){
+      const ajuste=celda(f,nivel,hora);
+      if(!esNoLectivoEditable(f) && !(ajuste&&ajuste.manual)) return '<td class="c-fer" onclick="toggleFeriadoDia(\''+f+'\')">'+(feriados[f]||'Feriado')+'</td>';
+      // La marca del día no debe impedir que cada hora tenga su propio estado.
+      const c=celda(f,nivel,hora);
+      const tipo=c&&c.tipo;
+      const cl=c?(tipo==='bloqueado'||tipo==='vacio'?'c-gray':clsDe(tipo)):(feriados[f]==='Vacaciones'?'c-vac':'c-ges');
+      const texto=c?(c.texto||''):(feriados[f]||'');
+      const accion=hora==='R'?'':' onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')"';
+      return '<td class="'+cl+'"'+accion+'>'+texto+'</td>';
+    }
     if(hora==='R') return '<td class="c-rec">RECREO</td>';
     const c=celda(f,nivel,hora);
+    if(c && (c.manual || c.tipo==='gestion' || c.tipo==='vacaciones' || c.tipo==='feriado' || c.tipo==='vacio')){
+      const texto=c.tipo==='vacio'?'':(c.texto|| (c.tipo==='feriado'?'Feriado':'—'));
+      return '<td class="'+clsDe(c.tipo)+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+texto+'</td>';
+    }
     if((c&&(c.tipo==='colegio'||c.tipo==='colegiado')) || (colOk(nivel,hora,wd)&&!(c&&c.tipo==='grupo'))){
       return '<td class="c-col" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+(c&&c.texto?c.texto:'Colegiado AIP')+'</td>';
     }
@@ -833,16 +858,19 @@ function render(){
     const cl=on?(c?clsDe(c.tipo):'c-aip'):'c-gray';
     return '<td class="'+cl+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+t+'</td>';
   }
-  let p='<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
+  let p='<table class="cal"><thead><tr>'+head('pri')+'</tr></thead><tbody>';
   HPRI().forEach(([h,lab])=>{ p+='<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'pri',h)).join('')+'</tr>'; });
   document.getElementById('boxPri').innerHTML=p+'</tbody></table>';
-  let s='<table class="cal"><thead><tr>'+head()+'</tr></thead><tbody>';
+  let s='<table class="cal"><thead><tr>'+head('sec')+'</tr></thead><tbody>';
   HSEC().forEach(([h,lab])=>{ s+='<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'sec',h)).join('')+'</tr>'; });
   document.getElementById('boxSec').innerHTML=s+'</tbody></table>';
 }
 function clicCelda(fecha,nivel,hora){
-  if(hora==='R') return;
-  if(esFeriado(fecha)&&!modoDefinir()){ if(confirm('¿Quitar feriado?')) toggleFeriadoDia(fecha); return; }
+  if(hora==='R'){
+    if(plan[fecha]?.recreoOculto?.[nivel]===true){ plan[fecha].recreoOculto[nivel]=false; render(); }
+    return;
+  }
+  if(esFeriado(fecha)&&!esNoLectivoEditable(fecha)&&!(celda(fecha,nivel,hora)||{}).manual&&!modoDefinir()){ if(confirm('¿Quitar feriado?')) toggleFeriadoDia(fecha); return; }
   if(modoDefinir()){
     const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
     if(slotActivo(fecha,nivel,hora,wd)||colOk(nivel,hora,wd)) setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
@@ -850,6 +878,49 @@ function clicCelda(fecha,nivel,hora){
     render(); return;
   }
   abrirModal(fecha,nivel,hora);
+}
+function abrirColumna(fecha,nivel){
+  editKey={fecha,nivel,columna:true};
+  const wd=new Date(fecha+'T12:00:00').getDay()-1;
+  document.getElementById('modTit').textContent=(nivel==='pri'?'Primaria':'Secundaria')+' · '+fecha+' · Todas las horas';
+  document.getElementById('modSub').textContent='Se aplicará a todas las horas de esta columna, excepto el recreo. No modifica el otro nivel.';
+  const sel=document.getElementById('modGrupo');
+  sel.innerHTML='';
+  if(nivel==='pri'){
+    ['3°','4°','5°','6°'].forEach(g=>{ const o=document.createElement('option'); o.value=g; o.textContent=g; sel.appendChild(o); });
+  } else {
+    const disponibles=new Map();
+    horasPed('sec').forEach(h=>candidatos(wd,h).forEach(c=>{ if(!disponibles.has(c.seccion)) disponibles.set(c.seccion,c.texto); }));
+    disponibles.forEach((texto,seccion)=>{ const o=document.createElement('option'); o.value=seccion; o.textContent=texto; sel.appendChild(o); });
+  }
+  document.getElementById('modTipo').value='';
+  onModTipo();
+  document.getElementById('modal').classList.remove('hidden');
+}
+function aplicarColumna(){
+  const {fecha,nivel}=editKey;
+  const tipo=document.getElementById('modTipo').value;
+  if(!tipo){ alert('Selecciona una opción para la fecha.'); return; }
+  const grupo=document.getElementById('modGrupo').value;
+  if(tipo==='grupo'&&!grupo){ alert('No hay un grupo disponible para esta fecha.'); return; }
+  const wd=new Date(fecha+'T12:00:00').getDay()-1;
+  const etiquetas={soporte:'Soporte',colegio:'Colegiado AIP',man:'Mantenimiento',gestion:'Semana gestión',vacaciones:'Vacaciones',feriado:'Feriado'};
+  const cambios=horasPed(nivel).map(hora=>{
+    if(tipo==='grupo'){
+      if(nivel==='pri') return [hora,{tipo:'grupo',texto:grupo,manual:true}];
+      const fila=(getHS()[wd]&&getHS()[wd][hora]&&getHS()[wd][hora][grupo]);
+      return [hora,fila?{tipo:'grupo',seccion:grupo,area:fila.area,doc:fila.doc,texto:grupo+' '+fila.area+' '+fila.doc,manual:true}:{tipo:'grupo',texto:grupo,manual:true}];
+    }
+    const texto=tipo==='abierto'?'—':(etiquetas[tipo]||'');
+    return [hora,{tipo,texto,manual:true}];
+  });
+  // Un solo nivel y una sola fecha; la lista excluye el recreo.
+  cambios.forEach(([hora,valor])=>setCelda(fecha,nivel,hora,valor));
+  // Estado visual por fecha/nivel; no asigna una actividad a R ni altera el horario.
+  if(!plan[fecha]) plan[fecha]={};
+  if(!plan[fecha].recreoOculto) plan[fecha].recreoOculto={};
+  plan[fecha].recreoOculto[nivel]=true;
+  cerrarModal(); render();
 }
 function abrirModal(fecha,nivel,hora){
   editKey={ fecha,nivel,hora };
@@ -860,16 +931,19 @@ function abrirModal(fecha,nivel,hora){
   sel.innerHTML='';
   if(nivel==='pri'){ ['3°','4°','5°','6°'].forEach(g=>{ const o=document.createElement('option'); o.value=g; o.textContent=g; sel.appendChild(o); }); }
   else { candidatos(wd,+hora).forEach(c=>{ const o=document.createElement('option'); o.value=c.seccion; o.textContent=c.texto; sel.appendChild(o); }); }
-  document.getElementById('modTipo').value='grupo'; onModTipo();
+  const actual=celda(fecha,nivel,hora);
+  document.getElementById('modTipo').value=(actual&&actual.tipo)||'grupo'; onModTipo();
   document.getElementById('modal').classList.remove('hidden');
 }
 function onModTipo(){ document.getElementById('wrapGrupo').classList.toggle('hidden', document.getElementById('modTipo').value!=='grupo'); }
 function cerrarModal(){ document.getElementById('modal').classList.add('hidden'); editKey=null; }
 function aplicarModal(){
   if(!editKey) return;
+  if(editKey.columna){ aplicarColumna(); return; }
   const {fecha,nivel,hora}=editKey; const tipo=document.getElementById('modTipo').value;
   const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
-  if(tipo==='vacio') setCelda(fecha,nivel,hora,null);
+  const eraManual=!!(celda(fecha,nivel,hora)||{}).manual;
+  if(tipo==='vacio') setCelda(fecha,nivel,hora,(eraManual||esNoLectivoEditable(fecha))?{ tipo:'vacio', texto:'' }:null);
   else if(tipo==='bloqueado') setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
   else if(tipo==='abierto') setCelda(fecha,nivel,hora,{ tipo:'abierto', texto:'—' });
   else if(tipo==='grupo'){
@@ -880,9 +954,17 @@ function aplicarModal(){
       setCelda(fecha,nivel,hora, row?{ tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc }:{ tipo:'grupo', texto:sec });
     }
   } else {
-    const map={ soporte:'Soporte', colegio:'Colegiado AIP', man:'Mantenimiento', gestion:'Semana gestión', vacaciones:'Vacaciones' };
-    if(tipo==='gestion'||tipo==='vacaciones') marcarNoClases(fecha, tipo);
-    else setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
+    const map={ soporte:'Soporte', colegio:'Colegiado AIP', man:'Mantenimiento', gestion:'Semana gestión', vacaciones:'Vacaciones', feriado:'Feriado' };
+    if(tipo==='gestion'||tipo==='vacaciones'){
+      // La primera designación sigue marcando el periodo; una edición posterior cambia solo esta hora.
+      if(esNoLectivoEditable(fecha)||eraManual) setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo] });
+      else marcarNoClases(fecha, tipo);
+    } else setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
+  }
+  if(eraManual){
+    const actual=celda(fecha,nivel,hora);
+    if(actual) actual.manual=true;
+    else setCelda(fecha,nivel,hora,{tipo:'vacio',texto:'',manual:true});
   }
   cerrarModal(); render();
 }
