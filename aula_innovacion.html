@@ -214,6 +214,7 @@
     <div class="font-black" id="modTit">Cambiar</div>
     <div class="text-xs text-slate-500" id="modSub"></div>
     <select id="modTipo" onchange="onModTipo()">
+      <option value="" disabled>Selecciona una actividad</option>
       <option value="grupo">Grupo / salón</option>
       <option value="abierto">Hora AIP libre</option>
       <option value="bloqueado">Bloquear este día</option>
@@ -947,10 +948,10 @@ function aplicarModal(){
       setCelda(fecha,nivel,hora, row?{ tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc }:{ tipo:'grupo', texto:sec });
     }
   } else {
-    const map={ soporte:'Soporte', colegio:'Colegiado AIP', man:'Mantenimiento', gestion:'Semana gestión', vacaciones:'Vacaciones' };
+    const map={ soporte:'Soporte', colegio:'Colegiado AIP', man:'Mantenimiento', gestion:'Semana gestión', vacaciones:'Vacaciones', feriado:'Feriado' };
     if(tipo==='gestion'||tipo==='vacaciones'){
       // La primera designación sigue marcando el periodo; una edición posterior cambia solo esta hora.
-      if(esNoLectivoEditable(fecha)) setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo] });
+      if(esNoLectivoEditable(fecha)||eraManual) setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo] });
       else marcarNoClases(fecha, tipo);
     } else setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
   }
