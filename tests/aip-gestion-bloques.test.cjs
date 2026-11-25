@@ -183,12 +183,12 @@ function recreoFixture(storage=new Map()){
  const elements={inpMes:{value:'2026-12'},selBloque:{value:'2'},modTipo:{value:'soporte'},modGrupo:{value:'3A'},titPri:{},titSec:{},boxPri:{},boxSec:{}};
  const horario={pri:{inicio:'08:00',minBloque:45,nHoras:6,recreoDespues:3,recreoMin:15},sec:{inicio:'13:00',minBloque:45,nHoras:7,recreoDespues:4,recreoMin:30}};
  let cloud=null;const requests=[];
- const v=make(['toMin','fromMin','buildHoras','HPRI','HSEC','horasPed','esFeriado','esNoLectivoEditable','celda','setCelda','clsDe','render','clicCelda','aplicarColumna','aplicarModal','load','guardar','paqueteAip','aplicarPaqueteAip','tokenSesionAip','subirAipNube','bajarAipNube'],{
+ const v=make(['toMin','fromMin','buildHoras','HPRI','HSEC','horasPed','esFeriado','esNoLectivoEditable','celda','setCelda','clsDe','render','clicCelda','aplicarColumna','aplicarModal','load','guardar','paqueteAip','aplicarPaqueteAip','limpiarMes','tokenSesionAip','subirAipNube','bajarAipNube'],{
   horario,plantilla:{pri:{},sec:{}},colegiado:{pri:{},sec:{}},cursosPorMes:{},KEY:'synthetic-aip-plan',CLOUD_API_URL:'https://synthetic.invalid',
   localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,s)=>storage.set(k,s)},sessionStorage:{getItem:()=>JSON.stringify({token:'synthetic-only'})},
   document:{getElementById:id=>elements[id]},diasMes:dates,ymd:d=>d.toISOString().slice(0,10),DOW:['LUN','MAR','MIE','JUE','VIE'],
   colOk:()=>false,slotActivo:()=>false,modoDefinir:()=>false,getHS:()=>({}),bloqueCfg:()=> '2',
-  guardarCfg(){},loadCfg(){},saveHS(){},leerFormHorario(){},pintarFormHorario(){},renderPlantilla(){},renderFeriados(){},renderCursosMes(){},renderEditorHS(){},cerrarModal(){},alert(){},
+  guardarCfg(){},loadCfg(){},saveHS(){},leerFormHorario(){},pintarFormHorario(){},renderPlantilla(){},renderFeriados(){},renderCursosMes(){},renderEditorHS(){},cerrarModal(){},alert(){},confirm:()=>true,
   abrirModal(){throw Error('R must not open an academic editor');},marcarNoClases(){throw Error('Individual edits must not change the entire period');},
   fetch:async(url,options)=>{const body=JSON.parse(options.body);requests.push(body.action);assert.equal(body.action,'saveaip');cloud=JSON.parse(JSON.stringify(body.payload));return {json:async()=>({ok:true})};},
   fetchLecturaNube:async()=>{requests.push('loadaip');return {json:async()=>({ok:true,payload:JSON.parse(JSON.stringify(cloud))})};}
@@ -212,7 +212,7 @@ test('individual academic edits preserve hidden/visible rest and isolate dates a
  const before=JSON.stringify(f.v.plan[monday].recreoOculto);f.v.editKey={fecha:monday,nivel:'pri',hora:1};f.elements.modTipo.value='man';f.v.aplicarModal();
  assert.equal(JSON.stringify(f.v.plan[monday].recreoOculto),before);assert.doesNotMatch(f.rest(monday,'pri'),/RECREO/);assert.doesNotMatch(f.rest(tuesday,'sec'),/RECREO/);
  f.v.clicCelda(monday,'pri','R');assert.match(f.rest(monday,'pri'),/>RECREO$/);assert.doesNotMatch(f.rest(tuesday,'sec'),/RECREO/);
- assert.equal(f.v.plan[monday].sec.R,undefined);assert.equal(f.v.feriados[monday],'Semana gestión');
+ assert.equal(f.v.plan[monday].sec?.R,undefined);assert.equal(f.v.feriados[monday],'Semana gestión');
 });
 test('rest presentation survives local save/reload and the actual upload/download payload in both states',async()=>{
  const f=recreoFixture();f.assign(monday,'pri');f.assign(tuesday,'sec');f.v.guardar(true);
@@ -222,4 +222,25 @@ test('rest presentation survives local save/reload and the actual upload/downloa
  next.assign(monday,'pri');await next.v.subirAipNube();next.v.plan={};await next.v.bajarAipNube();assert.doesNotMatch(next.rest(monday,'pri'),/RECREO/);
  const restored=recreoFixture(f.storage);restored.v.load();restored.v.render();assert.doesNotMatch(restored.rest(monday,'pri'),/RECREO/);
  assert.deepEqual(next.requests,['saveaip','loadaip','saveaip','loadaip']);
+});
+
+test('Limpiar cancels without changes, then deletes only the selected month and is idempotent',()=>{
+ const f=recreoFixture();
+ const next='2027-01-04',weekend='2026-12-19';
+ f.v.plan={...example(),[weekend]:{recreoOculto:{pri:true}},[next]:{sec:{1:{tipo:'soporte'}},recreoOculto:{sec:true}}};
+ f.v.feriados={[monday]:'Semana gestión',[weekend]:'Feriado',[next]:'Vacaciones'};
+ const before=JSON.stringify([f.v.plan,f.v.feriados]),other=JSON.stringify(f.v.plan[next]);
+ f.v.confirm=()=>false;f.v.limpiarMes();
+ assert.equal(JSON.stringify([f.v.plan,f.v.feriados]),before);
+ assert.equal(f.storage.size,0);
+ f.v.confirm=message=>{assert.match(message,/todas las asignaciones.*plantilla semanal vigente/);return true;};
+ for(let i=0;i<2;i++){
+  f.v.limpiarMes();
+  assert.deepEqual(Object.keys(f.v.plan),[next]);
+  assert.equal(JSON.stringify(f.v.plan[next]),other);
+  assert.deepEqual(Object.keys(f.v.feriados),[next]);
+  assert.equal(f.v.feriados[next],'Vacaciones');
+  assert.equal(f.storage.get('synthetic-aip-plan'),JSON.stringify(f.v.plan));
+ }
+ assert.deepEqual(f.requests,[]);
 });

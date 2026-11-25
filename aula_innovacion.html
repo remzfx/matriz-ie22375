@@ -525,8 +525,8 @@ function loadCfg(){
     pintarFormHorario();
   }catch(e){ plantilla=plantillaDefault(); colegiado=colegiadoDefault(); feriados={}; pintarFormHorario(); }
 }
-function guardarCfg(){
-  leerFormHorario();
+function guardarCfg(leerHorario=true){
+  if(leerHorario) leerFormHorario();
   localStorage.setItem(CFG_KEY, JSON.stringify({
     bloque:bloqueCfg(),
     modo:(document.getElementById('selModo')||{}).value||'asignar',
@@ -619,7 +619,7 @@ function imprimirPDF(){
   if(el){ const [Y,M]=ym.split('-'); const meses=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; el.textContent=(meses[+M]||'')+' '+Y; }
   setTimeout(()=>window.print(),200);
 }
-function celda(fecha,nivel,hora){ if(!plan[fecha]) plan[fecha]={}; if(!plan[fecha][nivel]) plan[fecha][nivel]={}; return plan[fecha][nivel][hora]; }
+function celda(fecha,nivel,hora){ return plan[fecha]?.[nivel]?.[hora]; }
 function setCelda(fecha,nivel,hora,obj){ if(!plan[fecha]) plan[fecha]={}; if(!plan[fecha][nivel]) plan[fecha][nivel]={}; if(!obj) delete plan[fecha][nivel][hora]; else plan[fecha][nivel][hora]=obj; }
 function toggleLista(obj,nivel,hora,wd){
   if(!obj[nivel]) obj[nivel]={}; const key=String(hora);
@@ -660,21 +660,16 @@ function renderPlantilla(){
   document.getElementById('boxPlantSec').innerHTML=tabla('sec',HSEC());
 }
 function limpiarMes(){
-  const ym=document.getElementById('inpMes').value;
-  if(!confirm('¿Limpiar el plan de '+ym+'?\nSe quitan salones, Soporte y Mantenimiento.\nFeriados, gestión, vacaciones y Colegiado AIP se quedan.')) return;
-  const days=diasMes(ym);
-  days.forEach(d=>{
-    const f=ymd(d);
-    ['pri','sec'].forEach(n=>{
-      const o=plan[f]&&plan[f][n]; if(!o) return;
-      Object.keys(o).forEach(h=>{
-        const t=o[h]&&o[h].tipo;
-        if(t==='colegio'||t==='colegiado'||t==='gestion'||t==='vacaciones') return;
-        delete o[h];
-      });
-    });
-  });
-  guardar(true); render();
+  const mes=document.getElementById('inpMes').value;
+  if(!/^[0-9]{4,}-(0[1-9]|1[0-2])$/.test(mes)) return;
+  if(!confirm('¿Limpiar el calendario de '+mes+'?\nSe eliminarán todas las asignaciones y marcas del mes y se restaurará la plantilla semanal vigente.')) return;
+  const prefijo=mes+'-';
+  for(const fecha of Object.keys(plan)) if(fecha.startsWith(prefijo)) delete plan[fecha];
+  for(const fecha of Object.keys(feriados)) if(fecha.startsWith(prefijo)) delete feriados[fecha];
+  guardarCfg(false);
+  localStorage.setItem(KEY,JSON.stringify(plan));
+  renderFeriados();
+  render();
 }
 function armarMes(silencio){
   const ym=document.getElementById('inpMes').value; const days=diasMes(ym);
