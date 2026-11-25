@@ -31,7 +31,8 @@
     for(const level of rule.levels){
       const rows=rule.hours?.[level];
       if(!rows||Array.isArray(rows)||typeof rows!=='object') return 'Selecciona horas para cada nivel.';
-      const allowed=rule.mode==='personalizado'?['0','1','2','3','4','extra']:['all'];
+      const byDay=['0','1','2','3','4'];
+      const allowed=rule.mode==='personalizado'?[...byDay,'extra']:rule.mode==='semanal'||Object.hasOwn(rows,'all')?['all']:byDay;
       if(Object.entries(rows).some(([key,hours])=>!allowed.includes(key)||!Array.isArray(hours)||
           hours.some(h=>!Number.isInteger(h)||h<1||h>50||(slots&&!slots[level].some(([number])=>number===h))))) return 'Selecciona únicamente horas pedagógicas disponibles.';
       const times=rule.times?.[level];
@@ -51,12 +52,12 @@
     const day=calendarDay(fecha);
     if(!day||day.weekday>4) return [];
     const hours=rule.hours[nivel];
-    if(rule.mode==='diario') return hours.all||[];
+    if(rule.mode==='diario') return hours[day.weekday]||hours.all||[];
     if(rule.mode==='semanal') return day.weekday===rule.day?hours.all||[]:[];
     if(rule.mode==='rotativo'){
       const start=calendarDay(rule.start);
       const week=Math.floor((day.number-start.number+start.weekday)/7);
-      return day.weekday===(rule.day+week)%5?hours.all||[]:[];
+      return day.weekday===(rule.day+week)%5?hours[day.weekday]||hours.all||[]:[];
     }
     return [...new Set([...(hours[day.weekday]||[]),...(rule.include.includes(fecha)?hours.extra||[]:[])])];
   }
