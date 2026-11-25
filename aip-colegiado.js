@@ -34,6 +34,9 @@
       const allowed=rule.mode==='personalizado'?['0','1','2','3','4','extra']:['all'];
       if(Object.entries(rows).some(([key,hours])=>!allowed.includes(key)||!Array.isArray(hours)||
           hours.some(h=>!Number.isInteger(h)||h<1||h>50||(slots&&!slots[level].some(([number])=>number===h))))) return 'Selecciona únicamente horas pedagógicas disponibles.';
+      const times=rule.times?.[level];
+      if(times!==undefined&&(!times||typeof times!=='object'||Array.isArray(times)||Object.entries(times).some(([hour,range])=>
+         !/^[1-9][0-9]?$/.test(hour)||typeof range!=='string'||!/^\d{2}:\d{2}-\d{2}:\d{2}$/.test(range)))) return 'Los tramos horarios no tienen un formato válido.';
       if(!Object.entries(rows).some(([key,hours])=>hours.length&&(key!=='extra'||rule.include.length))) return 'Selecciona horas para cada nivel.';
       if(rule.mode==='personalizado'&&rule.include.length&&!rows.extra?.length) return 'Selecciona horas para las fechas adicionales en cada nivel.';
     }

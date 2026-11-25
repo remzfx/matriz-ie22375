@@ -27,7 +27,7 @@ test('personalizado une horas específicas sin duplicar y da prioridad a exclusi
  assert.deepEqual(model.hoursOn(custom,'2026-12-21','sec'),[]);
 });
 test('valida estructura, fechas, niveles, recreo, duplicados de ID y disponibilidad horaria',()=>{
- const invalid=[{start:'2026-02-30'},{end:'2025-01-01'},{day:5},{mode:'otro'},{levels:['ambos']},{hours:{pri:{all:['R']}}},{include:['2026-12-26']}];
+ const invalid=[{start:'2026-02-30'},{end:'2025-01-01'},{day:5},{mode:'otro'},{levels:['ambos']},{hours:{pri:{all:['R']}}},{include:['2026-12-26']},{times:{pri:{1:'incorrecto'}}}];
  for(const change of invalid)assert.equal(model.read([{...base,...change}]),null);
  assert.equal(model.read([base,{...base}]),null);
  assert.equal(model.read([]).length,0);

@@ -13,9 +13,9 @@ function extract(name){
   return html.slice(from,next);
 }
 function make(names,extras={}){
-  const control={plan:{},feriados:{},programacionesColegiado:[],esColegiadoReservado:()=>false,leerProgramacionesColegiado(){},renderGestorColegiado(){},...extras};
+  const control={plan:{},feriados:{},programacionesColegiado:[],esColegiadoReservado:()=>false,hayColegiadoPendiente:()=>false,revisarColegiadoAntesDeGenerar:()=>true,leerProgramacionesColegiado(){},renderGestorColegiado(){},...extras};
   vm.createContext(control);
-  vm.runInContext(names.map(extract).join('\n'),control);
+  vm.runInContext(['esColegiadoMaterializado','depurarColegiadoMensual',...names].map(extract).join('\n'),control);
   return control;
 }
 const monday='2026-12-14',tuesday='2026-12-15';
@@ -242,5 +242,24 @@ test('Limpiar cancels without changes, then deletes only the selected month and 
   assert.equal(f.v.feriados[next],'Vacaciones');
   assert.equal(f.storage.get('synthetic-aip-plan'),JSON.stringify(f.v.plan));
  }
+ assert.deepEqual(f.requests,[]);
+});
+
+test('load and cloud discard obsolete monthly Colegiado cells but keep weekly settings and monthly overrides',()=>{
+ const f=recreoFixture();
+ const old=example();
+ old[monday].pri[3]={tipo:'colegio',manual:true};
+ old[monday].sec[3]={tipo:'colegiado'};
+ old[monday].recreoOculto={sec:true};
+ f.storage.set('synthetic-aip-plan',JSON.stringify(old));
+ f.v.load();
+ assert.equal(f.v.plan[monday].pri[3],undefined);
+ assert.equal(f.v.plan[monday].sec[3],undefined);
+ assert.equal(f.v.plan[monday].pri[2].tipo,'soporte');
+ assert.equal(f.v.plan[monday].recreoOculto.sec,true);
+ f.v.aplicarPaqueteAip({plan:old,colegiado:{pri:{1:[0]},sec:{}}});
+ assert.equal(f.v.plan[monday].pri[3],undefined);
+ assert.equal(f.v.plan[monday].sec[3],undefined);
+ assert.deepEqual(f.v.colegiado.pri[1],[0]);
  assert.deepEqual(f.requests,[]);
 });

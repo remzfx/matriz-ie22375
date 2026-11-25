@@ -96,11 +96,78 @@ async function run(){
   assert.equal(await page.evaluate(()=>JSON.stringify(programacionesColegiado)),original);
   await page.evaluate(()=>{const pkg=paqueteAip();delete pkg.programacionesColegiado;aplicarPaqueteAip(pkg);});
   assert.equal(await page.evaluate(()=>JSON.stringify(programacionesColegiado)),original);
+  const checkPreview=await page.evaluate(()=>{
+   document.getElementById('inpMes').value='2026-12';
+   // Only the individual block is no lectivo. Its neighboring block is still reserved.
+   setCelda('2026-12-21','pri',1,{tipo:'gestion',texto:'Gestión individual',manual:true});
+   setCelda('2026-12-21','sec',7,{tipo:'colegio',texto:'Copia residual',manual:true});
+   render();
+   const filas=ocurrenciasColegiado(programacionesColegiado[0]);
+   const acts=filas.find(x=>x.fecha==='2026-12-21'&&x.nivel==='pri');
+   const visible=[...document.querySelectorAll('#boxPri td.c-col')].filter(td=>td.onclick?.toString().includes('2026-12-21'));
+   return {preview:acts.horas,active:[1,2].map(h=>esColegiadoReservado('2026-12-21','pri',h)),
+     visible:visible.map(td=>td.textContent),residual:document.getElementById('boxSec').innerText.includes('Copia residual'),
+     residualUsable:slotActivo('2026-12-21','sec',7,0)};
+  });
+  assert.deepEqual(checkPreview,{preview:[2],active:[false,true],visible:['Colegiado AIP','Colegiado AIP'],residual:false,residualUsable:true});
+  await page.evaluate(()=>{setCelda('2026-12-21','pri',1,null);armarMes(true);});
+  assert.equal(await page.evaluate(()=>esColegiadoMaterializado(plan['2026-12-21'].sec[7])),false);
+  await page.evaluate(()=>{
+   document.getElementById('hsIni').value='14:00';
+   aplicarHorarioInst();
+  });
+  const halted=await page.evaluate(()=>{
+   const before=JSON.stringify(plan);
+   mesesAnioSel=['2026-12','2027-01'];
+   armarMes();armarAnio();aplicarPlantillaAlMes();armarSecundariaMes(diasMes('2026-12'));
+   return {active:esColegiadoReservado('2026-12-21','sec',5),blocked:!slotActivo('2026-12-21','sec',7,0),
+     unaffected:esColegiadoReservado('2026-12-21','pri',1),planKept:before===JSON.stringify(plan),
+     shown:document.querySelector('#boxSec button[onclick*="2026-12-21"]').textContent.includes('Revisar colegiado')};
+  });
+  assert.deepEqual(halted,{active:false,blocked:true,unaffected:true,planKept:true,shown:true});
+  assert.ok(messages.some(m=>/Generación pausada.*Colegiado AIP/.test(m)&&m.includes('Rotación ficticia')));
   await page.locator('#tabBtnColegiado').click();
+  assert.match(await page.locator('#colegiadoLista').innerText(),/Horario pendiente de revisión/);
   await page.getByRole('button',{name:'Editar',exact:true}).click();
+  await form.getByRole('button',{name:'Vista previa'}).click();
+  assert.match(await page.locator('#colegiadoVista').innerText(),/17:30-18:15/);
+  if(process.env.IE_AIP_EVIDENCE){
+   await page.evaluate(()=>window.scrollTo(0,0));
+   await page.screenshot({path:path.join(process.env.IE_AIP_EVIDENCE,'colegiado-revision-'+width+'.png'),fullPage:true});
+  }
+  cancel=true;
+  await form.getByRole('button',{name:'Guardar programación'}).click();
+  assert.match(messages.at(-1),/Se reemplazarán los tramos anteriores/);
+  assert.equal(await page.evaluate(()=>JSON.stringify(programacionesColegiado)),original);
+  assert.equal(await page.evaluate(()=>hayColegiadoPendiente('2026-12-21','sec')),true);
+  cancel=false;
   await form.locator('[name=nombre]').fill('Rotación actualizada');
   await form.getByRole('button',{name:'Guardar programación'}).click();
   assert.match(await page.locator('#colegiadoLista').innerText(),/Rotación actualizada/);
+  assert.equal(await page.evaluate(()=>programacionesColegiado[0].times.sec[5]),'17:30-18:15');
+  assert.equal(await page.evaluate(()=>hayColegiadoPendiente('2026-12-21','sec')),false);
+  assert.equal(await page.evaluate(()=>esColegiadoReservado('2026-12-21','sec',5)),true);
+  await page.evaluate(()=>{document.getElementById('hsN').value='5';aplicarHorarioInst();});
+  assert.equal(await page.evaluate(()=>hayColegiadoPendiente('2026-12-21','sec')&&!slotActivo('2026-12-21','sec',4,0)),true);
+  await page.evaluate(()=>{document.getElementById('hsN').value='7';aplicarHorarioInst();});
+  assert.equal(await page.evaluate(()=>hayColegiadoPendiente('2026-12-21','sec')),false);
+  assert.deepEqual(await page.evaluate(()=>{
+   return [['hsMin','50'],['hsRecH','3'],['hsRecM','40']].map(([id,value])=>{
+    const input=document.getElementById(id),old=input.value;
+    input.value=value;aplicarHorarioInst();
+    const pending=hayColegiadoPendiente('2026-12-21','sec');
+    input.value=old;aplicarHorarioInst();
+    return pending&&!hayColegiadoPendiente('2026-12-21','sec');
+   });
+  }),[true,false,true]); // Moving R earlier without changing the interval of hours 5–6 remains compatible.
+  await page.getByRole('button',{name:'Editar',exact:true}).click();
+  await form.locator('[name=fin]').fill('2027-01-23');
+  await form.locator('input[data-nivel=sec][value="6"]').uncheck();
+  await form.getByRole('button',{name:'Guardar programación'}).click();
+  assert.equal(await page.evaluate(()=>esColegiadoReservado('2027-01-25','pri',1)),false);
+  assert.equal(await page.evaluate(()=>esColegiadoReservado('2026-12-21','sec',6)),false);
+  assert.equal(await page.evaluate(()=>slotActivo('2026-12-21','sec',6,0)),true);
+
   await page.evaluate(()=>{
    const duplicate=structuredClone(programacionesColegiado[0]);duplicate.id='segunda';duplicate.name='Segunda reserva';
    confirmarProgramacionColegiado(duplicate,ocurrenciasColegiado(duplicate));
@@ -116,6 +183,12 @@ async function run(){
   await first.getByRole('button',{name:'Eliminar'}).click();
   assert.equal(await page.evaluate(()=>esColegiadoReservado('2026-12-21','pri',1)),false);
   assert.equal(await page.evaluate(()=>esColegiadoReservado('2026-12-21','pri',6)),true);
+  await page.evaluate(()=>{
+   editKey={fecha:'2026-12-21',nivel:'pri',hora:1};
+   document.getElementById('modTipo').value='colegio';
+   aplicarModal();
+  });
+  assert.equal(await page.evaluate(()=>esColegiadoReservado('2026-12-21','pri',1)&&!esColegiadoMaterializado(plan['2026-12-21']?.pri?.[1])),true);
   assert.deepEqual(requests,['saveaip','loadaip']);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
   console.log(JSON.stringify({width,expected,omitted:expected.slice(1,4),...results,requests}));
   await page.close();

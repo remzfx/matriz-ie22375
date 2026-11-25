@@ -389,21 +389,48 @@ function diasMes(ym){
 function diasDe(m, hora){ return m[String(hora)] || m[hora] || []; }
 function pipOk(nivel,hora,wd){ if(!plantilla) plantilla=plantillaDefault(); return diasDe(plantilla[nivel]||{},hora).indexOf(wd)>=0; }
 function colOk(nivel,hora,wd){ return diasDe((colegiado&&colegiado[nivel])||{},hora).indexOf(wd)>=0; }
-function fechaNoLectivaColegiado(fecha,nivel){
-  return esFeriado(fecha)||horasPed(nivel).every(hora=>['feriado','gestion','vacaciones'].includes(celda(fecha,nivel,hora)?.tipo));
+function esBloqueNoLectivo(fecha,nivel,hora){
+  return ['feriado','gestion','vacaciones'].includes(celda(fecha,nivel,hora)?.tipo);
+}
+function tramoColegiado(fecha,nivel,hora,disponibles=horasPorNivelColegiado()){
+  if(esFeriado(fecha)||esBloqueNoLectivo(fecha,nivel,hora)) return null;
+  return disponibles[nivel].find(([numero])=>numero===hora)?.[1];
+}
+function estadoTramoColegiado(regla,fecha,nivel,hora,disponibles){
+  const tramo=tramoColegiado(fecha,nivel,hora,disponibles);
+  if(tramo===null) return 'no-lectivo';
+  return tramo&&regla.times?.[nivel]?.[hora]===tramo?'vigente':'pendiente';
+}
+function horasColegiadasEfectivas(regla,fecha,nivel,disponibles){
+  return [...new Set(IEAipColegiado.hoursOn(regla,fecha,nivel))].filter(hora=>
+    estadoTramoColegiado(regla,fecha,nivel,hora,disponibles)==='vigente');
 }
 function esColegiadoReservado(fecha,nivel,hora,reglas=programacionesColegiado){
-  const numero=Number(hora);
-  const day=IEAipColegiado.calendarDay(fecha);
-  if(!day||day.weekday>4||!horasPed(nivel).includes(numero)||fechaNoLectivaColegiado(fecha,nivel)) return false;
-  if(['feriado','gestion','vacaciones'].includes(celda(fecha,nivel,numero)?.tipo)) return false;
-  return colOk(nivel,numero,day.weekday)||reglas.some(regla=>regla.active&&IEAipColegiado.hoursOn(regla,fecha,nivel).includes(numero));
+  const numero=Number(hora),day=IEAipColegiado.calendarDay(fecha);
+  if(!day||day.weekday>4) return false;
+  const disponibles=horasPorNivelColegiado();
+  if(!tramoColegiado(fecha,nivel,numero,disponibles)) return false;
+  return colOk(nivel,numero,day.weekday)||reglas.some(regla=>regla.active&&horasColegiadasEfectivas(regla,fecha,nivel,disponibles).includes(numero));
+}
+function reglaPendienteEnFecha(regla,fecha,nivel,disponibles=horasPorNivelColegiado()){
+  return regla.active&&IEAipColegiado.hoursOn(regla,fecha,nivel).some(hora=>
+    estadoTramoColegiado(regla,fecha,nivel,hora,disponibles)==='pendiente');
+}
+function hayColegiadoPendiente(fecha,nivel){
+  return programacionesColegiado.some(regla=>reglaPendienteEnFecha(regla,fecha,nivel));
+}
+function revisarColegiadoAntesDeGenerar(fechas,niveles=IEAipColegiado.levels){
+  const disponibles=horasPorNivelColegiado();
+  const pendientes=programacionesColegiado.filter(regla=>programacionColegiadoIncompatible(regla)&&
+    fechas.some(fecha=>niveles.some(nivel=>reglaPendienteEnFecha(regla,fecha,nivel,disponibles))));
+  if(!pendientes.length) return true;
+  alert('Generación pausada. Revisa y confirma los nuevos tramos en Colegiado AIP:\n'+pendientes.map(regla=>regla.name).join('\n'));
+  return false;
 }
 function slotActivo(fecha,nivel,hora,wd){
-  if(hora==='R'||esColegiadoReservado(fecha,nivel,hora)) return false;
+  if(hora==='R'||esColegiadoReservado(fecha,nivel,hora)||hayColegiadoPendiente(fecha,nivel)) return false;
   const c=celda(fecha,nivel,hora);
   if(c && (c.tipo==='bloqueado'||c.tipo==='gestion'||c.tipo==='vacaciones'||c.tipo==='feriado'||c.tipo==='vacio')) return false;
-  if(c && (c.tipo==='colegio'||c.tipo==='colegiado')) return false;
   if(c && c.tipo==='abierto') return true;
   if(c && c.tipo && c.tipo!=='bloqueado') return true;
   return pipOk(nivel,hora,wd);
@@ -530,6 +557,7 @@ function armarAnio(){
   if(!mesesAnioSel||!mesesAnioSel.length){ alert('Marca al menos un mes.'); return; }
   const origen=mesActual();
   const orden=mesesAnioSel.slice().sort();
+  if(!revisarColegiadoAntesDeGenerar(orden.flatMap(mes=>diasMes(mes).map(ymd)))) return;
   const pendientes=[];
   orden.forEach((ym,i)=>{
     document.getElementById('inpMes').value=ym;
@@ -547,7 +575,7 @@ function armarAnio(){
 function bloqueCfg(){ return (document.getElementById('selBloque')||{}).value||'2'; }
 function exigeDos(){ return bloqueCfg()==='2'; }
 function candidatosAIP(wd,hora,fecha){
-  if(fecha&&esColegiadoReservado(fecha,'sec',hora)) return [];
+  if(fecha&&(esColegiadoReservado(fecha,'sec',hora)||hayColegiadoPendiente(fecha,'sec'))) return [];
   let list=candidatos(wd,hora);
   if(!exigeDos()) return list;
   const par=horaPar(hora);
@@ -627,8 +655,8 @@ function agregarFeriado(){
 }
 function quitarFeriado(f){ delete feriados[f]; guardarCfg(); renderFeriados(); render(); }
 function toggleFeriadoDia(f){ if(feriados[f]) delete feriados[f]; else feriados[f]='Feriado'; guardarCfg(); renderFeriados(); render(); }
-function load(){ try{ plan=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ plan={}; } loadCfg(); }
-function guardar(silencio){ guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS(); if(!silencio) alert('Guardado en este navegador. Use Nube ↑ para otra PC.'); }
+function load(){ try{ plan=depurarColegiadoMensual(JSON.parse(localStorage.getItem(KEY))); }catch(e){ plan={}; } loadCfg(); }
+function guardar(silencio,leerHorario=true){ guardarCfg(leerHorario); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS(); if(!silencio) alert('Guardado en este navegador. Use Nube ↑ para otra PC.'); }
 function paqueteAip(){
   leerFormHorario();
   return { plan, plantilla, colegiado, programacionesColegiado, feriados, horario, horarioDoc:getHS(), cursosPorMes, mes:(document.getElementById('inpMes')||{}).value||'', bloque:bloqueCfg(), ts:Date.now() };
@@ -636,7 +664,7 @@ function paqueteAip(){
 function aplicarPaqueteAip(p){
   if(!p||typeof p!=='object') return;
   leerProgramacionesColegiado(p);
-  if(p.plan) plan=p.plan; if(p.plantilla) plantilla=p.plantilla; if(p.colegiado) colegiado=p.colegiado;
+  if(p.plan) plan=depurarColegiadoMensual(p.plan); if(p.plantilla) plantilla=p.plantilla; if(p.colegiado) colegiado=p.colegiado;
   if(p.feriados) feriados=p.feriados; if(p.horario) horario=p.horario;
   if(p.horarioDoc){ horarioDoc=p.horarioDoc; saveHS(); }
   if(p.mes&&document.getElementById('inpMes')) document.getElementById('inpMes').value=p.mes;
@@ -677,7 +705,22 @@ function imprimirPDF(){
   if(el){ const [Y,M]=ym.split('-'); const meses=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; el.textContent=(meses[+M]||'')+' '+Y; }
   setTimeout(()=>window.print(),200);
 }
-function celda(fecha,nivel,hora){ return plan[fecha]?.[nivel]?.[hora]; }
+function esColegiadoMaterializado(celda){
+  return celda?.tipo==='colegio'||celda?.tipo==='colegiado';
+}
+function depurarColegiadoMensual(datos){
+  if(!datos||typeof datos!=='object'||Array.isArray(datos)) return {};
+  for(const fecha of Object.values(datos)) for(const nivel of ['pri','sec']){
+    const horas=fecha?.[nivel];
+    if(!horas||typeof horas!=='object') continue;
+    for(const [hora,celda] of Object.entries(horas)) if(esColegiadoMaterializado(celda)) delete horas[hora];
+  }
+  return datos;
+}
+function celda(fecha,nivel,hora){
+  const dato=plan[fecha]?.[nivel]?.[hora];
+  return esColegiadoMaterializado(dato)?undefined:dato;
+}
 function setCelda(fecha,nivel,hora,obj){ if(!plan[fecha]) plan[fecha]={}; if(!plan[fecha][nivel]) plan[fecha][nivel]={}; if(!obj) delete plan[fecha][nivel][hora]; else plan[fecha][nivel][hora]=obj; }
 function toggleLista(obj,nivel,hora,wd){
   if(!obj[nivel]) obj[nivel]={}; const key=String(hora);
@@ -698,7 +741,7 @@ function togglePlantilla(nivel,hora,wd){
   guardarCfg(); renderPlantilla(); render();
 }
 function restaurarPlantilla(){ plantilla=plantillaDefault(); colegiado=colegiadoDefault(); guardarCfg(); renderPlantilla(); render(); }
-function aplicarPlantillaAlMes(){ render(); }
+function aplicarPlantillaAlMes(){ if(revisarColegiadoAntesDeGenerar(diasMes(mesActual()).map(ymd))) render(); }
 function renderPlantilla(){
   function tabla(nivel,horas){
     let h='<table class="cal"><thead><tr><th>Hora</th>'; DOW.forEach(x=>h+='<th>'+x+'</th>'); h+='</tr></thead><tbody>';
@@ -731,16 +774,17 @@ function limpiarMes(){
 }
 function armarMes(silencio){
   const ym=document.getElementById('inpMes').value; const days=diasMes(ym);
+  if(!revisarColegiadoAntesDeGenerar(days.map(ymd))) return;
   days.forEach(d=>{
     const f=ymd(d);
-    // Conservar cada ajuste manual de la semana de gestión o vacaciones.
-    if(esNoLectivoEditable(f)) return;
+    const noLectivo=esNoLectivoEditable(f);
     ['pri','sec'].forEach(n=>{
       const o=plan[f]&&plan[f][n]; if(!o) return;
       Object.keys(o).forEach(h=>{
         const t=o[h]&&o[h].tipo;
-        if(o[h]&&o[h].manual) return;
-        if(t==='bloqueado'||t==='abierto'||t==='colegio'||t==='colegiado'||t==='gestion'||t==='vacaciones'||t==='feriado') return;
+        if(esColegiadoMaterializado(o[h])){ delete o[h]; return; }
+        if(noLectivo||o[h]?.manual) return;
+        if(t==='bloqueado'||t==='abierto'||t==='gestion'||t==='vacaciones'||t==='feriado') return;
         delete o[h];
       });
     });
@@ -756,7 +800,7 @@ function armarMes(silencio){
     act.forEach(h=>{ if(usar.indexOf(h)>=0) setCelda(f,'pri',h,{ tipo:'grupo', texto:g }); else setCelda(f,'pri',h,{ tipo:'man', texto:'Mantenimiento' }); });
   });
   armarSecundariaMes(days, silencio);
-  guardar(true); if(!silencio) render();
+  guardar(true,false); if(!silencio) render();
 }
 function semanaDelMes(d, first){
   const mon=new Date(first.getFullYear(), first.getMonth(), first.getDate());
@@ -801,7 +845,7 @@ function candsPar(slot){
   return candidatos(slot.wd, slot.h1).filter(c=>mismoGrupo(slot.wd, slot.h1, slot.h2, c.seccion) && cursoPermitido(c.area));
 }
 function armarSecundariaMes(days, silencio){
-  if(!days.length) return;
+  if(!days.length||!revisarColegiadoAntesDeGenerar(days.map(ymd),['sec'])) return;
   const first=days[0];
   const slots=[];
   days.forEach(d=>paresLibresSec(d).forEach(s=>{ s.sem=semanaDelMes(d,first); slots.push(s); }));
@@ -862,7 +906,7 @@ function armarSecundariaMes(days, silencio){
     areasFaltan.forEach(a=>{ if(cur.indexOf(a)<0) cur.unshift(a); });
     cursosPorMes[nxt]=cur;
   }
-  guardarCfg();
+  guardarCfg(false);
   if(silencio) return;
   let msg='Armado listo.';
   if(faltan.length) msg+=' No entraron: '+faltan.join(', ')+'.';
@@ -870,7 +914,7 @@ function armarSecundariaMes(days, silencio){
   if(faltan.length||areasFaltan.length) msg+=' Quedan prioridad en '+nxt+'.';
   alert(msg);
 }
-function clsDe(tipo){ return ({ grupo:'c-aip', soporte:'c-sop', colegio:'c-col', colegiado:'c-col', man:'c-man', gestion:'c-ges', vacaciones:'c-vac', feriado:'c-fer', vacio:'c-gray', abierto:'c-aip', bloqueado:'c-gray' })[tipo]||'c-gray'; }
+function clsDe(tipo){ return ({ grupo:'c-aip', soporte:'c-sop', man:'c-man', gestion:'c-ges', vacaciones:'c-vac', feriado:'c-fer', vacio:'c-gray', abierto:'c-aip', bloqueado:'c-gray' })[tipo]||'c-gray'; }
 function render(){
   const ym=document.getElementById('inpMes').value; const [Y,M]=ym.split('-');
   const meses=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -882,7 +926,7 @@ function render(){
     days.forEach(d=>{
       const f=ymd(d);
       const feriadoNivel=horasPed(nivel).every(hora=>(celda(f,nivel,hora)||{}).tipo==='feriado');
-      h+='<th><button type="button" class="aip-day-head" title="Editar todas las horas de esta fecha en '+(nivel==='pri'?'Primaria':'Secundaria')+'" onclick="abrirColumna(\''+f+'\',\''+nivel+'\')">'+String(d.getDate()).padStart(2,'0')+'<br>'+DOW[d.getDay()-1]+(esFeriado(f)||feriadoNivel?'<br>FER':'')+'</button></th>';
+      h+='<th><button type="button" class="aip-day-head" title="Editar todas las horas de esta fecha en '+(nivel==='pri'?'Primaria':'Secundaria')+'" onclick="abrirColumna(\''+f+'\',\''+nivel+'\')">'+String(d.getDate()).padStart(2,'0')+'<br>'+DOW[d.getDay()-1]+(esFeriado(f)||feriadoNivel?'<br>FER':'')+(hayColegiadoPendiente(f,nivel)?'<br>Revisar colegiado':'')+'</button></th>';
     });
     return h;
   }
@@ -910,9 +954,6 @@ function render(){
       const texto=c.tipo==='vacio'?'':(c.texto|| (c.tipo==='feriado'?'Feriado':'—'));
       return '<td class="'+clsDe(c.tipo)+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+texto+'</td>';
     }
-    if(c&&(c.tipo==='colegio'||c.tipo==='colegiado')){
-      return '<td class="c-col" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+(c&&c.texto?c.texto:'Colegiado AIP')+'</td>';
-    }
     const on=slotActivo(f,nivel,hora,wd);
     const t=on?((c&&c.tipo!=='abierto'&&c.texto)?c.texto:'—'):'';
     const cl=on?(c?clsDe(c.tipo):'c-aip'):'c-gray';
@@ -930,7 +971,7 @@ function clicCelda(fecha,nivel,hora){
     if(plan[fecha]?.recreoOculto?.[nivel]===true){ plan[fecha].recreoOculto[nivel]=false; render(); }
     return;
   }
-  if(esColegiadoReservado(fecha,nivel,hora)){ avisarColegiadoProtegido(); return; }
+  if(hayColegiadoPendiente(fecha,nivel)||esColegiadoReservado(fecha,nivel,hora)){ avisarColegiadoProtegido(); return; }
   if(esFeriado(fecha)&&!esNoLectivoEditable(fecha)&&!(celda(fecha,nivel,hora)||{}).manual&&!modoDefinir()){ if(confirm('¿Quitar feriado?')) toggleFeriadoDia(fecha); return; }
   if(modoDefinir()){
     const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
@@ -962,11 +1003,12 @@ function aplicarColumna(){
   const {fecha,nivel}=editKey;
   const tipo=document.getElementById('modTipo').value;
   if(!tipo){ alert('Selecciona una opción para la fecha.'); return; }
-  if(horasPed(nivel).some(hora=>esColegiadoReservado(fecha,nivel,hora))){ avisarColegiadoProtegido(); return; }
+  if(hayColegiadoPendiente(fecha,nivel)||horasPed(nivel).some(hora=>esColegiadoReservado(fecha,nivel,hora))){ avisarColegiadoProtegido(); return; }
+  if(tipo==='colegio'){ programarColegiadoDesdeCalendario(fecha,nivel,horasPed(nivel),true); return; }
   const grupo=document.getElementById('modGrupo').value;
   if(tipo==='grupo'&&!grupo){ alert('No hay un grupo disponible para esta fecha.'); return; }
   const wd=new Date(fecha+'T12:00:00').getDay()-1;
-  const etiquetas={soporte:'Soporte',colegio:'Colegiado AIP',man:'Mantenimiento',gestion:'Semana gestión',vacaciones:'Vacaciones',feriado:'Feriado'};
+  const etiquetas={soporte:'Soporte',man:'Mantenimiento',gestion:'Semana gestión',vacaciones:'Vacaciones',feriado:'Feriado'};
   const cambios=horasPed(nivel).map(hora=>{
     if(tipo==='grupo'){
       if(nivel==='pri') return [hora,{tipo:'grupo',texto:grupo,manual:true}];
@@ -1004,8 +1046,9 @@ function aplicarModal(){
   if(editKey.columna){ aplicarColumna(); return; }
   const {fecha,nivel,hora}=editKey;
   if(hora==='R') return;
-  if(esColegiadoReservado(fecha,nivel,hora)){ avisarColegiadoProtegido(); return; }
+  if(hayColegiadoPendiente(fecha,nivel)||esColegiadoReservado(fecha,nivel,hora)){ avisarColegiadoProtegido(); return; }
   const tipo=document.getElementById('modTipo').value;
+  if(tipo==='colegio'){ programarColegiadoDesdeCalendario(fecha,nivel,[Number(hora)],false); return; }
   const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
   const eraManual=!!(celda(fecha,nivel,hora)||{}).manual;
   if(tipo==='vacio') setCelda(fecha,nivel,hora,(eraManual||esNoLectivoEditable(fecha))?{ tipo:'vacio', texto:'' }:null);
@@ -1019,7 +1062,7 @@ function aplicarModal(){
       setCelda(fecha,nivel,hora, row?{ tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc }:{ tipo:'grupo', texto:sec });
     }
   } else {
-    const map={ soporte:'Soporte', colegio:'Colegiado AIP', man:'Mantenimiento', gestion:'Semana gestión', vacaciones:'Vacaciones', feriado:'Feriado' };
+    const map={ soporte:'Soporte', man:'Mantenimiento', gestion:'Semana gestión', vacaciones:'Vacaciones', feriado:'Feriado' };
     if(tipo==='gestion'||tipo==='vacaciones'){
       // La primera designación sigue marcando el periodo; una edición posterior cambia solo esta hora.
       if(esNoLectivoEditable(fecha)||eraManual) setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo] });
@@ -1071,8 +1114,7 @@ function programacionColegiadoIncompatible(regla){
   const disponibles=horasPorNivelColegiado();
   return regla.levels.some(nivel=>Object.values(regla.hours[nivel]).flat().some(hora=>{
     const actual=disponibles[nivel].find(([h])=>h===hora);
-    const anterior=regla.times?.[nivel]?.[hora];
-    return !actual||(anterior&&anterior!==actual[1]);
+    return !actual||actual[1]!==regla.times?.[nivel]?.[hora];
   }));
 }
 let editorColegiado=null;
@@ -1152,8 +1194,7 @@ function ocurrenciasColegiado(regla){
   const otras=programacionesColegiado.filter(item=>item.id!==regla.id);
   const disponibles=horasPorNivelColegiado(),filas=[];
   for(const fecha of IEAipColegiado.dates(regla)) for(const nivel of regla.levels){
-    if(fechaNoLectivaColegiado(fecha,nivel)) continue;
-    const horas=[...new Set(IEAipColegiado.hoursOn(regla,fecha,nivel))].filter(h=>disponibles[nivel].some(([hora])=>hora===h));
+    const horas=horasColegiadasEfectivas(regla,fecha,nivel,disponibles);
     if(!horas.length) continue;
     const superpuestas=horas.filter(h=>esColegiadoReservado(fecha,nivel,h,otras));
     filas.push({fecha,nivel,horas,superpuestas});
@@ -1165,10 +1206,11 @@ function mostrarVistaColegiado(regla,filas){
   const titulo=document.createElement('p'),lista=document.createElement('ul');
   const horas=filas.reduce((total,fila)=>total+fila.horas.length,0);
   const repetidas=filas.reduce((total,fila)=>total+fila.superpuestas.length,0);
-  titulo.textContent=regla.name+' · '+horas+' horas previstas · '+repetidas+' coinciden con reservas existentes y cuentan una sola vez.';
+  titulo.textContent=regla.name+' · '+horas+' horas previstas · '+repetidas+' coinciden con reservas existentes · '+(horas-repetidas)+' horas adicionales.';
   for(const fila of filas){
     const item=document.createElement('li');
-    item.textContent=fila.fecha+' · '+nivelesColegiado[fila.nivel]+' · '+fila.horas.join(', ')+'ª';
+    const tramos=fila.horas.map(hora=>hora+'ª ('+regla.times[fila.nivel][hora]+')');
+    item.textContent=fila.fecha+' · '+nivelesColegiado[fila.nivel]+' · '+tramos.join(', ');
     lista.append(item);
   }
   box.replaceChildren(titulo,lista);
@@ -1180,13 +1222,32 @@ function previsualizarColegiado(){
   mostrarVistaColegiado(regla,filas);
   return {regla,filas};
 }
-function confirmarProgramacionColegiado(regla,filas){
+function programarColegiadoDesdeCalendario(fecha,nivel,horas,columna){
+  const disponibles=horasPorNivelColegiado();
+  const regla={id:crypto.randomUUID(),name:'Colegiado AIP · '+fecha,mode:'diario',active:true,levels:[nivel],
+    start:fecha,end:fecha,day:0,hours:{[nivel]:{all:horas}},include:[],exclude:[],
+    times:{[nivel]:Object.fromEntries(disponibles[nivel].filter(([h])=>horas.includes(h)))}};
+  const filas=ocurrenciasColegiado(regla);
+  if(!filas.length){ alert('No hay horas lectivas disponibles para Colegiado AIP en esta fecha.'); return; }
+  confirmarProgramacionColegiado(regla,filas,()=>{
+    if(columna){
+      const dia=plan[fecha]??={};
+      (dia.recreoOculto??={})[nivel]=true;
+    }
+    cerrarModal();
+  });
+}
+function confirmarProgramacionColegiado(regla,filas,alConfirmar){
   const conflictos=[];
   if(regla.active) for(const {fecha,nivel,horas} of filas) for(const hora of horas){
     const actividad=celda(fecha,nivel,hora);
-    if(actividad&&!['colegio','colegiado','feriado','gestion','vacaciones'].includes(actividad.tipo)) conflictos.push({fecha,nivel,hora});
+    if(actividad) conflictos.push({fecha,nivel,hora});
   }
   let mensaje='¿Guardar «'+regla.name+'» con la distribución de la vista previa?';
+  const anterior=programacionesColegiado.find(item=>item.id===regla.id);
+  if(anterior&&programacionColegiadoIncompatible(anterior)){
+    mensaje+='\nSe reemplazarán los tramos anteriores por los confirmados en la vista previa.';
+  }
   if(conflictos.length){
     const muestra=conflictos.slice(0,8).map(({fecha,nivel,hora})=>fecha+' · '+nivelesColegiado[nivel]+' · '+hora+'ª');
     mensaje+='\nSe retirarán '+conflictos.length+' asignaciones o ajustes existentes:\n'+muestra.join('\n');
@@ -1197,6 +1258,7 @@ function confirmarProgramacionColegiado(regla,filas){
   const index=programacionesColegiado.findIndex(item=>item.id===regla.id);
   if(index<0) programacionesColegiado.push(regla);
   else programacionesColegiado[index]=regla;
+  alConfirmar?.();
   cerrarEditorColegiado();
   persistirProgramacionesColegiado();
 }
@@ -1227,7 +1289,7 @@ function renderGestorColegiado(){
     if(programacionColegiadoIncompatible(regla)){
       const aviso=document.createElement('p');
       aviso.className='text-amber-800';
-      aviso.textContent='El horario pedagógico cambió. Revisa los bloques antes de guardar una actualización.';
+      aviso.textContent='Horario pendiente de revisión. Edita la programación y confirma los tramos vigentes. Los días afectados quedan fuera de la generación automática.';
       item.append(aviso);
     }
     const actions=document.createElement('div'); actions.className='flex flex-wrap gap-2';
