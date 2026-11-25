@@ -834,6 +834,10 @@ function render(){
   }
   function cell(d,nivel,hora){
     const f=ymd(d); const wd=d.getDay()-1;
+    const recreoOculto=plan[f]?.recreoOculto?.[nivel];
+    if(hora==='R' && typeof recreoOculto==='boolean'){
+      return '<td class="'+(recreoOculto?'':'c-rec')+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\'R\')">'+(recreoOculto?'':'RECREO')+'</td>';
+    }
     if(esFeriado(f)){
       const ajuste=celda(f,nivel,hora);
       if(!esNoLectivoEditable(f) && !(ajuste&&ajuste.manual)) return '<td class="c-fer" onclick="toggleFeriadoDia(\''+f+'\')">'+(feriados[f]||'Feriado')+'</td>';
@@ -867,7 +871,10 @@ function render(){
   document.getElementById('boxSec').innerHTML=s+'</tbody></table>';
 }
 function clicCelda(fecha,nivel,hora){
-  if(hora==='R') return;
+  if(hora==='R'){
+    if(plan[fecha]?.recreoOculto?.[nivel]===true){ plan[fecha].recreoOculto[nivel]=false; render(); }
+    return;
+  }
   if(esFeriado(fecha)&&!esNoLectivoEditable(fecha)&&!(celda(fecha,nivel,hora)||{}).manual&&!modoDefinir()){ if(confirm('¿Quitar feriado?')) toggleFeriadoDia(fecha); return; }
   if(modoDefinir()){
     const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
@@ -914,6 +921,10 @@ function aplicarColumna(){
   });
   // Un solo nivel y una sola fecha; la lista excluye el recreo.
   cambios.forEach(([hora,valor])=>setCelda(fecha,nivel,hora,valor));
+  // Estado visual por fecha/nivel; no asigna una actividad a R ni altera el horario.
+  if(!plan[fecha]) plan[fecha]={};
+  if(!plan[fecha].recreoOculto) plan[fecha].recreoOculto={};
+  plan[fecha].recreoOculto[nivel]=true;
   cerrarModal(); render();
 }
 function abrirModal(fecha,nivel,hora){

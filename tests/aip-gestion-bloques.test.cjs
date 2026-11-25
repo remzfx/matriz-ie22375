@@ -6,9 +6,9 @@ const vm=require('node:vm');
 const html=fs.readFileSync(path.join(__dirname,'..','aula_innovacion.html'),'utf8');
 
 function extract(name){
-  const start=html.indexOf('\nfunction '+name+'(');
+  const start=html.search(new RegExp('\\n(?:async )?function '+name+'\\('));
   assert.notEqual(start,-1,'Función '+name+' ausente');
-  const from=start+1, next=html.indexOf('\nfunction ',from+10);
+  const from=start+1, tail=html.slice(from+10), offset=tail.search(/\n(?:async )?function /), next=offset<0?-1:from+10+offset;
   assert.notEqual(next,-1,'Cierre de '+name+' no delimitado');
   return html.slice(from,next);
 }
@@ -177,4 +177,49 @@ test('Feriado por encabezado es exclusivo de la columna seleccionada y puede vis
  assert.equal(plan[fecha].sec[1].tipo,'feriado');
  assert.equal(plan[fecha].sec[2].tipo,'feriado');
  assert.equal(plan[fecha].pri[4].texto,'3°');
+});
+
+function recreoFixture(storage=new Map()){
+ const elements={inpMes:{value:'2026-12'},selBloque:{value:'2'},modTipo:{value:'soporte'},modGrupo:{value:'3A'},titPri:{},titSec:{},boxPri:{},boxSec:{}};
+ const horario={pri:{inicio:'08:00',minBloque:45,nHoras:6,recreoDespues:3,recreoMin:15},sec:{inicio:'13:00',minBloque:45,nHoras:7,recreoDespues:4,recreoMin:30}};
+ let cloud=null;const requests=[];
+ const v=make(['toMin','fromMin','buildHoras','HPRI','HSEC','horasPed','esFeriado','esNoLectivoEditable','celda','setCelda','clsDe','render','clicCelda','aplicarColumna','aplicarModal','load','guardar','paqueteAip','aplicarPaqueteAip','tokenSesionAip','subirAipNube','bajarAipNube'],{
+  horario,plantilla:{pri:{},sec:{}},colegiado:{pri:{},sec:{}},cursosPorMes:{},KEY:'synthetic-aip-plan',CLOUD_API_URL:'https://synthetic.invalid',
+  localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,s)=>storage.set(k,s)},sessionStorage:{getItem:()=>JSON.stringify({token:'synthetic-only'})},
+  document:{getElementById:id=>elements[id]},diasMes:dates,ymd:d=>d.toISOString().slice(0,10),DOW:['LUN','MAR','MIE','JUE','VIE'],
+  colOk:()=>false,slotActivo:()=>false,modoDefinir:()=>false,getHS:()=>({}),bloqueCfg:()=> '2',
+  guardarCfg(){},loadCfg(){},saveHS(){},leerFormHorario(){},pintarFormHorario(){},renderPlantilla(){},renderFeriados(){},renderCursosMes(){},renderEditorHS(){},cerrarModal(){},alert(){},
+  abrirModal(){throw Error('R must not open an academic editor');},marcarNoClases(){throw Error('Individual edits must not change the entire period');},
+  fetch:async(url,options)=>{const body=JSON.parse(options.body);requests.push(body.action);assert.equal(body.action,'saveaip');cloud=JSON.parse(JSON.stringify(body.payload));return {json:async()=>({ok:true})};},
+  fetchLecturaNube:async()=>{requests.push('loadaip');return {json:async()=>({ok:true,payload:JSON.parse(JSON.stringify(cloud))})};}
+ });
+ const assign=(fecha,nivel,tipo='soporte')=>{v.editKey={fecha,nivel,columna:true};elements.modTipo.value=tipo;v.aplicarColumna();};
+ const rest=(fecha,nivel)=>{const h=elements[nivel==='pri'?'boxPri':'boxSec'].innerHTML,needle="clicCelda('"+fecha+"','"+nivel+"','R')";const td=h.split('<td').find(x=>x.includes(needle));return td?td.split('</td>')[0]:null;};
+ return {v,elements,storage,requests,assign,rest};
+}
+for(const nivel of ['pri','sec'])test(nivel+': general assignment hides only its rest, first click restores it, next assignment hides again',()=>{
+ const f=recreoFixture(),before=JSON.stringify(f.v.horario);f.v.render();
+ assert.match(f.elements.boxPri.innerHTML,/class="c-rec">RECREO/);
+ f.assign(monday,nivel);assert.ok(f.rest(monday,nivel),'Empty R remains clickable');assert.doesNotMatch(f.rest(monday,nivel),/RECREO|c-rec|Soporte/);
+ assert.match(f.elements[nivel==='pri'?'boxSec':'boxPri'].innerHTML,/class="c-rec">RECREO/);
+ f.v.clicCelda(monday,nivel,'R');assert.match(f.rest(monday,nivel),/class="c-rec"/);assert.match(f.rest(monday,nivel),/>RECREO$/);
+ const after=JSON.stringify(f.v.plan);f.v.clicCelda(monday,nivel,'R');assert.equal(JSON.stringify(f.v.plan),after,'Visible R is not an academic editor or toggle');
+ f.assign(monday,nivel,'man');assert.doesNotMatch(f.rest(monday,nivel),/RECREO|c-rec|Mantenimiento/);
+ assert.equal(f.v.plan[monday][nivel].R,undefined);assert.equal(JSON.stringify(f.v.horario),before);assert.deepEqual(f.requests,[]);
+});
+test('individual academic edits preserve hidden/visible rest and isolate dates and levels, including nonteaching dates',()=>{
+ const f=recreoFixture();f.v.feriados[monday]='Semana gestión';f.assign(monday,'pri');f.assign(tuesday,'sec','feriado');
+ const before=JSON.stringify(f.v.plan[monday].recreoOculto);f.v.editKey={fecha:monday,nivel:'pri',hora:1};f.elements.modTipo.value='man';f.v.aplicarModal();
+ assert.equal(JSON.stringify(f.v.plan[monday].recreoOculto),before);assert.doesNotMatch(f.rest(monday,'pri'),/RECREO/);assert.doesNotMatch(f.rest(tuesday,'sec'),/RECREO/);
+ f.v.clicCelda(monday,'pri','R');assert.match(f.rest(monday,'pri'),/>RECREO$/);assert.doesNotMatch(f.rest(tuesday,'sec'),/RECREO/);
+ assert.equal(f.v.plan[monday].sec.R,undefined);assert.equal(f.v.feriados[monday],'Semana gestión');
+});
+test('rest presentation survives local save/reload and the actual upload/download payload in both states',async()=>{
+ const f=recreoFixture();f.assign(monday,'pri');f.assign(tuesday,'sec');f.v.guardar(true);
+ const next=recreoFixture(f.storage);next.v.load();next.v.render();assert.doesNotMatch(next.rest(monday,'pri'),/RECREO/);assert.doesNotMatch(next.rest(tuesday,'sec'),/RECREO/);
+ next.v.clicCelda(monday,'pri','R');await next.v.subirAipNube();next.v.plan={};await next.v.bajarAipNube();
+ assert.match(next.rest(monday,'pri'),/>RECREO$/);assert.doesNotMatch(next.rest(tuesday,'sec'),/RECREO/);
+ next.assign(monday,'pri');await next.v.subirAipNube();next.v.plan={};await next.v.bajarAipNube();assert.doesNotMatch(next.rest(monday,'pri'),/RECREO/);
+ const restored=recreoFixture(f.storage);restored.v.load();restored.v.render();assert.doesNotMatch(restored.rest(monday,'pri'),/RECREO/);
+ assert.deepEqual(next.requests,['saveaip','loadaip','saveaip','loadaip']);
 });
