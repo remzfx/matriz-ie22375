@@ -33,6 +33,15 @@
   .colegiado-hours { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,225px),1fr)); gap:8px; }
   .colegiado-hours fieldset { border:1px solid #cbd5e1; border-radius:10px; padding:8px; min-width:0; }
   .colegiado-hours label { display:inline-flex; align-items:center; gap:5px; min-height:32px; margin-right:10px; }
+  .colegiado-hours .colegiado-matrix { grid-column:1/-1; }
+  .colegiado-scroll { max-width:100%; overflow-x:auto; }
+  .colegiado-matrix table { width:100%; border-collapse:collapse; font-size:12px; }
+  .colegiado-matrix th,.colegiado-matrix td { border:1px solid #cbd5e1; padding:3px; text-align:center; min-width:90px; }
+  .colegiado-matrix th { background:#f1f5f9; }
+  .colegiado-matrix th:first-child { min-width:85px; }
+  .colegiado-matrix .colegiado-pip { background:#e0f2fe; }
+  .colegiado-matrix label { display:flex; justify-content:center; min-height:44px; margin:0; cursor:pointer; }
+  .colegiado-matrix input { width:20px; height:20px; }
   .colegiado-list article { border-top:1px solid #e2e8f0; padding:10px 0; overflow-wrap:anywhere; }
   .colegiado-preview { max-height:220px; overflow:auto; }
   .c-rec { background:#fde68a; font-weight:700; }
@@ -1131,12 +1140,24 @@ function horasMarcadasColegiado(){
 function renderHorasColegiado(){
   if(!editorColegiado) return;
   horasMarcadasColegiado();
-  const form=formColegiado(),fields=form.elements,modo=fields.modo.value,personalizado=modo==='personalizado';
+  const form=formColegiado(),fields=form.elements,modo=fields.modo.value,personalizado=modo==='personalizado',porDia=modo==='diario'||modo==='rotativo';
   document.getElementById('colegiadoDia').hidden=modo!=='semanal'&&modo!=='rotativo';
   document.getElementById('colegiadoFechas').hidden=!personalizado;
   const filas=personalizado?diasColegiado.map((dia,i)=>[String(i),dia]).concat([['extra','Fechas adicionales']]):[['all','Horas pedagógicas']];
   const niveles=fields.nivel.value==='ambos'?IEAipColegiado.levels:[fields.nivel.value];
   const disponibles=horasPorNivelColegiado();
+  if(porDia){
+    document.getElementById('colegiadoHoras').innerHTML=niveles.map(nivel=>{
+      const cabecera=disponibles[nivel].map(([hora,tramo])=>'<th scope="col">'+hora+'ª<br>'+tramo+'</th>').join('');
+      const cuerpo=diasColegiado.map((dia,wd)=>'<tr><th scope="row">'+dia+'</th>'+disponibles[nivel].map(([hora,tramo])=>{
+        const pip=pipOk(nivel,hora,wd),checked=editorColegiado.hours[nivel][wd]?.includes(hora);
+        return '<td class="'+(pip?'colegiado-pip':'')+'"><label title="'+(pip?'Disponible en plantilla PIP':'Fuera de plantilla PIP')+'"><input type="checkbox" data-nivel="'+nivel+'" data-fila="'+wd+'" value="'+hora+'" aria-label="'+nivelesColegiado[nivel]+' · '+dia+' · '+hora+'ª · '+tramo+'" '+(checked?'checked':'')+'></label></td>';
+      }).join('')+'</tr>').join('');
+      const aviso=editorColegiado.hours[nivel].all?.length?'<p>Configuración anterior común: selecciona y confirma las horas de cada día para reemplazarla.</p>':'';
+      return '<fieldset class="colegiado-matrix"><legend>'+nivelesColegiado[nivel]+'</legend><p>Azul: disponible en la plantilla semanal del PIP. Selección independiente por día.</p>'+aviso+'<div class="colegiado-scroll" role="region" aria-label="Horas por día de '+nivelesColegiado[nivel]+'" tabindex="0"><table><thead><tr><th scope="col">Día</th>'+cabecera+'</tr></thead><tbody>'+cuerpo+'</tbody></table></div></fieldset>';
+    }).join('');
+    return;
+  }
   // Labels are fixed, and hour numbers and times come from the current timetable.
   document.getElementById('colegiadoHoras').innerHTML=niveles.map(nivel=>filas.map(([fila,label])=>{
     const seleccion=editorColegiado.hours[nivel][fila]||[];
@@ -1180,7 +1201,7 @@ function leerEditorColegiado(){
   for(const nivel of levels){
     hours[nivel]={};
     for(const [key,seleccion] of Object.entries(editorColegiado.hours[nivel])){
-      if((mode==='personalizado')===(key!=='all')){
+      if(mode==='semanal'?key==='all':mode==='personalizado'?key!=='all':/^[0-4]$/.test(key)){
         hours[nivel][key]=seleccion.filter(h=>disponibles[nivel].some(([hora])=>hora===h)).sort((a,b)=>a-b);
       }
     }
@@ -1225,7 +1246,7 @@ function previsualizarColegiado(){
 function programarColegiadoDesdeCalendario(fecha,nivel,horas,columna){
   const disponibles=horasPorNivelColegiado();
   const regla={id:crypto.randomUUID(),name:'Colegiado AIP · '+fecha,mode:'diario',active:true,levels:[nivel],
-    start:fecha,end:fecha,day:0,hours:{[nivel]:{all:horas}},include:[],exclude:[],
+    start:fecha,end:fecha,day:0,hours:{[nivel]:{[IEAipColegiado.calendarDay(fecha).weekday]:horas}},include:[],exclude:[],
     times:{[nivel]:Object.fromEntries(disponibles[nivel].filter(([h])=>horas.includes(h)))}};
   const filas=ocurrenciasColegiado(regla);
   if(!filas.length){ alert('No hay horas lectivas disponibles para Colegiado AIP en esta fecha.'); return; }

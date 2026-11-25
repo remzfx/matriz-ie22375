@@ -47,7 +47,7 @@ async function run(){
   await form.locator('[name=modo]').selectOption('rotativo');
   await form.locator('[name=inicio]').fill('2026-12-21');
   await form.locator('[name=fin]').fill('2027-01-31');
-  for(const [nivel,horas] of [['pri',[1,2]],['sec',[5,6]]])for(const hora of horas)await form.locator('input[data-nivel='+nivel+'][value="'+hora+'"]').check();
+  for(const wd of [0,1,2,3,4])for(const [nivel,horas] of [['pri',[1,2]],['sec',[5,6]]])for(const hora of horas)await form.locator('input[data-nivel='+nivel+'][data-fila="'+wd+'"][value="'+hora+'"]').check();
   assert.equal(await form.locator('#colegiadoHoras input[value=R]').count(),0);
   assert.match(await form.locator('#colegiadoHoras').innerText(),/08:00-08:45/);
   await form.getByRole('button',{name:'Vista previa'}).click();
@@ -162,7 +162,7 @@ async function run(){
   }),[true,false,true]); // Moving R earlier without changing the interval of hours 5–6 remains compatible.
   await page.getByRole('button',{name:'Editar',exact:true}).click();
   await form.locator('[name=fin]').fill('2027-01-23');
-  await form.locator('input[data-nivel=sec][value="6"]').uncheck();
+  for(const wd of [0,1,2,3,4])await form.locator('input[data-nivel=sec][data-fila="'+wd+'"][value="6"]').uncheck();
   await form.getByRole('button',{name:'Guardar programación'}).click();
   assert.equal(await page.evaluate(()=>esColegiadoReservado('2027-01-25','pri',1)),false);
   assert.equal(await page.evaluate(()=>esColegiadoReservado('2026-12-21','sec',6)),false);
@@ -190,6 +190,88 @@ async function run(){
   });
   assert.equal(await page.evaluate(()=>esColegiadoReservado('2026-12-21','pri',1)&&!esColegiadoMaterializado(plan['2026-12-21']?.pri?.[1])),true);
   assert.deepEqual(requests,['saveaip','loadaip']);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+  // Differential coverage: real editor interactions with distinct weekday hours at both levels.
+  await page.evaluate(()=>{
+   plan={};feriados={'2027-01-06':'Feriado'};colegiado={pri:{},sec:{}};programacionesColegiado=[];
+   renderGestorColegiado();
+  });
+  await page.getByRole('button',{name:'Agregar programación'}).click();
+  await form.locator('[name=nombre]').fill('Horarios por día · prueba ficticia');
+  await form.locator('[name=nivel]').selectOption('ambos');
+  await form.locator('[name=modo]').selectOption('rotativo');
+  await form.locator('[name=inicio]').fill('2026-12-21');
+  await form.locator('[name=fin]').fill('2027-01-31');
+  const hours={pri:[[1],[2],[1,2],[2],[1]],sec:[[5],[6],[4],[7],[5,6]]};
+  for(const nivel of ['pri','sec'])for(let wd=0;wd<5;wd++)for(const h of hours[nivel][wd])
+   await form.locator(`input[data-nivel=${nivel}][data-fila="${wd}"][value="${h}"]`).check();
+  assert.equal(await form.locator('.colegiado-matrix').count(),2);
+  assert.equal(await form.locator('.colegiado-matrix tbody tr').count(),10);
+  assert.equal(await form.locator('input[value=R]').count(),0);
+  assert.ok(await form.locator('.colegiado-pip').count()>0);
+  assert.ok(await form.locator('td:not(.colegiado-pip)').count()>0);
+  const measure=await page.evaluate(()=>({
+   pageFits:document.documentElement.scrollWidth<=innerWidth,
+   matrices:[...document.querySelectorAll('.colegiado-scroll')].map(e=>({client:e.clientWidth,scroll:e.scrollWidth})),
+   touch:[...document.querySelectorAll('.colegiado-matrix label')].every(e=>e.getBoundingClientRect().height>=44)
+  }));
+  assert.equal(measure.pageFits,true);assert.equal(measure.touch,true);
+  if(width===390)assert.ok(measure.matrices.every(e=>e.scroll>e.client));
+  const scroller=form.locator('.colegiado-scroll').last();
+  await scroller.evaluate(e=>{e.scrollLeft=e.scrollWidth;});
+  if(width===390)assert.ok(await scroller.evaluate(e=>e.scrollLeft>0));
+  await scroller.evaluate(e=>{e.scrollLeft=0;});
+  await form.getByRole('button',{name:'Vista previa'}).click();
+  const expectedPreview=await page.evaluate(()=>ocurrenciasColegiado(leerEditorColegiado()));
+  for(const row of expectedPreview)assert.deepEqual(row.horas,hours[row.nivel][new Date(row.fecha+'T12:00:00').getDay()-1]);
+  assert.ok(expectedPreview.some(r=>r.fecha==='2027-01-25'&&r.nivel==='pri'&&r.horas.join()==='1'));
+  assert.ok(!expectedPreview.some(r=>r.fecha==='2027-01-06'));
+  if(process.env.IE_AIP_EVIDENCE){
+   await page.evaluate(()=>window.scrollTo(0,0));
+   await page.screenshot({path:path.join(process.env.IE_AIP_EVIDENCE,'colegiado-por-dia-'+width+'.png'),fullPage:true});
+  }
+  await form.getByRole('button',{name:'Guardar programación'}).click();
+  const dayRule=await page.evaluate(()=>JSON.stringify(programacionesColegiado));
+  const compare=()=>page.evaluate(()=>{
+   const rows=ocurrenciasColegiado(programacionesColegiado[0]);
+   const exact=IEAipColegiado.dates(programacionesColegiado[0]).every(fecha=>['pri','sec'].every(nivel=>
+    horasPed(nivel).every(h=>esColegiadoReservado(fecha,nivel,h)===(rows.find(r=>r.fecha===fecha&&r.nivel===nivel)?.horas.includes(h)||false))));
+   let calendar=true;
+   const selected=document.getElementById('inpMes').value;
+   for(const month of ['2026-12','2027-01']){
+    document.getElementById('inpMes').value=month;render();
+    for(const nivel of ['pri','sec'])for(const td of document.querySelectorAll(nivel==='pri'?'#boxPri td[onclick]':'#boxSec td[onclick]')){
+     const match=td.getAttribute('onclick').match(/clicCelda\('([^']+)','[^']+','(\d+)'\)/);
+     if(match&&td.classList.contains('c-col')!==esColegiadoReservado(match[1],nivel,Number(match[2])))calendar=false;
+    }
+   }
+   document.getElementById('inpMes').value=selected;render();
+   return {rows,exact,calendar};
+  });
+  const compared=await compare();
+  assert.deepEqual(compared.rows,expectedPreview);assert.equal(compared.exact,true);assert.equal(compared.calendar,true);
+  await page.evaluate(()=>{
+   document.getElementById('inpMes').value='2026-12';mesesAnioSel=['2026-12','2027-01'];
+   armarMes();armarAnio();limpiarMes();
+  });
+  assert.equal(await page.evaluate(()=>JSON.stringify(programacionesColegiado)),dayRule);
+  assert.equal((await compare()).exact,true);
+  await page.reload();
+  assert.equal(await page.evaluate(()=>JSON.stringify(programacionesColegiado)),dayRule);
+  await page.evaluate(()=>subirAipNube());
+  await page.evaluate(()=>{programacionesColegiado=[];return bajarAipNube();});
+  assert.equal(await page.evaluate(()=>JSON.stringify(programacionesColegiado)),dayRule);
+  await page.locator('#tabBtnColegiado').click();
+  await page.getByRole('button',{name:'Editar',exact:true}).click();
+  await form.locator('[name=modo]').selectOption('diario');
+  const daily=await page.evaluate(()=>ocurrenciasColegiado(leerEditorColegiado()));
+  for(const row of daily)assert.deepEqual(row.horas,hours[row.nivel][new Date(row.fecha+'T12:00:00').getDay()-1]);
+  assert.ok(daily.length>expectedPreview.length);
+  await form.getByRole('button',{name:'Guardar programación'}).click();
+  assert.equal((await compare()).exact,true);
+  assert.equal((await compare()).calendar,true);
+  assert.deepEqual(requests,['saveaip','loadaip','saveaip','loadaip']);
+  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+  console.log(JSON.stringify({weekdayMatrices:width,rotationRows:expectedPreview.length,dailyRows:daily.length,measure}));
   console.log(JSON.stringify({width,expected,omitted:expected.slice(1,4),...results,requests}));
   await page.close();
  }}finally{await browser.close();}
