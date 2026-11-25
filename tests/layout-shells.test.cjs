@@ -17,10 +17,19 @@ test('login stays compact inside shell-auth and Registro entry selector uses the
  assert.match(read('index.html'),/id="viewLogin" class="shell shell-auth /);assert.match(read('index.html'),/<div class="w-full max-w-sm">/);assert.match(read('registro.html'),/id="viewHome" class="hidden shell shell-auth /);
 });
 test('Unrelated module HTML remains identical to the approved responsive shells base',()=>{
- const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['aula_innovacion.html','primaria.html','secundaria.html']){
+ const baseNow='d1b97a4804bb9f1065bf39073743c846e7a30632';for(const file of ['primaria.html','secundaria.html']){
  let current=withoutPr73Escaping(require('./b2-snapshot.cjs')(file,read(file)));
  assert.equal(current,execFileSync('git',['show',baseNow+':'+file],{cwd:root,encoding:'utf8'}).replace(/\r\n/g,'\n'));
  }
+});
+
+
+test('AIP header centers Inicio and keeps cloud actions labelled with icons',()=>{
+ const html=read('aula_innovacion.html');
+ assert.match(html,/\.mobile-header-actions > a, \.mobile-header-actions > button \{[^}]*align-items:center; justify-content:center;/);
+ assert.match(html,/<button[^>]*onclick="subirAipNube\(\)"[^>]*><svg[^>]*class="aip-nav-icon"[^>]*>[\s\S]*?<span>Subir nube<\/span><\/button>/);
+ assert.match(html,/<button[^>]*onclick="bajarAipNube\(\)"[^>]*><svg[^>]*class="aip-nav-icon"[^>]*>[\s\S]*?<span>Bajar nube<\/span><\/button>/);
+ assert.match(html,/<a href="index\.html" class="btn btn-ghost text-xs">Inicio<\/a>/);
 });
 
 test('Registro shares shell-work across header, context, all panels main and lower bar without per-tab widths',()=>{

@@ -30,8 +30,10 @@
   .mobile-header-actions { -webkit-overflow-scrolling:touch; scrollbar-width:none; }
   .mobile-header-actions::-webkit-scrollbar { display:none; }
   .mobile-header-actions > a, .mobile-header-actions > button {
-    min-height:44px; flex:0 0 auto; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18);
+    min-height:44px; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; gap:.4rem;
+    text-align:center; touch-action:manipulation; -webkit-tap-highlight-color:rgba(255,255,255,.18);
   }
+  .aip-nav-icon { width:16px; height:16px; flex:none; }
   @media (max-width:640px) {
     .mobile-aip-row { flex-direction:column; align-items:stretch !important; gap:8px; }
     .mobile-header-actions { width:100%; flex-wrap:nowrap !important; overflow-x:auto; justify-content:flex-start; padding-bottom:2px; }
@@ -59,8 +61,8 @@
       <div class="font-black">Aula de Innovación · Competencia 28</div>
     </div>
     <div class="mobile-header-actions flex gap-2">
-      <button class="btn btn-ok text-xs" type="button" onclick="subirAipNube()">Nube ↑</button>
-      <button class="btn btn-ghost text-xs" type="button" onclick="bajarAipNube()">Nube ↓</button>
+      <button class="btn btn-ok text-xs" type="button" onclick="subirAipNube()" title="Guardar plan AIP en la nube"><svg class="aip-nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.88 18.09A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 18.5"/><path d="M12 13v8"/><path d="m8 17 4-4 4 4"/></svg><span>Subir nube</span></button>
+      <button class="btn btn-ghost text-xs" type="button" onclick="bajarAipNube()" title="Descargar plan AIP de la nube"><svg class="aip-nav-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.88 18.09A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 18.5"/><path d="M12 13v8"/><path d="m8 17 4 4 4-4"/></svg><span>Bajar nube</span></button>
       <a href="index.html" class="btn btn-ghost text-xs">Inicio</a>
     </div>
   </div>
