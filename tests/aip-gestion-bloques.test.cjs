@@ -13,7 +13,7 @@ function extract(name){
   return html.slice(from,next);
 }
 function make(names,extras={}){
-  const control={plan:{},feriados:{},...extras};
+  const control={plan:{},feriados:{},programacionesColegiado:[],esColegiadoReservado:()=>false,leerProgramacionesColegiado(){},renderGestorColegiado(){},...extras};
   vm.createContext(control);
   vm.runInContext(names.map(extract).join('\n'),control);
   return control;

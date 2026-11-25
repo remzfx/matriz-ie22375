@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>AIP · Horario mensual · IE 22375</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="aip-colegiado.js"></script>
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; color:#0f172a; margin:0; }
   .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); overflow:hidden; }
@@ -26,6 +27,14 @@
   .c-fer { background:#fecaca; font-weight:800; }
   .c-ges { background:#fdba74; cursor:pointer; font-weight:800; }
   .c-vac { background:#fda4af; cursor:pointer; font-weight:800; }
+  .colegiado-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:8px; }
+  #pane-colegiado [hidden] { display:none; }
+  .colegiado-fields label { display:grid; gap:3px; }
+  .colegiado-hours { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,225px),1fr)); gap:8px; }
+  .colegiado-hours fieldset { border:1px solid #cbd5e1; border-radius:10px; padding:8px; min-width:0; }
+  .colegiado-hours label { display:inline-flex; align-items:center; gap:5px; min-height:32px; margin-right:10px; }
+  .colegiado-list article { border-top:1px solid #e2e8f0; padding:10px 0; overflow-wrap:anywhere; }
+  .colegiado-preview { max-height:220px; overflow:auto; }
   .c-rec { background:#fde68a; font-weight:700; }
   .sticky-top { position:sticky; top:0; z-index:20; }
   .mobile-safe-header { padding-top: env(safe-area-inset-top, 0px); }
@@ -79,6 +88,7 @@
   <div class="no-print flex flex-wrap gap-2">
     <button type="button" class="aip-tab on" id="tabBtnMes" onclick="showAipTab('mes')">Plan del mes</button>
     <button type="button" class="aip-tab" id="tabBtnHs" onclick="showAipTab('hs')">Horario de docentes</button>
+    <button type="button" class="aip-tab" id="tabBtnColegiado" onclick="showAipTab('colegiado')">Colegiado AIP</button>
     <button type="button" class="aip-tab" id="tabBtnReloj" onclick="showAipTab('reloj')">Reloj / feriados</button>
   </div>
   <div id="pane-mes" class="space-y-3 pane-print">
@@ -191,6 +201,35 @@
     <div class="card p-3 overflow-auto mes-only"><div class="font-black text-sm mb-2" id="titPri">Primaria</div><div id="boxPri"></div></div>
     <div class="card p-3 overflow-auto mes-only"><div class="font-black text-sm mb-2" id="titSec">Secundaria</div><div id="boxSec"></div></div>
   </div>
+  <section id="pane-colegiado" class="card p-3 space-y-3 hidden no-print" aria-labelledby="colegiadoTitle">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h2 id="colegiadoTitle" class="font-black text-sm">Programaciones de Colegiado AIP</h2>
+      <button class="btn btn-primary" type="button" onclick="editarProgramacionColegiado()">Agregar programación</button>
+    </div>
+    <p id="colegiadoAviso" class="text-sm text-amber-800" role="status"></p>
+    <form id="colegiadoForm" class="space-y-2 hidden" onsubmit="event.preventDefault(); guardarProgramacionColegiado()">
+      <div class="colegiado-fields text-sm">
+        <label>Nombre <input name="nombre" type="text" required maxlength="100"></label>
+        <label>Nivel <select name="nivel" onchange="renderHorasColegiado()"><option value="pri">Primaria</option><option value="sec">Secundaria</option><option value="ambos">Ambos</option></select></label>
+        <label>Modalidad <select name="modo" onchange="renderHorasColegiado()"><option value="diario">Diario</option><option value="semanal">Semanal fijo</option><option value="rotativo">Rotativo semanal</option><option value="personalizado">Personalizado</option></select></label>
+        <label>Inicio <input name="inicio" type="date" required></label>
+        <label>Término <input name="fin" type="date" required></label>
+        <label id="colegiadoDia">Día fijo o inicial <select name="dia"></select></label>
+      </div>
+      <div id="colegiadoFechas" class="colegiado-fields text-sm">
+        <label>Fechas adicionales (AAAA-MM-DD, separadas por comas) <input name="incluir" type="text"></label>
+        <label>Fechas excluidas (AAAA-MM-DD, separadas por comas) <input name="excluir" type="text"></label>
+      </div>
+      <div id="colegiadoHoras" class="colegiado-hours text-sm"></div>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn btn-ghost" type="button" onclick="previsualizarColegiado()">Vista previa</button>
+        <button class="btn btn-ok" type="submit">Guardar programación</button>
+        <button class="btn btn-ghost" type="button" onclick="cerrarEditorColegiado()">Cancelar</button>
+      </div>
+    </form>
+    <div id="colegiadoVista" role="status" class="colegiado-preview text-sm"></div>
+    <div id="colegiadoLista" class="colegiado-list text-sm"></div>
+  </section>
   <div id="pane-hs" class="space-y-3 hidden no-print">
     <div class="card p-3 space-y-2">
       <div class="font-black text-sm">Horario de docentes</div>
@@ -337,6 +376,8 @@ let plan = {};
 let editKey = null;
 let plantilla = null;
 let colegiado = { pri:{}, sec:{} };
+let programacionesColegiado = [];
+let avisoDatosColegiado = '';
 function plantillaDefault(){ return { pri: JSON.parse(JSON.stringify(PIP_PRI)), sec: JSON.parse(JSON.stringify(PIP_SEC)) }; }
 function colegiadoDefault(){ return { pri:{}, sec:{} }; }
 function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -348,12 +389,21 @@ function diasMes(ym){
 function diasDe(m, hora){ return m[String(hora)] || m[hora] || []; }
 function pipOk(nivel,hora,wd){ if(!plantilla) plantilla=plantillaDefault(); return diasDe(plantilla[nivel]||{},hora).indexOf(wd)>=0; }
 function colOk(nivel,hora,wd){ return diasDe((colegiado&&colegiado[nivel])||{},hora).indexOf(wd)>=0; }
+function fechaNoLectivaColegiado(fecha,nivel){
+  return esFeriado(fecha)||horasPed(nivel).every(hora=>['feriado','gestion','vacaciones'].includes(celda(fecha,nivel,hora)?.tipo));
+}
+function esColegiadoReservado(fecha,nivel,hora,reglas=programacionesColegiado){
+  const numero=Number(hora);
+  const day=IEAipColegiado.calendarDay(fecha);
+  if(!day||day.weekday>4||!horasPed(nivel).includes(numero)||fechaNoLectivaColegiado(fecha,nivel)) return false;
+  if(['feriado','gestion','vacaciones'].includes(celda(fecha,nivel,numero)?.tipo)) return false;
+  return colOk(nivel,numero,day.weekday)||reglas.some(regla=>regla.active&&IEAipColegiado.hoursOn(regla,fecha,nivel).includes(numero));
+}
 function slotActivo(fecha,nivel,hora,wd){
-  if(hora==='R') return false;
+  if(hora==='R'||esColegiadoReservado(fecha,nivel,hora)) return false;
   const c=celda(fecha,nivel,hora);
   if(c && (c.tipo==='bloqueado'||c.tipo==='gestion'||c.tipo==='vacaciones'||c.tipo==='feriado'||c.tipo==='vacio')) return false;
   if(c && (c.tipo==='colegio'||c.tipo==='colegiado')) return false;
-  if(colOk(nivel,hora,wd) && !(c && c.tipo==='abierto')) return false;
   if(c && c.tipo==='abierto') return true;
   if(c && c.tipo && c.tipo!=='bloqueado') return true;
   return pipOk(nivel,hora,wd);
@@ -480,24 +530,28 @@ function armarAnio(){
   if(!mesesAnioSel||!mesesAnioSel.length){ alert('Marca al menos un mes.'); return; }
   const origen=mesActual();
   const orden=mesesAnioSel.slice().sort();
+  const pendientes=[];
   orden.forEach((ym,i)=>{
     document.getElementById('inpMes').value=ym;
     if(!Object.prototype.hasOwnProperty.call(cursosPorMes,ym) || !cursosPorMes[ym] || !cursosPorMes[ym].length){
       cursosPorMes[ym]=(i%2===0)?MITAD_A.slice():MITAD_B.slice();
     }
     armarMes(true);
+    const deuda=deudaAip[mesSiguiente(ym)];
+    if(deuda?.de===ym&&(deuda.secciones.length||deuda.areas.length)) pendientes.push(ym+': '+deuda.secciones.concat(deuda.areas).join(', '));
   });
   document.getElementById('inpMes').value=origen;
   renderCursosMes(); renderMesesAnio(); render();
-  alert('Listo: '+orden.join(', ')+'. Revisa mes por mes. Colegiado no se tocó.');
+  alert('Listo: '+orden.join(', ')+'.'+(pendientes.length?'\nAtenciones pendientes:\n'+pendientes.join('\n'):''));
 }
 function bloqueCfg(){ return (document.getElementById('selBloque')||{}).value||'2'; }
 function exigeDos(){ return bloqueCfg()==='2'; }
 function candidatosAIP(wd,hora,fecha){
+  if(fecha&&esColegiadoReservado(fecha,'sec',hora)) return [];
   let list=candidatos(wd,hora);
   if(!exigeDos()) return list;
   const par=horaPar(hora);
-  if(!par) return [];
+  if(!par||!horasConsecutivasSec(Math.min(hora,par),Math.max(hora,par))) return [];
   if(fecha && (!slotActivo(fecha,'sec',hora,wd)||!slotActivo(fecha,'sec',par,wd))) return [];
   return list.filter(c=>mismoGrupo(wd,hora,par,c.seccion));
 }
@@ -512,6 +566,7 @@ function normFecha(v){
 function loadCfg(){
   try{
     const c=JSON.parse(localStorage.getItem(CFG_KEY)||'{}');
+    leerProgramacionesColegiado(c);
     if(c.bloque) document.getElementById('selBloque').value=c.bloque;
     if(c.modo) document.getElementById('selModo').value=c.modo;
     plantilla=(c.plantilla&&c.plantilla.pri&&c.plantilla.sec)?c.plantilla:plantillaDefault();
@@ -532,6 +587,7 @@ function guardarCfg(leerHorario=true){
     modo:(document.getElementById('selModo')||{}).value||'asignar',
     plantilla:plantilla||plantillaDefault(),
     colegiado:colegiado||colegiadoDefault(),
+    programacionesColegiado,
     feriados:feriados, horario:horario,
     plantModo:(document.getElementById('selPlantModo')||{}).value||'aip',
     cursosPorMes:cursosPorMes,
@@ -555,7 +611,8 @@ function aplicarHorarioInst(){
   if(!plantilla) plantilla=plantillaDefault();
   horasPed('pri').forEach(h=>{ if(!plantilla.pri[h]&&!plantilla.pri[String(h)]) plantilla.pri[h]=[]; });
   horasPed('sec').forEach(h=>{ if(!plantilla.sec[h]&&!plantilla.sec[String(h)]) plantilla.sec[h]=[]; });
-  guardarCfg(); renderPlantilla(); render();
+  guardarCfg(); renderPlantilla(); render(); renderGestorColegiado();
+  if(programacionesColegiado.some(programacionColegiadoIncompatible)) alert('El horario cambió. Revisa las programaciones en Colegiado AIP.');
 }
 function renderFeriados(){
   const box=document.getElementById('listaFer'); if(!box) return;
@@ -574,10 +631,11 @@ function load(){ try{ plan=JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){
 function guardar(silencio){ guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS(); if(!silencio) alert('Guardado en este navegador. Use Nube ↑ para otra PC.'); }
 function paqueteAip(){
   leerFormHorario();
-  return { plan, plantilla, colegiado, feriados, horario, horarioDoc:getHS(), cursosPorMes, mes:(document.getElementById('inpMes')||{}).value||'', bloque:bloqueCfg(), ts:Date.now() };
+  return { plan, plantilla, colegiado, programacionesColegiado, feriados, horario, horarioDoc:getHS(), cursosPorMes, mes:(document.getElementById('inpMes')||{}).value||'', bloque:bloqueCfg(), ts:Date.now() };
 }
 function aplicarPaqueteAip(p){
   if(!p||typeof p!=='object') return;
+  leerProgramacionesColegiado(p);
   if(p.plan) plan=p.plan; if(p.plantilla) plantilla=p.plantilla; if(p.colegiado) colegiado=p.colegiado;
   if(p.feriados) feriados=p.feriados; if(p.horario) horario=p.horario;
   if(p.horarioDoc){ horarioDoc=p.horarioDoc; saveHS(); }
@@ -585,7 +643,7 @@ function aplicarPaqueteAip(p){
   if(p.bloque&&document.getElementById('selBloque')) document.getElementById('selBloque').value=p.bloque;
   if(p.cursosPorMes) cursosPorMes=p.cursosPorMes;
   pintarFormHorario(); guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan||{}));
-  renderPlantilla(); renderFeriados(); renderCursosMes(); renderEditorHS(); render();
+  renderPlantilla(); renderFeriados(); renderCursosMes(); renderEditorHS(); renderGestorColegiado(); render();
 }
 function tokenSesionAip() {
   try {
@@ -687,14 +745,10 @@ function armarMes(silencio){
       });
     });
   });
-  days.forEach(d=>{
-    const f=ymd(d); if(esFeriado(f)) return; const wd=d.getDay()-1;
-    ['pri','sec'].forEach(n=>{ horasPed(n).forEach(h=>{ if(colOk(n,h,wd)) setCelda(f,n,h,{ tipo:'colegio', texto:'Colegiado AIP' }); }); });
-  });
   const rotPri=['3°','4°','5°','6°']; let ip=0;
   days.forEach(d=>{
     const f=ymd(d); if(esFeriado(f)) return; const wd=d.getDay()-1;
-    const act=horasPed('pri').filter(h=>slotActivo(f,'pri',h,wd)&&!colOk('pri',h,wd)&&!(celda(f,'pri',h)||{}).manual).sort((a,b)=>a-b);
+    const act=horasPed('pri').filter(h=>slotActivo(f,'pri',h,wd)&&!(celda(f,'pri',h)||{}).manual).sort((a,b)=>a-b);
     if(!act.length) return;
     const g=rotPri[ip++%rotPri.length]; const modo=bloqueCfg(); let usar=act.slice();
     if(modo==='1') usar=act.slice(0,1);
@@ -710,11 +764,16 @@ function semanaDelMes(d, first){
   mon.setDate(mon.getDate()-shift);
   return Math.floor((d-mon)/86400000/7);
 }
+function horasConsecutivasSec(primera,segunda){
+  const bloques=HSEC();
+  const index=bloques.findIndex(([hora])=>hora===primera);
+  return index>=0&&bloques[index+1]?.[0]===segunda;
+}
 function paresLibresSec(d){
   const f=ymd(d); if(esFeriado(f)) return [];
   const wd=d.getDay()-1;
   const act=horasPed('sec').filter(h=>{
-    if(!slotActivo(f,'sec',h,wd)||colOk('sec',h,wd)) return false;
+    if(!slotActivo(f,'sec',h,wd)) return false;
     const c=celda(f,'sec',h);
     if(c && (c.manual || (c.tipo && c.tipo!=='abierto'))) return false;
     return true;
@@ -722,7 +781,7 @@ function paresLibresSec(d){
   const pares=[]; const taken={};
   act.forEach(h=>{
     if(taken[h]) return;
-    if(act.indexOf(h+1)>=0){ pares.push({ d:d, f:f, wd:wd, h1:h, h2:h+1 }); taken[h]=taken[h+1]=1; }
+    if(act.includes(h+1)&&horasConsecutivasSec(h,h+1)){ pares.push({ d:d, f:f, wd:wd, h1:h, h2:h+1 }); taken[h]=taken[h+1]=1; }
     else pares.push({ d:d, f:f, wd:wd, h1:h, h2:null });
   });
   return pares;
@@ -845,12 +904,13 @@ function render(){
       return '<td class="'+cl+'"'+accion+'>'+texto+'</td>';
     }
     if(hora==='R') return '<td class="c-rec">RECREO</td>';
+    if(esColegiadoReservado(f,nivel,hora)) return '<td class="c-col" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">Colegiado AIP</td>';
     const c=celda(f,nivel,hora);
     if(c && (c.manual || c.tipo==='gestion' || c.tipo==='vacaciones' || c.tipo==='feriado' || c.tipo==='vacio')){
       const texto=c.tipo==='vacio'?'':(c.texto|| (c.tipo==='feriado'?'Feriado':'—'));
       return '<td class="'+clsDe(c.tipo)+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+texto+'</td>';
     }
-    if((c&&(c.tipo==='colegio'||c.tipo==='colegiado')) || (colOk(nivel,hora,wd)&&!(c&&c.tipo==='grupo'))){
+    if(c&&(c.tipo==='colegio'||c.tipo==='colegiado')){
       return '<td class="c-col" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+(c&&c.texto?c.texto:'Colegiado AIP')+'</td>';
     }
     const on=slotActivo(f,nivel,hora,wd);
@@ -870,10 +930,11 @@ function clicCelda(fecha,nivel,hora){
     if(plan[fecha]?.recreoOculto?.[nivel]===true){ plan[fecha].recreoOculto[nivel]=false; render(); }
     return;
   }
+  if(esColegiadoReservado(fecha,nivel,hora)){ avisarColegiadoProtegido(); return; }
   if(esFeriado(fecha)&&!esNoLectivoEditable(fecha)&&!(celda(fecha,nivel,hora)||{}).manual&&!modoDefinir()){ if(confirm('¿Quitar feriado?')) toggleFeriadoDia(fecha); return; }
   if(modoDefinir()){
     const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
-    if(slotActivo(fecha,nivel,hora,wd)||colOk(nivel,hora,wd)) setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
+    if(slotActivo(fecha,nivel,hora,wd)) setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
     else setCelda(fecha,nivel,hora,{ tipo:'abierto', texto:'—' });
     render(); return;
   }
@@ -901,6 +962,7 @@ function aplicarColumna(){
   const {fecha,nivel}=editKey;
   const tipo=document.getElementById('modTipo').value;
   if(!tipo){ alert('Selecciona una opción para la fecha.'); return; }
+  if(horasPed(nivel).some(hora=>esColegiadoReservado(fecha,nivel,hora))){ avisarColegiadoProtegido(); return; }
   const grupo=document.getElementById('modGrupo').value;
   if(tipo==='grupo'&&!grupo){ alert('No hay un grupo disponible para esta fecha.'); return; }
   const wd=new Date(fecha+'T12:00:00').getDay()-1;
@@ -940,7 +1002,10 @@ function cerrarModal(){ document.getElementById('modal').classList.add('hidden')
 function aplicarModal(){
   if(!editKey) return;
   if(editKey.columna){ aplicarColumna(); return; }
-  const {fecha,nivel,hora}=editKey; const tipo=document.getElementById('modTipo').value;
+  const {fecha,nivel,hora}=editKey;
+  if(hora==='R') return;
+  if(esColegiadoReservado(fecha,nivel,hora)){ avisarColegiadoProtegido(); return; }
+  const tipo=document.getElementById('modTipo').value;
   const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
   const eraManual=!!(celda(fecha,nivel,hora)||{}).manual;
   if(tipo==='vacio') setCelda(fecha,nivel,hora,(eraManual||esNoLectivoEditable(fecha))?{ tipo:'vacio', texto:'' }:null);
@@ -987,16 +1052,223 @@ function marcarNoClases(fecha, tipo){
   });
   guardarCfg(); renderFeriados();
 }
+function leerProgramacionesColegiado(paquete){
+  // A legacy package has no authoritative schedule list.
+  if(!Object.hasOwn(paquete,'programacionesColegiado')) return;
+  const reglas=IEAipColegiado.read(paquete.programacionesColegiado);
+  avisoDatosColegiado=reglas?'':'No se aplicó la lista de programaciones porque no tiene un formato válido.';
+  if(reglas) programacionesColegiado=reglas;
+}
+function avisarColegiadoProtegido(){
+  alert('Hay horas reservadas para Colegiado AIP. Modifica la programación en el apartado Colegiado AIP o, para una reserva semanal, en la plantilla del PIP.');
+}
+const nivelesColegiado={pri:'Primaria',sec:'Secundaria'};
+const diasColegiado=['Lunes','Martes','Miércoles','Jueves','Viernes'];
+const modosColegiado={diario:'Diario',semanal:'Semanal fijo',rotativo:'Rotativo semanal',personalizado:'Personalizado'};
+const formColegiado=()=>document.getElementById('colegiadoForm');
+const horasPorNivelColegiado=()=>({pri:HPRI().filter(([h])=>h!=='R'),sec:HSEC().filter(([h])=>h!=='R')});
+function programacionColegiadoIncompatible(regla){
+  const disponibles=horasPorNivelColegiado();
+  return regla.levels.some(nivel=>Object.values(regla.hours[nivel]).flat().some(hora=>{
+    const actual=disponibles[nivel].find(([h])=>h===hora);
+    const anterior=regla.times?.[nivel]?.[hora];
+    return !actual||(anterior&&anterior!==actual[1]);
+  }));
+}
+let editorColegiado=null;
+function horasMarcadasColegiado(){
+  for(const input of document.querySelectorAll('#colegiadoHoras input')){
+    const {nivel,fila}=input.dataset;
+    const horas=editorColegiado.hours[nivel][fila]??=[];
+    const numero=Number(input.value);
+    const index=horas.indexOf(numero);
+    if(input.checked&&index<0) horas.push(numero);
+    if(!input.checked&&index>=0) horas.splice(index,1);
+  }
+}
+function renderHorasColegiado(){
+  if(!editorColegiado) return;
+  horasMarcadasColegiado();
+  const form=formColegiado(),fields=form.elements,modo=fields.modo.value,personalizado=modo==='personalizado';
+  document.getElementById('colegiadoDia').hidden=modo!=='semanal'&&modo!=='rotativo';
+  document.getElementById('colegiadoFechas').hidden=!personalizado;
+  const filas=personalizado?diasColegiado.map((dia,i)=>[String(i),dia]).concat([['extra','Fechas adicionales']]):[['all','Horas pedagógicas']];
+  const niveles=fields.nivel.value==='ambos'?IEAipColegiado.levels:[fields.nivel.value];
+  const disponibles=horasPorNivelColegiado();
+  // Labels are fixed, and hour numbers and times come from the current timetable.
+  document.getElementById('colegiadoHoras').innerHTML=niveles.map(nivel=>filas.map(([fila,label])=>{
+    const seleccion=editorColegiado.hours[nivel][fila]||[];
+    const opciones=disponibles[nivel].map(([hora,tramo])=>'<label><input type="checkbox" data-nivel="'+nivel+'" data-fila="'+fila+'" value="'+hora+'" '+(seleccion.includes(hora)?'checked':'')+'> '+hora+'ª · '+tramo+'</label>').join('');
+    return '<fieldset><legend>'+nivelesColegiado[nivel]+' · '+label+'</legend>'+opciones+'</fieldset>';
+  }).join('')).join('');
+}
+function editarProgramacionColegiado(regla){
+  const form=formColegiado(),fields=form.elements;
+  document.getElementById('colegiadoHoras').replaceChildren();
+  editorColegiado={
+    id:regla?.id||crypto.randomUUID(),
+    active:regla?.active??true,
+    hours:{pri:structuredClone(regla?.hours.pri||{}),sec:structuredClone(regla?.hours.sec||{})}
+  };
+  fields.dia.innerHTML=diasColegiado.map((dia,i)=>'<option value="'+i+'">'+dia+'</option>').join('');
+  fields.nombre.value=regla?.name||'';
+  fields.nivel.value=regla?.levels.length===2?'ambos':regla?.levels[0]||'pri';
+  fields.modo.value=regla?.mode||'diario';
+  fields.inicio.value=regla?.start||'';
+  fields.fin.value=regla?.end||'';
+  fields.dia.value=regla?.day??0;
+  fields.incluir.value=regla?.include.join(', ')||'';
+  fields.excluir.value=regla?.exclude.join(', ')||'';
+  document.getElementById('colegiadoVista').replaceChildren();
+  form.classList.remove('hidden');
+  renderHorasColegiado();
+  fields.nombre.focus();
+}
+function cerrarEditorColegiado(){
+  formColegiado().classList.add('hidden');
+  document.getElementById('colegiadoHoras').replaceChildren();
+  editorColegiado=null;
+}
+function leerEditorColegiado(){
+  horasMarcadasColegiado();
+  const f=formColegiado().elements,mode=f.modo.value,disponibles=horasPorNivelColegiado();
+  const levels=f.nivel.value==='ambos'?IEAipColegiado.levels.slice():[f.nivel.value];
+  const fechas=value=>[...new Set(value.split(/[\s,]+/).filter(Boolean))].sort();
+  const hours={},times={};
+  for(const nivel of levels){
+    hours[nivel]={};
+    for(const [key,seleccion] of Object.entries(editorColegiado.hours[nivel])){
+      if((mode==='personalizado')===(key!=='all')){
+        hours[nivel][key]=seleccion.filter(h=>disponibles[nivel].some(([hora])=>hora===h)).sort((a,b)=>a-b);
+      }
+    }
+    times[nivel]=Object.fromEntries(disponibles[nivel].filter(([h])=>Object.values(hours[nivel]).some(list=>list.includes(h))));
+  }
+  return {id:editorColegiado.id,active:editorColegiado.active,name:f.nombre.value.trim(),mode,levels,
+    start:f.inicio.value,end:f.fin.value,day:Number(f.dia.value),hours,times,
+    include:mode==='personalizado'?fechas(f.incluir.value):[],exclude:mode==='personalizado'?fechas(f.excluir.value):[]};
+}
+function ocurrenciasColegiado(regla){
+  const otras=programacionesColegiado.filter(item=>item.id!==regla.id);
+  const disponibles=horasPorNivelColegiado(),filas=[];
+  for(const fecha of IEAipColegiado.dates(regla)) for(const nivel of regla.levels){
+    if(fechaNoLectivaColegiado(fecha,nivel)) continue;
+    const horas=[...new Set(IEAipColegiado.hoursOn(regla,fecha,nivel))].filter(h=>disponibles[nivel].some(([hora])=>hora===h));
+    if(!horas.length) continue;
+    const superpuestas=horas.filter(h=>esColegiadoReservado(fecha,nivel,h,otras));
+    filas.push({fecha,nivel,horas,superpuestas});
+  }
+  return filas;
+}
+function mostrarVistaColegiado(regla,filas){
+  const box=document.getElementById('colegiadoVista');
+  const titulo=document.createElement('p'),lista=document.createElement('ul');
+  const horas=filas.reduce((total,fila)=>total+fila.horas.length,0);
+  const repetidas=filas.reduce((total,fila)=>total+fila.superpuestas.length,0);
+  titulo.textContent=regla.name+' · '+horas+' horas previstas · '+repetidas+' coinciden con reservas existentes y cuentan una sola vez.';
+  for(const fila of filas){
+    const item=document.createElement('li');
+    item.textContent=fila.fecha+' · '+nivelesColegiado[fila.nivel]+' · '+fila.horas.join(', ')+'ª';
+    lista.append(item);
+  }
+  box.replaceChildren(titulo,lista);
+}
+function previsualizarColegiado(){
+  const regla=leerEditorColegiado(),error=IEAipColegiado.validate(regla,horasPorNivelColegiado());
+  if(error){ document.getElementById('colegiadoVista').textContent=error; return null; }
+  const filas=ocurrenciasColegiado(regla);
+  mostrarVistaColegiado(regla,filas);
+  return {regla,filas};
+}
+function confirmarProgramacionColegiado(regla,filas){
+  const conflictos=[];
+  if(regla.active) for(const {fecha,nivel,horas} of filas) for(const hora of horas){
+    const actividad=celda(fecha,nivel,hora);
+    if(actividad&&!['colegio','colegiado','feriado','gestion','vacaciones'].includes(actividad.tipo)) conflictos.push({fecha,nivel,hora});
+  }
+  let mensaje='¿Guardar «'+regla.name+'» con la distribución de la vista previa?';
+  if(conflictos.length){
+    const muestra=conflictos.slice(0,8).map(({fecha,nivel,hora})=>fecha+' · '+nivelesColegiado[nivel]+' · '+hora+'ª');
+    mensaje+='\nSe retirarán '+conflictos.length+' asignaciones o ajustes existentes:\n'+muestra.join('\n');
+    if(conflictos.length>muestra.length) mensaje+='\nY '+(conflictos.length-muestra.length)+' más.';
+  }
+  if(!confirm(mensaje)) return;
+  for(const {fecha,nivel,hora} of conflictos) setCelda(fecha,nivel,hora,null);
+  const index=programacionesColegiado.findIndex(item=>item.id===regla.id);
+  if(index<0) programacionesColegiado.push(regla);
+  else programacionesColegiado[index]=regla;
+  cerrarEditorColegiado();
+  persistirProgramacionesColegiado();
+}
+function guardarProgramacionColegiado(){
+  const preview=previsualizarColegiado();
+  if(preview) confirmarProgramacionColegiado(preview.regla,preview.filas);
+}
+function persistirProgramacionesColegiado(){
+  avisoDatosColegiado='';
+  guardarCfg(false);
+  localStorage.setItem(KEY,JSON.stringify(plan));
+  renderGestorColegiado();
+  render();
+}
+function renderGestorColegiado(){
+  const list=document.getElementById('colegiadoLista');
+  list.replaceChildren();
+  document.getElementById('colegiadoAviso').textContent=avisoDatosColegiado;
+  if(!programacionesColegiado.length){ list.textContent='Aún no hay programaciones.'; return; }
+  for(const regla of programacionesColegiado){
+    const item=document.createElement('article'),titulo=document.createElement('strong'),info=document.createElement('p'),detalle=document.createElement('p');
+    titulo.textContent=regla.name;
+    info.textContent=regla.levels.map(n=>nivelesColegiado[n]).join(' y ')+' · '+modosColegiado[regla.mode]+' · '+regla.start+' a '+regla.end+' · '+(regla.active?'Activa':'Inactiva');
+    const dias=regla.mode==='diario'?'Lunes a viernes':regla.mode==='semanal'?diasColegiado[regla.day]:regla.mode==='rotativo'?'Empieza el '+diasColegiado[regla.day]:'Días y fechas personalizados';
+    const filas=regla.levels.flatMap(n=>Object.entries(regla.hours[n]).filter(([,h])=>h.length).map(([d,h])=>nivelesColegiado[n]+(d==='all'?'':' '+(diasColegiado[d]||'fechas adicionales'))+' '+h.join(', ')+'ª'));
+    detalle.textContent=[dias,...filas,regla.include.length?'Incluye '+regla.include.join(', '):'',regla.exclude.length?'Excluye '+regla.exclude.join(', '):''].filter(Boolean).join(' · ');
+    item.append(titulo,info,detalle);
+    if(programacionColegiadoIncompatible(regla)){
+      const aviso=document.createElement('p');
+      aviso.className='text-amber-800';
+      aviso.textContent='El horario pedagógico cambió. Revisa los bloques antes de guardar una actualización.';
+      item.append(aviso);
+    }
+    const actions=document.createElement('div'); actions.className='flex flex-wrap gap-2';
+    function boton(label,action){
+      const button=document.createElement('button'); button.type='button'; button.className='btn btn-ghost';
+      button.textContent=label; button.onclick=action; actions.append(button);
+    }
+    boton('Vista previa',()=>mostrarVistaColegiado(regla,ocurrenciasColegiado(regla)));
+    boton('Editar',()=>editarProgramacionColegiado(regla));
+    boton(regla.active?'Desactivar':'Activar',()=>{
+      if(regla.active){ regla.active=false; cerrarEditorColegiado(); persistirProgramacionesColegiado(); return; }
+      if(programacionColegiadoIncompatible(regla)){ alert('Revisa el horario de esta programación antes de activarla.'); return; }
+      const activa={...regla,active:true},filas=ocurrenciasColegiado(activa);
+      mostrarVistaColegiado(activa,filas);
+      confirmarProgramacionColegiado(activa,filas);
+    });
+    boton('Eliminar',()=>{
+      if(!confirm('¿Eliminar «'+regla.name+'»?')) return;
+      programacionesColegiado=programacionesColegiado.filter(item=>item.id!==regla.id);
+      cerrarEditorColegiado();
+      persistirProgramacionesColegiado();
+      document.getElementById('colegiadoVista').replaceChildren();
+    });
+    item.append(actions);list.append(item);
+  }
+}
+
+
 function showAipTab(t){
   const mes=document.getElementById('pane-mes'), hs=document.getElementById('pane-hs'), reloj=document.getElementById('pane-reloj');
-  if(mes) mes.classList.toggle('hidden', t==='hs');
+  const paneColegiado=document.getElementById('pane-colegiado');
+  if(paneColegiado) paneColegiado.classList.toggle('hidden',t!=='colegiado');
+  if(mes) mes.classList.toggle('hidden', t==='hs'||t==='colegiado');
   if(hs) hs.classList.toggle('hidden', t!=='hs');
   if(reloj) reloj.classList.toggle('hidden', t!=='reloj');
   document.querySelectorAll('.mes-only').forEach(el=>el.classList.toggle('hidden', t!=='mes'));
   document.querySelectorAll('.aip-tab').forEach(b=>b.classList.remove('on'));
-  const map={ mes:'tabBtnMes', hs:'tabBtnHs', reloj:'tabBtnReloj' };
+  const map={ mes:'tabBtnMes', hs:'tabBtnHs', reloj:'tabBtnReloj', colegiado:'tabBtnColegiado' };
   const btn=document.getElementById(map[t]); if(btn) btn.classList.add('on');
   if(t==='hs') renderEditorHS(); if(t==='reloj') renderFeriados();
+  if(t==='colegiado') renderGestorColegiado();
 }
 function onMes(){ renderCursosMes(); renderMesesAnio(); render(); }
 function wdNombre(i){ return DOW[i]||('D'+i); }
@@ -1140,6 +1412,7 @@ function importarHS(inp){
   reader.readAsText(f);
 }
 
+if(!window.IEAipColegiado) throw new Error('No se cargaron las reglas de Colegiado AIP. Recarga la página.');
 load();
 loadHS();
 if(!plantilla) plantilla=plantillaDefault();
