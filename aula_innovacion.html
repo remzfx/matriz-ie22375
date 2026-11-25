@@ -498,6 +498,7 @@ function candidatosAIP(wd,hora,fecha){
   return list.filter(c=>mismoGrupo(wd,hora,par,c.seccion));
 }
 function esFeriado(f){ return !!(feriados&&feriados[f]); }
+function esNoLectivoEditable(f){ return !!(feriados&&(feriados[f]==='Semana gestión'||feriados[f]==='Vacaciones')); }
 function normFecha(v){
   if(!v) return ''; v=String(v).trim();
   let m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); if(m) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
@@ -675,6 +676,8 @@ function armarMes(silencio){
   const ym=document.getElementById('inpMes').value; const days=diasMes(ym);
   days.forEach(d=>{
     const f=ymd(d);
+    // Conservar cada ajuste manual de la semana de gestión o vacaciones.
+    if(esNoLectivoEditable(f)) return;
     ['pri','sec'].forEach(n=>{
       const o=plan[f]&&plan[f][n]; if(!o) return;
       Object.keys(o).forEach(h=>{
@@ -822,7 +825,16 @@ function render(){
   }
   function cell(d,nivel,hora){
     const f=ymd(d); const wd=d.getDay()-1;
-    if(esFeriado(f)) return '<td class="c-fer" onclick="toggleFeriadoDia(\''+f+'\')">'+(feriados[f]||'Feriado')+'</td>';
+    if(esFeriado(f)){
+      if(!esNoLectivoEditable(f)) return '<td class="c-fer" onclick="toggleFeriadoDia(\''+f+'\')">'+(feriados[f]||'Feriado')+'</td>';
+      // La marca del día no debe impedir que cada hora tenga su propio estado.
+      const c=celda(f,nivel,hora);
+      const tipo=c&&c.tipo;
+      const cl=c?(tipo==='bloqueado'||tipo==='vacio'?'c-gray':clsDe(tipo)):(feriados[f]==='Vacaciones'?'c-vac':'c-ges');
+      const texto=c?(c.texto||''):(feriados[f]||'');
+      const accion=hora==='R'?'':' onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')"';
+      return '<td class="'+cl+'"'+accion+'>'+texto+'</td>';
+    }
     if(hora==='R') return '<td class="c-rec">RECREO</td>';
     const c=celda(f,nivel,hora);
     if((c&&(c.tipo==='colegio'||c.tipo==='colegiado')) || (colOk(nivel,hora,wd)&&!(c&&c.tipo==='grupo'))){
@@ -842,7 +854,7 @@ function render(){
 }
 function clicCelda(fecha,nivel,hora){
   if(hora==='R') return;
-  if(esFeriado(fecha)&&!modoDefinir()){ if(confirm('¿Quitar feriado?')) toggleFeriadoDia(fecha); return; }
+  if(esFeriado(fecha)&&!esNoLectivoEditable(fecha)&&!modoDefinir()){ if(confirm('¿Quitar feriado?')) toggleFeriadoDia(fecha); return; }
   if(modoDefinir()){
     const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
     if(slotActivo(fecha,nivel,hora,wd)||colOk(nivel,hora,wd)) setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
@@ -860,7 +872,8 @@ function abrirModal(fecha,nivel,hora){
   sel.innerHTML='';
   if(nivel==='pri'){ ['3°','4°','5°','6°'].forEach(g=>{ const o=document.createElement('option'); o.value=g; o.textContent=g; sel.appendChild(o); }); }
   else { candidatos(wd,+hora).forEach(c=>{ const o=document.createElement('option'); o.value=c.seccion; o.textContent=c.texto; sel.appendChild(o); }); }
-  document.getElementById('modTipo').value='grupo'; onModTipo();
+  const actual=celda(fecha,nivel,hora);
+  document.getElementById('modTipo').value=(actual&&actual.tipo)||'grupo'; onModTipo();
   document.getElementById('modal').classList.remove('hidden');
 }
 function onModTipo(){ document.getElementById('wrapGrupo').classList.toggle('hidden', document.getElementById('modTipo').value!=='grupo'); }
@@ -869,7 +882,7 @@ function aplicarModal(){
   if(!editKey) return;
   const {fecha,nivel,hora}=editKey; const tipo=document.getElementById('modTipo').value;
   const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
-  if(tipo==='vacio') setCelda(fecha,nivel,hora,null);
+  if(tipo==='vacio') setCelda(fecha,nivel,hora,esNoLectivoEditable(fecha)?{ tipo:'vacio', texto:'' }:null);
   else if(tipo==='bloqueado') setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
   else if(tipo==='abierto') setCelda(fecha,nivel,hora,{ tipo:'abierto', texto:'—' });
   else if(tipo==='grupo'){
@@ -881,8 +894,11 @@ function aplicarModal(){
     }
   } else {
     const map={ soporte:'Soporte', colegio:'Colegiado AIP', man:'Mantenimiento', gestion:'Semana gestión', vacaciones:'Vacaciones' };
-    if(tipo==='gestion'||tipo==='vacaciones') marcarNoClases(fecha, tipo);
-    else setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
+    if(tipo==='gestion'||tipo==='vacaciones'){
+      // La primera designación sigue marcando el periodo; una edición posterior cambia solo esta hora.
+      if(esNoLectivoEditable(fecha)) setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo] });
+      else marcarNoClases(fecha, tipo);
+    } else setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
   }
   cerrarModal(); render();
 }
