@@ -127,6 +127,7 @@
       <label>Ordenar <select name="orden"><option value="nombre">Nombre</option><option value="pendientes">Pendientes primero</option><option value="horas">Más horas en el periodo</option></select></label>
       <label>Buscar en la matriz <input name="buscar" type="search" placeholder="Docente, curso o sección" oninput="renderEstadisticasAip()"></label>
     </form>
+    <div id="rondasAip" class="space-y-3 text-sm"></div>
     <div id="resultadoAip" class="space-y-3 text-sm"></div>
   </section>
   <div id="pane-mes" class="space-y-3 pane-print">
@@ -411,6 +412,7 @@ const HS = {
   },
 };
 let plan = {};
+let exclusionesRondasAip={};
 let editKey = null;
 let plantilla = null;
 let colegiado = { pri:{}, sec:{} };
@@ -585,6 +587,7 @@ function normFecha(v){
 function loadCfg(){
   try{
     const c=JSON.parse(localStorage.getItem(CFG_KEY)||'{}');
+    exclusionesRondasAip=IEAipDistribucion.readExclusions(c.exclusionesRondasAip);
     leerProgramacionesColegiado(c);
     if(c.bloque) document.getElementById('selBloque').value=c.bloque;
     if(c.modo) document.getElementById('selModo').value=c.modo;
@@ -606,6 +609,7 @@ function guardarCfg(leerHorario=true){
     plantilla:plantilla||plantillaDefault(),
     colegiado:colegiado||colegiadoDefault(),
     programacionesColegiado,
+    exclusionesRondasAip,
     feriados:feriados, horario:horario,
     plantModo:(document.getElementById('selPlantModo')||{}).value||'aip',
     cursosPorMes:cursosPorMes
@@ -648,11 +652,12 @@ function load(){ try{ plan=depurarColegiadoMensual(JSON.parse(localStorage.getIt
 function guardar(silencio,leerHorario=true){ guardarCfg(leerHorario); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS(); if(!silencio) alert('Guardado en este navegador. Use Nube ↑ para otra PC.'); }
 function paqueteAip(){
   leerFormHorario();
-  return { plan, plantilla, colegiado, programacionesColegiado, feriados, horario, horarioDoc:getHS(), cursosPorMes, mes:(document.getElementById('inpMes')||{}).value||'', bloque:bloqueCfg(), ts:Date.now() };
+  return { plan, plantilla, colegiado, programacionesColegiado, exclusionesRondasAip, feriados, horario, horarioDoc:getHS(), cursosPorMes, mes:(document.getElementById('inpMes')||{}).value||'', bloque:bloqueCfg(), ts:Date.now() };
 }
 function aplicarPaqueteAip(p){
   if(!p||typeof p!=='object') return;
   leerProgramacionesColegiado(p);
+  exclusionesRondasAip=IEAipDistribucion.readExclusions(p.exclusionesRondasAip);
   ultimoInformeAip=[];renderInformeAip();
   if(p.plan) plan=depurarColegiadoMensual(p.plan); if(p.plantilla) plantilla=p.plantilla; if(p.colegiado) colegiado=p.colegiado;
   if(p.feriados) feriados=p.feriados; if(p.horario) horario=p.horario;
@@ -663,12 +668,12 @@ function aplicarPaqueteAip(p){
   pintarFormHorario(); guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan||{}));
   renderPlantilla(); renderFeriados(); renderCursosMes(); renderEditorHS(); renderGestorColegiado(); render();
 }
-function tokenSesionAip() {
+function tokenSesionAip(perfil=false) {
   try {
     const raw = sessionStorage.getItem('ie22375_session_v1') || localStorage.getItem('ie22375_session_v1');
-    const sesion = raw ? JSON.parse(raw) : null;
-    return sesion && sesion.token ? sesion.token : '';
-  } catch (e) { return ''; }
+    const sesion=raw?JSON.parse(raw):null;
+    return perfil?sesion:sesion?.token||'';
+  } catch (e) { return perfil?null:''; }
 }
 async function subirAipNube(){
   guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS();
@@ -798,7 +803,7 @@ function horasConsecutivasSec(primera,segunda){
   return index>=0&&bloques[index+1]?.[0]===segunda;
 }
 function seccionAip(value){
-  return String(value||'').toUpperCase().replace(/[^0-9A-Z]/g,'').replace(/UNICA$/,'U');
+  return normDoc(value).replace(/[^0-9A-Z]/g,'').replace(/UNICA$/,'U');
 }
 function claseHorarioAip(dia,hora,seccion){
   const fila=getHS()[dia]?.[hora]||{};
@@ -832,9 +837,9 @@ function inventarioAip(nombres){
   }
   return combos;
 }
-function historialAip(anio,nombres=docentesAip()){
+function historialAip(anio,nombres=docentesAip(),calendarioAip=plan){
   const filas=[];
-  for(const [date,dia] of Object.entries(plan)){
+  for(const [date,dia] of Object.entries(calendarioAip)){
     const calendario=IEAipColegiado.calendarDay(date);
     if(!date.startsWith(anio+'-')||!calendario||calendario.weekday>4||esFeriado(date))continue;
     for(const [h,c] of Object.entries(dia.sec||{})){
@@ -845,6 +850,30 @@ function historialAip(anio,nombres=docentesAip()){
     }
   }
   return filas.sort((a,b)=>IEAipDistribucion.compare(a.date,b.date)||a.hour-b.hour);
+}
+function universoRondasAip(anio,catalogo){
+  const exclusiones=new Map((exclusionesRondasAip[anio]||[]).map(r=>[r.id,r]));
+  return {exclusiones,target:[...catalogo.keys()].filter(id=>!exclusiones.has(id))};
+}
+function puedeAutorizarRondasAip(){
+  const sesion=tokenSesionAip(true);
+  return sesion?.role==='pip'&&sesion.user==='pip'&&!!sesion.token&&Number(sesion.tokenExp)>Date.now();
+}
+function configurarExclusionAip(anio,id,reason){
+  if(!puedeAutorizarRondasAip()){alert('La autorización requiere una sesión vigente del PIP.');return;}
+  if(!/^\d{4}$/.test(anio))return;
+  const registrar=reason!==null,motivo=reason?.trim()||'',anterior=exclusionesRondasAip;
+  const actual=anterior[anio]||[];
+  if(registrar&&(!inventarioAip(docentesAip()).has(id)||!motivo||motivo.length>240))return;
+  if(!registrar&&!actual.some(r=>r.id===id))return;
+  if(!confirm(registrar?'¿Excluir esta combinación del universo objetivo del año seleccionado?':'¿Reincorporar esta combinación al universo objetivo del año seleccionado?'))return;
+  const next=actual.filter(r=>r.id!==id);
+  if(registrar)next.push({id,reason:motivo,at:new Date().toISOString(),by:'pip'});
+  exclusionesRondasAip={...anterior,[anio]:next};
+  try{guardarCfg(false);}catch(error){
+    exclusionesRondasAip=anterior;alert('No se pudo guardar la autorización en este navegador.');return;
+  }
+  ultimoInformeAip=[];renderInformeAip();renderEstadisticasAip();
 }
 function horasLibresSec(d,proyectar=false){
   const f=ymd(d),wd=d.getDay()-1;
@@ -922,15 +951,20 @@ function generarPeriodoAip(meses,silencio=false,niveles=['pri','sec'],diasExacto
     if(niveles.includes('sec'))for(const anio of new Set(elegidos.map(m=>m.slice(0,4)))){
       const dias=elegidos.filter(m=>m.startsWith(anio+'-')).flatMap(m=>diasPorMes.get(m));
       const history=historialAip(anio,nombres),datos=oportunidadesAip(dias,nombres);
-      const entrada={history,opportunities:datos.opportunities},rows=IEAipDistribucion.solve(entrada);
-      const resultado=IEAipDistribucion.validate(entrada,rows);
-      propuestas.push({anio,rows,history,resultado,datos});
+      const motor=IEAipDistribucion,{target}=universoRondasAip(anio,universo);
+      const before=motor.rounds(target,motor.completeBlocks(historialAip(anio,nombres,original),horasConsecutivasSec));
+      const selectedDates=new Set(dias.map(ymd)),first=ymd(dias[0]);
+      const protectedBlocks=[...before.credits].filter(([,r])=>r.row.date>=first&&!selectedDates.has(r.row.date)).map(([id])=>id);
+      const entrada={history,opportunities:datos.opportunities,target,consecutive:horasConsecutivasSec,protectedBlocks};
+      const rows=motor.solve(entrada),resultado=motor.validate(entrada,rows);
+      const inicial=motor.rounds(target,motor.completeBlocks(history.filter(r=>r.date<first),horasConsecutivasSec));
+      propuestas.push({anio,rows,history,resultado,datos,inicial,before});
     }
     // Apply only after validating every year's proposal.
     if(niveles.includes('pri'))for(const dias of diasPorMes.values())armarPrimariaMes(dias);
     for(const propuesta of propuestas){
       const extras=aplicarAtencionesAip(propuesta.rows,propuesta.datos.libres);
-      informes.push(informeDistribucionAip(propuesta,universo,extras));
+      informes.push(informeDistribucionAip(propuesta,extras));
     }
     localStorage.setItem(KEY,JSON.stringify(plan));
   }catch(error){
@@ -947,7 +981,7 @@ function armarSecundariaMes(days,silencio){
   if(!days.length)return false;
   return generarPeriodoAip([ymd(days[0]).slice(0,7)],silencio,['sec'],days);
 }
-function informeDistribucionAip({anio,rows,history,resultado,datos},universo,extras){
+function informeDistribucionAip({anio,rows,history,resultado,datos,inicial,before},extras){
   const motor=IEAipDistribucion,previo=motor.summarize(history,[]);
   const opciones=new Map(),autom=new Set(rows.map(motor.monthly));
   for(const fila of datos.opportunities){
@@ -956,19 +990,26 @@ function informeDistribucionAip({anio,rows,history,resultado,datos},universo,ext
     opciones.get(key).add(motor.monthly(fila));
   }
   const causas=new Map();
-  for(const key of universo.keys())if(!resultado.combos.has(key)){
+  for(const key of resultado.rounds.pending){
     const posibles=opciones.get(key);
     const diagnostico=datos.diagnostico.get(key);
-    const motivos=posibles?.size?['Capacidad insuficiente para cubrir todas las combinaciones']:
+    const motivos=posibles?.size?['Oportunidad presente; revisar capacidad, secuencia o límite mensual']:
       diagnostico?.size?[...diagnostico]:['Sin oportunidades compatibles'];
     motivos.forEach(motivo=>causas.set(motivo,(causas.get(motivo)||0)+1));
   }
   const excesosHistoricos=IEAipEstadisticas.monthlyExcesses(history);
   const mensualesLimitadas=new Set(datos.opportunities.filter(fila=>(previo.months.get(motor.monthly(fila))||0)>0).map(motor.monthly));
   const repeticiones=motor.adjacentMonths(resultado.months).filter(r=>autom.has(r.month+'|'+r.combo)||autom.has(r.previous+'|'+r.combo));
+  const estado=resultado.rounds,occupied=new Set(rows.flatMap(r=>[r.date+'|'+r.h1,r.date+'|'+r.h2]));
+  const possible=new Set(datos.opportunities.map(r=>r.date+'|'+r.h1));
+  let sinCandidatos=0;
+  for(const [date,horas] of datos.libres)for(const h of horas){
+    if(horas.includes(h+1)&&horasConsecutivasSec(h,h+1)&&!occupied.has(date+'|'+h)&&!occupied.has(date+'|'+(h+1))&&!possible.has(date+'|'+h))sinCandidatos++;
+  }
   return {anio,covered:resultado.counts.map(m=>m.size),newCombos:resultado.combos.size-previo.combos.size,
-    pending:[...universo.keys()].filter(k=>!resultado.combos.has(k)).length,hours:rows.length*2,extras,causas,excesosHistoricos,
-    oportunidades:datos.opportunities.length,mensualesLimitadas,repeticiones};
+    pending:estado.pending.size,hours:rows.length*2,extras,causas,excesosHistoricos,
+    oportunidades:datos.opportunities.length,mensualesLimitadas,repeticiones,estado,
+    inicial:inicial.completed.length+1,nuevas:Math.max(0,estado.completed.length-before.completed.length),sinCandidatos};
 }
 function detalleExcesoAip({hours,manual,inherited}){
   return hours+' horas programadas (manuales: '+manual+' · heredadas sin marca manual: '+inherited+')';
@@ -985,8 +1026,15 @@ function renderInformeAip(){
     summary.textContent='Cobertura del año: '+i.covered[0]+' docentes, '+i.covered[1]+' secciones y '+i.covered[2]+' cursos. Pendientes: '+i.pending+'. Horas sin atención: '+(i.extras.soporte+i.extras.mantenimiento)+' ('+i.extras.soporte+' soporte y '+i.extras.mantenimiento+' mantenimiento). Conflictos automáticos de colegiado, horario y límite: 0.';
     const reasons=document.createElement('p');
     reasons.textContent=['Oportunidades compatibles evaluadas: '+i.oportunidades,
+      'Bloques libres sin candidato horario: '+i.sinCandidatos,
       ...[...i.causas].map(([causa,total])=>causa+': '+total),
       'Combinaciones mensuales limitadas por atención previa: '+i.mensualesLimitadas.size].join(' · ');
+    const rounds=document.createElement('p'),estado=i.estado;
+    rounds.textContent='Ronda inicial: '+i.inicial+' · Ronda activa al finalizar: '+(estado.completed.length+1)+
+      ' · Rondas completas en el año: '+estado.completed.length+' ('+i.nuevas+' adicionales)'+
+      ' · Avance: '+(estado.target.size-estado.pending.size)+' de '+estado.target.size+
+      ' · Repeticiones mensuales válidas: '+i.repeticiones.length+' · Anomalías históricas: '+estado.anomalies.length+
+      ' · Repeticiones nuevas en la misma ronda e inicios anticipados: 0.';
     const issues=document.createElement('ul'),catalog=inventarioAip(docentesAip());
     for(const r of i.repeticiones){
       const li=document.createElement('li'),fila=catalog.get(r.combo),label=fila?[fila.doc,fila.course,fila.section].join(' · '):JSON.parse(r.combo).join(' · ');
@@ -997,7 +1045,7 @@ function renderInformeAip(){
       const fila=catalog.get(id.slice(8)),label=fila?[fila.doc,fila.course,fila.section].join(' · '):JSON.parse(id.slice(8)).join(' · ');
       li.textContent=id.slice(0,7)+' · '+label+': '+detalleExcesoAip(counts)+'. Exceso previo conservado.';issues.append(li);
     }
-    details.append(title,summary,reasons,issues);box.append(details);
+    details.append(title,summary,rounds,reasons,issues);box.append(details);
   }
 }
 
@@ -1448,6 +1496,82 @@ function opcionesEstadisticasAip(form,catalog){
     if(values.has(anterior))select.value=anterior;
   }
 }
+function renderRondasAip(box,anio,catalogo,historico,horizonte){
+  const motor=IEAipDistribucion,{target,exclusiones}=universoRondasAip(anio,catalogo);
+  const estado=motor.rounds(target,motor.completeBlocks(historico,horasConsecutivasSec));
+  const compatible=new Set(horizonte.opportunities.map(motor.key));
+  const anomalias=new Set(estado.anomalies.map(({row})=>motor.key(row)));
+  const acreditadas=new Map(),ultima=new Map();
+  for(const {row,round} of estado.credits.values()){
+    const id=motor.key(row);
+    if(!acreditadas.has(id))acreditadas.set(id,[]);
+    acreditadas.get(id).push(round);
+  }
+  for(const row of historico)ultima.set(motor.key(row),row.date);
+  const nombre=row=>[row.doc,etiquetaCursoAip(row.course),row.section].join(' · ');
+  const label=id=>catalogo.has(id)?nombre(catalogo.get(id)):JSON.parse(id).join(' · ');
+  const momento=(r,h)=>r?r.date+' · '+h+'ª hora ('+(HSEC().find(([n])=>n===h)?.[1]||'tramo histórico')+')':'—';
+  const atendidas=estado.target.size-estado.pending.size;
+  const avance=estado.target.size?(atendidas===estado.target.size?'100':String(Math.floor(atendidas*10000/estado.target.size)/100))+' %':'—';
+  const h=document.createElement('h3');h.className='font-bold';h.textContent='Rondas de cobertura · Secundaria · '+anio;box.append(h);
+  const p=document.createElement('p');
+  p.textContent='Rondas completadas: '+estado.completed.length+' · Universo institucional: '+catalogo.size+' · Universo autorizado: '+target.length+
+    ' · Horas programadas del año: '+historico.length+' · Anomalías históricas: '+estado.anomalies.length;
+  box.append(p);
+  const filas=estado.completed.map(({start,close},i)=>[i+1,target.length+' de '+target.length,'100 %','Completada',momento(start,start.h1),momento(close,close.h2)]);
+  if(target.length)filas.push([estado.completed.length+1,atendidas+' de '+target.length,avance,
+    (atendidas?'En progreso':'Disponible')+' · '+estado.pending.size+' pendientes',momento(estado.start,estado.start?.h1),'—']);
+  box.append(tablaEstadisticasAip('Avance anual de rondas',['Ronda','Combinaciones','Avance','Estado','Inicio','Último tramo del cierre'],filas));
+  const siguiente=document.createElement('p');
+  siguiente.textContent=target.length?'Ronda '+(estado.completed.length+2)+' bloqueada hasta completar la ronda '+(estado.completed.length+1)+'.':'Sin combinaciones en el universo autorizado.';
+  box.append(siguiente);
+  const retiradas=new Set(historico.map(motor.key).filter(id=>!catalogo.has(id)));
+  if(retiradas.size){
+    const warning=document.createElement('p');
+    warning.textContent=retiradas.size+' combinaciones históricas están fuera del horario vigente. Sus horas permanecen en el calendario.';
+    box.append(warning);
+  }
+  const pendientes=[...estado.pending].map(id=>[label(id),compatible.has(id)?'Con oportunidad compatible en el año':
+    'Sin oportunidad en el año · '+([...horizonte.diagnostico.get(id)||[]].join(', ')||'Horario sin bloque compatible')]);
+  if(pendientes.length){
+    const details=document.createElement('details'),summary=document.createElement('summary');
+    summary.textContent='Combinaciones pendientes de la ronda activa';
+    details.append(summary,tablaEstadisticasAip('Pendientes de cobertura',['Combinación','Oportunidades del año'],pendientes));box.append(details);
+  }
+  if(estado.anomalies.length){
+    const details=document.createElement('details'),summary=document.createElement('summary');
+    summary.textContent='Ver anomalías históricas';
+    details.append(summary,tablaEstadisticasAip('Repeticiones sin crédito',['Combinación','Ronda activa','Tramo'],
+      estado.anomalies.map(({row,round})=>[nombre(row),round,momento(row,row.h1)])));box.append(details);
+  }
+  for(const [id,item] of exclusiones){
+    const line=document.createElement('div');
+    line.textContent=label(id)+' · '+item.reason+' · PIP, '+item.at.slice(0,10)+' ';
+    if(puedeAutorizarRondasAip()){
+      const button=document.createElement('button');button.type='button';button.className='btn btn-ghost text-xs';button.textContent='Reincorporar';
+      button.onclick=()=>configurarExclusionAip(anio,id,null);line.append(button);
+    }
+    box.append(line);
+  }
+  if(target.length&&puedeAutorizarRondasAip()){
+    const form=document.createElement('form');form.className='colegiado-fields';
+    const list=document.createElement('select'),reason=document.createElement('input'),save=document.createElement('button');
+    list.setAttribute('aria-label','Combinación a excluir');reason.setAttribute('aria-label','Motivo de la exclusión');
+    reason.required=true;reason.maxLength=240;reason.placeholder='Motivo de la exclusión';
+    for(const id of target.slice().sort((a,b)=>label(a).localeCompare(label(b),'es')))list.add(new Option(label(id),id));
+    save.className='btn btn-ghost text-xs';save.textContent='Autorizar exclusión';save.type='submit';
+    form.onsubmit=event=>{event.preventDefault();configurarExclusionAip(anio,list.value,reason.value);};
+    form.append(list,reason,save);box.append(form);
+  }
+  function estadoCombo(id){
+    if(exclusiones.has(id))return {text:'Excluida por el PIP',style:'aip-stat-empty'};
+    if(!estado.target.has(id))return {text:'Histórica',style:'aip-stat-empty'};
+    if(anomalias.has(id))return {text:estado.pending.has(id)?'Pendiente · anomalía histórica':'Programada · anomalía histórica',style:'aip-stat-repeat'};
+    if(!estado.pending.has(id))return {text:'Programada',style:'aip-stat-hit'};
+    return compatible.has(id)?{text:'Pendiente',style:'aip-stat-empty'}:{text:'Sin oportunidad compatible',style:'aip-stat-repeat'};
+  }
+  return {estado,acreditadas,ultima,estadoCombo};
+}
 function registrosCalendarioAip(dias,nivel,filter,nombres){
   const conteo={grupo:0,colegiado:0,soporte:0,man:0},grados=new Map();
   const filtroIndividual=Object.values(filter).some(Boolean);
@@ -1481,6 +1605,7 @@ function renderEstadisticasAip(){
   const form=document.getElementById('filtrosAip'),f=form.elements;
   if(!f.anio.value)f.anio.value=anioDeMes();
   const anio=f.anio.value,output=document.getElementById('resultadoAip');
+  const rondaBox=document.getElementById('rondasAip');rondaBox.replaceChildren();
   if(!/^[2-9]\d{3}$/.test(anio)){output.textContent='Indica un año escolar válido.';return;}
   const modo=f.periodo.value,nivel=f.nivel.value;
   document.getElementById('aipFiltroDesde').hidden=modo==='anio';
@@ -1507,6 +1632,8 @@ function renderEstadisticasAip(){
   }
   if(nivel==='pri')return;
   const datos=oportunidadesAip(periodo,nombres,true);
+  const ronda=renderRondasAip(rondaBox,anio,new Map(catalog.map(r=>[IEAipDistribucion.key(r),r])),historico,
+    desde===1&&hasta===12?datos:oportunidadesAip(dias(1,12),nombres,true));
   const informe=IEAipEstadisticas.report({catalog,history:historico,opportunities:datos.opportunities,from:ym(desde),to:ym(hasta),filter,consecutive:horasConsecutivasSec});
   const pct=(a,b)=>b?Math.round(a*100/b)+'%':'—';
   output.append(tablaEstadisticasAip('Cobertura de Secundaria',
@@ -1531,9 +1658,10 @@ function renderEstadisticasAip(){
     const h=x.months[ym(i)]||0,repeat=x.repeats.includes(ym(i));
     return {text:h,style:h>2?'aip-stat-danger':repeat?'aip-stat-repeat':h?'aip-stat-hit':'aip-stat-empty',
       label:h>2?'Supera dos horas. '+detalleExcesoAip(x.excesses[ym(i)]):repeat?'Atención en meses consecutivos':h?'Atención programada':'Sin atención'};
-  }),x.annual]);
+  }),ronda.estado.complete.get(x.id)||0,(ronda.acreditadas.get(x.id)||[]).join(', ')||'—',
+    ronda.estadoCombo(x.id),ronda.ultima.get(x.id)||'—',x.annual]);
   output.append(tablaEstadisticasAip('Matriz anual por docente, curso y sección',
-    ['Docente','Curso','Sección',...meses.map(i=>NOM_MES[i]),'Total del año'],rows));
+    ['Docente','Curso','Sección',...meses.map(i=>NOM_MES[i]),'Bloques completos','Rondas acreditadas','Ronda activa','Última atención','Total del año'],rows));
   texto('Gris: sin atención. Verde: dentro del límite. Naranja: meses consecutivos. Rojo: más de dos horas. El total incluye enero y febrero si tienen registros.');
   const excesos=matriz.flatMap(x=>Object.entries(x.excesses).map(([mes,counts])=>[mes,...labels(x),detalleExcesoAip(counts)]));
   if(excesos.length)output.append(tablaEstadisticasAip('Origen de excesos mensuales',
@@ -1606,24 +1734,38 @@ function renderEditorHS(){
   });
   box.innerHTML=h+'</tbody></table>'; renderChoques();
 }
+function avisoUniversoAip(anterior){
+  const nuevo=inventarioAip(docentesAip());
+  const added=[...nuevo.keys()].filter(id=>!anterior.has(id)).length;
+  const removed=[...anterior.keys()].filter(id=>!nuevo.has(id)).length;
+  if(added||removed)alert('Cambió el universo institucional de rondas: '+added+' incorporadas y '+removed+' retiradas. Revisa Estadísticas AIP. El calendario histórico se conserva.');
+}
 function guardarDiaHS(){
+  const anterior=inventarioAip(docentesAip());
   const sel=document.getElementById('selDiaHS'); if(!sel) return; const wd=+sel.value; const M=ensureHS(); if(!M[wd]) M[wd]={};
   horasPed('sec').forEach(num=>{
     if(!M[wd][num]) M[wd][num]={};
     secsVivas().forEach(s=>{
       const area=((document.getElementById('hsA_'+wd+'_'+num+'_'+s)||{}).value||'').trim();
       const doc=((document.getElementById('hsD_'+wd+'_'+num+'_'+s)||{}).value||'').trim();
-      if(area||doc) M[wd][num][s]={ area:area||'—', doc:doc||'—' }; else delete M[wd][num][s];
+      const previo=M[wd][num][s],docenteId=previo?.docenteId;
+      if(area||doc) M[wd][num][s]={area:area||'—',doc:doc||'—',...(docenteId&&normDoc(previo.doc)===normDoc(doc)?{docenteId}:{})};
+      else delete M[wd][num][s];
     });
   });
   saveHS(); renderEditorHS();
   const n=choquesHS().filter(c=>c.wd===wd).length;
   alert('Horario de '+wdNombre(wd)+' guardado.'+(n?('\nOjo: '+n+' choque(s).'):' Sin choques.'));
+  avisoUniversoAip(anterior);
 }
 function exportarHS(){ const blob=new Blob([JSON.stringify(getHS(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='horario_docentes_aip.json'; a.click(); }
-function restaurarHSEjemplo(){ if(!confirm('¿Volver al horario oficial del Excel?')) return; horarioDoc=JSON.parse(JSON.stringify(HS)); saveHS(); renderEditorHS(); }
+function restaurarHSEjemplo(){ if(!confirm('¿Volver al horario oficial del Excel?')) return; aplicarMapaHS(JSON.parse(JSON.stringify(HS))); }
 function diaCsvAIndex(v){ v=String(v||'').trim().toUpperCase(); const map={LUN:0,LUNES:0,MAR:1,MARTES:1,MIE:2,MIERCOLES:2,MIÉRCOLES:2,JUE:3,JUEVES:3,VIE:4,VIERNES:4,'0':0,'1':1,'2':2,'3':3,'4':4}; return map[v]!==undefined?map[v]:parseInt(v,10); }
-function aplicarMapaHS(obj){ if(!obj||typeof obj!=='object') return false; horarioDoc=obj; saveHS(); renderEditorHS(); return true; }
+function aplicarMapaHS(obj){
+  if(!obj||typeof obj!=='object')return false;
+  const anterior=inventarioAip(docentesAip());
+  horarioDoc=obj;saveHS();renderEditorHS();avisoUniversoAip(anterior);return true;
+}
 function parseCsvHS(text){
   const lines=text.replace(/\r/g,'').split('\n').filter(x=>x.trim()); if(lines.length<2) throw new Error('CSV vacío');
   const head=lines[0].split(/[;,]/).map(x=>x.trim().toLowerCase().replace(/['"]/g,''));
