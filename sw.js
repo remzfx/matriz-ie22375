@@ -8,7 +8,8 @@ const PRECACHE = [
   './', './index.html', './admin.html', './primaria.html', './secundaria.html', './auxiliar.html',
   './layout-shells.css', './manifest.json', './icon-192.png', './icon-512.png',
   './students.js', './matrix-teachers.js', './student-identity.js', './matrix-registry-import.js', './auxiliar-permissions.js', './login-bridge.js',
-  './registro.html', './registro-academic-model.js', './registro-reconcile.js', './academic-identity.js','./conclusion-suggestions.js', './transversales.html', './transversales-client.js', './registro-evaluation.js', './registro-transversales.js', './students-migration.js', './aula_innovacion.js'
+  './registro.html', './registro-academic-model.js', './registro-reconcile.js', './academic-identity.js','./conclusion-suggestions.js', './transversales.html', './transversales-client.js', './registro-evaluation.js', './registro-transversales.js', './students-migration.js', './aula_innovacion.js',
+  './aula_innovacion.html', './aip-colegiado.js', './aip-distribucion.js', './aip-estadisticas.js', './aip-paquete.js'
 ];
 const STATIC_URLS = new Set(PRECACHE.map(path => new URL(path, self.registration.scope).href));
 // Puente de lectura: comparte una petición en curso entre Hub y Auxiliar al navegar.

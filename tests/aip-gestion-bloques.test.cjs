@@ -13,7 +13,7 @@ function extract(name){
   return html.slice(from,next);
 }
 function make(names,extras={}){
-  const control={plan:{},feriados:{},programacionesColegiado:[],esColegiadoReservado:()=>false,hayColegiadoPendiente:()=>false,revisarColegiadoAntesDeGenerar:()=>true,leerProgramacionesColegiado(){},renderGestorColegiado(){},...extras};
+  const control={IEAipPaquete:require('../aip-paquete.js'),plan:{},feriados:{},ultimoInformeAip:[],renderInformeAip(){},renderEstadisticasAip(){},programacionesColegiado:[],esColegiadoReservado:()=>false,hayColegiadoPendiente:()=>false,revisarColegiadoAntesDeGenerar:()=>true,leerProgramacionesColegiado(){},renderGestorColegiado(){},...extras};
   vm.createContext(control);
   vm.runInContext(['esColegiadoMaterializado','depurarColegiadoMensual',...names].map(extract).join('\n'),control);
   return control;
@@ -87,7 +87,7 @@ test('Editar una hora de gestión conserva otras horas y el horario de primaria/
 test('Armar mes no borra cambios individuales en los días de gestión',()=>{
  const plan=example();
  plan[monday].pri[2]={tipo:'soporte',texto:'Soporte'};
- const v=make(['esFeriado','esNoLectivoEditable','armarMes'],{
+ const v=make(['esFeriado','esNoLectivoEditable','liberarAsignacionesAip','armarPrimariaMes'],{
    plan,feriados:{[monday]:'Semana gestión'},
    document:{getElementById:id=>({value:'2026-12'})},
    diasMes:dates,ymd:d=>d.toISOString().slice(0,10),
@@ -95,7 +95,7 @@ test('Armar mes no borra cambios individuales en los días de gestión',()=>{
    setCelda:(f,n,h,o)=>{plan[f]??={};plan[f][n]??={};plan[f][n][h]=o;},
    bloqueCfg:()=> '2',armarSecundariaMes:()=>{},guardar:()=>{},render:()=>{}
  });
- v.armarMes(true);
+ v.liberarAsignacionesAip(dates(),['pri','sec']); v.armarPrimariaMes(dates());
  assert.equal(plan[monday].pri[2].texto,'Soporte');
  assert.equal(plan[monday].sec[1].tipo,'gestion');
 });

@@ -10,7 +10,7 @@ async function run(){
   await page.route('**/*',async route=>{
    const url=route.request().url();
    if(url==='https://aip.fixture.invalid/')return route.fulfill({contentType:'text/html',body:source});
-   if(url==='https://aip.fixture.invalid/aip-colegiado.js')return route.fulfill({contentType:'text/javascript',body:fs.readFileSync('aip-colegiado.js','utf8')});
+   for(const file of ['aip-colegiado.js','aip-distribucion.js','aip-estadisticas.js', 'aip-paquete.js'])if(url==='https://aip.fixture.invalid/'+file)return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(file,'utf8')});
    if(url==='https://aip.fixture.invalid/layout-shells.css')return route.fulfill({contentType:'text/css',body:fs.readFileSync('layout-shells.css','utf8')});
    if(url==='https://backend.fixture.invalid/exec'){
     const body=route.request().postDataJSON();requests.push(body.action);

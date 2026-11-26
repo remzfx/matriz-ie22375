@@ -6,6 +6,9 @@
 <title>AIP · Horario mensual · IE 22375</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="aip-colegiado.js"></script>
+<script src="aip-distribucion.js"></script>
+<script src="aip-estadisticas.js"></script>
+<script src="aip-paquete.js"></script>
 <style>
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#f1f5f9; color:#0f172a; margin:0; }
   .card { background:#fff; border-radius:16px; box-shadow:0 4px 16px rgba(15,23,42,.06); overflow:hidden; }
@@ -44,6 +47,15 @@
   .colegiado-matrix input { width:20px; height:20px; }
   .colegiado-list article { border-top:1px solid #e2e8f0; padding:10px 0; overflow-wrap:anywhere; }
   .colegiado-preview { max-height:220px; overflow:auto; }
+  .aip-stat-scroll { overflow-x:auto; max-width:100%; }
+  .aip-stat-scroll th, .aip-stat-scroll td { min-width:64px; }
+  .aip-stat-scroll th:first-child, .aip-stat-scroll td:first-child { min-width:112px; }
+  .aip-stat-empty { background:#e2e8f0; }
+  .aip-stat-hit { background:#bbf7d0; }
+  .aip-stat-repeat { background:#fed7aa; }
+  .aip-stat-danger { background:#fecaca; font-weight:bold; }
+  #filtrosAip input[type=search] { min-width:0; border:1px solid #cbd5e1; border-radius:10px; padding:6px 10px; }
+  #pane-estadisticas [hidden] { display:none; }
   .c-rec { background:#fde68a; font-weight:700; }
   .sticky-top { position:sticky; top:0; z-index:20; }
   .mobile-safe-header { padding-top: env(safe-area-inset-top, 0px); }
@@ -99,7 +111,24 @@
     <button type="button" class="aip-tab" id="tabBtnHs" onclick="showAipTab('hs')">Horario de docentes</button>
     <button type="button" class="aip-tab" id="tabBtnColegiado" onclick="showAipTab('colegiado')">Colegiado AIP</button>
     <button type="button" class="aip-tab" id="tabBtnReloj" onclick="showAipTab('reloj')">Reloj / feriados</button>
+    <button type="button" class="aip-tab" id="tabBtnEstadisticas" onclick="showAipTab('estadisticas')">Estadísticas AIP</button>
   </div>
+  <section id="pane-estadisticas" class="card p-3 space-y-3 hidden no-print" aria-labelledby="aipEstadisticasTitulo">
+    <h2 class="font-black text-sm" id="aipEstadisticasTitulo">Estadísticas AIP · Atenciones programadas</h2>
+    <form class="colegiado-fields text-sm" id="filtrosAip" onchange="renderEstadisticasAip()" onsubmit="event.preventDefault()">
+      <label>Año <input name="anio" type="number" min="2000" max="9999" placeholder="Año escolar"></label>
+      <label>Periodo <select name="periodo"><option value="anio">Todo el año</option><option value="mes">Un mes</option><option value="rango">Periodo de meses</option></select></label>
+      <label id="aipFiltroDesde" hidden>Desde <select name="desde"></select></label>
+      <label id="aipFiltroHasta" hidden>Hasta <select name="hasta"></select></label>
+      <label>Nivel <select name="nivel"><option value="ambos">Ambos</option><option value="pri">Primaria</option><option value="sec">Secundaria</option></select></label>
+      <label>Docente <select name="teacher"></select></label>
+      <label>Curso <select name="course"></select></label>
+      <label>Sección <select name="section"></select></label>
+      <label>Ordenar <select name="orden"><option value="nombre">Nombre</option><option value="pendientes">Pendientes primero</option><option value="horas">Más horas en el periodo</option></select></label>
+      <label>Buscar en la matriz <input name="buscar" type="search" placeholder="Docente, curso o sección" oninput="renderEstadisticasAip()"></label>
+    </form>
+    <div id="resultadoAip" class="space-y-3 text-sm"></div>
+  </section>
   <div id="pane-mes" class="space-y-3 pane-print">
     <div class="card p-3 no-print space-y-3">
       <div class="flex flex-wrap items-end gap-2">
@@ -140,10 +169,10 @@
         </div>
         <p class="text-[11px] text-slate-500">Marca lo que priorizas este mes. El siguiente mes marcas la otra mitad. Solo entran bloques de 2 h de esos cursos.</p>
         <div id="boxCursosMes" class="flex flex-wrap gap-2"></div>
-        <div id="boxDeudaMes" class="text-[11px] text-amber-800"></div>
+        <div id="boxInformeAip" class="text-[11px] text-amber-800"></div>
         <div class="border-t border-slate-200 pt-2 space-y-1">
           <div class="text-xs font-black">Panorama del año</div>
-          <p class="text-[11px] text-slate-500">Primero marca feriados, gestión o vacaciones mes a mes (clic en el día). Luego arma. Esas fechas y el colegiado no se pisan; solo se llenan días hábiles. Mitad A / mitad B de cursos si el mes no tenía checklist.</p>
+          <p class="text-[11px] text-slate-500">Primero marca feriados, gestión o vacaciones mes a mes (clic en el día). Luego arma. El motor protege esas fechas y el Colegiado. Si no configuras el mes, considera todas las áreas del horario.</p>
           <div class="flex flex-wrap items-center gap-3">
             <div id="boxMesesAnio" class="flex flex-wrap gap-1"></div>
             <span class="hidden sm:inline w-px h-7 bg-slate-300"></span>
@@ -454,16 +483,11 @@ function candidatos(wd,hora){
   const M=getHS(); const row=(M[wd]&&M[wd][hora])||{};
   return Object.keys(row).map(s=>({ seccion:s, area:row[s].area, doc:row[s].doc, texto:s+' '+row[s].area+' '+row[s].doc }));
 }
-function horaPar(h,nivel){
-  const arr=horasPed(nivel||'sec'); const i=arr.indexOf(+h);
-  if(i<0) return null; if(i%2===0) return arr[i+1]||null; return arr[i-1]||null;
-}
 function mismoGrupo(wd,h1,h2,seccion){
-  const M=getHS();
-  const a=M[wd]&&M[wd][h1]&&M[wd][h1][seccion];
-  const b=M[wd]&&M[wd][h2]&&M[wd][h2][seccion];
-  if(!a||!b) return false;
-  return normDoc(a.doc)===normDoc(b.doc) && esDocValido(a.doc);
+  const a=claseHorarioAip(wd,h1,seccion),b=claseHorarioAip(wd,h2,seccion);
+  return !!a&&!!b&&esDocValido(a.doc)&&esDocValido(b.doc)&&
+    (a.docenteId&&b.docenteId?String(a.docenteId)===String(b.docenteId):normDoc(a.doc)===normDoc(b.doc))&&
+    !!normArea(a.area)&&normArea(a.area)===normArea(b.area);
 }
 const AREAS_MES = [
   { id:'MAT', nom:'Matemática' },
@@ -479,7 +503,7 @@ const AREAS_MES = [
   { id:'TUT', nom:'Tutoría' }
 ];
 let cursosPorMes = {};
-let deudaAip = {};
+
 function normArea(s){
   let x=String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
   x=x.replace(/[^A-Z]/g,'');
@@ -497,32 +521,17 @@ function normArea(s){
   return x;
 }
 function mesActual(){ return (document.getElementById('inpMes')||{}).value||'2026-10'; }
-function cursosDelMes(){
-  const m=mesActual();
-  if(!Object.prototype.hasOwnProperty.call(cursosPorMes,m)) return AREAS_MES.map(a=>a.id);
-  return cursosPorMes[m]||[];
-}
-function cursoPermitido(area){ return cursosDelMes().indexOf(normArea(area))>=0; }
-function mesSiguiente(ym){
-  const [Y,M]=(ym||mesActual()).split('-').map(Number);
-  const d=new Date(Y,M,1);
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+function cursosDelMes(mes=mesActual()){
+  if(!Object.hasOwn(cursosPorMes,mes)) return AREAS_MES.map(a=>a.id);
+  return cursosPorMes[mes]||[];
 }
 function renderCursosMes(){
   const box=document.getElementById('boxCursosMes'); if(!box) return;
   const sel=cursosDelMes();
-  const deuda=deudaAip[mesActual()]||{};
-  const prios=deuda.areas||[];
   box.innerHTML=AREAS_MES.map(a=>{
-    const on=sel.indexOf(a.id)>=0; const deb=prios.indexOf(a.id)>=0;
-    return '<label class="text-xs font-bold px-2 py-1 rounded-lg cursor-pointer" style="border:1px solid '+(deb?'#d97706':'#cbd5e1')+';background:'+(on?'#bbf7d0':'#f1f5f9')+'"><input type="checkbox" '+(on?'checked':'')+' onchange="toggleCursoMes(\''+a.id+'\')" style="margin-right:4px">'+a.nom+(deb?' ★':'')+'</label>';
+    const on=sel.includes(a.id);
+    return '<label class="text-xs font-bold px-2 py-1 rounded-lg cursor-pointer" style="border:1px solid #cbd5e1;background:'+(on?'#bbf7d0':'#f1f5f9')+'"><input type="checkbox" '+(on?'checked':'')+' onchange="toggleCursoMes(\''+a.id+'\')" style="margin-right:4px">'+a.nom+'</label>';
   }).join('');
-  const nota=document.getElementById('boxDeudaMes');
-  if(nota){
-    if(deuda.secciones||deuda.areas){
-      nota.textContent='Prioridad del mes anterior ('+(deuda.de||'')+'): secciones '+(deuda.secciones||[]).join(', ')+' · cursos '+(deuda.areas||[]).map(id=>(AREAS_MES.find(a=>a.id===id)||{nom:id}).nom).join(', ');
-    } else nota.textContent='';
-  }
 }
 function toggleCursoMes(id){
   const m=mesActual();
@@ -536,8 +545,6 @@ function marcarCursosMes(todos){
   cursosPorMes[mesActual()]=todos?AREAS_MES.map(a=>a.id):[];
   guardarCfg(); renderCursosMes();
 }
-const MITAD_A=['MAT','COM','CYT','CCSS','ING','TUT'];
-const MITAD_B=['ART','EFIS','EPT','DPCC','REL','TUT'];
 const NOM_MES=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'];
 let mesesAnioSel=null;
 function anioDeMes(){ return +(mesActual().split('-')[0]||2026); }
@@ -563,35 +570,10 @@ function toggleMesAnio(id){
   renderMesesAnio();
 }
 function armarAnio(){
-  if(!mesesAnioSel||!mesesAnioSel.length){ alert('Marca al menos un mes.'); return; }
-  const origen=mesActual();
-  const orden=mesesAnioSel.slice().sort();
-  if(!revisarColegiadoAntesDeGenerar(orden.flatMap(mes=>diasMes(mes).map(ymd)))) return;
-  const pendientes=[];
-  orden.forEach((ym,i)=>{
-    document.getElementById('inpMes').value=ym;
-    if(!Object.prototype.hasOwnProperty.call(cursosPorMes,ym) || !cursosPorMes[ym] || !cursosPorMes[ym].length){
-      cursosPorMes[ym]=(i%2===0)?MITAD_A.slice():MITAD_B.slice();
-    }
-    armarMes(true);
-    const deuda=deudaAip[mesSiguiente(ym)];
-    if(deuda?.de===ym&&(deuda.secciones.length||deuda.areas.length)) pendientes.push(ym+': '+deuda.secciones.concat(deuda.areas).join(', '));
-  });
-  document.getElementById('inpMes').value=origen;
-  renderCursosMes(); renderMesesAnio(); render();
-  alert('Listo: '+orden.join(', ')+'.'+(pendientes.length?'\nAtenciones pendientes:\n'+pendientes.join('\n'):''));
+  if(!mesesAnioSel?.length){ alert('Marca al menos un mes.'); return; }
+  generarPeriodoAip(mesesAnioSel);
 }
 function bloqueCfg(){ return (document.getElementById('selBloque')||{}).value||'2'; }
-function exigeDos(){ return bloqueCfg()==='2'; }
-function candidatosAIP(wd,hora,fecha){
-  if(fecha&&(esColegiadoReservado(fecha,'sec',hora)||hayColegiadoPendiente(fecha,'sec'))) return [];
-  let list=candidatos(wd,hora);
-  if(!exigeDos()) return list;
-  const par=horaPar(hora);
-  if(!par||!horasConsecutivasSec(Math.min(hora,par),Math.max(hora,par))) return [];
-  if(fecha && (!slotActivo(fecha,'sec',hora,wd)||!slotActivo(fecha,'sec',par,wd))) return [];
-  return list.filter(c=>mismoGrupo(wd,hora,par,c.seccion));
-}
 function esFeriado(f){ return !!(feriados&&feriados[f]); }
 function esNoLectivoEditable(f){ return !!(feriados&&(feriados[f]==='Semana gestión'||feriados[f]==='Vacaciones')); }
 function normFecha(v){
@@ -613,7 +595,6 @@ function loadCfg(){
     if(c.horario&&c.horario.pri&&c.horario.sec) horario=c.horario;
     if(c.plantModo&&document.getElementById('selPlantModo')) document.getElementById('selPlantModo').value=c.plantModo;
     if(c.cursosPorMes&&typeof c.cursosPorMes==='object') cursosPorMes=c.cursosPorMes;
-    if(c.deudaAip&&typeof c.deudaAip==='object') deudaAip=c.deudaAip;
     pintarFormHorario();
   }catch(e){ plantilla=plantillaDefault(); colegiado=colegiadoDefault(); feriados={}; pintarFormHorario(); }
 }
@@ -627,8 +608,7 @@ function guardarCfg(leerHorario=true){
     programacionesColegiado,
     feriados:feriados, horario:horario,
     plantModo:(document.getElementById('selPlantModo')||{}).value||'aip',
-    cursosPorMes:cursosPorMes,
-    deudaAip:deudaAip
+    cursosPorMes:cursosPorMes
   }));
 }
 function pintarFormHorario(){
@@ -673,6 +653,7 @@ function paqueteAip(){
 function aplicarPaqueteAip(p){
   if(!p||typeof p!=='object') return;
   leerProgramacionesColegiado(p);
+  ultimoInformeAip=[];renderInformeAip();
   if(p.plan) plan=depurarColegiadoMensual(p.plan); if(p.plantilla) plantilla=p.plantilla; if(p.colegiado) colegiado=p.colegiado;
   if(p.feriados) feriados=p.feriados; if(p.horario) horario=p.horario;
   if(p.horarioDoc){ horarioDoc=p.horarioDoc; saveHS(); }
@@ -692,7 +673,7 @@ function tokenSesionAip() {
 async function subirAipNube(){
   guardarCfg(); localStorage.setItem(KEY,JSON.stringify(plan)); saveHS();
   try{
-    const res=await fetch(CLOUD_API_URL,{ method:'POST', body:JSON.stringify({ action:'saveaip', token:tokenSesionAip(), payload:paqueteAip(), ts:Date.now() }) });
+    const res=await fetch(CLOUD_API_URL,{ method:'POST', body:JSON.stringify({ action:'saveaip', token:tokenSesionAip(), payload:await IEAipPaquete.encode(paqueteAip()), ts:Date.now() }) });
     const data=await res.json();
     if(!data||!data.ok) throw new Error((data&&data.error)||'Sin respuesta');
     alert('Plan AIP subido a la nube.');
@@ -704,7 +685,7 @@ async function bajarAipNube(){
     const data=await res.json();
     if(!data||!data.ok) throw new Error((data&&data.error)||'Sin respuesta');
     if(!data.payload){ alert('En la nube no hay plan AIP. Sube con Nube ↑.'); return; }
-    aplicarPaqueteAip(data.payload); alert('Plan AIP bajado de la nube.');
+    aplicarPaqueteAip(await IEAipPaquete.decode(data.payload)); alert('Plan AIP bajado de la nube.');
   }catch(e){ alert('No bajó de la nube.\n'+e.message); }
 }
 function imprimirPDF(){
@@ -776,28 +757,30 @@ function limpiarMes(){
   const prefijo=mes+'-';
   for(const fecha of Object.keys(plan)) if(fecha.startsWith(prefijo)) delete plan[fecha];
   for(const fecha of Object.keys(feriados)) if(fecha.startsWith(prefijo)) delete feriados[fecha];
+  ultimoInformeAip=[]; renderInformeAip();
   guardarCfg(false);
   localStorage.setItem(KEY,JSON.stringify(plan));
   renderFeriados();
   render();
 }
 function armarMes(silencio){
-  const ym=document.getElementById('inpMes').value; const days=diasMes(ym);
-  if(!revisarColegiadoAntesDeGenerar(days.map(ymd))) return;
-  days.forEach(d=>{
+  generarPeriodoAip([mesActual()],silencio);
+}
+function liberarAsignacionesAip(days,niveles){
+  for(const d of days){
     const f=ymd(d);
-    const noLectivo=esNoLectivoEditable(f);
-    ['pri','sec'].forEach(n=>{
-      const o=plan[f]&&plan[f][n]; if(!o) return;
-      Object.keys(o).forEach(h=>{
-        const t=o[h]&&o[h].tipo;
-        if(esColegiadoMaterializado(o[h])){ delete o[h]; return; }
-        if(noLectivo||o[h]?.manual) return;
-        if(t==='bloqueado'||t==='abierto'||t==='gestion'||t==='vacaciones'||t==='feriado') return;
-        delete o[h];
-      });
-    });
-  });
+    for(const nivel of niveles){
+      const row=plan[f]?.[nivel];
+      if(!row)continue;
+      for(const [hora,c] of Object.entries(row)){
+        if(esColegiadoMaterializado(c)){ delete row[hora]; continue; }
+        if(esNoLectivoEditable(f)||c?.manual||['bloqueado','abierto','gestion','vacaciones','feriado'].includes(c?.tipo))continue;
+        delete row[hora];
+      }
+    }
+  }
+}
+function armarPrimariaMes(days){
   const rotPri=['3°','4°','5°','6°']; let ip=0;
   days.forEach(d=>{
     const f=ymd(d); if(esFeriado(f)) return; const wd=d.getDay()-1;
@@ -808,121 +791,216 @@ function armarMes(silencio){
     else if(modo==='2'){ usar=[]; for(let i=0;i<act.length-1;i++){ if(act[i+1]===act[i]+1){ usar=[act[i],act[i+1]]; break; } } if(!usar.length) usar=act.slice(0,2); }
     act.forEach(h=>{ if(usar.indexOf(h)>=0) setCelda(f,'pri',h,{ tipo:'grupo', texto:g }); else setCelda(f,'pri',h,{ tipo:'man', texto:'Mantenimiento' }); });
   });
-  armarSecundariaMes(days, silencio);
-  guardar(true,false); if(!silencio) render();
-}
-function semanaDelMes(d, first){
-  const mon=new Date(first.getFullYear(), first.getMonth(), first.getDate());
-  const shift=(mon.getDay()+6)%7;
-  mon.setDate(mon.getDate()-shift);
-  return Math.floor((d-mon)/86400000/7);
 }
 function horasConsecutivasSec(primera,segunda){
   const bloques=HSEC();
   const index=bloques.findIndex(([hora])=>hora===primera);
   return index>=0&&bloques[index+1]?.[0]===segunda;
 }
-function paresLibresSec(d){
-  const f=ymd(d); if(esFeriado(f)) return [];
-  const wd=d.getDay()-1;
-  const act=horasPed('sec').filter(h=>{
-    if(!slotActivo(f,'sec',h,wd)) return false;
-    const c=celda(f,'sec',h);
-    if(c && (c.manual || (c.tipo && c.tipo!=='abierto'))) return false;
-    return true;
-  }).sort((a,b)=>a-b);
-  const pares=[]; const taken={};
-  act.forEach(h=>{
-    if(taken[h]) return;
-    if(act.includes(h+1)&&horasConsecutivasSec(h,h+1)){ pares.push({ d:d, f:f, wd:wd, h1:h, h2:h+1 }); taken[h]=taken[h+1]=1; }
-    else pares.push({ d:d, f:f, wd:wd, h1:h, h2:null });
-  });
-  return pares;
+function seccionAip(value){
+  return String(value||'').toUpperCase().replace(/[^0-9A-Z]/g,'').replace(/UNICA$/,'U');
 }
-function ponerGrupoSec(slot, pick){
-  const M=getHS();
-  const r1=M[slot.wd]&&M[slot.wd][slot.h1]&&M[slot.wd][slot.h1][pick.seccion];
-  setCelda(slot.f,'sec',slot.h1,{ tipo:'grupo', seccion:pick.seccion, area:pick.area|| (r1&&r1.area), doc:pick.doc||(r1&&r1.doc), texto:pick.texto });
-  if(slot.h2){
-    const r2=M[slot.wd]&&M[slot.wd][slot.h2]&&M[slot.wd][slot.h2][pick.seccion];
-    if(r2) setCelda(slot.f,'sec',slot.h2,{ tipo:'grupo', seccion:pick.seccion, area:r2.area, doc:r2.doc, texto:pick.seccion+' '+r2.area+' '+r2.doc });
-    else setCelda(slot.f,'sec',slot.h2,{ tipo:'man', texto:'Mantenimiento' });
+function claseHorarioAip(dia,hora,seccion){
+  const fila=getHS()[dia]?.[hora]||{};
+  if(Object.hasOwn(fila,seccion))return fila[seccion];
+  const matches=Object.keys(fila).filter(key=>seccionAip(key)===seccionAip(seccion));
+  return matches.length===1?fila[matches[0]]:null;
+}
+function docentesAip(){
+  const nombres=new Map();
+  for(const turnos of Object.values(getHS())) for(const hora of Object.values(turnos||{})) for(const dato of Object.values(hora||{})){
+    if(!dato?.docenteId||!esDocValido(dato.doc))continue;
+    const nombre=normDoc(dato.doc);
+    if(!nombres.has(nombre))nombres.set(nombre,new Set());
+    nombres.get(nombre).add(String(dato.docenteId));
   }
+  return nombres;
 }
-function candsPar(slot){
-  if(!slot.h2) return [];
-  return candidatos(slot.wd, slot.h1).filter(c=>mismoGrupo(slot.wd, slot.h1, slot.h2, c.seccion) && cursoPermitido(c.area));
+function identidadAip(c,nombres){
+  const nombre=normDoc(c.doc),ids=nombres.get(nombre);
+  if(!esDocValido(nombre))return null;
+  const id=c.docenteId?String(c.docenteId):ids?.size===1?[...ids][0]:null;
+  const course=normArea(c.area),section=seccionAip(c.seccion);
+  return course&&section?{teacher:id?'id:'+id:'nombre:'+nombre,course,section,doc:c.doc,area:c.area,seccion:c.seccion,
+    ...(id?{docenteId:id}:{})}:null;
 }
-function armarSecundariaMes(days, silencio){
-  if(!days.length||!revisarColegiadoAntesDeGenerar(days.map(ymd),['sec'])) return;
-  const first=days[0];
-  const slots=[];
-  days.forEach(d=>paresLibresSec(d).forEach(s=>{ s.sem=semanaDelMes(d,first); slots.push(s); }));
-  const SECS_NOW=secsVivas();
-  const visits={}; SECS_NOW.forEach(s=>visits[s]=0);
-  const weekGot={};
-  const ordenPrimera=[];
-  function tomar(slot, soloNuevos){
-    if(celda(slot.f,'sec',slot.h1)&&celda(slot.f,'sec',slot.h1).tipo==='grupo') return false;
-    const got=weekGot[slot.sem]||(weekGot[slot.sem]={});
-    let cands=candsPar(slot).filter(c=>!got[c.seccion]);
-    if(soloNuevos) cands=cands.filter(c=>visits[c.seccion]===0);
-    if(!cands.length) return false;
-    cands.sort((a,b)=>{
-      const dv=(visits[a.seccion]||0)-(visits[b.seccion]||0);
-      if(dv) return dv;
-      const ia=ordenPrimera.indexOf(a.seccion), ib=ordenPrimera.indexOf(b.seccion);
-      if(ia>=0 || ib>=0) return (ia<0?99:ia)-(ib<0?99:ib);
-      return ordenSec(a.seccion,b.seccion);
-    });
-    const pick=cands[0];
-    if(visits[pick.seccion]===0) ordenPrimera.push(pick.seccion);
-    visits[pick.seccion]++;
-    got[pick.seccion]=1;
-    ponerGrupoSec(slot, pick);
-    return true;
+function inventarioAip(nombres){
+  const combos=new Map();
+  for(const turnos of Object.values(getHS()))for(const hora of Object.values(turnos||{}))for(const [seccion,dato] of Object.entries(hora||{})){
+    const fila=identidadAip({...dato,seccion},nombres);
+    if(fila)combos.set(IEAipDistribucion.key(fila),fila);
   }
-  const maxSem=slots.reduce((m,s)=>Math.max(m,s.sem),0);
-  for(let sem=0; sem<=maxSem; sem++) slots.filter(s=>s.sem===sem && s.h2).forEach(s=>tomar(s,true));
-  for(let sem=0; sem<=maxSem; sem++) slots.filter(s=>s.sem===sem && s.h2).forEach(s=>tomar(s,false));
-  slots.forEach(s=>{
-    const c=celda(s.f,'sec',s.h1);
-    if(c && c.tipo==='grupo') return;
-    setCelda(s.f,'sec',s.h1,{ tipo:'soporte', texto:'Soporte' });
-    if(s.h2){
-      const c2=celda(s.f,'sec',s.h2);
-      if(!c2 || c2.tipo==='abierto' || !c2.tipo) setCelda(s.f,'sec',s.h2,{ tipo:'man', texto:'Mantenimiento' });
+  return combos;
+}
+function historialAip(anio,nombres=docentesAip()){
+  const filas=[];
+  for(const [date,dia] of Object.entries(plan)){
+    const calendario=IEAipColegiado.calendarDay(date);
+    if(!date.startsWith(anio+'-')||!calendario||calendario.weekday>4||esFeriado(date))continue;
+    for(const [h,c] of Object.entries(dia.sec||{})){
+      const hour=Number(h);
+      if(c?.tipo!=='grupo'||!horasPed('sec').includes(hour)||esColegiadoReservado(date,'sec',hour))continue;
+      const fila=identidadAip(c,nombres);
+      if(fila)filas.push({...fila,date,hour,manual:c.manual===true});
     }
-  });
-  const faltan=SECS_NOW.filter(s=>!visits[s]);
-  const pedidas=cursosDelMes();
-  const usadas={};
-  days.forEach(d=>{
-    const f=ymd(d);
-    horasPed('sec').forEach(h=>{
-      const c=celda(f,'sec',h);
-      if(c&&c.tipo==='grupo'&&c.area) usadas[normArea(c.area)]=1;
-    });
-  });
-  const areasFaltan=pedidas.filter(a=>!usadas[a]);
-  const nxt=mesSiguiente(mesActual());
-  deudaAip[nxt]={ de:mesActual(), secciones:faltan.slice(), areas:areasFaltan.slice() };
-  if(!Object.prototype.hasOwnProperty.call(cursosPorMes,nxt)){
-    cursosPorMes[nxt]=areasFaltan.concat(pedidas.filter(a=>areasFaltan.indexOf(a)<0)).filter((a,i,arr)=>arr.indexOf(a)===i);
-    if(!cursosPorMes[nxt].length) cursosPorMes[nxt]=pedidas.slice();
-  } else {
-    const cur=cursosPorMes[nxt].slice();
-    areasFaltan.forEach(a=>{ if(cur.indexOf(a)<0) cur.unshift(a); });
-    cursosPorMes[nxt]=cur;
   }
-  guardarCfg(false);
-  if(silencio) return;
-  let msg='Armado listo.';
-  if(faltan.length) msg+=' No entraron: '+faltan.join(', ')+'.';
-  if(areasFaltan.length) msg+=' Cursos sin visita: '+areasFaltan.join(', ')+'.';
-  if(faltan.length||areasFaltan.length) msg+=' Quedan prioridad en '+nxt+'.';
-  alert(msg);
+  return filas.sort((a,b)=>IEAipDistribucion.compare(a.date,b.date)||a.hour-b.hour);
 }
+function horasLibresSec(d,proyectar=false){
+  const f=ymd(d),wd=d.getDay()-1;
+  return horasPed('sec').filter(h=>{
+    const c=celda(f,'sec',h);
+    if(proyectar&&c?.tipo&&!c.manual&&!['bloqueado','abierto','gestion','vacaciones','feriado'].includes(c.tipo)){
+      return !esFeriado(f)&&!esColegiadoReservado(f,'sec',h)&&!hayColegiadoPendiente(f,'sec')&&pipOk('sec',h,wd);
+    }
+    return !esFeriado(f)&&slotActivo(f,'sec',h,wd)&&(!c||(!c.manual&&c.tipo==='abierto'));
+  });
+}
+function paresLibresSec(d,proyectar=false){
+  const libres=horasLibresSec(d,proyectar);
+  return libres.filter(h=>libres.includes(h+1)&&horasConsecutivasSec(h,h+1)).map(h=>({f:ymd(d),wd:d.getDay()-1,h1:h,h2:h+1}));
+}
+function oportunidadesAip(days,nombres,proyectar=false){
+  const opportunities=[],diagnostico=new Map(),libres=new Map();
+  for(const d of days){
+    const date=ymd(d),wd=d.getDay()-1,cursos=new Set(cursosDelMes(date.slice(0,7)));
+    const disponibles=horasLibresSec(d,proyectar),set=new Set(disponibles);
+    libres.set(date,disponibles);
+    for(const h1 of horasPed('sec')){
+      const h2=h1+1;
+      for(const [seccion,a] of Object.entries(getHS()[wd]?.[h1]||{})){
+        const fila=identidadAip({...a,seccion},nombres);
+        if(!fila)continue;
+        const id=IEAipDistribucion.key(fila);
+        if(!diagnostico.has(id))diagnostico.set(id,new Set());
+        const causas=diagnostico.get(id);
+        if(!cursos.has(fila.course)){ causas.add('Curso no seleccionado');continue; }
+        if(!horasConsecutivasSec(h1,h2)||!mismoGrupo(wd,h1,h2,seccion)){ causas.add('Falta de bloques consecutivos');continue; }
+        if(esFeriado(date)||hayColegiadoPendiente(date,'sec')){ causas.add('Restricciones del calendario');continue; }
+        if([h1,h2].some(h=>esColegiadoReservado(date,'sec',h))){ causas.add('Horas de colegiado');continue; }
+        if(!set.has(h1)||!set.has(h2)){ causas.add('Plantilla, bloqueos o edición manual');continue; }
+        opportunities.push({...fila,date,h1,h2});
+      }
+    }
+  }
+  return {opportunities,diagnostico,libres};
+}
+function aplicarAtencionesAip(rows,libres){
+  const ocupadas=new Set();
+  for(const r of rows){
+    for(const h of [r.h1,r.h2]){
+      setCelda(r.date,'sec',h,{tipo:'grupo',seccion:r.seccion,area:r.area,doc:r.doc,
+        ...(r.docenteId?{docenteId:r.docenteId}:{}),texto:r.seccion+' '+r.area+' '+r.doc});
+      ocupadas.add(r.date+'|'+h);
+    }
+  }
+  let soporte=0,mantenimiento=0;
+  for(const [date,horas] of libres){
+    const sobrantes=new Set(horas.filter(h=>!ocupadas.has(date+'|'+h)));
+    for(const h of sobrantes){
+      setCelda(date,'sec',h,{tipo:'soporte',texto:'Soporte'});soporte++;
+      if(sobrantes.has(h+1)&&horasConsecutivasSec(h,h+1)){
+        setCelda(date,'sec',h+1,{tipo:'man',texto:'Mantenimiento'});mantenimiento++;
+        sobrantes.delete(h+1);
+      }
+    }
+  }
+  return {soporte,mantenimiento};
+}
+function generarPeriodoAip(meses,silencio=false,niveles=['pri','sec'],diasExactos=null){
+  const elegidos=[...new Set(meses)].filter(m=>/^\d{4}-(0[1-9]|1[0-2])$/.test(m)).sort();
+  if(!elegidos.length)return false;
+  const diasPorMes=new Map(elegidos.map(m=>[m,diasExactos||diasMes(m)]));
+  if(!revisarColegiadoAntesDeGenerar([...diasPorMes.values()].flat().map(ymd),niveles))return false;
+  const original=plan,informes=[];
+  try{
+    // The isolated draft is only visible inside this synchronous calculation.
+    plan=structuredClone(original);
+    for(const dias of diasPorMes.values())liberarAsignacionesAip(dias,niveles);
+    const nombres=docentesAip(),universo=inventarioAip(nombres);
+    const propuestas=[];
+    if(niveles.includes('sec'))for(const anio of new Set(elegidos.map(m=>m.slice(0,4)))){
+      const dias=elegidos.filter(m=>m.startsWith(anio+'-')).flatMap(m=>diasPorMes.get(m));
+      const history=historialAip(anio,nombres),datos=oportunidadesAip(dias,nombres);
+      const entrada={history,opportunities:datos.opportunities},rows=IEAipDistribucion.solve(entrada);
+      const resultado=IEAipDistribucion.validate(entrada,rows);
+      propuestas.push({anio,rows,history,resultado,datos});
+    }
+    // Apply only after validating every year's proposal.
+    if(niveles.includes('pri'))for(const dias of diasPorMes.values())armarPrimariaMes(dias);
+    for(const propuesta of propuestas){
+      const extras=aplicarAtencionesAip(propuesta.rows,propuesta.datos.libres);
+      informes.push(informeDistribucionAip(propuesta,universo,extras));
+    }
+    localStorage.setItem(KEY,JSON.stringify(plan));
+  }catch(error){
+    plan=original;
+    alert('No se aplicó la distribución. '+error.message);
+    return false;
+  }
+  ultimoInformeAip=informes;
+  render();renderInformeAip();
+  if(!silencio)alert('Atenciones programadas: '+informes.reduce((n,i)=>n+i.hours,0)+' horas de Secundaria. Consulta el informe bajo el selector de cursos.');
+  return true;
+}
+function armarSecundariaMes(days,silencio){
+  if(!days.length)return false;
+  return generarPeriodoAip([ymd(days[0]).slice(0,7)],silencio,['sec'],days);
+}
+function informeDistribucionAip({anio,rows,history,resultado,datos},universo,extras){
+  const motor=IEAipDistribucion,previo=motor.summarize(history,[]);
+  const opciones=new Map(),autom=new Set(rows.map(motor.monthly));
+  for(const fila of datos.opportunities){
+    const key=motor.key(fila);
+    if(!opciones.has(key))opciones.set(key,new Set());
+    opciones.get(key).add(motor.monthly(fila));
+  }
+  const causas=new Map();
+  for(const key of universo.keys())if(!resultado.combos.has(key)){
+    const posibles=opciones.get(key);
+    const diagnostico=datos.diagnostico.get(key);
+    const motivos=posibles?.size?['Capacidad insuficiente para cubrir todas las combinaciones']:
+      diagnostico?.size?[...diagnostico]:['Sin oportunidades compatibles'];
+    motivos.forEach(motivo=>causas.set(motivo,(causas.get(motivo)||0)+1));
+  }
+  const excesosHistoricos=IEAipEstadisticas.monthlyExcesses(history);
+  const mensualesLimitadas=new Set(datos.opportunities.filter(fila=>(previo.months.get(motor.monthly(fila))||0)>0).map(motor.monthly));
+  const repeticiones=motor.adjacentMonths(resultado.months).filter(r=>autom.has(r.month+'|'+r.combo)||autom.has(r.previous+'|'+r.combo));
+  return {anio,covered:resultado.counts.map(m=>m.size),newCombos:resultado.combos.size-previo.combos.size,
+    pending:[...universo.keys()].filter(k=>!resultado.combos.has(k)).length,hours:rows.length*2,extras,causas,excesosHistoricos,
+    oportunidades:datos.opportunities.length,mensualesLimitadas,repeticiones};
+}
+function detalleExcesoAip({hours,manual,inherited}){
+  return hours+' horas programadas (manuales: '+manual+' · heredadas sin marca manual: '+inherited+')';
+}
+let ultimoInformeAip=[];
+function renderInformeAip(){
+  const box=document.getElementById('boxInformeAip');if(!box)return;
+  box.replaceChildren();
+  for(const i of ultimoInformeAip){
+    const details=document.createElement('details');details.open=true;
+    const title=document.createElement('summary');
+    title.textContent=i.anio+' · '+i.hours+' horas de atención programadas · '+i.newCombos+' combinaciones nuevas';
+    const summary=document.createElement('p');
+    summary.textContent='Cobertura del año: '+i.covered[0]+' docentes, '+i.covered[1]+' secciones y '+i.covered[2]+' cursos. Pendientes: '+i.pending+'. Horas sin atención: '+(i.extras.soporte+i.extras.mantenimiento)+' ('+i.extras.soporte+' soporte y '+i.extras.mantenimiento+' mantenimiento). Conflictos automáticos de colegiado, horario y límite: 0.';
+    const reasons=document.createElement('p');
+    reasons.textContent=['Oportunidades compatibles evaluadas: '+i.oportunidades,
+      ...[...i.causas].map(([causa,total])=>causa+': '+total),
+      'Combinaciones mensuales limitadas por atención previa: '+i.mensualesLimitadas.size].join(' · ');
+    const issues=document.createElement('ul'),catalog=inventarioAip(docentesAip());
+    for(const r of i.repeticiones){
+      const li=document.createElement('li'),fila=catalog.get(r.combo),label=fila?[fila.doc,fila.course,fila.section].join(' · '):JSON.parse(r.combo).join(' · ');
+      li.textContent='Repetición '+r.previous+' → '+r.month+': '+label+'.';issues.append(li);
+    }
+    for(const [id,counts] of i.excesosHistoricos){
+      const li=document.createElement('li');
+      const fila=catalog.get(id.slice(8)),label=fila?[fila.doc,fila.course,fila.section].join(' · '):JSON.parse(id.slice(8)).join(' · ');
+      li.textContent=id.slice(0,7)+' · '+label+': '+detalleExcesoAip(counts)+'. Exceso previo conservado.';issues.append(li);
+    }
+    details.append(title,summary,reasons,issues);box.append(details);
+  }
+}
+
 function clsDe(tipo){ return ({ grupo:'c-aip', soporte:'c-sop', man:'c-man', gestion:'c-ges', vacaciones:'c-vac', feriado:'c-fer', vacio:'c-gray', abierto:'c-aip', bloqueado:'c-gray' })[tipo]||'c-gray'; }
 function render(){
   const ym=document.getElementById('inpMes').value; const [Y,M]=ym.split('-');
@@ -974,6 +1052,7 @@ function render(){
   let s='<table class="cal"><thead><tr>'+head('sec')+'</tr></thead><tbody>';
   HSEC().forEach(([h,lab])=>{ s+='<tr><td>'+h+'</td><td>'+lab+'</td>'+days.map(d=>cell(d,'sec',h)).join('')+'</tr>'; });
   document.getElementById('boxSec').innerHTML=s+'</tbody></table>';
+  renderEstadisticasAip();
 }
 function clicCelda(fecha,nivel,hora){
   if(hora==='R'){
@@ -1067,8 +1146,8 @@ function aplicarModal(){
     if(nivel==='pri') setCelda(fecha,nivel,hora,{ tipo:'grupo', texto:document.getElementById('modGrupo').value });
     else {
       const sec=document.getElementById('modGrupo').value;
-      const row=(getHS()[wd]&&getHS()[wd][hora]&&getHS()[wd][hora][sec]);
-      setCelda(fecha,nivel,hora, row?{ tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, texto:sec+' '+row.area+' '+row.doc }:{ tipo:'grupo', texto:sec });
+      const row=claseHorarioAip(wd,hora,sec);
+      setCelda(fecha,nivel,hora, row?{ tipo:'grupo', seccion:sec, area:row.area, doc:row.doc, ...(row.docenteId?{docenteId:String(row.docenteId)}:{}), texto:sec+' '+row.area+' '+row.doc }:{ tipo:'grupo', texto:sec });
     }
   } else {
     const map={ soporte:'Soporte', man:'Mantenimiento', gestion:'Semana gestión', vacaciones:'Vacaciones', feriado:'Feriado' };
@@ -1078,7 +1157,7 @@ function aplicarModal(){
       else marcarNoClases(fecha, tipo);
     } else setCelda(fecha,nivel,hora,{ tipo:tipo, texto:map[tipo]||tipo });
   }
-  if(eraManual){
+  if(eraManual||tipo==='grupo'||tipo==='soporte'||tipo==='man'){
     const actual=celda(fecha,nivel,hora);
     if(actual) actual.manual=true;
     else setCelda(fecha,nivel,hora,{tipo:'vacio',texto:'',manual:true});
@@ -1339,19 +1418,143 @@ function renderGestorColegiado(){
 }
 
 
+
+function etiquetaCursoAip(id){ return AREAS_MES.find(a=>a.id===id)?.nom||id; }
+function tablaEstadisticasAip(title,columns,rows){
+  const section=document.createElement('section'),heading=document.createElement('h3'),scroll=document.createElement('div'),table=document.createElement('table');
+  heading.textContent=title;heading.className='font-bold';
+  scroll.className='aip-stat-scroll';scroll.tabIndex=0;scroll.setAttribute('aria-label',title);
+  table.className='cal';
+  const head=table.createTHead().insertRow();
+  for(const label of columns){ const th=document.createElement('th');th.scope='col';th.textContent=label;head.append(th); }
+  const body=table.createTBody();
+  for(const row of rows){
+    const tr=body.insertRow();
+    for(const item of row){
+      const td=tr.insertCell();
+      if(item&&typeof item==='object'){td.textContent=item.text;td.className=item.style;td.title=item.label||'';}
+      else td.textContent=item;
+    }
+  }
+  if(!rows.length){const cell=body.insertRow().insertCell();cell.colSpan=columns.length;cell.textContent='Sin resultados para estos filtros.';}
+  scroll.append(table);section.append(heading,scroll);
+  return section;
+}
+function opcionesEstadisticasAip(form,catalog){
+  for(const [key,label] of [['teacher','doc'],['course','course'],['section','section']]){
+    const select=form.elements[key],anterior=select.value;
+    const values=new Map(catalog.map(row=>[row[key],key==='course'?etiquetaCursoAip(row[label]):row[label]]));
+    select.replaceChildren(new Option('Todos',''),...[...values].sort((a,b)=>a[1].localeCompare(b[1],'es')).map(([id,text])=>new Option(text,id)));
+    if(values.has(anterior))select.value=anterior;
+  }
+}
+function registrosCalendarioAip(dias,nivel,filter,nombres){
+  const conteo={grupo:0,colegiado:0,soporte:0,man:0},grados=new Map();
+  const filtroIndividual=Object.values(filter).some(Boolean);
+  for(const d of dias){
+    const fecha=ymd(d);if(esFeriado(fecha))continue;
+    for(const n of nivel==='ambos'?['pri','sec']:[nivel])for(const h of horasPed(n)){
+      if(esColegiadoReservado(fecha,n,h)){if(!filtroIndividual)conteo.colegiado++;continue;}
+      const c=celda(fecha,n,h);
+      if(!c)continue;
+      if(c.tipo==='grupo'){
+        if(n==='pri'){
+          if(filtroIndividual)continue;
+          const grado=String(c.texto||'').match(/^[3-6](?=°|º|$)/)?.[0];
+          if(!grado)continue;
+          const mes=fecha.slice(0,7);
+          if(!grados.has(grado))grados.set(grado,new Map());
+          const entradas=grados.get(grado);entradas.set(mes,(entradas.get(mes)||0)+1);
+        }else{
+          const identidad=identidadAip(c,nombres);
+          if(!identidad||Object.entries(filter).some(([k,v])=>v&&identidad[k]!==v))continue;
+        }
+        conteo.grupo++;
+      }else if(!filtroIndividual&&['soporte','man'].includes(c.tipo))conteo[c.tipo]++;
+    }
+  }
+  return {conteo,grados};
+}
+function renderEstadisticasAip(){
+  const pane=document.getElementById('pane-estadisticas');
+  if(!pane||pane.classList.contains('hidden'))return;
+  const form=document.getElementById('filtrosAip'),f=form.elements;
+  if(!f.anio.value)f.anio.value=anioDeMes();
+  const anio=f.anio.value,output=document.getElementById('resultadoAip');
+  if(!/^[2-9]\d{3}$/.test(anio)){output.textContent='Indica un año escolar válido.';return;}
+  const modo=f.periodo.value,nivel=f.nivel.value;
+  document.getElementById('aipFiltroDesde').hidden=modo==='anio';
+  document.getElementById('aipFiltroHasta').hidden=modo!=='rango';
+  const desde=modo==='anio'?1:Number(f.desde.value),hasta=modo==='anio'?12:modo==='mes'?desde:Number(f.hasta.value);
+  if(desde>hasta){output.textContent='El mes final debe ser igual o posterior al inicial.';return;}
+  const ym=i=>anio+'-'+String(i).padStart(2,'0');
+  const dias=(a,b)=>Array.from({length:b-a+1},(_,i)=>diasMes(ym(a+i))).flat(),periodo=dias(desde,hasta);
+  const nombres=docentesAip(),catalog=[...inventarioAip(nombres).values()],historico=historialAip(anio,nombres);
+  opcionesEstadisticasAip(form,catalog.concat(historico));
+  for(const key of ['teacher','course','section'])f[key].disabled=nivel==='pri';
+  const filter=nivel==='pri'?{}:{teacher:f.teacher.value,course:f.course.value,section:f.section.value};
+  const stats=registrosCalendarioAip(periodo,nivel,filter,nombres);
+  output.replaceChildren();
+  function texto(value){const node=document.createElement('p');node.textContent=value;output.append(node);}
+  const c=stats.conteo;
+  texto(Object.values(filter).some(Boolean)?c.grupo+' horas de atención programadas con estos filtros. Colegiado, soporte y mantenimiento se muestran sin filtros individuales.':
+    c.grupo+' horas de atención programadas · '+c.colegiado+' de Colegiado · '+c.soporte+' de soporte · '+c.man+' de mantenimiento.');
+  if(nivel!=='sec'){
+    const rows=[...stats.grados].sort().map(([grado,m])=>[grado+'°',[...m].map(([mes,h])=>NOM_MES[+mes.slice(5)]+' '+h+' h').join(' · '),[...m.values()].reduce((a,b)=>a+b,0)]);
+    const anual=registrosCalendarioAip(dias(1,12),'pri',filter,nombres).grados;
+    texto('Primaria · '+stats.grados.size+' de 4 grados con atención programada en el periodo · '+anual.size+' de 4 en el año.');
+    output.append(tablaEstadisticasAip('Primaria por grado',['Grado','Frecuencia mensual','Horas'],rows));
+  }
+  if(nivel==='pri')return;
+  const datos=oportunidadesAip(periodo,nombres,true);
+  const informe=IEAipEstadisticas.report({catalog,history:historico,opportunities:datos.opportunities,from:ym(desde),to:ym(hasta),filter,consecutive:horasConsecutivasSec});
+  const pct=(a,b)=>b?Math.round(a*100/b)+'%':'—';
+  output.append(tablaEstadisticasAip('Cobertura de Secundaria',
+    ['Universo','Total institucional','Con atención','Pendientes','Cobertura','Con bloque compatible','Cobertura compatible'],
+    informe.measures.map((m,i)=>[['Docentes','Secciones','Cursos','Combinaciones'][i],m.total,m.attended,m.pending,pct(m.attended,m.total),m.compatible,pct(m.compatibleAttended,m.compatible)])));
+  texto('El universo institucional se toma del horario docente. Los bloques compatibles pueden competir por la misma hora.');
+  const sort=f.orden.value;
+  const arrange=(rows,label)=>rows.slice().sort((a,b)=>(sort==='pendientes'?a.hours-b.hours:sort==='horas'?b.hours-a.hours:0)||label(a).localeCompare(label(b),'es'));
+  const labelDoc=x=>x.row.doc,labelCurso=x=>etiquetaCursoAip(x.row.course),labelSec=x=>x.row.section;
+  output.append(
+    tablaEstadisticasAip('Por docente',['Docente','Cursos','Secciones','Horas del periodo','Horas del año','Bloques del periodo','Última hasta el periodo','Próxima posterior','Bloques compatibles','Cobertura'],
+      arrange(informe.tables[0],labelDoc).map(x=>[labelDoc(x),x.courses.map(etiquetaCursoAip).join(', '),x.sections.join(', '),x.hours,x.annual,x.blocks,x.last,x.next,x.opportunities,x.coverage])),
+    tablaEstadisticasAip('Por curso',['Curso','Docentes','Secciones','Horas del periodo','Horas del año','Cobertura'],
+      arrange(informe.tables[1],labelCurso).map(x=>[labelCurso(x),x.teachers,x.sections.join(', '),x.hours,x.annual,x.coverage])),
+    tablaEstadisticasAip('Por sección',['Sección','Cursos','Docentes','Horas del periodo','Horas del año','Cobertura'],
+      arrange(informe.tables[2],labelSec).map(x=>[labelSec(x),x.courses.map(etiquetaCursoAip).join(', '),x.teachers,x.hours,x.annual,x.coverage]))
+  );
+  const search=normDoc(f.buscar.value),labels=x=>[labelDoc(x),labelCurso(x),labelSec(x)];
+  const meses=Array.from({length:10},(_,i)=>i+3);
+  const matriz=arrange(informe.matrix.filter(x=>normDoc(labels(x).join(' ')).includes(search)),x=>labels(x).join(' '));
+  const rows=matriz.map(x=>[...labels(x),...meses.map(i=>{
+    const h=x.months[ym(i)]||0,repeat=x.repeats.includes(ym(i));
+    return {text:h,style:h>2?'aip-stat-danger':repeat?'aip-stat-repeat':h?'aip-stat-hit':'aip-stat-empty',
+      label:h>2?'Supera dos horas. '+detalleExcesoAip(x.excesses[ym(i)]):repeat?'Atención en meses consecutivos':h?'Atención programada':'Sin atención'};
+  }),x.annual]);
+  output.append(tablaEstadisticasAip('Matriz anual por docente, curso y sección',
+    ['Docente','Curso','Sección',...meses.map(i=>NOM_MES[i]),'Total del año'],rows));
+  texto('Gris: sin atención. Verde: dentro del límite. Naranja: meses consecutivos. Rojo: más de dos horas. El total incluye enero y febrero si tienen registros.');
+  const excesos=matriz.flatMap(x=>Object.entries(x.excesses).map(([mes,counts])=>[mes,...labels(x),detalleExcesoAip(counts)]));
+  if(excesos.length)output.append(tablaEstadisticasAip('Origen de excesos mensuales',
+    ['Mes','Docente','Curso','Sección','Horas programadas'],excesos));
+}
+
 function showAipTab(t){
   const mes=document.getElementById('pane-mes'), hs=document.getElementById('pane-hs'), reloj=document.getElementById('pane-reloj');
   const paneColegiado=document.getElementById('pane-colegiado');
   if(paneColegiado) paneColegiado.classList.toggle('hidden',t!=='colegiado');
-  if(mes) mes.classList.toggle('hidden', t==='hs'||t==='colegiado');
+  document.getElementById('pane-estadisticas').classList.toggle('hidden',t!=='estadisticas');
+  if(mes) mes.classList.toggle('hidden', t==='hs'||t==='colegiado'||t==='estadisticas');
   if(hs) hs.classList.toggle('hidden', t!=='hs');
   if(reloj) reloj.classList.toggle('hidden', t!=='reloj');
   document.querySelectorAll('.mes-only').forEach(el=>el.classList.toggle('hidden', t!=='mes'));
   document.querySelectorAll('.aip-tab').forEach(b=>b.classList.remove('on'));
-  const map={ mes:'tabBtnMes', hs:'tabBtnHs', reloj:'tabBtnReloj', colegiado:'tabBtnColegiado' };
+  const map={ mes:'tabBtnMes', hs:'tabBtnHs', reloj:'tabBtnReloj', colegiado:'tabBtnColegiado', estadisticas:'tabBtnEstadisticas' };
   const btn=document.getElementById(map[t]); if(btn) btn.classList.add('on');
   if(t==='hs') renderEditorHS(); if(t==='reloj') renderFeriados();
   if(t==='colegiado') renderGestorColegiado();
+  if(t==='estadisticas') renderEstadisticasAip();
 }
 function onMes(){ renderCursosMes(); renderMesesAnio(); render(); }
 function wdNombre(i){ return DOW[i]||('D'+i); }
@@ -1498,6 +1701,9 @@ function importarHS(inp){
 if(!window.IEAipColegiado) throw new Error('No se cargaron las reglas de Colegiado AIP. Recarga la página.');
 load();
 loadHS();
+const filtrosMesAip=document.getElementById('filtrosAip').elements;
+for(let mes=1;mes<=12;mes++)for(const select of [filtrosMesAip.desde,filtrosMesAip.hasta])select.add(new Option(NOM_MES[mes],mes));
+filtrosMesAip.desde.value=+mesActual().slice(5);filtrosMesAip.hasta.value=12;
 if(!plantilla) plantilla=plantillaDefault();
 if(!colegiado) colegiado=colegiadoDefault();
 if(!feriados) feriados={};
