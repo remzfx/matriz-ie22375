@@ -963,11 +963,15 @@ function informeDistribucionAip({anio,rows,history,resultado,datos},universo,ext
       diagnostico?.size?[...diagnostico]:['Sin oportunidades compatibles'];
     motivos.forEach(motivo=>causas.set(motivo,(causas.get(motivo)||0)+1));
   }
-  const limitesManuales=[...previo.months].filter(([,h])=>h>2).map(([id,h])=>({id,h}));
+  const excesosHistoricos=IEAipEstadisticas.monthlyExcesses(history);
   const mensualesLimitadas=new Set(datos.opportunities.filter(fila=>(previo.months.get(motor.monthly(fila))||0)>0).map(motor.monthly));
   const repeticiones=motor.adjacentMonths(resultado.months).filter(r=>autom.has(r.month+'|'+r.combo)||autom.has(r.previous+'|'+r.combo));
   return {anio,covered:resultado.counts.map(m=>m.size),newCombos:resultado.combos.size-previo.combos.size,
-    pending:[...universo.keys()].filter(k=>!resultado.combos.has(k)).length,hours:rows.length*2,extras,causas,limitesManuales,mensualesLimitadas,repeticiones};
+    pending:[...universo.keys()].filter(k=>!resultado.combos.has(k)).length,hours:rows.length*2,extras,causas,excesosHistoricos,
+    oportunidades:datos.opportunities.length,mensualesLimitadas,repeticiones};
+}
+function detalleExcesoAip({hours,manual,inherited}){
+  return hours+' horas programadas (manuales: '+manual+' · heredadas sin marca manual: '+inherited+')';
 }
 let ultimoInformeAip=[];
 function renderInformeAip(){
@@ -980,16 +984,18 @@ function renderInformeAip(){
     const summary=document.createElement('p');
     summary.textContent='Cobertura del año: '+i.covered[0]+' docentes, '+i.covered[1]+' secciones y '+i.covered[2]+' cursos. Pendientes: '+i.pending+'. Horas sin atención: '+(i.extras.soporte+i.extras.mantenimiento)+' ('+i.extras.soporte+' soporte y '+i.extras.mantenimiento+' mantenimiento). Conflictos automáticos de colegiado, horario y límite: 0.';
     const reasons=document.createElement('p');
-    reasons.textContent=[...i.causas].map(([causa,total])=>causa+': '+total).concat(['Combinaciones mensuales limitadas por atención previa: '+i.mensualesLimitadas.size]).join(' · ');
+    reasons.textContent=['Oportunidades compatibles evaluadas: '+i.oportunidades,
+      ...[...i.causas].map(([causa,total])=>causa+': '+total),
+      'Combinaciones mensuales limitadas por atención previa: '+i.mensualesLimitadas.size].join(' · ');
     const issues=document.createElement('ul'),catalog=inventarioAip(docentesAip());
     for(const r of i.repeticiones){
       const li=document.createElement('li'),fila=catalog.get(r.combo),label=fila?[fila.doc,fila.course,fila.section].join(' · '):JSON.parse(r.combo).join(' · ');
       li.textContent='Repetición '+r.previous+' → '+r.month+': '+label+'.';issues.append(li);
     }
-    for(const limite of i.limitesManuales){
+    for(const [id,counts] of i.excesosHistoricos){
       const li=document.createElement('li');
-      const fila=catalog.get(limite.id.slice(8)),label=fila?[fila.doc,fila.course,fila.section].join(' · '):JSON.parse(limite.id.slice(8)).join(' · ');
-      li.textContent=limite.id.slice(0,7)+' · '+label+': '+limite.h+' horas existentes; no se agregaron horas automáticas.';issues.append(li);
+      const fila=catalog.get(id.slice(8)),label=fila?[fila.doc,fila.course,fila.section].join(' · '):JSON.parse(id.slice(8)).join(' · ');
+      li.textContent=id.slice(0,7)+' · '+label+': '+detalleExcesoAip(counts)+'. Exceso previo conservado.';issues.append(li);
     }
     details.append(title,summary,reasons,issues);box.append(details);
   }
@@ -1524,11 +1530,14 @@ function renderEstadisticasAip(){
   const rows=matriz.map(x=>[...labels(x),...meses.map(i=>{
     const h=x.months[ym(i)]||0,repeat=x.repeats.includes(ym(i));
     return {text:h,style:h>2?'aip-stat-danger':repeat?'aip-stat-repeat':h?'aip-stat-hit':'aip-stat-empty',
-      label:h>2?'Supera dos horas':repeat?'Atención en meses consecutivos':h?'Atención programada':'Sin atención'};
+      label:h>2?'Supera dos horas. '+detalleExcesoAip(x.excesses[ym(i)]):repeat?'Atención en meses consecutivos':h?'Atención programada':'Sin atención'};
   }),x.annual]);
   output.append(tablaEstadisticasAip('Matriz anual por docente, curso y sección',
     ['Docente','Curso','Sección',...meses.map(i=>NOM_MES[i]),'Total del año'],rows));
   texto('Gris: sin atención. Verde: dentro del límite. Naranja: meses consecutivos. Rojo: más de dos horas. El total incluye enero y febrero si tienen registros.');
+  const excesos=matriz.flatMap(x=>Object.entries(x.excesses).map(([mes,counts])=>[mes,...labels(x),detalleExcesoAip(counts)]));
+  if(excesos.length)output.append(tablaEstadisticasAip('Origen de excesos mensuales',
+    ['Mes','Docente','Curso','Sección','Horas programadas'],excesos));
 }
 
 function showAipTab(t){

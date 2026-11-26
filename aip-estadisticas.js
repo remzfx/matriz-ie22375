@@ -3,6 +3,17 @@
  const motor=root.IEAipDistribucion||(typeof require==='function'?require('./aip-distribucion.js'):null);
  const fields=['teacher','course','section'];
  const distinct=(rows,field)=>new Set(rows.map(r=>r[field]));
+ function monthlyExcesses(history){
+  const counts=new Map();
+  for(const row of history){
+   const id=motor.monthly(row);
+   if(!counts.has(id))counts.set(id,{hours:0,manual:0,inherited:0});
+   const count=counts.get(id);
+   count.hours++;
+   count[row.manual===true?'manual':'inherited']++;
+  }
+  return [...counts].filter(([,count])=>count.hours>2);
+ }
  function report({catalog,history,opportunities,from,to,filter={},consecutive=(a,b)=>b===a+1}){
   const allowed=r=>fields.every(f=>!filter[f]||r[f]===filter[f]);
   const inRange=r=>motor.month(r)>=from&&motor.month(r)<=to;
@@ -48,12 +59,13 @@
      months:[...distinct(yearRows.map(r=>({...r,month:motor.month(r)})),'month')].sort()};
    });
   });
-  const repeats=motor.adjacentMonths(totals.months);
+  const repeats=motor.adjacentMonths(totals.months),excesses=monthlyExcesses(annual);
   return {hours:period.length,measures,tables:mapTables,matrix:[...combos].map(([id,row])=>({id,row,
    annual:totals.combos.get(id)||0,hours:selected.combos.get(id)||0,
    months:Object.fromEntries([...totals.months].filter(([k])=>k.slice(8)===id).map(([k,h])=>[k.slice(0,7),h])),
+   excesses:Object.fromEntries(excesses.filter(([k])=>k.slice(8)===id).map(([k,counts])=>[k.slice(0,7),counts])),
    repeats:repeats.filter(r=>r.combo===id).map(r=>r.month)}))};
  }
- root.IEAipEstadisticas={report};
+ root.IEAipEstadisticas={report,monthlyExcesses};
  if(typeof module!=='undefined'&&module.exports) module.exports=root.IEAipEstadisticas;
 })(typeof window==='undefined'?globalThis:window);

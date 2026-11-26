@@ -137,6 +137,18 @@ async function run(){
    const reloaded=await matrix.locator('tbody tr').evaluateAll(rows=>rows.reduce((n,r)=>n+Number(r.lastElementChild.textContent),0));
    assert.equal(reloaded,cleaned);
    assert.deepEqual(f.requests,['saveaip','loadaip']);assert.deepEqual(f.external,[]);assert.deepEqual(f.errors,[]);
+   assert.equal(await p.evaluate(()=>{
+    const month='2026-03',date=month+'-03',first=getHS()[1][1]['1A'];
+    const group={tipo:'grupo',seccion:'1A',doc:first.doc,area:first.area};
+    plan={[date]:{sec:{1:{...group,manual:true},2:{...group},3:{...group}}}};
+    const preserved=JSON.stringify(plan[date]);
+    return generarPeriodoAip(['2026-05'],true,['sec'])&&JSON.stringify(plan[date])===preserved;
+   }),true);
+   const excess='3 horas programadas (manuales: 1 · heredadas sin marca manual: 2)';
+   assert.match(await p.locator('#boxInformeAip').textContent(),/Oportunidades compatibles evaluadas: [1-9]\d*/);
+   assert.ok((await p.locator('#boxInformeAip').textContent()).includes(excess));
+   assert.ok((await p.locator('[aria-label="Origen de excesos mensuales"]').textContent()).includes(excess));
+   assert.deepEqual(f.requests,['saveaip','loadaip']);assert.deepEqual(f.errors,[]);
    console.log(JSON.stringify({width,old:oldMetrics,new:modern,cleaned,cloudChars:JSON.stringify(f.package()).length}));
    await f.ctx.close();
   }

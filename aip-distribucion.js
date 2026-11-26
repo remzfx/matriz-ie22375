@@ -9,15 +9,17 @@
  const serial=m=>Number(m.slice(0,4))*12+Number(m.slice(5,7));
  const axes=['teacher','section','course'];
  function count(map,k,n=1){map.set(k,(map.get(k)||0)+n);}
- function summarize(history,selected){
-  const counts=axes.map(()=>new Map()),combos=new Map(),months=new Map();
-  function add(r,hours){
-   axes.forEach((field,i)=>count(counts[i],r[field],hours));
-   count(combos,key(r),hours);count(months,monthly(r),hours);
-  }
-  history.forEach(r=>add(r,1));selected.forEach(r=>add(r,2));
-  return {counts,combos,months};
+ function addHours(state,r,hours){
+  axes.forEach((field,i)=>count(state.counts[i],r[field],hours));
+  count(state.combos,key(r),hours);
+  count(state.months,monthly(r),hours);
  }
+ function summarize(history,selected){
+  const state={counts:axes.map(()=>new Map()),combos:new Map(),months:new Map()};
+  history.forEach(r=>addHours(state,r,1));selected.forEach(r=>addHours(state,r,2));
+  return state;
+ }
+ const equityGain=(hours,delta)=>Math.log1p(delta/(1+hours));
  function shiftMonth(id,offset){
   const index=serial(id)+offset-1,y=Math.floor(index/12),m=index%12+1;
   return y+'-'+String(m).padStart(2,'0')+id.slice(7);
@@ -58,7 +60,7 @@
     const coverage=Number(after>0)-Number(before>0);
     next[i===0?0:1]+=coverage;
     if(i===0&&!fixed.counts[0].has(id)) next[3]+=coverage/(teacherFrequency.get(id)||1);
-    next[4]+=(i===0?2:1)*(Math.log1p(after)-Math.log1p(before));
+    next[4]+=(i===0?2:1)*equityGain(before,hours);
    }
    for(const [combo,hours] of combos){
     const before=state.combos.get(combo)||0,coverage=Number(before+hours>0)-Number(before>0);
@@ -126,10 +128,23 @@
   }
   // Fill spare time only when it does not add consecutive-month repetition.
   // The coverage passes above may repeat if necessary to cover someone.
-  for(const edge of edges){
+  let spare=edges.map(edge=>{
    const id=monthly(edge);
-   if(resources(edge).some(k=>occupancy.has(k))||state.months.has(shiftMonth(id,-1))||state.months.has(shiftMonth(id,1)))continue;
-   add(edge);count(state.months,id,2);
+   return {edge,combo:key(edge),resources:resources(edge),neighbors:[shiftMonth(id,-1),shiftMonth(id,1)]};
+  });
+  while(spare.length){
+   let best=null,bestValue=null;
+   spare=spare.filter(candidate=>{
+    if(candidate.resources.some(k=>occupancy.has(k))||candidate.neighbors.some(k=>state.months.has(k)))return false;
+    const {edge,combo}=candidate;
+    const value=[axes.reduce((total,field,i)=>total+(i===0?2:1)*equityGain(state.counts[i].get(edge[field])||0,2),0),
+     -(state.combos.get(combo)||0)];
+    // The existing rank supplies stable ties after the current equity totals.
+    if(!best||better(value,bestValue)){best=edge;bestValue=value;}
+    return true;
+   });
+   if(!best)break;
+   add(best);addHours(state,best,2);
   }
   return current.sort((a,b)=>compare(a.date,b.date)||a.h1-b.h1||compare(key(a),key(b)));
  }
