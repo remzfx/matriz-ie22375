@@ -7,6 +7,7 @@ const current=fs.readFileSync('aula_innovacion.html','utf8'),previous=fromBaseli
 const baselineModules=new Map(['aip-distribucion.js','aip-estadisticas.js'].map(file=>[file,fromBaseline(file)]));
 const audit=require('../aip-distribucion.js');
 const plantilla30=require('./fixtures/aip-plantilla-30.json');
+const horarioRealista=require('./fixtures/aip-horario-realista.cjs');
 const fake='https://backend.fixture.invalid/exec';
 async function run(){
  const {chromium}=require(process.env.IE_PLAYWRIGHT_MODULE||'playwright');
@@ -118,9 +119,10 @@ async function run(){
  try{
   if(preview){
    const f=await fixture(1366,current);
-   await f.page.evaluate(config=>{
-    plantilla=config;colegiado={pri:{},sec:{}};guardarCfg(false);saveHS();renderPlantilla();renderMesesAnio();generarPeriodoAip(mesesAnioSel,true);
-   },plantilla30);
+   await f.page.evaluate(({config,horario})=>{
+    plantilla=config;horarioDoc=horario;plan={};colegiado={pri:{},sec:{}};
+    guardarCfg(false);saveHS();renderPlantilla();renderMesesAnio();renderEditorHS();generarPeriodoAip(mesesAnioSel,true);
+   },{config:plantilla30,horario:horarioRealista});
    console.log('Vista previa ficticia de AIP en Edge. Cierra la ventana para terminar.');
    await f.page.waitForEvent('close',{timeout:0});
    return;
@@ -273,7 +275,10 @@ async function run(){
    console.log(JSON.stringify({width,old:oldMetrics,new:modern,cleaned,cloudChars,oldCompatible,compatible,dynamicStarts}));
    await f.ctx.close();
    const weekly=await fixture(width,current),page=weekly.page;
-   await page.evaluate(()=>{colegiado={pri:{},sec:{}};renderPlantilla();renderMesesAnio();render();});
+   await page.evaluate(horario=>{
+    horarioDoc=horario;plan={};colegiado={pri:{},sec:{}};
+    renderPlantilla();renderMesesAnio();renderEditorHS();render();
+   },horarioRealista);
    const templates=page.locator('#boxPlantPri, #boxPlantSec');
    const slot=(nivel,h,day)=>page.locator(`td[onclick="togglePlantilla('${nivel}',${h},${day})"]`);
    const cell=(date,nivel,h)=>page.locator(`td[onclick="clicCelda('${date}','${nivel}','${h}')"]`);
@@ -318,6 +323,28 @@ async function run(){
    await page.getByRole('button',{name:'Armar meses marcados',exact:true}).click();
    await verifyPlan(plantilla30,schoolMonths.map(m=>m.slice(5)));
    assert.equal(await snapshot(),protectedRules);
+   const roundCheck=await page.evaluate(()=>{
+    const motor=IEAipDistribucion,report=ultimoInformeAip[0].estado;
+    const owners=new Set(),monthHours=new Map();
+    for(const [date,day] of Object.entries(plan))for(const c of Object.values(day.sec||{})){
+     if(c.tipo!=='grupo'||c.manual)continue;
+     if(c.seccion==='5U'&&c.area==='CCSS')owners.add(c.docenteId);
+     const id=[date.slice(0,7),c.area,c.seccion].join('|');
+     monthHours.set(id,(monthHours.get(id)||0)+1);
+    }
+    const sequence=[...report.credits.values()];
+    return {crossings:choquesHS().length,owners:[...owners],cap:Math.max(0,...monthHours.values()),
+     target:report.target.size,covered:new Set(sequence.map(({row})=>motor.key(row))).size,
+     closed:report.completed.length,pending:report.pending.size,anomalies:report.anomalies.length,
+     chronological:sequence.every(({row,round})=>{
+      const previous=report.completed[round-2]?.close;
+      return !previous||row.date>previous.date||(row.date===previous.date&&row.h1>previous.h2);
+     })};
+   });
+   assert.deepEqual(roundCheck.owners,['fixture-03']);
+   assert.equal(roundCheck.crossings+roundCheck.anomalies,0);
+   assert.equal(roundCheck.cap,2);assert.equal(roundCheck.target,54);assert.equal(roundCheck.covered,54);
+   assert.ok(roundCheck.closed>=2);assert.equal(roundCheck.chronological,true);
    const override=cell('2026-03-02','pri',4);
    await override.click();
    await page.locator('#modTipo').selectOption('soporte');
@@ -364,7 +391,7 @@ async function run(){
    assert.equal(await snapshot(),protectedRules);
    assert.equal(await override.innerText(),'Soporte');
    assert.deepEqual(weekly.requests,['saveaip','loadaip']);assert.deepEqual(weekly.errors,[]);assert.deepEqual(weekly.external,[]);
-   console.log(JSON.stringify({width,weeklyTemplateHours:30,afterEditing:28,atomic,months:10}));
+   console.log(JSON.stringify({width,weeklyTemplateHours:30,afterEditing:28,atomic,months:10,roundCheck}));
    await weekly.ctx.close();
   }
  }finally{await browser.close();}

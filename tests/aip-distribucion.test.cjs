@@ -7,6 +7,26 @@ const targetOf=(...rows)=>rows.map(motor.key);
 const pair=(date,h,teacher,course,section)=>[hour(date,h,teacher,course,section),hour(date,h+1,teacher,course,section)];
 const run=(history,opportunities,target=targetOf(...opportunities))=>{const input={history,opportunities,target},rows=motor.solve(input);motor.validate(input,rows);return rows;};
 
+test('the preview timetable has stable course-section owners and no teacher crossings',()=>{
+ const timetable=require('./fixtures/aip-horario-realista.cjs');
+ const owners=new Map(),teachers=new Map();
+ for(const shifts of Object.values(timetable))for(const slot of Object.values(shifts)){
+  const available=new Set();
+  for(const [section,{area,doc,docenteId}] of Object.entries(slot)){
+   assert.equal(available.has(docenteId),false,'simultaneous assignment for '+doc);
+   available.add(docenteId);
+   const key=area+'|'+section;
+   if(owners.has(key))assert.equal(owners.get(key),docenteId,key+' changes teacher');
+   owners.set(key,docenteId);
+   if(!teachers.has(docenteId))teachers.set(docenteId,{courses:new Set(),sections:new Set()});
+   teachers.get(docenteId).courses.add(area);teachers.get(docenteId).sections.add(section);
+  }
+ }
+ assert.equal(owners.size,54);
+ assert.equal(owners.get('CCSS|5U'),'fixture-03');
+ assert.ok([...teachers.values()].some(t=>t.courses.size>1&&t.sections.size>1));
+});
+
 test('repair recovers the known two-teacher optimum across overlapping starts',()=>{
  const edges=[edge('2026-03-02',1,'A'),edge('2026-03-02',2,'B'),edge('2026-03-03',1,'A')];
  const rows=run([],edges);
