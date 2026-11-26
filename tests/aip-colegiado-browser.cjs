@@ -17,7 +17,7 @@ async function run(){
    const url=route.request().url();
    if(url==='https://aip.fixture.invalid/')return route.fulfill({contentType:'text/html',body:source});
    if(url==='https://cdn.tailwindcss.com/')return route.fulfill({contentType:'text/javascript',body:process.env.IE_AIP_TAILWIND?fs.readFileSync(process.env.IE_AIP_TAILWIND,'utf8'):"document.head.insertAdjacentHTML('beforeend','<style>.hidden{display:none!important}</style>')"});
-   for(const file of ['layout-shells.css','aip-colegiado.js'])if(url==='https://aip.fixture.invalid/'+file)return route.fulfill({contentType:file.endsWith('.css')?'text/css':'text/javascript',body:fs.readFileSync(file,'utf8')});
+   for(const file of ['layout-shells.css','aip-colegiado.js','aip-distribucion.js','aip-estadisticas.js', 'aip-paquete.js'])if(url==='https://aip.fixture.invalid/'+file)return route.fulfill({contentType:file.endsWith('.css')?'text/css':'text/javascript',body:fs.readFileSync(file,'utf8')});
    if(url===backend){
     const body=route.request().postDataJSON();
     requests.push(body.action);
@@ -82,7 +82,7 @@ async function run(){
   const results=await page.evaluate(()=>{
    const noGroups=['2026-12-21','2027-01-22','2027-01-25'].every(f=>[1,2].every(h=>!celda(f,'pri',h))&&[5,6].every(h=>!celda(f,'sec',h)));
    const pairs=paresLibresSec(new Date('2026-12-21T12:00:00')).filter(s=>s.h2);
-   return {noGroups,noCross:pairs.every(s=>s.h2<5||s.h1>6),elsewhere:Object.values(plan).some(row=>Object.values(row.sec||{}).some(c=>c.tipo==='grupo')),pending:!!deudaAip['2027-01']};
+   return {noGroups,noCross:pairs.every(s=>s.h2<5||s.h1>6),elsewhere:Object.values(plan).some(row=>Object.values(row.sec||{}).some(c=>c.tipo==='grupo')),pending:ultimoInformeAip.length>0};
   });
   assert.deepEqual(results,{noGroups:true,noCross:true,elsewhere:true,pending:true});
   await page.evaluate(()=>limpiarMes());

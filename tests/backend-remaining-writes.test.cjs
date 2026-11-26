@@ -221,7 +221,7 @@ for (const [file, name, helper, role, action] of [
       document: {getElementById: id => ({value: id==='inpFecha' ? '2026-10-03' : /Nivel/.test(id) ? 'primaria' : /Bim/.test(id) ? 'I' : /Sec/.test(id) ? 'Única' : '1', files: [fileFixture]})},
       btoa: value => Buffer.from(value, 'binary').toString('base64'),
       listarPlantillasSiagie() {}, renderAulasSiagie() {}, aulasDelNivel: () => [], loadGruposWa: () => [], saveGruposWaLocal() {},
-      guardarCfg() {}, saveHS() {}, paqueteAip: () => ({plan: 'synthetic'}), alert() {}, toast() {}, renderLista() {},
+      guardarCfg() {}, saveHS() {}, IEAipPaquete: require('../aip-paquete.js'), paqueteAip: () => ({plan: 'synthetic'}), alert() {}, toast() {}, renderLista() {},
       completarFaltasAlSubir: () => 0, loadAsis: () => ({'2026||III||2026-10-03||primaria||1||Única||siagie:PRIMARY-1': {marca:'P',nombre:'Synthetic Student'}}), asisKey: () => '2026||III||2026-10-03||primaria||1||Única||siagie:PRIMARY-1',
       anioAsistencia:()=>2026,bimestreAsistencia:()=> 'III',asistenciaEscribible:()=>true,verificarCierreAsistencia:async()=>true,
       prepararSubidaAsistencia:async()=>true,pendienteMarcaAsistencia:()=>true,resolverSubidaAsistencia:items=>items,confirmarSubidaAsistencia(){},recToItem: () => request(s, 'saveasis', token).items[0]
