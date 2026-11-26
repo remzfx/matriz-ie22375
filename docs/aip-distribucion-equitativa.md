@@ -69,3 +69,31 @@ Se sirvieron el HTML y los módulos del SHA de integración `0697074` y los del 
 En esta prueba, 125 combinaciones tienen bloques completos y otra tiene una hora manual aislada. La reducción de 874 horas programadas corresponde a los 437 bloques que antes se repetían con la primera ronda abierta. En el caso independiente con dos combinaciones compatibles, el PR #129 programa 4 horas en marzo y abril, y el motor por rondas programa 8 y cierra dos rondas. Al retirar el par consecutivo de una combinación, la segunda ronda queda bloqueada. También se probó el cierre de 60/60 con un segundo bloque válido ese mismo día, el bloqueo con 59/60 y 12 rondas sucesivas sin un tope artificial.
 
 La búsqueda no certifica que sea imposible mejorar la cobertura de un calendario dado. La comprobación de compatibilidad y persistencia usa datos ficticios y transporte simulado. Las horas nominales de los tramos históricos se muestran según la configuración pedagógica vigente.
+
+## Inicio dinámico y cierre temprano de rondas
+
+En el PR #130 la búsqueda de prefijos solo adelantaba rondas completas. Una ronda incompleta podía conservar asignaciones tardías favorecidas por el equilibrio entre quincenas. Ahora el motor busca primero la mejor cobertura que encuentra con todas las oportunidades disponibles. Luego busca un prefijo más temprano que conserve o mejore esa cobertura, tanto si la ronda se completa como si sigue abierta. Conserva la mejor solución encontrada y usa las reasignaciones existentes. Dentro de un prefijo, adelantar las asignaciones precede a escasez, cobertura por docente, curso y sección, equidad, tiempo sin atención y rotación. El cálculo por quincenas se retira. La búsqueda acotada no certifica cobertura ni fechas óptimas en términos matemáticos.
+
+En Secundaria, marzo a diciembre define los meses habilitados. La fecha y las horas de inicio se obtienen de las oportunidades que resultan de los meses marcados, el horario docente, la plantilla PIP, los cursos y las restricciones del calendario. Una oportunidad temprana se conserva cuando es compatible con la cobertura que encuentra el motor. Enero y febrero se mantienen en el calendario y en los acumulados, sin acreditar rondas ni regenerarse automáticamente en Secundaria. La operación de Primaria conserva sus meses y reglas.
+
+Estadísticas muestra los créditos acumulados por mes, rondas cerradas, horas de atención, Soporte, Mantenimiento y los dos universos de cobertura. El informe de generación asigna un motivo a cada tramo de Soporte y Mantenimiento y distingue un tramo incompatible de una oportunidad compatible que la búsqueda no asignó. Si una regeneración deja sin crédito un bloque posterior conservado, indica los meses concretos que requieren regeneración conjunta.
+
+### Mismo calendario ficticio del PR #130
+
+| Medida | PR #130 | Cierre temprano |
+| --- | ---: | ---: |
+| Combinaciones acreditadas en marzo | 13 | 57 |
+| Combinaciones acreditadas hasta abril | 27 | 112 |
+| Combinaciones acreditadas hasta mayo | 39 | 125 |
+| Último bloque acreditado de la primera ronda | 22 dic. | 22 may. |
+| Cobertura al terminar / rondas cerradas | 125 de 181 / 0 | 125 de 181 / 0 |
+| Horas programadas en marzo / total anual | 26 / 251 | 114 / 251 |
+| Horas de Soporte / Mantenimiento | 696 / 437 | 696 / 437 |
+| Repeticiones dentro de una ronda / colisiones con Colegiado | 0 / 0 | 0 / 0 |
+| Tiempo de generación en Edge | 419 ms | 417–432 ms |
+
+Las 56 combinaciones pendientes siguen bloqueando el inicio de la segunda ronda. La hora programada en febrero explica la diferencia entre 250 horas escolares de atención y 251 horas acumuladas. En el escenario completamente compatible de dos combinaciones se cierran diez rondas desde marzo hasta diciembre con 40 horas. Los casos de inicio dinámico cambian plantilla y horario. El primero llega al miércoles 25 de marzo en las horas 5–6 después de restricciones de calendario y un bloqueo. El segundo llega al jueves 21 de mayo en las horas 1–2 tras omitir abril por curso desmarcado, una fecha de vacaciones y una reserva de Colegiado. Estas fechas son datos de las pruebas.
+
+### Vista previa local aislada
+
+Abre la rama en VS Code. Desde la terminal del repositorio ejecuta `node tests/aip-distribucion-browser.cjs --preview` con Playwright disponible y Edge instalado. Si Playwright está instalado fuera del repositorio, configura `IE_PLAYWRIGHT_MODULE` con su ruta. La vista previa carga la página real con un año ficticio, intercepta las solicitudes de nube y bloquea recursos externos. Para aplicar Tailwind, indica una copia local de `tailwindcss.js` en `IE_AIP_TAILWIND`; sin ella se aplica un respaldo mínimo de estilos. En Plan del mes, abre marzo o abril y revisa «Motivos de Soporte y Mantenimiento». En Estadísticas AIP consulta «Cobertura acumulada y horas de Secundaria». Cierra Edge para terminar.
