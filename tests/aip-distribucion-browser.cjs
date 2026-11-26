@@ -6,6 +6,7 @@ const fromBaseline=file=>execFileSync('git',['show',baseline+':'+file],{encoding
 const current=fs.readFileSync('aula_innovacion.html','utf8'),previous=fromBaseline('aula_innovacion.html');
 const baselineModules=new Map(['aip-distribucion.js','aip-estadisticas.js'].map(file=>[file,fromBaseline(file)]));
 const audit=require('../aip-distribucion.js');
+const plantilla30=require('./fixtures/aip-plantilla-30.json');
 const fake='https://backend.fixture.invalid/exec';
 async function run(){
  const {chromium}=require(process.env.IE_PLAYWRIGHT_MODULE||'playwright');
@@ -60,7 +61,7 @@ async function run(){
    cursosPorMes=Object.fromEntries(mesesAnioSel.map(m=>[m,areas.slice()]));
    plan={'2026-02-09':{sec:{1:{tipo:'grupo',seccion:'1A',doc:'Docente ficticio 01',area:'MAT',texto:'Fijo previo',manual:true}}},
     '2027-03-01':{sec:{1:{tipo:'grupo',seccion:'1A',doc:'Docente ficticio 99',area:'MAT',texto:'Otro año',manual:true}}}};
-   document.getElementById('inpMes').value='2026-03';render();
+   document.getElementById('inpMes').value='2026-03';renderPlantilla();render();
   });
   return {ctx,page,errors,external,requests,package:()=>cloud};
  }
@@ -117,7 +118,9 @@ async function run(){
  try{
   if(preview){
    const f=await fixture(1366,current);
-   await f.page.evaluate(()=>{renderMesesAnio();armarAnio();});
+   await f.page.evaluate(config=>{
+    plantilla=config;colegiado={pri:{},sec:{}};guardarCfg(false);saveHS();renderPlantilla();renderMesesAnio();generarPeriodoAip(mesesAnioSel,true);
+   },plantilla30);
    console.log('Vista previa ficticia de AIP en Edge. Cierra la ventana para terminar.');
    await f.page.waitForEvent('close',{timeout:0});
    return;
@@ -269,6 +272,100 @@ async function run(){
    assert.deepEqual(f.requests,['saveaip','loadaip','saveaip','loadaip']);assert.deepEqual(f.external,[]);assert.deepEqual(f.errors,[]);
    console.log(JSON.stringify({width,old:oldMetrics,new:modern,cleaned,cloudChars,oldCompatible,compatible,dynamicStarts}));
    await f.ctx.close();
+   const weekly=await fixture(width,current),page=weekly.page;
+   await page.evaluate(()=>{colegiado={pri:{},sec:{}};renderPlantilla();renderMesesAnio();render();});
+   const templates=page.locator('#boxPlantPri, #boxPlantSec');
+   const slot=(nivel,h,day)=>page.locator(`td[onclick="togglePlantilla('${nivel}',${h},${day})"]`);
+   const cell=(date,nivel,h)=>page.locator(`td[onclick="clicCelda('${date}','${nivel}','${h}')"]`);
+   for(const [nivel,horas] of [['pri',6],['sec',7]])for(let h=1;h<=horas;h++)for(let day=0;day<5;day++){
+    const wanted=(plantilla30[nivel][h]||[]).includes(day);
+    if((await slot(nivel,h,day).innerText()==='AIP')!==wanted)await slot(nivel,h,day).click();
+   }
+   async function checkTemplate(expected){
+    assert.deepEqual(await templates.evaluateAll(roots=>roots.map(root=>[...root.querySelectorAll('td.c-aip')].map(c=>c.getAttribute('onclick')))),
+     Object.entries(expected).map(([level,hours])=>Object.entries(hours).flatMap(([h,days])=>days.slice().sort().map(day=>`togglePlantilla('${level}',${h},${day})`))));
+    for(const level of ['pri','sec'])assert.deepEqual(await page.evaluate(n=>{
+     const clean=value=>Object.fromEntries(Object.entries(value).filter(([,days])=>days.length).map(([h,days])=>[h,days.slice().sort()]));
+     return [clean(plantilla[n]),clean(JSON.parse(localStorage.getItem(CFG_KEY)).plantilla[n])];
+    },level),[expected[level],expected[level]]);
+   }
+   await checkTemplate(plantilla30);
+   if(process.env.IE_AIP_EVIDENCE)for(const [i,level] of ['pri','sec'].entries()){
+    await templates.nth(i).screenshot({path:path.join(process.env.IE_AIP_EVIDENCE,'pr131-plantilla-30-'+level+'-'+width+'.png')});
+   }
+   const snapshot=()=>page.evaluate(()=>JSON.stringify(programacionesColegiado));
+   const protectedRules=await snapshot();
+   const verifyPlan=async(expected,months)=>{
+    const result=await page.evaluate(({expected,months})=>{
+     const used=new Set(),errors=[],types=new Set(),summary={pri:0,sec:0};
+     for(const [date,record] of Object.entries(plan)){
+      if(!date.startsWith('2026-'))continue;
+      for(const level of ['pri','sec'])for(const [h,c] of Object.entries(record[level]||{})){
+       if(c.manual||!['grupo','soporte','man'].includes(c.tipo))continue;
+       const day=new Date(date+'T12:00:00').getDay()-1;
+       if(!months.includes(date.slice(5,7))||!(expected[level][h]||[]).includes(day)
+         ||esColegiadoReservado(date,level,Number(h))||!horasPed(level).includes(Number(h)))errors.push([date,level,h,c.tipo]);
+       used.add(date.slice(5,7));types.add(c.tipo);summary[level]++;
+      }
+     }
+     return {used:[...used].sort(),errors,types:[...types].sort(),summary};
+    },{expected,months});
+    assert.deepEqual(result.used,months);assert.deepEqual(result.errors,[]);assert.deepEqual(result.types,['grupo','man','soporte']);
+    assert.ok(result.summary.pri&&result.summary.sec);
+   };
+   await page.getByRole('button',{name:'Armar mes',exact:true}).click();
+   await verifyPlan(plantilla30,['03']);
+   await page.getByRole('button',{name:'Armar meses marcados',exact:true}).click();
+   await verifyPlan(plantilla30,schoolMonths.map(m=>m.slice(5)));
+   assert.equal(await snapshot(),protectedRules);
+   const override=cell('2026-03-02','pri',4);
+   await override.click();
+   await page.locator('#modTipo').selectOption('soporte');
+   await page.locator('#modal').getByRole('button',{name:'Aplicar',exact:true}).click();
+   assert.equal(await override.innerText(),'Soporte');
+   const inactivePri=cell('2026-03-03','pri',4),inactiveSec=cell('2026-03-03','sec',2);
+   assert.ok(await inactivePri.innerText());assert.ok(await inactiveSec.innerText());
+   const conteoDeMarzo=()=>page.evaluate(()=>['pri','sec'].map(n=>{
+    const {conteo}=registrosCalendarioAip(diasMes('2026-03'),n,{},docentesAip());
+    return conteo.grupo+conteo.soporte+conteo.man;
+   }));
+   const beforeClosing=await conteoDeMarzo();
+   await slot('pri',4,1).click();
+   await slot('sec',2,1).click();
+   await page.getByRole('button',{name:'Aplicar plantilla al mes',exact:true}).click();
+   for(const disabled of [inactivePri,inactiveSec]){
+    assert.equal(await disabled.innerText(),'');assert.match(await disabled.getAttribute('class'),/c-gray/);
+   }
+   assert.ok((await conteoDeMarzo()).every((count,i)=>count<beforeClosing[i]));
+   const modified=structuredClone(plantilla30);modified.pri[4]=[3];modified.sec[2]=[0,2,3,4];
+   await page.getByRole('button',{name:'Armar meses marcados',exact:true}).click();
+   await verifyPlan(modified,schoolMonths.map(m=>m.slice(5)));
+   await checkTemplate(modified);
+   assert.equal(await override.innerText(),'Soporte');assert.equal(await snapshot(),protectedRules);
+   const atomic=await page.evaluate(()=>{
+    const old=JSON.stringify(plan),stored=localStorage.getItem(KEY),original=armarPrimariaMes;
+    armarPrimariaMes=days=>{original(days);setCelda('2026-03-02','pri',1,{tipo:'man',texto:'Forzado por la prueba'});};
+    try{return !generarPeriodoAip(['2026-03'],true)&&JSON.stringify(plan)===old&&localStorage.getItem(KEY)===stored;}
+    finally{armarPrimariaMes=original;}
+   });
+   assert.equal(atomic,true);
+   if(process.env.IE_AIP_EVIDENCE){
+    await templates.last().screenshot({path:path.join(process.env.IE_AIP_EVIDENCE,'pr131-plantilla-sec-'+width+'.png')});
+    await page.locator('#boxPri').screenshot({path:path.join(process.env.IE_AIP_EVIDENCE,'pr131-calendario-pri-'+width+'.png')});
+   }
+   assert.deepEqual(weekly.requests,[]);
+   await Promise.all([page.waitForResponse(fake),page.getByRole('button',{name:'Subir nube'}).click()]);
+   await page.reload();await checkTemplate(modified);
+   await slot('pri',4,1).click();
+   await Promise.all([page.waitForResponse(fake),page.getByRole('button',{name:'Bajar nube'}).click()]);
+   await page.waitForFunction(()=>!pipOk('pri',4,1));
+   await checkTemplate(modified);
+   await verifyPlan(modified,schoolMonths.map(m=>m.slice(5)));
+   assert.equal(await snapshot(),protectedRules);
+   assert.equal(await override.innerText(),'Soporte');
+   assert.deepEqual(weekly.requests,['saveaip','loadaip']);assert.deepEqual(weekly.errors,[]);assert.deepEqual(weekly.external,[]);
+   console.log(JSON.stringify({width,weeklyTemplateHours:30,afterEditing:28,atomic,months:10}));
+   await weekly.ctx.close();
   }
  }finally{await browser.close();}
 }

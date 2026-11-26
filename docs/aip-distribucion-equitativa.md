@@ -97,3 +97,9 @@ Las 56 combinaciones pendientes siguen bloqueando el inicio de la segunda ronda.
 ### Vista previa local aislada
 
 Abre la rama en VS Code. Desde la terminal del repositorio ejecuta `node tests/aip-distribucion-browser.cjs --preview` con Playwright disponible y Edge instalado. Si Playwright está instalado fuera del repositorio, configura `IE_PLAYWRIGHT_MODULE` con su ruta. La vista previa carga la página real con un año ficticio, intercepta las solicitudes de nube y bloquea recursos externos. Para aplicar Tailwind, indica una copia local de `tailwindcss.js` en `IE_AIP_TAILWIND`; sin ella se aplica un respaldo mínimo de estilos. En Plan del mes, abre marzo o abril y revisa «Motivos de Soporte y Mantenimiento». En Estadísticas AIP consulta «Cobertura acumulada y horas de Secundaria». Cierra Edge para terminar.
+
+### Plantilla semanal y regeneración
+
+La vista previa carga la plantilla solicitada como dato ficticio, con 6 horas en Primaria y 24 en Secundaria antes de las reservas de Colegiado. Redibuja la cuadrícula con esa configuración y la guarda en el perfil aislado. Los botones de la plantilla modifican la misma configuración que usa el generador y que viaja en el paquete AIP.
+
+Ambos niveles filtran las horas automáticas por la disponibilidad semanal y comprueban grupos, Soporte y Mantenimiento en el borrador antes de guardar. Si una asignación incumple la plantilla, se conserva el plan previo. Cerrar una hora deja en gris sus asignaciones automáticas en el calendario y las aparta de las estadísticas vigentes. Al regenerar se retiran del mes seleccionado. El historial almacenado de otros meses y las excepciones manuales protegidas se conservan.

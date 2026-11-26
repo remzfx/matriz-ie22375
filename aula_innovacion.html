@@ -472,8 +472,13 @@ function slotActivo(fecha,nivel,hora,wd){
   const c=celda(fecha,nivel,hora);
   if(c && (c.tipo==='bloqueado'||c.tipo==='gestion'||c.tipo==='vacaciones'||c.tipo==='feriado'||c.tipo==='vacio')) return false;
   if(c && c.tipo==='abierto') return true;
-  if(c && c.tipo && c.tipo!=='bloqueado') return true;
   return pipOk(nivel,hora,wd);
+}
+function horaGenerableAip(fecha,nivel,hora,wd){
+  return !esFeriado(fecha)&&pipOk(nivel,hora,wd)&&!celda(fecha,nivel,hora)?.manual&&slotActivo(fecha,nivel,hora,wd);
+}
+function esAsignacionAutomaticaAip(celda){
+  return !!celda&&!celda.manual&&['grupo','soporte','man'].includes(celda.tipo);
 }
 function modoDefinir(){ return (document.getElementById('selModo')||{}).value==='definir'; }
 const HS_KEY='ie22375_aip_hs_oficial_2026';
@@ -736,7 +741,10 @@ function togglePlantilla(nivel,hora,wd){
   guardarCfg(); renderPlantilla(); render();
 }
 function restaurarPlantilla(){ plantilla=plantillaDefault(); colegiado=colegiadoDefault(); guardarCfg(); renderPlantilla(); render(); }
-function aplicarPlantillaAlMes(){ if(revisarColegiadoAntesDeGenerar(diasMes(mesActual()).map(ymd))) render(); }
+function aplicarPlantillaAlMes(){
+  if(!revisarColegiadoAntesDeGenerar(diasMes(mesActual()).map(ymd)))return;
+  renderPlantilla();render();
+}
 function renderPlantilla(){
   function tabla(nivel,horas){
     let h='<table class="cal"><thead><tr><th>Hora</th>'; DOW.forEach(x=>h+='<th>'+x+'</th>'); h+='</tr></thead><tbody>';
@@ -789,7 +797,7 @@ function armarPrimariaMes(days){
   const rotPri=['3°','4°','5°','6°']; let ip=0;
   days.forEach(d=>{
     const f=ymd(d); if(esFeriado(f)) return; const wd=d.getDay()-1;
-    const act=horasPed('pri').filter(h=>slotActivo(f,'pri',h,wd)&&!(celda(f,'pri',h)||{}).manual).sort((a,b)=>a-b);
+    const act=horasPed('pri').filter(h=>horaGenerableAip(f,'pri',h,wd)).sort((a,b)=>a-b);
     if(!act.length) return;
     const g=rotPri[ip++%rotPri.length]; const modo=bloqueCfg(); let usar=act.slice();
     if(modo==='1') usar=act.slice(0,1);
@@ -845,6 +853,7 @@ function historialAip(anio,nombres=docentesAip(),calendarioAip=plan){
     for(const [h,c] of Object.entries(dia.sec||{})){
       const hour=Number(h);
       if(c?.tipo!=='grupo'||!horasPed('sec').includes(hour)||esColegiadoReservado(date,'sec',hour))continue;
+      if(esAsignacionAutomaticaAip(c)&&!pipOk('sec',hour,calendario.weekday))continue;
       const fila=identidadAip(c,nombres);
       if(fila)filas.push({...fila,date,hour,manual:c.manual===true});
     }
@@ -878,12 +887,9 @@ function configurarExclusionAip(anio,id,reason){
 function horasLibresSec(d,proyectar=false){
   const f=ymd(d),wd=d.getDay()-1;
   return horasPed('sec').filter(h=>{
-    if(esFeriado(f)||!pipOk('sec',h,wd))return false;
+    if(!horaGenerableAip(f,'sec',h,wd))return false;
     const c=celda(f,'sec',h);
-    if(proyectar&&c?.tipo&&!c.manual&&!['bloqueado','abierto','gestion','vacaciones','feriado'].includes(c.tipo)){
-      return !esColegiadoReservado(f,'sec',h)&&!hayColegiadoPendiente(f,'sec');
-    }
-    return slotActivo(f,'sec',h,wd)&&(!c||(!c.manual&&c.tipo==='abierto'));
+    return !c||c.tipo==='abierto'||(proyectar&&esAsignacionAutomaticaAip(c));
   });
 }
 function paresLibresSec(d,proyectar=false){
@@ -948,23 +954,38 @@ function aplicarAtencionesAip(rows,libres){
   }
   return {soporte,mantenimiento,alternativas};
 }
+function validarAsignacionesSemanaAip(dias,nivel,original){
+  const horas=new Set(horasPed(nivel));
+  const diasObjetivo=new Map(dias.map(d=>[ymd(d),d.getDay()-1]));
+  for(const [fecha,dia] of Object.entries(plan)){
+    const wd=diasObjetivo.get(fecha);
+    for(const [h,c] of Object.entries(dia?.[nivel]||{})){
+      if(!esAsignacionAutomaticaAip(c))continue;
+      // Las ediciones antiguas en gestión/vacaciones podían guardarse sin marca manual.
+      if((wd===undefined||esNoLectivoEditable(fecha))&&JSON.stringify(c)===JSON.stringify(original[fecha]?.[nivel]?.[h]))continue;
+      if(wd===undefined||!horas.has(Number(h))||!horaGenerableAip(fecha,nivel,Number(h),wd)){
+        throw new Error('Asignación automática fuera de la disponibilidad semanal ('+nivel+', '+fecha+', hora '+h+').');
+      }
+    }
+  }
+}
 function generarPeriodoAip(meses,silencio=false,niveles=['pri','sec'],diasExactos=null){
   const elegidos=[...new Set(meses)].filter(m=>/^\d{4}-(0[1-9]|1[0-2])$/.test(m)).sort();
   if(!elegidos.length)return false;
   const diasPorMes=new Map(elegidos.map(m=>[m,diasExactos||diasMes(m)]));
   const motor=IEAipDistribucion,mesesSec=niveles.includes('sec')?elegidos.filter(motor.schoolMonth):[];
-  const diasSec=mesesSec.flatMap(m=>diasPorMes.get(m));
+  const diasSec=mesesSec.flatMap(m=>diasPorMes.get(m)),diasPri=niveles.includes('pri')?[...diasPorMes.values()].flat():[];
   if(!niveles.includes('pri')&&!diasSec.length){
     if(!silencio)alert('Las rondas de Secundaria se generan de marzo a diciembre.');
     return false;
   }
-  if(niveles.includes('pri')&&!revisarColegiadoAntesDeGenerar([...diasPorMes.values()].flat().map(ymd),['pri']))return false;
+  if(diasPri.length&&!revisarColegiadoAntesDeGenerar(diasPri.map(ymd),['pri']))return false;
   if(diasSec.length&&!revisarColegiadoAntesDeGenerar(diasSec.map(ymd),['sec']))return false;
   const original=plan,informes=[];
   try{
     // The isolated draft is only visible inside this synchronous calculation.
     plan=structuredClone(original);
-    if(niveles.includes('pri'))for(const dias of diasPorMes.values())liberarAsignacionesAip(dias,['pri']);
+    liberarAsignacionesAip(diasPri,['pri']);
     liberarAsignacionesAip(diasSec,['sec']);
     const nombres=docentesAip(),universo=inventarioAip(nombres);
     const propuestas=[];
@@ -987,6 +1008,8 @@ function generarPeriodoAip(meses,silencio=false,niveles=['pri','sec'],diasExacto
       const extras=aplicarAtencionesAip(propuesta.rows,propuesta.datos.libres);
       informes.push(informeDistribucionAip(propuesta,extras));
     }
+    validarAsignacionesSemanaAip(diasPri,'pri',original);
+    validarAsignacionesSemanaAip(diasSec,'sec',original);
     localStorage.setItem(KEY,JSON.stringify(plan));
   }catch(error){
     plan=original;
@@ -1622,6 +1645,7 @@ function registrosCalendarioAip(dias,nivel,filter,nombres){
       if(esColegiadoReservado(fecha,n,h)){if(!filtroIndividual)conteo.colegiado++;continue;}
       const c=celda(fecha,n,h);
       if(!c)continue;
+      if(esAsignacionAutomaticaAip(c)&&!pipOk(n,h,d.getDay()-1))continue;
       if(c.tipo==='grupo'){
         if(n==='pri'){
           if(filtroIndividual)continue;
