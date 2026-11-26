@@ -4,6 +4,7 @@
  const key=(r)=>JSON.stringify([r.teacher,r.course,r.section]);
  const month=r=>r.date.slice(0,7);
  const monthly=r=>month(r)+'|'+key(r);
+ const fortnight=r=>month(r)+'|'+(Number(r.date.slice(8,10))<=15?1:2);
  const cell=(date,hour)=>date+'|'+hour;
  const compare=(a,b)=>String(a)<String(b)?-1:String(a)>String(b)?1:0;
  const serial=m=>Number(m.slice(0,4))*12+Number(m.slice(5,7));
@@ -13,9 +14,10 @@
   axes.forEach((field,i)=>count(state.counts[i],r[field],hours));
   count(state.combos,key(r),hours);
   count(state.months,monthly(r),hours);
+  count(state.fortnights,fortnight(r),hours);
  }
  function summarize(history,selected){
-  const state={counts:axes.map(()=>new Map()),combos:new Map(),months:new Map()};
+  const state={counts:axes.map(()=>new Map()),combos:new Map(),months:new Map(),fortnights:new Map()};
   history.forEach(r=>addHours(state,r,1));selected.forEach(r=>addHours(state,r,2));
   return state;
  }
@@ -24,8 +26,12 @@
   const index=serial(id)+offset-1,y=Math.floor(index/12),m=index%12+1;
   return y+'-'+String(m).padStart(2,'0')+id.slice(7);
  }
- function resources(r){return [cell(r.date,r.h1),cell(r.date,r.h2),monthly(r)];}
- function solve({history,opportunities}){
+ const chronological=(a,b)=>compare(a.date,b.date)||a.h1-b.h1||compare(key(a),key(b));
+ const startsAfter=(r,close)=>!close||r.date>close.date||(r.date===close.date&&r.h1>close.h2);
+ const endSlot=r=>cell(r.date,String(r.h2).padStart(2,'0'));
+ const blockId=r=>JSON.stringify([r.date,r.h1,r.h2,key(r)]);
+ function resources(r){return [cell(r.date,r.h1),cell(r.date,r.h2),'round|'+key(r)];}
+ function optimize(history,opportunities,last){
   const fixed=summarize(history,[]),used=new Set(history.map(r=>cell(r.date,r.hour)));
   const edges=opportunities.filter(r=>!fixed.months.has(monthly(r))&&!used.has(cell(r.date,r.h1))&&!used.has(cell(r.date,r.h2)));
   const frequency=new Map(),teacherSlots=new Map(),byResource=new Map();
@@ -41,38 +47,38 @@
   const teacherFrequency=new Map([...teacherSlots].map(([id,slots])=>[id,slots.size]));
   function rank(a,b){
    return teacherFrequency.get(a.teacher)-teacherFrequency.get(b.teacher)||frequency.get(key(a))-frequency.get(key(b))||
-    compare(a.date,b.date)||a.h1-b.h1||compare(key(a),key(b));
+    compare(last.get(key(a))?.date||'',last.get(key(b))?.date||'')||chronological(a,b);
   }
   edges.sort(rank);
   for(const list of byResource.values())list.sort(rank);
   function evaluateChanges(state,removed,added,base){
-   const changes=axes.map(()=>new Map()),combos=new Map(),months=new Map();
+   const changes=axes.map(()=>new Map()),months=new Map(),combos=new Map(),fortnights=new Map();
    function move(rows,delta){
     for(const r of rows){
      axes.forEach((field,i)=>count(changes[i],r[field],delta));
-     count(combos,key(r),delta);count(months,monthly(r),delta);
+     count(months,monthly(r),delta);count(combos,key(r),delta);count(fortnights,fortnight(r),delta);
     }
    }
    move(removed,-2);move(added,2);
    const next=base.slice();
+   next[0]+=added.length-removed.size;
    for(const [i,delta] of changes.entries())for(const [id,hours] of delta){
     const before=state.counts[i].get(id)||0,after=before+hours;
     const coverage=Number(after>0)-Number(before>0);
-    next[i===0?0:1]+=coverage;
-    if(i===0&&!fixed.counts[0].has(id)) next[3]+=coverage/(teacherFrequency.get(id)||1);
-    next[4]+=(i===0?2:1)*equityGain(before,hours);
+    next[i===0?1:2]+=coverage;
+    next[i===0?4:5]+=equityGain(before,hours);
    }
-   for(const [combo,hours] of combos){
-    const before=state.combos.get(combo)||0,coverage=Number(before+hours>0)-Number(before>0);
-    next[2]+=coverage;
-    if(!fixed.combos.has(combo))next[3]+=coverage/(frequency.get(combo)||1);
+   for(const [rows,sign] of [[removed,-1],[added,1]])for(const row of rows){
+    next[3]+=sign/frequency.get(key(row));
+    next[7]-=sign*(last.get(key(row))?Number(last.get(key(row)).date.replaceAll('-','')):0);
    }
+   for(const [id,hours] of combos)next[6]+=equityGain(state.combos.get(id)||0,hours);
+   for(const [id,hours] of fortnights)next[9]+=equityGain(state.fortnights.get(id)||0,hours);
    const touched=new Set([...months.keys()].flatMap(id=>[id,shiftMonth(id,-1)]));
    for(const id of touched){
     const other=shiftMonth(id,1),a=state.months.get(id)||0,b=state.months.get(other)||0;
-    next[5]+=Number(a>0&&b>0)-Number(a+(months.get(id)||0)>0&&b+(months.get(other)||0)>0);
+    next[8]+=Number(a>0&&b>0)-Number(a+(months.get(id)||0)>0&&b+(months.get(other)||0)>0);
    }
-   next[6]+=added.length-removed.size;
    return next;
   }
   function better(a,b){for(let i=0;i<a.length;i++){if(Math.abs(a[i]-b[i])>1e-9)return a[i]>b[i];}return false;}
@@ -80,17 +86,16 @@
   const index=rows=>new Map(rows.flatMap(r=>resources(r).map(k=>[k,r])));
   const add=(r)=>{current.push(r);resources(r).forEach(k=>occupancy.set(k,r));};
   // Seed in three coverage passes, with scarce choices first and stable ties.
-  const seeded=axes.map((_,i)=>new Set(fixed.counts[i].keys())),seedCombos=new Set(fixed.combos.keys());
+  const seeded=axes.map(()=>new Set());
   for(let priority=0;priority<3;priority++)for(const r of edges){
    if(resources(r).some(k=>occupancy.has(k))) continue;
    if(priority===0&&seeded[0].has(r.teacher))continue;
    if(priority===1&&seeded[1].has(r.section)&&seeded[2].has(r.course))continue;
-   if(priority===2&&seedCombos.has(key(r)))continue;
-   add(r);axes.forEach((f,i)=>seeded[i].add(r[f]));seedCombos.add(key(r));
+   add(r);axes.forEach((f,i)=>seeded[i].add(r[f]));
   }
   let state=summarize(history,current);
-  let value=evaluateChanges(fixed,new Set(),current,[fixed.counts[0].size,
-    fixed.counts[1].size+fixed.counts[2].size,fixed.combos.size,0,0,-adjacentMonths(fixed.months).length,0]);
+  let value=evaluateChanges(fixed,new Set(),current,[0,fixed.counts[0].size,
+    fixed.counts[1].size+fixed.counts[2].size,0,0,0,0,0,0,0]);
   // Insert a different edge, displace conflicts, then repair through every freed resource.
   // The bounded neighborhood handles both competing starts and displaced combinations.
   for(let pass=0;pass<3;pass++){
@@ -115,8 +120,6 @@
     let best=null,bestValue=value;
     for(const added of variants){
      const next=evaluateChanges(state,blocked,added,value);
-     // Expanding the core must buy coverage; spare capacity is handled independently.
-     if(added.length>blocked.size&&!better(next.slice(0,3),value.slice(0,3)))continue;
      if(better(next,bestValue)){best=added;bestValue=next;}
     }
     if(best){
@@ -126,27 +129,87 @@
    }
    if(!improved)break;
   }
-  // Fill spare time only when it does not add consecutive-month repetition.
-  // The coverage passes above may repeat if necessary to cover someone.
-  let spare=edges.map(edge=>{
-   const id=monthly(edge);
-   return {edge,combo:key(edge),resources:resources(edge),neighbors:[shiftMonth(id,-1),shiftMonth(id,1)]};
-  });
-  while(spare.length){
-   let best=null,bestValue=null;
-   spare=spare.filter(candidate=>{
-    if(candidate.resources.some(k=>occupancy.has(k))||candidate.neighbors.some(k=>state.months.has(k)))return false;
-    const {edge,combo}=candidate;
-    const value=[axes.reduce((total,field,i)=>total+(i===0?2:1)*equityGain(state.counts[i].get(edge[field])||0,2),0),
-     -(state.combos.get(combo)||0)];
-    // The existing rank supplies stable ties after the current equity totals.
-    if(!best||better(value,bestValue)){best=edge;bestValue=value;}
-    return true;
-   });
-   if(!best)break;
-   add(best);addHours(state,best,2);
+  return current.sort(chronological);
+ }
+ function completeBlocks(history,consecutive=(a,b)=>b===a+1){
+  const ordered=history.slice().sort((a,b)=>compare(a.date,b.date)||a.hour-b.hour);
+  const blocks=[];
+  for(let i=0;i+1<ordered.length;i++){
+   const a=ordered[i],b=ordered[i+1];
+   if(a.date!==b.date||b.hour!==a.hour+1||key(a)!==key(b)||!consecutive(a.hour,b.hour))continue;
+   blocks.push({...a,h1:a.hour,h2:b.hour});i++;
   }
-  return current.sort((a,b)=>compare(a.date,b.date)||a.h1-b.h1||compare(key(a),key(b)));
+  return blocks;
+ }
+ function readExclusions(value){
+  const result={};
+  if(!value||typeof value!=='object'||Array.isArray(value))return result;
+  for(const [year,rows] of Object.entries(value)){
+   if(!/^\d{4}$/.test(year)||!Array.isArray(rows))continue;
+   const accepted=new Map();
+   for(const row of rows){
+    if(typeof row?.id!=='string'||typeof row.reason!=='string'||!row.reason.trim()||
+       row.reason.length>240||typeof row.at!=='string'||!Number.isFinite(Date.parse(row.at))||row.by!=='pip')continue;
+    accepted.set(row.id,{id:row.id,reason:row.reason.trim(),at:row.at,by:row.by});
+   }
+   if(accepted.size)result[year]=[...accepted.values()];
+  }
+  return result;
+ }
+ function rounds(target,blocks){
+  const universe=new Set(target),pending=new Set(universe),completed=[],credits=new Map(),anomalies=[],complete=new Map();
+  let start=null;
+  for(const row of blocks.slice().sort(chronological)){
+   const id=key(row);
+   count(complete,id);
+   if(!universe.has(id))continue;
+   if(!pending.delete(id)){anomalies.push({row,round:completed.length+1});continue;}
+   start ||= row;
+   credits.set(blockId(row),{row,round:completed.length+1});
+   if(pending.size===0){
+    completed.push({start,close:row});
+    start=null;
+    for(const combination of universe)pending.add(combination);
+   }
+  }
+  return {completed,credits,anomalies,complete,pending,start,target:universe};
+ }
+ function solve({history,opportunities,target,consecutive}){
+  const universe=new Set(target),preserved=completeBlocks(history,consecutive);
+  const rows=[],calendar=history.slice(),last=new Map();
+  let close=null;
+  while(universe.size){
+   const existing=preserved.filter(row=>startsAfter(row,close)&&universe.has(key(row)));
+   const eligible=opportunities.filter(row=>startsAfter(row,close)&&universe.has(key(row)));
+   const ends=[...new Set([...existing,...eligible].map(endSlot))].sort(compare);
+   if(!ends.length)break;
+   function propose(end){
+    const within=row=>compare(endSlot(row),end)<=0;
+    const first=new Map();
+    for(const row of existing)if(within(row)&&!first.has(key(row)))first.set(key(row),row);
+    const proposed=optimize(calendar,eligible.filter(row=>within(row)&&!first.has(key(row))),last);
+    const covered=[...first.values(),...proposed].sort(chronological);
+    return {proposed,covered,complete:covered.length===universe.size};
+   }
+   let choice=propose(ends.at(-1));
+   if(choice.complete){
+    // Earlier closures can unlock later opportunities. Keep the known feasible
+    // result if the bounded optimizer cannot solve a shorter prefix.
+    const knownClose=choice.covered.at(-1);
+    let lo=universe.size-1,hi=ends.indexOf(endSlot(knownClose))-1;
+    while(lo<=hi){
+     const mid=Math.floor((lo+hi)/2),candidate=propose(ends[mid]);
+     if(candidate.complete){choice=candidate;hi=mid-1;}else lo=mid+1;
+    }
+   }
+   for(const row of choice.proposed){
+    rows.push(row);calendar.push({...row,hour:row.h1},{...row,hour:row.h2});
+   }
+   if(!choice.complete)break;
+   for(const row of choice.covered)last.set(key(row),row);
+   close=choice.covered.at(-1);
+  }
+  return rows.sort(chronological);
  }
  function adjacentMonths(months){
   const groups=new Map(),out=[];
@@ -162,20 +225,23 @@
   }
   return out;
  }
- function validate({history,opportunities},rows){
-  const allowed=new Set(opportunities.map(r=>JSON.stringify([r.date,r.h1,r.h2,key(r)])));
+ function validate({history,opportunities,target,consecutive,protectedBlocks=[]},rows){
+  const allowed=new Set(opportunities.map(blockId));
   const used=new Set(history.map(r=>cell(r.date,r.hour)));
   const months=summarize(history,[]).months;
   for(const r of rows){
-   if(!allowed.has(JSON.stringify([r.date,r.h1,r.h2,key(r)]))||r.h2!==r.h1+1||
+   if(!allowed.has(blockId(r))||r.h2!==r.h1+1||(consecutive&&!consecutive(r.h1,r.h2))||
       used.has(cell(r.date,r.h1))||used.has(cell(r.date,r.h2))||(months.get(monthly(r))||0)+2>2){
     throw new Error('La propuesta contiene un bloque no disponible o supera el límite mensual.');
    }
    used.add(cell(r.date,r.h1));used.add(cell(r.date,r.h2));count(months,monthly(r),2);
   }
-  return summarize(history,rows);
+  const state=rounds(target,[...completeBlocks(history,consecutive),...rows]);
+  if(rows.some(r=>!state.credits.has(blockId(r))))throw new Error('La propuesta repite una combinación o adelanta una ronda.');
+  if(protectedBlocks.some(id=>!state.credits.has(id)))throw new Error('La regeneración interrumpe una ronda de un mes posterior. Regenera conjuntamente los meses afectados.');
+  return {...summarize(history,rows),rounds:state};
  }
- const api={key,month,monthly,compare,solve,validate,summarize,adjacentMonths};
+ const api={key,month,monthly,compare,solve,validate,summarize,adjacentMonths,completeBlocks,rounds,readExclusions};
  root.IEAipDistribucion=api;
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

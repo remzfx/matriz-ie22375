@@ -38,3 +38,34 @@ En el caso de regresión, A partía con cuatro horas y B con dos. Con un único 
 ## Persistencia y reversión
 
 Estadísticas y matriz se calculan a partir del plan, sin persistir una segunda copia del historial. Solo la acción explícita de subir envía un paquete a la nube. Se conserva la lectura del formato anterior. Si el JSON supera 49.000 caracteres, el frontend utiliza gzip y Base64. El paquete anual del escenario ficticio ocupó 11.318 caracteres y se recuperó íntegramente con transporte simulado. Si el navegador no admite compresión o el resultado supera el límite, el plan queda en el dispositivo y la subida se rechaza. Un frontend anterior no interpreta el paquete comprimido. Antes de revertir el frontend, cualquier plan comprimido debe conservarse en un cliente compatible. No se probó la nube institucional.
+
+## Rondas continuas de Secundaria
+
+El PR #129 podía asignar un segundo bloque a una combinación aun cuando otras seguían pendientes. Además, el relleno descartaba automáticamente meses consecutivos. Este cambio convierte la cobertura de la ronda en una restricción. Se extraen parejas de horas consecutivas en una misma fecha y con la misma identidad académica, sin cruzar el recreo ni contar horas aisladas. Estas horas siguen formando parte de los acumulados y del límite mensual. Los bloques históricos repetidos antes del cierre quedan visibles como anomalías, sin crédito anticipado.
+
+Cada pasada del optimizador conserva la búsqueda acotada y las reasignaciones del PR #129. Dentro de una ronda solo se permite una asignación por combinación. Se considera la cantidad de combinaciones pendientes cubiertas, la cobertura institucional, la escasez, la equidad acumulada, la atención más antigua, la rotación y el balance entre quincenas. Cuando es posible cerrar una ronda, se exploran prefijos cronológicos para adelantar el cierre. Cualquier atención de la siguiente ronda debe comenzar después del último tramo del cierre. Una validación separada reconstruye las rondas y comprueba cada asignación propuesta antes de aplicar el calendario. Si una regeneración invalida un crédito posterior conservado, se detiene y solicita regenerar conjuntamente los meses afectados.
+
+El universo usa el horario institucional vigente y no se reduce cuando se desmarca un curso de un mes. El PIP puede autorizar o revertir una exclusión por año e identidad desde Estadísticas AIP, con confirmación y motivo. El paquete solo agrega estos metadatos, nunca copias de rondas. El backend conserva sus permisos actuales para sincronizar el paquete AIP. La comprobación de edición de exclusiones actúa en la interfaz con el perfil PIP vigente.
+
+### Repetición del escenario del PR #129
+
+Se sirvieron el HTML y los módulos del SHA de integración `0697074` y los del motor por rondas en Edge. Ambos usaron los mismos 24 docentes, 9 secciones, 6 cursos y 10 meses ficticios.
+
+| Indicador | PR #129 | Rondas |
+| --- | ---: | ---: |
+| Docentes / cursos / secciones | 24 / 6 / 9 | 24 / 6 / 9 |
+| Combinaciones con horas programadas | 126 | 126 |
+| Universo objetivo / pendientes de ronda | 181 / 56 | 181 / 56 |
+| Rondas completas | 0 | 0 |
+| Atención pedagógica | 1125 h | 251 h |
+| Soporte | 259 h | 696 h |
+| Mantenimiento | 0 h | 437 h |
+| Máximo mensual por combinación | 2 h | 2 h |
+| Repeticiones entre meses consecutivos | 0 | 0 |
+| Bloques repetidos sin crédito de ronda | 437 | 0 |
+| Conflictos de Colegiado / fuera de horario | 0 / 0 | 0 / 0 |
+| Tiempo de generación | 280 ms | 408–424 ms |
+
+En esta prueba, 125 combinaciones tienen bloques completos y otra tiene una hora manual aislada. La reducción de 874 horas programadas corresponde a los 437 bloques que antes se repetían con la primera ronda abierta. En el caso independiente con dos combinaciones compatibles, el PR #129 programa 4 horas en marzo y abril, y el motor por rondas programa 8 y cierra dos rondas. Al retirar el par consecutivo de una combinación, la segunda ronda queda bloqueada. También se probó el cierre de 60/60 con un segundo bloque válido ese mismo día, el bloqueo con 59/60 y 12 rondas sucesivas sin un tope artificial.
+
+La búsqueda no certifica que sea imposible mejorar la cobertura de un calendario dado. La comprobación de compatibilidad y persistencia usa datos ficticios y transporte simulado. Las horas nominales de los tramos históricos se muestran según la configuración pedagógica vigente.

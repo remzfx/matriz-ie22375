@@ -13,7 +13,7 @@ function extract(name){
   return html.slice(from,next);
 }
 function make(names,extras={}){
-  const control={IEAipPaquete:require('../aip-paquete.js'),plan:{},feriados:{},ultimoInformeAip:[],renderInformeAip(){},renderEstadisticasAip(){},programacionesColegiado:[],esColegiadoReservado:()=>false,hayColegiadoPendiente:()=>false,revisarColegiadoAntesDeGenerar:()=>true,leerProgramacionesColegiado(){},renderGestorColegiado(){},...extras};
+  const control={IEAipPaquete:require('../aip-paquete.js'),IEAipDistribucion:require('../aip-distribucion.js'),exclusionesRondasAip:{},plan:{},feriados:{},ultimoInformeAip:[],renderInformeAip(){},renderEstadisticasAip(){},programacionesColegiado:[],esColegiadoReservado:()=>false,hayColegiadoPendiente:()=>false,revisarColegiadoAntesDeGenerar:()=>true,leerProgramacionesColegiado(){},renderGestorColegiado(){},...extras};
   vm.createContext(control);
   vm.runInContext(['esColegiadoMaterializado','depurarColegiadoMensual',...names].map(extract).join('\n'),control);
   return control;
