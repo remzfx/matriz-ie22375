@@ -87,17 +87,48 @@ test('Editar una hora de gestión conserva otras horas y el horario de primaria/
 test('Armar mes no borra cambios individuales en los días de gestión',()=>{
  const plan=example();
  plan[monday].pri[2]={tipo:'soporte',texto:'Soporte'};
- const v=make(['esFeriado','esNoLectivoEditable','liberarAsignacionesAip','armarPrimariaMes'],{
+ const v=make(['esFeriado','esNoLectivoEditable','liberarAsignacionesAip','armarPrimariaMes','horaGenerableAip','celda'],{
    plan,feriados:{[monday]:'Semana gestión'},
    document:{getElementById:id=>({value:'2026-12'})},
    diasMes:dates,ymd:d=>d.toISOString().slice(0,10),
-   horasPed:()=>[1,2],colOk:()=>false,slotActivo:()=>false,
+   horasPed:()=>[1,2],colOk:()=>false,pipOk:()=>true,slotActivo:()=>false,
    setCelda:(f,n,h,o)=>{plan[f]??={};plan[f][n]??={};plan[f][n][h]=o;},
    bloqueCfg:()=> '2',armarSecundariaMes:()=>{},guardar:()=>{},render:()=>{}
  });
  v.liberarAsignacionesAip(dates(),['pri','sec']); v.armarPrimariaMes(dates());
  assert.equal(plan[monday].pri[2].texto,'Soporte');
  assert.equal(plan[monday].sec[1].tipo,'gestion');
+});
+test('Una asignación antigua o una apertura manual no habilitan la generación fuera de la plantilla',()=>{
+ const day='2026-03-02',plan={[day]:{pri:{1:{tipo:'grupo'},2:{tipo:'abierto'},3:{tipo:'grupo',manual:true}}}};
+ const v=make(['celda','slotActivo','horaGenerableAip','armarPrimariaMes'],{
+   plan,esFeriado:()=>false,pipOk:(n,h)=>h===3||h===4,horasPed:()=>[1,2,3,4],ymd:()=>day,
+   bloqueCfg:()=> '2',setCelda:(f,n,h,c)=>{plan[f][n][h]=c;}
+ });
+ assert.equal(v.slotActivo(day,'pri',1,0),false);
+ assert.equal(v.slotActivo(day,'pri',2,0),true);
+ assert.equal(v.horaGenerableAip(day,'pri',2,0),false);
+ v.armarPrimariaMes([new Date(day+'T12:00:00')]);
+ assert.equal(plan[day].pri[2].tipo,'abierto');
+ assert.equal(plan[day].pri[3].manual,true);
+ assert.equal(plan[day].pri[4].texto,'3°');
+});
+test('La validación final rechaza grupos, soporte y mantenimiento fuera de la plantilla en ambos niveles',()=>{
+ const day='2026-03-02',dias=[new Date(day+'T12:00:00')];
+ const v=make(['celda','slotActivo','horaGenerableAip','esAsignacionAutomaticaAip','validarAsignacionesSemanaAip'],{
+   esFeriado:()=>false,esNoLectivoEditable:()=>false,pipOk:(n,h)=>h===2,horasPed:()=>[1,2],ymd:()=>day
+ });
+ for(const nivel of ['pri','sec'])for(const tipo of ['grupo','man','soporte']){
+   v.plan={[day]:{[nivel]:{1:{tipo}}}};
+   assert.throws(()=>v.validarAsignacionesSemanaAip(dias,nivel,{}),/fuera de la disponibilidad semanal/);
+   v.plan[day][nivel][1].manual=true;
+   v.plan[day][nivel][2]={tipo};
+   assert.doesNotThrow(()=>v.validarAsignacionesSemanaAip(dias,nivel,{}));
+ }
+ const later={'2026-04-06':{sec:{2:{tipo:'soporte'}}}};
+ v.plan=structuredClone(later);
+ assert.throws(()=>v.validarAsignacionesSemanaAip(dias,'sec',{}),/2026-04-06/);
+ assert.doesNotThrow(()=>v.validarAsignacionesSemanaAip(dias,'sec',later));
 });
 
 test('Encabezado de fecha abre menú por nivel sin marcar feriado automáticamente',()=>{

@@ -7,6 +7,26 @@ const targetOf=(...rows)=>rows.map(motor.key);
 const pair=(date,h,teacher,course,section)=>[hour(date,h,teacher,course,section),hour(date,h+1,teacher,course,section)];
 const run=(history,opportunities,target=targetOf(...opportunities))=>{const input={history,opportunities,target},rows=motor.solve(input);motor.validate(input,rows);return rows;};
 
+test('the preview timetable has stable course-section owners and no teacher crossings',()=>{
+ const timetable=require('./fixtures/aip-horario-realista.cjs');
+ const owners=new Map(),teachers=new Map();
+ for(const shifts of Object.values(timetable))for(const slot of Object.values(shifts)){
+  const available=new Set();
+  for(const [section,{area,doc,docenteId}] of Object.entries(slot)){
+   assert.equal(available.has(docenteId),false,'simultaneous assignment for '+doc);
+   available.add(docenteId);
+   const key=area+'|'+section;
+   if(owners.has(key))assert.equal(owners.get(key),docenteId,key+' changes teacher');
+   owners.set(key,docenteId);
+   if(!teachers.has(docenteId))teachers.set(docenteId,{courses:new Set(),sections:new Set()});
+   teachers.get(docenteId).courses.add(area);teachers.get(docenteId).sections.add(section);
+  }
+ }
+ assert.equal(owners.size,54);
+ assert.equal(owners.get('CCSS|5U'),'fixture-03');
+ assert.ok([...teachers.values()].some(t=>t.courses.size>1&&t.sections.size>1));
+});
+
 test('repair recovers the known two-teacher optimum across overlapping starts',()=>{
  const edges=[edge('2026-03-02',1,'A'),edge('2026-03-02',2,'B'),edge('2026-03-03',1,'A')];
  const rows=run([],edges);
@@ -97,6 +117,38 @@ test('validate rejects reused hours, forged slots and over-cap proposals',()=>{
  const input={history:[],opportunities:[a,b,c],target:targetOf(a,b,c)};
  for(const rows of [[a,b],[a,c],[{...a,course:'CX'}]])assert.throws(()=>motor.validate(input,rows),/límite|disponible/);
 });
+test('an impossible C keeps the round open while A and B use March opportunities',()=>{
+ const dates=['2026-03-16','2026-03-23','2026-04-06','2026-05-04'];
+ const opportunities=dates.flatMap(date=>['A','B'].map(teacher=>edge(date,1,teacher)));
+ const target=targetOf(...opportunities.slice(0,2),edge(dates[0],3,'C'));
+ const rows=run([],opportunities,target);
+ assert.deepEqual(rows.map(r=>r.date),dates.slice(0,2));
+ assert.deepEqual(run([],opportunities.slice().reverse(),target),rows);
+ const state=motor.rounds(target,rows);
+ assert.equal(state.completed.length,0);
+ assert.deepEqual([...state.pending],[target[2]]);
+});
+test('an earlier opportunity yields when it would reduce coverage, and incompatible March is skipped',()=>{
+ const earlyA=edge('2026-03-16',1,'A'),onlyB=edge('2026-03-16',2,'B'),laterA=edge('2026-04-06',1,'A');
+ const latestA=edge('2026-05-04',1,'A'),impossibleC=edge('2026-05-04',3,'C');
+ const rows=run([],[earlyA,onlyB,laterA,latestA],targetOf(earlyA,onlyB,impossibleC));
+ assert.deepEqual(rows,[onlyB,laterA]);
+ const input={history:[hour(earlyA.date,1,'Z')],opportunities:[earlyA,laterA,latestA],target:targetOf(earlyA)};
+ const plan=run(input.history,input.opportunities,input.target);
+ assert.deepEqual(plan,[laterA,latestA]);
+ assert.equal(motor.validate(input,plan).rounds.completed[0].close.date,laterA.date);
+});
+test('January and February retain their hours without accrediting the school-year round',()=>{
+ const past=[...pair('2026-01-05',1,'A'),...pair('2026-02-09',1,'B')];
+ const extra=[edge('2026-02-16',1,'A'),edge('2026-03-16',1,'A'),edge('2026-04-06',1,'A')];
+ const target=targetOf(past[0],past[2]),input={history:past,opportunities:extra,target};
+ const selected=run(past,extra,target),result=motor.validate(input,selected);
+ assert.deepEqual(selected,[extra[1]]);
+ assert.equal(result.rounds.completed.length,0);
+ assert.equal(result.rounds.pending.has(target[1]),true);
+ assert.deepEqual([...result.counts[0].values()],[4,2]);
+ assert.throws(()=>motor.validate(input,[extra[0]]),/periodo escolar/);
+});
 test('60 of 60 opens another round after the last June block, even on the same date',()=>{
  const dates=['03','04','05','06'], all=Array.from({length:60},(_,i)=>edge('2026-'+dates[Math.floor(i/15)]+'-'+String(i%15+1).padStart(2,'0'),1,'T'+i));
  const again=edge('2026-06-15',3,'T0'),tooSoon=edge('2026-06-15',1,'T0');
@@ -143,10 +195,10 @@ test('history credits complete adjacent blocks, reports duplicates, and keeps pa
  assert.equal(motor.summarize(history,[]).months.get(motor.monthly(history[4])),2);
 });
 test('never starts another round before completion and has no fixed round count',()=>{
- const candidates=Array.from({length:12},(_,i)=>edge('2026-'+String(i+1).padStart(2,'0')+'-05',1,'A'));
+ const candidates=Array.from({length:10},(_,i)=>edge('2026-'+String(i+3).padStart(2,'0')+'-05',1,'A'));
  const target=targetOf(candidates[0]);
  const rows=run([],candidates,target);
- assert.equal(motor.rounds(target,rows).completed.length,12);
+ assert.equal(motor.rounds(target,rows).completed.length,10);
  assert.deepEqual(run([],candidates.slice().reverse(),target),rows);
  const june=edge('2026-06-12',1,'A'), sameMonth=edge('2026-06-19',1,'A'), july=edge('2026-07-03',1,'A');
  assert.deepEqual(run([],[june,sameMonth,july],target),[june,july]);
@@ -156,8 +208,18 @@ test('rejects a regeneration that would invalidate an accredited block in anothe
  const target=targetOf(a,b),history=[...pair(b.date,1,'B'),...pair(later.date,1,'B')];
  const previous=motor.rounds(target,motor.completeBlocks(pair(a.date,1,'A').concat(history)));
  const protectedBlocks=[...previous.credits].filter(([,credit])=>credit.row.date>=b.date).map(([id])=>id);
- assert.throws(()=>motor.validate({history,opportunities:[],target,protectedBlocks},[]),/mes posterior/);
+ assert.throws(()=>motor.validate({history,opportunities:[],target,protectedBlocks},[]),/mes posterior.*2026-05/);
  assert.equal(motor.validate({history,opportunities:[a],target,protectedBlocks},[a]).rounds.completed.length,1);
+});
+test('fallback causes follow the round at each block, including same-day closure',()=>{
+ const a=edge('2026-03-16',1,'A'),b=edge('2026-03-16',5,'B'),c=edge('2026-03-16',7,'C');
+ const target=targetOf(a,b),state=motor.rounds(target,[a,b]);
+ const offered=[edge(a.date,3,'A'),c,edge(a.date,9,'A'),edge('2026-04-06',1,'A')];
+ const alternatives=[...offered,edge(a.date,11,'A'),{date:a.date,h1:13}].reverse();
+ assert.deepEqual(stats.unusedBlocks(state,new Map([[motor.monthly(a),2]]),offered,alternatives).map(x=>x.reason),[
+  'Candidatos ya acreditados en la ronda activa','Candidatos excluidos por el PIP','Límite mensual comprometido',
+  'Sin candidato compatible para el bloque','Sin segundo tramo libre y consecutivo','Oportunidad compatible sin asignar en la búsqueda'
+ ]);
 });
 test('statistics reconcile teacher, course, section and yearly matrix directly from plan rows',()=>{
  const a=edge('2026-03-02',1,'A'), b=edge('2026-04-02',1,'B','COM','2A'), c=edge('2026-04-02',1,'C','COM','2A');

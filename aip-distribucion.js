@@ -4,7 +4,8 @@
  const key=(r)=>JSON.stringify([r.teacher,r.course,r.section]);
  const month=r=>r.date.slice(0,7);
  const monthly=r=>month(r)+'|'+key(r);
- const fortnight=r=>month(r)+'|'+(Number(r.date.slice(8,10))<=15?1:2);
+ const schoolMonth=ym=>{const n=Number(ym.slice(5,7));return n>=3&&n<=12;};
+ const inSchoolYear=r=>schoolMonth(month(r));
  const cell=(date,hour)=>date+'|'+hour;
  const compare=(a,b)=>String(a)<String(b)?-1:String(a)>String(b)?1:0;
  const serial=m=>Number(m.slice(0,4))*12+Number(m.slice(5,7));
@@ -14,10 +15,9 @@
   axes.forEach((field,i)=>count(state.counts[i],r[field],hours));
   count(state.combos,key(r),hours);
   count(state.months,monthly(r),hours);
-  count(state.fortnights,fortnight(r),hours);
  }
  function summarize(history,selected){
-  const state={counts:axes.map(()=>new Map()),combos:new Map(),months:new Map(),fortnights:new Map()};
+  const state={counts:axes.map(()=>new Map()),combos:new Map(),months:new Map()};
   history.forEach(r=>addHours(state,r,1));selected.forEach(r=>addHours(state,r,2));
   return state;
  }
@@ -51,12 +51,13 @@
   }
   edges.sort(rank);
   for(const list of byResource.values())list.sort(rank);
+  const slotCost=new Map(edges.map(r=>[r,Date.parse(r.date)/86400000*100+r.h2]));
   function evaluateChanges(state,removed,added,base){
-   const changes=axes.map(()=>new Map()),months=new Map(),combos=new Map(),fortnights=new Map();
+   const changes=axes.map(()=>new Map()),months=new Map(),combos=new Map();
    function move(rows,delta){
     for(const r of rows){
      axes.forEach((field,i)=>count(changes[i],r[field],delta));
-     count(months,monthly(r),delta);count(combos,key(r),delta);count(fortnights,fortnight(r),delta);
+     count(months,monthly(r),delta);count(combos,key(r),delta);
     }
    }
    move(removed,-2);move(added,2);
@@ -65,19 +66,19 @@
    for(const [i,delta] of changes.entries())for(const [id,hours] of delta){
     const before=state.counts[i].get(id)||0,after=before+hours;
     const coverage=Number(after>0)-Number(before>0);
-    next[i===0?1:2]+=coverage;
-    next[i===0?4:5]+=equityGain(before,hours);
+    next[i===0?3:4]+=coverage;
+    next[i===0?5:6]+=equityGain(before,hours);
    }
    for(const [rows,sign] of [[removed,-1],[added,1]])for(const row of rows){
-    next[3]+=sign/frequency.get(key(row));
-    next[7]-=sign*(last.get(key(row))?Number(last.get(key(row)).date.replaceAll('-','')):0);
+    next[1]-=sign*slotCost.get(row);
+    next[2]+=sign/frequency.get(key(row));
+    next[8]-=sign*(last.get(key(row))?Number(last.get(key(row)).date.replaceAll('-','')):0);
    }
-   for(const [id,hours] of combos)next[6]+=equityGain(state.combos.get(id)||0,hours);
-   for(const [id,hours] of fortnights)next[9]+=equityGain(state.fortnights.get(id)||0,hours);
+   for(const [id,hours] of combos)next[7]+=equityGain(state.combos.get(id)||0,hours);
    const touched=new Set([...months.keys()].flatMap(id=>[id,shiftMonth(id,-1)]));
    for(const id of touched){
     const other=shiftMonth(id,1),a=state.months.get(id)||0,b=state.months.get(other)||0;
-    next[8]+=Number(a>0&&b>0)-Number(a+(months.get(id)||0)>0&&b+(months.get(other)||0)>0);
+    next[9]+=Number(a>0&&b>0)-Number(a+(months.get(id)||0)>0&&b+(months.get(other)||0)>0);
    }
    return next;
   }
@@ -94,8 +95,8 @@
    add(r);axes.forEach((f,i)=>seeded[i].add(r[f]));
   }
   let state=summarize(history,current);
-  let value=evaluateChanges(fixed,new Set(),current,[0,fixed.counts[0].size,
-    fixed.counts[1].size+fixed.counts[2].size,0,0,0,0,0,0,0]);
+  let value=evaluateChanges(fixed,new Set(),current,[0,0,0,fixed.counts[0].size,
+    fixed.counts[1].size+fixed.counts[2].size,0,0,0,0,0]);
   // Insert a different edge, displace conflicts, then repair through every freed resource.
   // The bounded neighborhood handles both competing starts and displaced combinations.
   for(let pass=0;pass<3;pass++){
@@ -162,7 +163,7 @@
   for(const row of blocks.slice().sort(chronological)){
    const id=key(row);
    count(complete,id);
-   if(!universe.has(id))continue;
+   if(!inSchoolYear(row)||!universe.has(id))continue;
    if(!pending.delete(id)){anomalies.push({row,round:completed.length+1});continue;}
    start ||= row;
    credits.set(blockId(row),{row,round:completed.length+1});
@@ -175,12 +176,13 @@
   return {completed,credits,anomalies,complete,pending,start,target:universe};
  }
  function solve({history,opportunities,target,consecutive}){
-  const universe=new Set(target),preserved=completeBlocks(history,consecutive);
+  const universe=new Set(target),preserved=completeBlocks(history,consecutive).filter(inSchoolYear);
+  const schoolOpportunities=opportunities.filter(inSchoolYear);
   const rows=[],calendar=history.slice(),last=new Map();
   let close=null;
   while(universe.size){
    const existing=preserved.filter(row=>startsAfter(row,close)&&universe.has(key(row)));
-   const eligible=opportunities.filter(row=>startsAfter(row,close)&&universe.has(key(row)));
+   const eligible=schoolOpportunities.filter(row=>startsAfter(row,close)&&universe.has(key(row)));
    const ends=[...new Set([...existing,...eligible].map(endSlot))].sort(compare);
    if(!ends.length)break;
    function propose(end){
@@ -189,23 +191,22 @@
     for(const row of existing)if(within(row)&&!first.has(key(row)))first.set(key(row),row);
     const proposed=optimize(calendar,eligible.filter(row=>within(row)&&!first.has(key(row))),last);
     const covered=[...first.values(),...proposed].sort(chronological);
-    return {proposed,covered,complete:covered.length===universe.size};
+    return {proposed,covered};
    }
    let choice=propose(ends.at(-1));
-   if(choice.complete){
-    // Earlier closures can unlock later opportunities. Keep the known feasible
-    // result if the bounded optimizer cannot solve a shorter prefix.
-    const knownClose=choice.covered.at(-1);
-    let lo=universe.size-1,hi=ends.indexOf(endSlot(knownClose))-1;
-    while(lo<=hi){
-     const mid=Math.floor((lo+hi)/2),candidate=propose(ends[mid]);
-     if(candidate.complete){choice=candidate;hi=mid-1;}else lo=mid+1;
-    }
+   if(!choice.covered.length)break;
+   // Seek the earliest prefix with the best coverage found, even if a round
+   // stays open. Every accepted prefix preserves or improves that coverage.
+   let lo=choice.covered.length-1,hi=ends.indexOf(endSlot(choice.covered.at(-1)))-1;
+   while(lo<=hi){
+    const mid=Math.floor((lo+hi)/2),candidate=propose(ends[mid]);
+    if(candidate.covered.length<choice.covered.length){lo=mid+1;continue;}
+    choice=candidate;hi=ends.indexOf(endSlot(choice.covered.at(-1)))-1;
    }
    for(const row of choice.proposed){
     rows.push(row);calendar.push({...row,hour:row.h1},{...row,hour:row.h2});
    }
-   if(!choice.complete)break;
+   if(choice.covered.length!==universe.size)break;
    for(const row of choice.covered)last.set(key(row),row);
    close=choice.covered.at(-1);
   }
@@ -230,6 +231,7 @@
   const used=new Set(history.map(r=>cell(r.date,r.hour)));
   const months=summarize(history,[]).months;
   for(const r of rows){
+   if(!inSchoolYear(r))throw new Error('El bloque está fuera del periodo escolar de marzo a diciembre.');
    if(!allowed.has(blockId(r))||r.h2!==r.h1+1||(consecutive&&!consecutive(r.h1,r.h2))||
       used.has(cell(r.date,r.h1))||used.has(cell(r.date,r.h2))||(months.get(monthly(r))||0)+2>2){
     throw new Error('La propuesta contiene un bloque no disponible o supera el límite mensual.');
@@ -238,10 +240,11 @@
   }
   const state=rounds(target,[...completeBlocks(history,consecutive),...rows]);
   if(rows.some(r=>!state.credits.has(blockId(r))))throw new Error('La propuesta repite una combinación o adelanta una ronda.');
-  if(protectedBlocks.some(id=>!state.credits.has(id)))throw new Error('La regeneración interrumpe una ronda de un mes posterior. Regenera conjuntamente los meses afectados.');
+  const affected=new Set(protectedBlocks.filter(id=>!state.credits.has(id)).map(id=>JSON.parse(id)[0].slice(0,7)));
+  if(affected.size)throw new Error('La regeneración interrumpe una ronda de un mes posterior. Incluye estos meses en la regeneración conjunta: '+[...affected].sort(compare).join(', ')+'.');
   return {...summarize(history,rows),rounds:state};
  }
- const api={key,month,monthly,compare,solve,validate,summarize,adjacentMonths,completeBlocks,rounds,readExclusions};
+ const api={key,month,monthly,compare,schoolMonth,solve,validate,summarize,adjacentMonths,completeBlocks,rounds,readExclusions};
  root.IEAipDistribucion=api;
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

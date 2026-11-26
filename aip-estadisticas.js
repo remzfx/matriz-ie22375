@@ -14,6 +14,35 @@
   }
   return [...counts].filter(([,count])=>count.hours>2);
  }
+ function unusedBlocks(state,months,opportunities,alternatives){
+  const bySlot=new Map(),slot=r=>r.date+'|'+r.h1;
+  for(const row of opportunities){
+   const id=slot(row);
+   if(!bySlot.has(id))bySlot.set(id,[]);
+   if(state.target.has(motor.key(row)))bySlot.get(id).push(row);
+  }
+  const credits=[...state.credits.values()],pending=new Set(state.target);
+  let index=0;
+  return alternatives.slice().sort((a,b)=>motor.compare(a.date,b.date)||a.h1-b.h1).map(block=>{
+   while(index<credits.length){
+    const {row}=credits[index];
+    if(row.date>block.date||(row.date===block.date&&row.h2>=block.h1))break;
+    pending.delete(motor.key(row));
+    if(!pending.size)for(const id of state.target)pending.add(id);
+    index++;
+   }
+   const candidates=bySlot.get(slot(block))||[];
+   const active=candidates.filter(r=>pending.has(motor.key(r)));
+   let reason;
+   if(!block.h2)reason='Sin segundo tramo libre y consecutivo';
+   else if(!bySlot.has(slot(block)))reason='Sin candidato compatible para el bloque';
+   else if(!candidates.length)reason='Candidatos excluidos por el PIP';
+   else if(!active.length)reason='Candidatos ya acreditados en la ronda activa';
+   else if(active.every(r=>months.has(motor.monthly(r))))reason='Límite mensual comprometido';
+   else reason='Oportunidad compatible sin asignar en la búsqueda';
+   return {...block,reason};
+  });
+ }
  function report({catalog,history,opportunities,from,to,filter={},consecutive=(a,b)=>b===a+1}){
   const allowed=r=>fields.every(f=>!filter[f]||r[f]===filter[f]);
   const inRange=r=>motor.month(r)>=from&&motor.month(r)<=to;
@@ -66,6 +95,6 @@
    excesses:Object.fromEntries(excesses.filter(([k])=>k.slice(8)===id).map(([k,counts])=>[k.slice(0,7),counts])),
    repeats:repeats.filter(r=>r.combo===id).map(r=>r.month)}))};
  }
- root.IEAipEstadisticas={report,monthlyExcesses};
+ root.IEAipEstadisticas={report,monthlyExcesses,unusedBlocks};
  if(typeof module!=='undefined'&&module.exports) module.exports=root.IEAipEstadisticas;
 })(typeof window==='undefined'?globalThis:window);
