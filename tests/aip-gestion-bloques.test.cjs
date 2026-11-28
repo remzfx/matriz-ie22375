@@ -15,7 +15,7 @@ function extract(name){
 function make(names,extras={}){
   const control={IEAipPaquete:require('../aip-paquete.js'),IEAipDistribucion:require('../aip-distribucion.js'),exclusionesRondasAip:{},plan:{},feriados:{},ultimoInformeAip:[],renderInformeAip(){},renderEstadisticasAip(){},programacionesColegiado:[],esColegiadoReservado:()=>false,hayColegiadoPendiente:()=>false,revisarColegiadoAntesDeGenerar:()=>true,leerProgramacionesColegiado(){},renderGestorColegiado(){},...extras};
   vm.createContext(control);
-  vm.runInContext(['esColegiadoMaterializado','depurarColegiadoMensual',...names].map(extract).join('\n'),control);
+ vm.runInContext(['esColegiadoMaterializado','depurarColegiadoMensual','esPersonalizacionAip',...names].map(extract).join('\n'),control);
   return control;
 }
 const monday='2026-12-14',tuesday='2026-12-15';
@@ -208,6 +208,35 @@ test('Feriado por encabezado es exclusivo de la columna seleccionada y puede vis
  assert.equal(plan[fecha].sec[1].tipo,'feriado');
  assert.equal(plan[fecha].sec[2].tipo,'feriado');
  assert.equal(plan[fecha].pri[4].texto,'3°');
+});
+test('Vacío suspende la reserva recurrente sin borrar la regla y el colegiado manual cuenta una sola vez',()=>{
+ const fecha='2026-07-31',siguiente='2026-08-03';
+ const regla={id:'rotativa',name:'Prueba',active:true,mode:'rotativo',start:fecha,end:siguiente,day:4,levels:['sec'],
+  hours:{sec:{all:[5,6]}},times:{sec:{5:'16:30-17:15',6:'17:15-18:00'}},include:[],exclude:[]};
+ const v=make(['celda','setCelda','esBloqueNoLectivo','tramoColegiado','estadoTramoColegiado','horasColegiadasEfectivas',
+   'esColegiadoReservado','restablecerPersonalizacionAip','confirmarProgramacionColegiado'],{
+   IEAipColegiado:require('../aip-colegiado.js'),programacionesColegiado:[regla],esFeriado:()=>false,colOk:()=>false,
+   horasPorNivelColegiado:()=>({pri:[],sec:[[5,'16:30-17:15'],[6,'17:15-18:00']]}),
+   nivelesColegiado:{sec:'Secundaria'},programacionColegiadoIncompatible:()=>false,confirm:()=>true,
+   cerrarModal(){},cerrarEditorColegiado(){},persistirProgramacionesColegiado(){},render(){}
+ });
+ assert.equal(v.esColegiadoReservado(fecha,'sec',5),true);
+ v.setCelda(fecha,'sec',5,{tipo:'vacio',texto:'',manual:true});
+ assert.equal(v.esColegiadoReservado(fecha,'sec',5),false);
+ assert.equal(v.esColegiadoReservado(fecha,'sec',6),true);
+ assert.equal(v.esColegiadoReservado(siguiente,'sec',5),true);
+ // A stale preview cannot erase an exception while the recurrence is confirmed.
+ v.confirmarProgramacionColegiado(regla,[{fecha,nivel:'sec',horas:[5,6]}]);
+ assert.equal(v.celda(fecha,'sec',5).tipo,'vacio');
+ v.setCelda(fecha,'sec',5,{tipo:'colegiado-manual',texto:'Colegiado AIP',manual:true});
+ assert.equal(v.esColegiadoReservado(fecha,'sec',5),true);
+ assert.equal(v.horasColegiadasEfectivas(regla,fecha,'sec',v.horasPorNivelColegiado()).join(','),'6');
+ const loaded=v.depurarColegiadoMensual(JSON.parse(JSON.stringify(v.plan)));
+ assert.equal(loaded[fecha].sec[5].tipo,'colegiado-manual');
+ v.restablecerPersonalizacionAip(fecha,'sec',[5],false);
+ assert.equal(v.celda(fecha,'sec',5),undefined);
+ assert.equal(v.esColegiadoReservado(fecha,'sec',5),true);
+ assert.equal(v.programacionesColegiado.length,1);
 });
 
 function recreoFixture(storage=new Map()){
