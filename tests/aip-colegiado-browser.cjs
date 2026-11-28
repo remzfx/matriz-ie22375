@@ -35,7 +35,7 @@ async function run(){
    cursosPorMes={'2026-12':['MAT'],'2027-01':['MAT']};
    horarioDoc={};
    for(let d=0;d<5;d++)horarioDoc[d]=Object.fromEntries([4,5,6,7].map(h=>[h,{'1A':{area:'Matemática',doc:'Docente ficticio'}}]));
-   setCelda('2026-12-21','pri',1,{tipo:'grupo',texto:'Asignación ficticia',manual:true});
+   setCelda('2026-12-21','pri',1,{tipo:'grupo',texto:'Asignación ficticia'});
    document.getElementById('selBloque').value='2';
    document.getElementById('inpMes').value='2026-12';
   });
@@ -69,10 +69,8 @@ async function run(){
   const active=expected.map((f,i)=>[f,[0,4,5].includes(i)?[true,true]:[false,false],[0,4,5].includes(i)?[true,true]:[false,false]]);
   assert.deepEqual(await reserva(),active);
   await page.evaluate(()=>{clicCelda('2026-12-21','pri','1');});
-  assert.match(messages.at(-1),/apartado Colegiado AIP/);
-  await page.evaluate(()=>{abrirColumna('2026-12-21','sec');document.getElementById('modTipo').value='grupo';aplicarModal();cerrarModal();});
-  assert.match(messages.at(-1),/apartado Colegiado AIP/);
-  await page.evaluate(()=>{editKey={fecha:'2026-12-21',nivel:'pri',hora:1};document.getElementById('modTipo').value='soporte';aplicarModal();cerrarModal();});
+  assert.equal(await page.locator('#modTipo').inputValue(),'colegio');
+  await page.locator('#modal').getByRole('button',{name:'Cancelar'}).click();
   assert.equal(await page.evaluate(()=>celda('2026-12-21','pri',1)),undefined);
   await page.locator('#tabBtnMes').click();
   const generate=()=>page.evaluate(()=>{mesesAnioSel=['2026-12','2027-01'];armarAnio();});
@@ -271,6 +269,136 @@ async function run(){
   assert.equal((await compare()).calendar,true);
   assert.deepEqual(requests,['saveaip','loadaip','saveaip','loadaip']);
   assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+  const date='2026-07-31',next='2026-08-03';
+  await page.evaluate(({date,next})=>{
+   plan={};feriados={};colegiado={pri:{},sec:{}};cursosPorMes={};
+   const grupos={'1A':{area:'MAT',doc:'Docente ficticio'}};
+   horarioDoc={4:Object.fromEntries([1,2,3,4,5,6,7].map(h=>[h,grupos]))};
+   plantilla={pri:{},sec:{5:[0,4],6:[0,4]}};
+   const hours=horasPorNivelColegiado();
+   const rule=(nivel,hs)=>({id:'fixture-'+nivel,name:'Reserva '+nivel,mode:'rotativo',active:true,levels:[nivel],start:date,end:next,
+    day:4,hours:{[nivel]:{all:hs}},times:{[nivel]:Object.fromEntries(hours[nivel].filter(([h])=>hs.includes(h)))},include:[],exclude:[]});
+   programacionesColegiado=[rule('pri',[1]),rule('sec',[5,6])];
+   document.getElementById('inpMes').value='2026-07';showAipTab('mes');onMes();
+  },{date,next});
+  const originalRules=await page.evaluate(()=>JSON.stringify(programacionesColegiado));
+  const cell=(h,n='sec')=>page.locator(`td[onclick="clicCelda('${date}','${n}','${h}')"]`);
+  const header=page.locator(`button[onclick="abrirColumna('${date}','sec')"]`);
+  const modal=page.locator('#modal');
+  const apply=async(trigger,tipo)=>{
+   await trigger.click();await modal.locator('#modTipo').selectOption(tipo);
+   if(tipo==='grupo')await modal.locator('#modGrupo').selectOption('1A');
+   await modal.getByRole('button',{name:'Aplicar',exact:true}).click();
+  };
+  const state=()=>page.evaluate(({date,next})=>({
+   tipos:horasPed('sec').map(h=>celda(date,'sec',h)?.tipo||null),
+   sec:[5,6].map(h=>esColegiadoReservado(date,'sec',h)),
+   pri:esColegiadoReservado(date,'pri',1),next:esColegiadoReservado(next,'sec',5),
+   horas:registrosCalendarioAip([new Date(date+'T12:00:00')],'sec',{},docentesAip()).conteo.colegiado
+  }),{date,next});
+  assert.deepEqual((await state()).sec,[true,true]);
+  await apply(header,'vacio');
+  const empty=await state();
+  assert.deepEqual(empty,{tipos:Array(7).fill('vacio'),sec:[false,false],pri:true,next:true,horas:0});
+  assert.equal(await cell(5).innerText(),'');
+  assert.equal(await cell(1,'pri').innerText(),'Colegiado AIP');
+  assert.equal(await page.evaluate(date=>celda(date,'sec','R'),date),undefined);
+  await cell('R').click();
+  assert.equal(await cell('R').innerText(),'RECREO');
+  // Creating, deactivating and reactivating a recurrence leaves the exception intact.
+  await page.evaluate(()=>{
+   const copied={...structuredClone(programacionesColegiado[1]),id:'segunda-prueba',name:'Segunda rotación'};
+   confirmarProgramacionColegiado(copied,ocurrenciasColegiado(copied));
+  });
+  await page.locator('#tabBtnColegiado').click();
+  const extraRule=page.locator('#colegiadoLista article').last();
+  await extraRule.getByRole('button',{name:'Vista previa'}).click();
+  assert.doesNotMatch(await page.locator('#colegiadoVista').innerText(),/2026-07-31/);
+  await extraRule.getByRole('button',{name:'Desactivar'}).click();
+  await extraRule.getByRole('button',{name:'Activar',exact:true}).click();
+  await extraRule.getByRole('button',{name:'Eliminar'}).click();
+  assert.equal(await page.evaluate(()=>JSON.stringify(programacionesColegiado)),originalRules);
+  await page.locator('#tabBtnMes').click();
+  assert.deepEqual(await state(),empty);
+  await page.emulateMedia({media:'print'});
+  assert.equal(await cell(5).innerText(),'');assert.equal(await cell(1,'pri').innerText(),'Colegiado AIP');
+  await page.emulateMedia({media:'screen'});
+  async function evidencia(nombre){
+   if(!process.env.IE_AIP_EVIDENCE)return;
+   await cell(5).scrollIntoViewIfNeeded();
+   await page.locator('#boxSec').screenshot({path:path.join(process.env.IE_AIP_EVIDENCE,nombre+'-'+width+'.png')});
+  }
+  await evidencia('prioridad-vacio');
+  await apply(cell(5),'colegio');await apply(cell(6),'colegio');
+  assert.deepEqual(await state(),{...empty,tipos:['vacio','vacio','vacio','vacio','colegiado-manual','colegiado-manual','vacio'],sec:[true,true],horas:2});
+  await evidencia('prioridad-colegiado-individual');
+  await apply(cell(5),'soporte');
+  assert.deepEqual((await state()).sec,[false,true]);
+  assert.equal(await cell(5).innerText(),'Soporte');
+  await apply(cell(5),'restaurar');
+  assert.deepEqual((await state()).sec,[true,true]);
+  for(const tipo of ['gestion','vacaciones','feriado','bloqueado','soporte','man','grupo','abierto','colegio','vacio']){
+   await apply(header,tipo);
+   const s=await state(),col=tipo==='colegio';
+   assert.deepEqual(s.tipos,Array(7).fill(col?'colegiado-manual':tipo));
+   assert.deepEqual(s.sec,[col,col]);assert.equal(s.pri&&s.next,true);
+   assert.equal(await page.evaluate(()=>JSON.stringify(programacionesColegiado)),originalRules);
+  }
+  await apply(cell(6),'colegio');
+  const mixed=await state();
+  await page.getByRole('button',{name:'Armar mes',exact:true}).click();
+  await page.evaluate(()=>{mesesAnioSel=['2026-07','2026-08'];renderMesesAnio();});
+  await page.getByRole('button',{name:'Armar meses marcados',exact:true}).click();
+  assert.deepEqual(await state(),mixed);
+  await page.getByRole('button',{name:'Guardar',exact:true}).click();
+  await page.reload();
+  await page.evaluate(()=>{document.getElementById('inpMes').value='2026-08';onMes();document.getElementById('inpMes').value='2026-07';onMes();});
+  assert.deepEqual(await state(),mixed);
+  await page.evaluate(async()=>{await subirAipNube();plan={};await bajarAipNube();});
+  assert.deepEqual(await state(),mixed);
+  await apply(header,'restaurar');
+  assert.deepEqual((await state()).sec,[true,true]);
+  await apply(header,'vacio');
+  await page.getByRole('button',{name:'Limpiar',exact:true}).click();
+  assert.deepEqual(await state(),{...empty,tipos:Array(7).fill(null),sec:[true,true],horas:2});
+  assert.equal(await page.evaluate(()=>JSON.stringify(programacionesColegiado)),originalRules);
+
+  // Vacío on an ordinary cell has to block a recurrence created later.
+  const individual=()=>page.evaluate(date=>({
+   value:celda(date,'sec',4),reserved:esColegiadoReservado(date,'sec',4),
+   neighboring:esColegiadoReservado(date,'sec',3)
+  }),date);
+  assert.deepEqual(await individual(),{value:undefined,reserved:false,neighboring:false});
+  await apply(cell(4),'vacio');
+  const explicitEmpty={tipo:'vacio',texto:'',manual:true};
+  assert.deepEqual((await individual()).value,explicitEmpty);
+  await page.locator('#tabBtnColegiado').click();
+  await page.getByRole('button',{name:'Agregar programación'}).click();
+  await form.locator('[name=nombre]').fill('Colegiado posterior · prueba');
+  await form.locator('[name=nivel]').selectOption('sec');
+  await form.locator('[name=modo]').selectOption('semanal');
+  await form.locator('[name=dia]').selectOption('4');
+  await form.locator('[name=inicio]').fill(date);
+  await form.locator('[name=fin]').fill(date);
+  for(const h of [3,4])await form.locator(`input[data-nivel=sec][data-fila=all][value="${h}"]`).check();
+  await form.getByRole('button',{name:'Guardar programación'}).click();
+  const preserved={value:explicitEmpty,reserved:false,neighboring:true};
+  assert.deepEqual(await individual(),preserved);
+  await page.locator('#tabBtnMes').click();
+  await page.getByRole('button',{name:'Armar mes',exact:true}).click();
+  assert.deepEqual(await individual(),preserved);
+  await page.getByRole('button',{name:'Guardar',exact:true}).click();
+  await page.reload();
+  await page.evaluate(()=>{document.getElementById('inpMes').value='2026-07';onMes();});
+  assert.deepEqual(await individual(),preserved);
+  await page.evaluate(async()=>{await subirAipNube();plan={};await bajarAipNube();});
+  assert.deepEqual(await individual(),preserved);
+  assert.equal(await cell(4).innerText(),'');
+  await apply(cell(4),'restaurar');
+  assert.deepEqual(await individual(),{value:undefined,reserved:true,neighboring:true});
+  assert.deepEqual(requests,['saveaip','loadaip','saveaip','loadaip','saveaip','loadaip','saveaip','loadaip']);
+  assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+  console.log(JSON.stringify({width,date,overrides:true,recurrenceRestored:true,persistence:true}));
   console.log(JSON.stringify({weekdayMatrices:width,rotationRows:expectedPreview.length,dailyRows:daily.length,measure}));
   console.log(JSON.stringify({width,expected,omitted:expected.slice(1,4),...results,requests}));
   await page.close();

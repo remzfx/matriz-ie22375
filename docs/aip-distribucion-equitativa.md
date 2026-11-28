@@ -105,3 +105,9 @@ La vista previa carga la plantilla solicitada como dato ficticio, con 6 horas en
 Ambos niveles filtran las horas automáticas por la disponibilidad semanal y comprueban grupos, Soporte y Mantenimiento en el borrador antes de guardar. Si una asignación incumple la plantilla, se conserva el plan previo. Cerrar una hora deja en gris sus asignaciones automáticas en el calendario y las aparta de las estadísticas vigentes. Al regenerar se retiran del mes seleccionado. El historial almacenado de otros meses y las excepciones manuales protegidas se conservan.
 
 La vista previa usa un horario ficticio de 9 secciones y 6 áreas con un responsable estable por curso y sección. Hay docentes que imparten más de un área y atienden varias secciones en tramos distintos. Con la plantilla de 30 horas, el escenario anual acreditó las 54 combinaciones, completó tres rondas y alcanzó 52 de 54 combinaciones en la cuarta. Se verificaron cero cruces docentes y un máximo de dos horas por curso y sección en cada mes. La comparación histórica de rendimiento conserva su conjunto de datos original.
+
+### Personalizaciones del calendario y Colegiado
+
+Las personalizaciones del calendario se guardan en la fecha, nivel y hora correspondientes. Vacío guarda una celda explícita y Colegiado asignado desde el calendario se guarda como `colegiado-manual`. La recurrencia y su rotación se mantienen por separado. La misma resolución se usa para el calendario, las ocurrencias recurrentes efectivas, las estadísticas y la generación. Una edición individual reemplaza una sola hora. Una nueva edición de columna reemplaza sus horas pedagógicas y conserva el manejo visual del recreo.
+
+**Restablecer programación original** quita la personalización de la hora o columna. **Limpiar** retira todas las personalizaciones del mes. Guardar, recargar y sincronizar usan el mismo paquete AIP, sin un registro adicional de excepciones. Los feriados globales mantienen su tratamiento preexistente.
