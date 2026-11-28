@@ -15,7 +15,7 @@ function extract(name){
 function make(names,extras={}){
   const control={IEAipPaquete:require('../aip-paquete.js'),IEAipDistribucion:require('../aip-distribucion.js'),exclusionesRondasAip:{},plan:{},feriados:{},ultimoInformeAip:[],renderInformeAip(){},renderEstadisticasAip(){},programacionesColegiado:[],esColegiadoReservado:()=>false,hayColegiadoPendiente:()=>false,revisarColegiadoAntesDeGenerar:()=>true,leerProgramacionesColegiado(){},renderGestorColegiado(){},...extras};
   vm.createContext(control);
- vm.runInContext(['esColegiadoMaterializado','depurarColegiadoMensual','esPersonalizacionAip',...names].map(extract).join('\n'),control);
+ vm.runInContext(['esColegiadoMaterializado','depurarColegiadoMensual','esPersonalizacionAip','programarAutomaticoAip',...names].map(extract).join('\n'),control);
   return control;
 }
 const monday='2026-12-14',tuesday='2026-12-15';
@@ -112,6 +112,27 @@ test('Una asignación antigua o una apertura manual no habilitan la generación 
  assert.equal(plan[day].pri[2].tipo,'abierto');
  assert.equal(plan[day].pri[3].manual,true);
  assert.equal(plan[day].pri[4].texto,'3°');
+});
+test('Hora AIP libre admite actividad automática y se recupera al regenerar, a diferencia de Vacío',()=>{
+ const fecha='2026-05-07',dias=[new Date(fecha+'T12:00:00')];
+ const v=make(['celda','setCelda','slotActivo','horaGenerableAip','liberarAsignacionesAip'],{
+   esFeriado:()=>false,esNoLectivoEditable:()=>false,pipOk:(n,h)=>h!==3,ymd:()=>fecha
+ });
+ const abierto={tipo:'abierto',texto:'—',manual:true};
+ v.setCelda(fecha,'sec',1,abierto);
+ v.setCelda(fecha,'sec',2,{tipo:'vacio',texto:'',manual:true});
+ v.setCelda(fecha,'sec',3,abierto);
+ assert.equal(v.horaGenerableAip(fecha,'sec',1,3),true);
+ assert.equal(v.horaGenerableAip(fecha,'sec',2,3),false);
+ assert.equal(v.horaGenerableAip(fecha,'sec',3,3),false);
+ v.programarAutomaticoAip(fecha,'sec',1,{tipo:'grupo',texto:'1A'});
+ assert.equal(v.celda(fecha,'sec',1).aperturaAip,true);
+ assert.equal(v.esPersonalizacionAip(v.celda(fecha,'sec',1)),true);
+ v.plan=v.depurarColegiadoMensual(JSON.parse(JSON.stringify(v.plan)));
+ v.liberarAsignacionesAip(dias,['sec']);
+ assert.deepEqual(JSON.parse(JSON.stringify(v.celda(fecha,'sec',1))),abierto);
+ assert.equal(v.horaGenerableAip(fecha,'sec',1,3),true);
+ assert.equal(v.celda(fecha,'sec',2).tipo,'vacio');
 });
 test('La validación final rechaza grupos, soporte y mantenimiento fuera de la plantilla en ambos niveles',()=>{
  const day='2026-03-02',dias=[new Date(day+'T12:00:00')];
