@@ -117,6 +117,15 @@ test('validate rejects reused hours, forged slots and over-cap proposals',()=>{
  const input={history:[],opportunities:[a,b,c],target:targetOf(a,b,c)};
  for(const rows of [[a,b],[a,c],[{...a,course:'CX'}]])assert.throws(()=>motor.validate(input,rows),/límite|disponible/);
 });
+test('an augmenting chain moves occupied pairs and recovers the eighth combination',()=>{
+ const {dates,starts,slots,sections}=require('./fixtures/aip-cadena-reasignacion.cjs');
+ const opportunities=slots.flatMap((indices,i)=>indices.map(j=>edge(dates[j],starts[j],'D'+i,'MAT',sections[i])));
+ const target=targetOf(...opportunities),rows=run([],opportunities,target);
+ const round=motor.rounds(target,rows);
+ assert.equal(rows.length,8);
+ assert.equal(round.completed.length,1);
+ assert.deepEqual(run([],opportunities.slice().reverse(),target),rows);
+});
 test('an impossible C keeps the round open while A and B use March opportunities',()=>{
  const dates=['2026-03-16','2026-03-23','2026-04-06','2026-05-04'];
  const opportunities=dates.flatMap(date=>['A','B'].map(teacher=>edge(date,1,teacher)));

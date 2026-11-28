@@ -31,6 +31,48 @@
  const endSlot=r=>cell(r.date,String(r.h2).padStart(2,'0'));
  const blockId=r=>JSON.stringify([r.date,r.h1,r.h2,key(r)]);
  function resources(r){return [cell(r.date,r.h1),cell(r.date,r.h2),'round|'+key(r)];}
+ function extendCoverage(rows,byResource,frequency){
+  const occupied=new Map(),assigned=new Map(),trail=[];
+  function write(row,add){
+   if(add)assigned.set(key(row),row);else assigned.delete(key(row));
+   for(const id of resources(row)){
+    if(add)occupied.set(id,row);else occupied.delete(id);
+   }
+  }
+  for(const row of rows)write(row,true);
+  // A failed branch rolls back every displaced row. The bounds apply per
+  // evaluated prefix, keeping the yearly search responsive in the browser.
+  let budget=12000,attempts;
+  function place(combo,ancestors){
+   if(assigned.has(combo))return true;
+   if(ancestors.size>=8)return false;
+   const path=new Set(ancestors).add(combo);
+   for(const row of byResource.get('round|'+combo)||[]){
+    if(--budget<0||--attempts<0)return false;
+    const displaced=new Set(resources(row).map(id=>occupied.get(id)).filter(Boolean));
+    if([...displaced].some(other=>path.has(key(other))))continue;
+    const checkpoint=trail.length;
+    for(const other of displaced){write(other,false);trail.push([other,true]);}
+    write(row,true);trail.push([row,false]);
+    if([...displaced].every(other=>place(key(other),path)))return true;
+    while(trail.length>checkpoint)write(...trail.pop());
+   }
+   return false;
+  }
+  const pending=[...frequency.keys()].filter(id=>!assigned.has(id))
+   .sort((a,b)=>frequency.get(a)-frequency.get(b)||compare(a,b));
+  for(let pass=0;pass<3&&budget>0;pass++){
+   const before=assigned.size;
+   for(const id of pending){
+    if(budget<=0)break;
+    attempts=1200;
+    place(id,new Set());
+    trail.length=0;
+   }
+   if(assigned.size===before)break;
+  }
+  return [...assigned.values()];
+ }
  function optimize(history,opportunities,last){
   const fixed=summarize(history,[]),used=new Set(history.map(r=>cell(r.date,r.hour)));
   const edges=opportunities.filter(r=>!fixed.months.has(monthly(r))&&!used.has(cell(r.date,r.h1))&&!used.has(cell(r.date,r.h2)));
@@ -130,7 +172,7 @@
    }
    if(!improved)break;
   }
-  return current.sort(chronological);
+  return extendCoverage(current,byResource,frequency).sort(chronological);
  }
  function completeBlocks(history,consecutive=(a,b)=>b===a+1){
   const ordered=history.slice().sort((a,b)=>compare(a.date,b.date)||a.hour-b.hour);

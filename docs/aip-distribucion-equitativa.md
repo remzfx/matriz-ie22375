@@ -111,3 +111,22 @@ La vista previa usa un horario ficticio de 9 secciones y 6 áreas con un respons
 Las personalizaciones del calendario se guardan en la fecha, nivel y hora correspondientes. Vacío guarda una celda explícita y Colegiado asignado desde el calendario se guarda como `colegiado-manual`. La recurrencia y su rotación se mantienen por separado. La misma resolución se usa para el calendario, las ocurrencias recurrentes efectivas, las estadísticas y la generación. Una edición individual reemplaza una sola hora. Una nueva edición de columna reemplaza sus horas pedagógicas y conserva el manejo visual del recreo.
 
 **Restablecer programación original** quita la personalización de la hora o columna. **Limpiar** retira todas las personalizaciones del mes. Guardar, recargar y sincronizar usan el mismo paquete AIP, sin un registro adicional de excepciones. Los feriados globales mantienen su tratamiento preexistente.
+
+### Reasignación adaptativa de bloques
+
+La comparación utiliza el merge del PR #132 (`a4f0e4d`) y las mismas entradas para ambos motores. Cada curso y sección tiene un responsable estable. En el caso de ocho combinaciones, el calendario disponible admite las ocho, pero la búsqueda anterior terminaba con siete. Llegar al bloque libre exige mover varias asignaciones consecutivas. En el calendario anual de 54 combinaciones, las siete pendientes pertenecían a la cuarta ronda. Con una combinación adicional que solo tiene un tramo aislado, las 54 compatibles quedan acreditadas y la primera ronda queda abierta.
+
+Después de la optimización existente, la nueva búsqueda recorre primero las combinaciones pendientes con menos bloques. Intenta liberar cada bloque desplazando únicamente asignaciones automáticas de su propuesta, y revierte toda la cadena si no logra recolocarlas. Conserva la selección de prefijos tempranos, el cierre de rondas al 100 %, los límites mensuales y el calendario protegido. La búsqueda por prefijo tiene una profundidad de hasta ocho y un presupuesto finito, por lo que puede quedar una solución mejor sin explorar.
+
+Hora AIP libre permite asignaciones automáticas dentro de la plantilla vigente. Si el generador usa esa hora, el plan conserva la apertura como parte de la asignación para poder restaurarla antes de regenerar. Vacío, los bloqueos, los demás ajustes protegidos y los colegiados efectivos siguen fuera de la búsqueda. El informe distingue el total institucional, las combinaciones sin oportunidad anual y las que quedan pendientes pese a tener alguna.
+
+| Escenario ficticio | Institucionales / compatibles / sin oportunidad | Bloques impedidos por ajustes, base → nuevo | Horas pedagógicas, base → nuevo | Rondas cerradas, base → nuevo | Soporte / Mantenimiento, base → nuevo |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Cadena concentrada en abril y mayo | 8 / 8 / 0 | 343 → 343 | 14 → 16 | 0 → 1 | 2 / 2 → 1 / 1 |
+| Cuatro ventanas entre abril y octubre | 8 / 8 / 0 | 319 → 319 | 62 → 64 | 3 → 4 | 5 / 5 → 4 / 4 |
+| Anual con restricciones variadas | 54 / 54 / 0 | 10 → 9 | 418 → 418 | 3 → 3 | 379 / 91 → 379 / 92 |
+| Anual con un curso sin par anual | 55 / 54 / 1 | 10 → 9 | 108 → 108 | 0 → 0 | 534 / 246 → 534 / 247 |
+
+Los bloques impedidos se cuentan por fecha y hora de inicio, comparando con el mismo calendario sin ajustes locales. La reapertura deja disponible un bloque en los dos casos anuales. La columna de horas de Soporte y Mantenimiento incluye ese tramo reabierto, que en la muestra quedó como mantenimiento. No se detectaron casos de asignación directa omitida según el diagnóstico de tramos sobrantes. En la cadena sí se recuperó una atención a través de varias reasignaciones.
+
+En el caso de continuidad, el primer cierre se adelantó del 1 de junio al 8 de mayo y la cuarta ronda cerró el 23 de octubre. Las horas pedagógicas de abril y mayo pasaron de 8 y 6 a 8 y 8. En el escenario anual con restricciones se conservaron los totales de marzo a diciembre: 66, 24, 16, 60, 42, 40, 52, 22, 52 y 44. El límite de dos horas, el orden de las rondas y la ausencia de conflictos se comprobaron en ambos tamaños de pantalla. El escenario anual tomó aproximadamente 0,8 s en Edge en el equipo de prueba.

@@ -431,7 +431,7 @@ function diasDe(m, hora){ return m[String(hora)] || m[hora] || []; }
 function pipOk(nivel,hora,wd){ if(!plantilla) plantilla=plantillaDefault(); return diasDe(plantilla[nivel]||{},hora).indexOf(wd)>=0; }
 function colOk(nivel,hora,wd){ return diasDe((colegiado&&colegiado[nivel])||{},hora).indexOf(wd)>=0; }
 function esPersonalizacionAip(c){
-  return !!c&&(c.manual===true||['vacio','abierto','bloqueado'].includes(c.tipo));
+  return !!c&&(c.manual===true||c.aperturaAip===true||['vacio','abierto','bloqueado'].includes(c.tipo));
 }
 function esBloqueNoLectivo(fecha,nivel,hora){
   return ['feriado','gestion','vacaciones','vacio'].includes(celda(fecha,nivel,hora)?.tipo);
@@ -482,7 +482,9 @@ function slotActivo(fecha,nivel,hora,wd){
   return pipOk(nivel,hora,wd);
 }
 function horaGenerableAip(fecha,nivel,hora,wd){
-  return !esFeriado(fecha)&&pipOk(nivel,hora,wd)&&!esPersonalizacionAip(celda(fecha,nivel,hora))&&slotActivo(fecha,nivel,hora,wd);
+  const c=celda(fecha,nivel,hora);
+  const libre=!esPersonalizacionAip(c)||c.tipo==='abierto'||c.aperturaAip===true;
+  return libre&&!esFeriado(fecha)&&pipOk(nivel,hora,wd)&&slotActivo(fecha,nivel,hora,wd);
 }
 function esAsignacionAutomaticaAip(celda){
   return !!celda&&!celda.manual&&['grupo','soporte','man'].includes(celda.tipo);
@@ -729,6 +731,10 @@ function celda(fecha,nivel,hora){
   return esColegiadoMaterializado(dato)?undefined:dato;
 }
 function setCelda(fecha,nivel,hora,obj){ if(!plan[fecha]) plan[fecha]={}; if(!plan[fecha][nivel]) plan[fecha][nivel]={}; if(!obj) delete plan[fecha][nivel][hora]; else plan[fecha][nivel][hora]=obj; }
+function programarAutomaticoAip(fecha,nivel,hora,actividad){
+  if(celda(fecha,nivel,hora)?.tipo==='abierto')actividad.aperturaAip=true;
+  setCelda(fecha,nivel,hora,actividad);
+}
 function toggleLista(obj,nivel,hora,wd){
   if(!obj[nivel]) obj[nivel]={}; const key=String(hora);
   if(!obj[nivel][key]) obj[nivel][key]=(obj[nivel][hora]||[]).slice();
@@ -794,6 +800,7 @@ function liberarAsignacionesAip(days,niveles){
       if(!row)continue;
       for(const [hora,c] of Object.entries(row)){
         if(esColegiadoMaterializado(c)){ delete row[hora]; continue; }
+        if(c?.aperturaAip===true){row[hora]={tipo:'abierto',texto:'—',manual:true};continue;}
         if(esNoLectivoEditable(f)||esPersonalizacionAip(c)||['gestion','vacaciones','feriado'].includes(c?.tipo))continue;
         delete row[hora];
       }
@@ -809,7 +816,7 @@ function armarPrimariaMes(days){
     const g=rotPri[ip++%rotPri.length]; const modo=bloqueCfg(); let usar=act.slice();
     if(modo==='1') usar=act.slice(0,1);
     else if(modo==='2'){ usar=[]; for(let i=0;i<act.length-1;i++){ if(act[i+1]===act[i]+1){ usar=[act[i],act[i+1]]; break; } } if(!usar.length) usar=act.slice(0,2); }
-    act.forEach(h=>{ if(usar.indexOf(h)>=0) setCelda(f,'pri',h,{ tipo:'grupo', texto:g }); else setCelda(f,'pri',h,{ tipo:'man', texto:'Mantenimiento' }); });
+    act.forEach(h=>programarAutomaticoAip(f,'pri',h,usar.includes(h)?{tipo:'grupo',texto:g}:{tipo:'man',texto:'Mantenimiento'}));
   });
 }
 function horasConsecutivasSec(primera,segunda){
@@ -939,7 +946,7 @@ function aplicarAtencionesAip(rows,libres){
   const ocupadas=new Set();
   for(const r of rows){
     for(const h of [r.h1,r.h2]){
-      setCelda(r.date,'sec',h,{tipo:'grupo',seccion:r.seccion,area:r.area,doc:r.doc,
+      programarAutomaticoAip(r.date,'sec',h,{tipo:'grupo',seccion:r.seccion,area:r.area,doc:r.doc,
         ...(r.docenteId?{docenteId:r.docenteId}:{}),texto:r.seccion+' '+r.area+' '+r.doc});
       ocupadas.add(r.date+'|'+h);
     }
@@ -949,9 +956,9 @@ function aplicarAtencionesAip(rows,libres){
   for(const [date,horas] of libres){
     const sobrantes=new Set(horas.filter(h=>!ocupadas.has(date+'|'+h)));
     for(const h of sobrantes){
-      setCelda(date,'sec',h,{tipo:'soporte',texto:'Soporte'});soporte++;
+      programarAutomaticoAip(date,'sec',h,{tipo:'soporte',texto:'Soporte'});soporte++;
       if(sobrantes.has(h+1)&&horasConsecutivasSec(h,h+1)){
-        setCelda(date,'sec',h+1,{tipo:'man',texto:'Mantenimiento'});mantenimiento++;
+        programarAutomaticoAip(date,'sec',h+1,{tipo:'man',texto:'Mantenimiento'});mantenimiento++;
         sobrantes.delete(h+1);
         alternativas.push({date,h1:h,h2:h+1});
       }else{
@@ -1059,7 +1066,8 @@ function informeDistribucionAip({anio,rows,history,resultado,datos,horizonte,uni
     pending:estado.pending.size,hours:rows.length*2,extras,causas,excesosHistoricos,
     oportunidades:datos.opportunities.length,mensualesLimitadas,repeticiones,estado,
     inicial:inicial.completed.length+1,nuevas:Math.max(0,estado.completed.length-before.completed.length),
-    institucional:universo.size,compatibles:[...universo.keys()].filter(id=>compatibles.has(id)).length,alternativas};
+    institucional:universo.size,compatibles:[...universo.keys()].filter(id=>compatibles.has(id)).length,
+    pendientesCompatibles:[...estado.pending].filter(id=>compatibles.has(id)).length,alternativas};
 }
 function detalleExcesoAip({hours,manual,inherited}){
   return hours+' horas programadas (manuales: '+manual+' · heredadas sin marca manual: '+inherited+')';
@@ -1078,6 +1086,8 @@ function renderInformeAip(){
     reasons.textContent=['Oportunidades compatibles evaluadas: '+i.oportunidades,
       'Universo institucional: '+i.institucional,'Universo autorizado: '+i.estado.target.size,
       'Combinaciones compatibles de marzo a diciembre: '+i.compatibles,'Exclusiones: '+(i.institucional-i.estado.target.size),
+      'Combinaciones sin oportunidad en todo el año: '+(i.institucional-i.compatibles),
+      'Pendientes de la ronda con oportunidad compatible en el año: '+i.pendientesCompatibles,
       ...[...i.causas].map(([causa,total])=>causa+': '+total),
       'Combinaciones mensuales limitadas por atención previa: '+i.mensualesLimitadas.size].join(' · ');
     const rounds=document.createElement('p'),estado=i.estado;
@@ -1148,7 +1158,8 @@ function render(){
     }
     if(hora==='R') return '<td class="c-rec">RECREO</td>';
     if(esColegiadoReservado(f,nivel,hora)) return '<td class="c-col" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">Colegiado AIP</td>';
-    const c=celda(f,nivel,hora);
+    const almacenada=celda(f,nivel,hora);
+    const c=almacenada?.aperturaAip&&!pipOk(nivel,hora,wd)?{tipo:'abierto',texto:'—',manual:true}:almacenada;
     if(c && (esPersonalizacionAip(c) || c.tipo==='gestion' || c.tipo==='vacaciones' || c.tipo==='feriado')){
       const texto=['vacio','bloqueado'].includes(c.tipo)?'':(c.texto|| (c.tipo==='feriado'?'Feriado':'—'));
       return '<td class="'+clsDe(c.tipo)+'" onclick="clicCelda(\''+f+'\',\''+nivel+'\',\''+hora+'\')">'+texto+'</td>';
