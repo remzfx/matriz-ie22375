@@ -209,6 +209,20 @@ test('Feriado por encabezado es exclusivo de la columna seleccionada y puede vis
  assert.equal(plan[fecha].sec[2].tipo,'feriado');
  assert.equal(plan[fecha].pri[4].texto,'3°');
 });
+test('Vacío individual crea una personalización explícita desde cualquier estado previo',()=>{
+ const fecha='2026-07-31',expected={tipo:'vacio',texto:'',manual:true};
+ const v=make(['esNoLectivoEditable','celda','setCelda','aplicarModal','restablecerPersonalizacionAip'],{
+   document:{getElementById:()=>({value:'vacio'})},cerrarModal(){},render(){}
+ });
+ for(const anterior of [null,{tipo:'grupo',texto:'3A'},{tipo:'soporte',texto:'Soporte',manual:true}]){
+   v.setCelda(fecha,'sec',5,anterior);
+   v.editKey={fecha,nivel:'sec',hora:5};
+   v.aplicarModal();
+   assert.deepEqual(JSON.parse(JSON.stringify(v.celda(fecha,'sec',5)??null)),expected);
+   v.restablecerPersonalizacionAip(fecha,'sec',[5],false);
+   assert.equal(v.celda(fecha,'sec',5),undefined);
+ }
+});
 test('Vacío suspende la reserva recurrente sin borrar la regla y el colegiado manual cuenta una sola vez',()=>{
  const fecha='2026-07-31',siguiente='2026-08-03';
  const regla={id:'rotativa',name:'Prueba',active:true,mode:'rotativo',start:fecha,end:siguiente,day:4,levels:['sec'],

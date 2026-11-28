@@ -1261,7 +1261,7 @@ function aplicarModal(){
   }
   const d=new Date(fecha+'T12:00:00'); const wd=d.getDay()-1;
   const eraManual=esPersonalizacionAip(celda(fecha,nivel,hora))||esColegiadoReservado(fecha,nivel,hora)||hayColegiadoPendiente(fecha,nivel);
-  if(tipo==='vacio') setCelda(fecha,nivel,hora,(eraManual||esNoLectivoEditable(fecha))?{ tipo:'vacio', texto:'' }:null);
+  if(tipo==='vacio') setCelda(fecha,nivel,hora,{tipo:'vacio',texto:'',manual:true});
   else if(tipo==='bloqueado') setCelda(fecha,nivel,hora,{ tipo:'bloqueado', texto:'' });
   else if(tipo==='abierto') setCelda(fecha,nivel,hora,{ tipo:'abierto', texto:'—' });
   else if(tipo==='grupo'){

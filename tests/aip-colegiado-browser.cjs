@@ -362,7 +362,41 @@ async function run(){
   await page.getByRole('button',{name:'Limpiar',exact:true}).click();
   assert.deepEqual(await state(),{...empty,tipos:Array(7).fill(null),sec:[true,true],horas:2});
   assert.equal(await page.evaluate(()=>JSON.stringify(programacionesColegiado)),originalRules);
-  assert.deepEqual(requests,['saveaip','loadaip','saveaip','loadaip','saveaip','loadaip']);
+
+  // Vacío on an ordinary cell has to block a recurrence created later.
+  const individual=()=>page.evaluate(date=>({
+   value:celda(date,'sec',4),reserved:esColegiadoReservado(date,'sec',4),
+   neighboring:esColegiadoReservado(date,'sec',3)
+  }),date);
+  assert.deepEqual(await individual(),{value:undefined,reserved:false,neighboring:false});
+  await apply(cell(4),'vacio');
+  const explicitEmpty={tipo:'vacio',texto:'',manual:true};
+  assert.deepEqual((await individual()).value,explicitEmpty);
+  await page.locator('#tabBtnColegiado').click();
+  await page.getByRole('button',{name:'Agregar programación'}).click();
+  await form.locator('[name=nombre]').fill('Colegiado posterior · prueba');
+  await form.locator('[name=nivel]').selectOption('sec');
+  await form.locator('[name=modo]').selectOption('semanal');
+  await form.locator('[name=dia]').selectOption('4');
+  await form.locator('[name=inicio]').fill(date);
+  await form.locator('[name=fin]').fill(date);
+  for(const h of [3,4])await form.locator(`input[data-nivel=sec][data-fila=all][value="${h}"]`).check();
+  await form.getByRole('button',{name:'Guardar programación'}).click();
+  const preserved={value:explicitEmpty,reserved:false,neighboring:true};
+  assert.deepEqual(await individual(),preserved);
+  await page.locator('#tabBtnMes').click();
+  await page.getByRole('button',{name:'Armar mes',exact:true}).click();
+  assert.deepEqual(await individual(),preserved);
+  await page.getByRole('button',{name:'Guardar',exact:true}).click();
+  await page.reload();
+  await page.evaluate(()=>{document.getElementById('inpMes').value='2026-07';onMes();});
+  assert.deepEqual(await individual(),preserved);
+  await page.evaluate(async()=>{await subirAipNube();plan={};await bajarAipNube();});
+  assert.deepEqual(await individual(),preserved);
+  assert.equal(await cell(4).innerText(),'');
+  await apply(cell(4),'restaurar');
+  assert.deepEqual(await individual(),{value:undefined,reserved:true,neighboring:true});
+  assert.deepEqual(requests,['saveaip','loadaip','saveaip','loadaip','saveaip','loadaip','saveaip','loadaip']);
   assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
   console.log(JSON.stringify({width,date,overrides:true,recurrenceRestored:true,persistence:true}));
   console.log(JSON.stringify({weekdayMatrices:width,rotationRows:expectedPreview.length,dailyRows:daily.length,measure}));
